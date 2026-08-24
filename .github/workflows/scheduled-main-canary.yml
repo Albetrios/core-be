@@ -56,6 +56,39 @@ jobs:
       - name: Run static quality slice
         run: pnpm ci:quality
 
+  resolve-success:
+    name: Close ci-failure issue
+    needs: [quality]
+    if: always() && needs.quality.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Close the open ci-failure issue
+        # `notify-failure` opens one issue and comments repeats onto it, but nothing
+        # ever closed it: a canary that went green left the issue open until a human
+        # noticed, so the tracker accumulated failures that had already been fixed
+        # forward. Closing on the first green run makes an open ci-failure issue mean
+        # "main is red right now" instead of "main was red at some point".
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Main quality canary failing"
+          existing="$(gh issue list --repo "$GH_REPOSITORY" --state open --label ci-failure \
+            --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            echo "No open ci-failure issue to close."
+            exit 0
+          fi
+          gh issue close "$existing" --repo "$GH_REPOSITORY" \
+            --comment "Canary is green again on main — closing automatically. Run: ${WORKFLOW_URL}"
+          echo "Closed ci-failure issue #${existing}."
+
   notify-failure:
     name: Notify failure
     needs: [quality]
