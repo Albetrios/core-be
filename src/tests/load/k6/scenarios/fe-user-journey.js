@@ -166,13 +166,13 @@ export const options = {
   thresholds: { journey_complete: ['rate>=0'] },
 };
 
-/** Announce the run shape to the load viewer (404s harmlessly without it). */
+/** Announce the run shape to the load-testing monitor (404s harmlessly without it). */
 export function setup() {
   if (AUTH !== 'otp' && credentialPool.length === 0) {
     throw new Error('AUTH=password needs a credential pool — run: pnpm db:seed:loadtest');
   }
   http.post(
-    `${__ENV.BASE_URL || ''}/__viewer/run`,
+    `${__ENV.BASE_URL || ''}/__monitor/run`,
     JSON.stringify({
       command: `BASE_URL=${__ENV.BASE_URL || 'http://localhost:3000'} VUS=${VUS} \\\n    k6 run src/tests/load/k6/scenarios/fe-user-journey.js`,
       vus: VUS,
@@ -182,7 +182,7 @@ export function setup() {
     }),
     {
       headers: { 'Content-Type': 'application/json' },
-      tags: { name: 'viewer-announce' },
+      tags: { name: 'monitor-announce' },
       responseCallback: http.expectedStatuses(200, 404),
     },
   );

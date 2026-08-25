@@ -111,21 +111,21 @@ When k6 runs on the **same host** as the API (the common local setup), the load 
 
 **For true capacity numbers**, run k6 from a **separate host** (so the generator never steals the server's CPU), size the API box to **cores ≥ replicas (+~2 for OS/IO)**, scale processes with `cluster-run.mjs` / `DEPLOYMENT_API_REPLICA_COUNT`, and keep Postgres/Redis on low-latency links (not a localhost port-forward). Treat single-box numbers as **lower bounds and regression signals**, not absolute capacity.
 
-## Load viewer (local)
+## Load Testing Monitoring (local)
 
-`pnpm load:viewer` starts a recording reverse proxy on **:4985** that forwards to the API on
+`pnpm load:monitor` starts a recording reverse proxy on **:4985** that forwards to the API on
 :3000 and serves a live dashboard of everything passing through it. Point a load run at :4985
 instead of :3000 and each call appears as it happens, grouped per route.
 
 ```bash
-pnpm load:viewer                 # proxy + dashboard on http://localhost:4985
+pnpm load:monitor                 # proxy + dashboard on http://localhost:4985
 BASE_URL=http://localhost:4985 VUS=50 k6 run src/tests/load/k6/scenarios/fe-user-journey.js
 ```
 
 **Port 4985 is fixed and not configurable.** It sits beside the DB viewer's 4984 so the loopback
 dev tools occupy one obvious band, and it is deliberately not read from the environment: a bare
 `PORT` is the API server's own variable (env schema, default 3000), so a shell exporting it for
-the API would silently move this proxy too. `LOAD_VIEWER_UPSTREAM` (default
+the API would silently move this proxy too. `LOAD_MONITOR_UPSTREAM` (default
 `http://localhost:3000`) still points it at a different API when you need to.
 
 Node built-ins only — no dependencies. Loopback development tool: it records full request and
@@ -134,10 +134,10 @@ response bodies in memory, so never point it at anything but a local API.
 | Endpoint | Purpose |
 | -------- | ------- |
 | `/` | Dashboard — per-route calls, ok/error/429 counts, avg, p95, max, total time |
-| `/__viewer/stream` | Server-sent events feed of calls as they land |
-| `/__viewer/stats` | Per-route aggregates as JSON |
-| `/__viewer/calls` | Recorded calls (`?limit=`) with headers and bodies |
-| `/__viewer/clear` | `POST` — reset counters between runs |
+| `/__monitor/stream` | Server-sent events feed of calls as they land |
+| `/__monitor/stats` | Per-route aggregates as JSON |
+| `/__monitor/calls` | Recorded calls (`?limit=`) with headers and bodies |
+| `/__monitor/clear` | `POST` — reset counters between runs |
 
 Because it sits in the request path it adds a small amount of latency and a second event loop to the
 same box; treat its timings as directionally accurate and compare monitor-to-monitor, not

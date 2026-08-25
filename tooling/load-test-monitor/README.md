@@ -1,10 +1,10 @@
-# Load viewer
+# Load Testing Monitoring
 
 A recording reverse proxy on **:4985** with a live dashboard, for reading what a load run actually
 did. Point k6 at it instead of the API and every call is captured and grouped per route as it lands.
 
 ```bash
-pnpm load:viewer                     # proxy + dashboard on http://localhost:4985
+pnpm load:monitor                     # proxy + dashboard on http://localhost:4985
 BASE_URL=http://localhost:4985 VUS=50 k6 run src/tests/load/k6/scenarios/fe-user-journey.js
 ```
 
@@ -24,19 +24,20 @@ Not application monitoring, and not a second copy of one. Production signals com
 bodies, has no authentication, and disappears when you stop it. **Loopback development only** —
 never put it in front of a deployed API.
 
-It is named a *viewer*, alongside `tooling/db-viewer/`, precisely so it is not mistaken for a
-monitor: both are throwaway local UIs for inspecting something, not services that watch anything.
+The name carries the qualifier for a reason. "Load **Testing** Monitoring" is monitoring *of a load
+test* — it exists for the minutes a run takes and then goes away. An unqualified "api-monitor", which
+this was once called, reads as monitoring *of the API*, a job the list above already covers.
 
 ## Endpoints
 
 | Endpoint | Purpose |
 | -------- | ------- |
 | `/` | Dashboard — per-route calls, ok/error/429 counts, avg, p95, max, total time |
-| `/__viewer/stream` | Server-sent events feed of calls as they land |
-| `/__viewer/stats` | Per-route aggregates as JSON |
-| `/__viewer/calls` | Recorded calls (`?limit=`) with headers and bodies |
-| `/__viewer/clear` | `POST` — reset counters between runs |
-| `/__viewer/run` | `POST` — a scenario announces its shape (VUs, routes, pool) so the board can show the command that produced the numbers |
+| `/__monitor/stream` | Server-sent events feed of calls as they land |
+| `/__monitor/stats` | Per-route aggregates as JSON |
+| `/__monitor/calls` | Recorded calls (`?limit=`) with headers and bodies |
+| `/__monitor/clear` | `POST` — reset counters between runs |
+| `/__monitor/run` | `POST` — a scenario announces its shape (VUs, routes, pool) so the board can show the command that produced the numbers |
 | everything else | proxied to the upstream API |
 
 ## Configuration
@@ -48,12 +49,12 @@ would silently move this proxy too.
 
 | Env | Default | Purpose |
 | --- | ------- | ------- |
-| `LOAD_VIEWER_UPSTREAM` | `http://localhost:3000` | The API to forward to |
+| `LOAD_MONITOR_UPSTREAM` | `http://localhost:3000` | The API to forward to |
 
 ## Reading the numbers
 
 The proxy sits in the request path, so it adds latency and a second event loop on the same box.
-Compare viewer-to-viewer, never viewer-to-direct. Before quoting any before/after, read
+Compare monitor-to-monitor, never monitor-to-direct. Before quoting any before/after, read
 [Trusting a result](../../docs/reference/testing/load-testing.md#trusting-a-result) — run-to-run
 variance on a co-located box has been measured at 2.07x.
 
