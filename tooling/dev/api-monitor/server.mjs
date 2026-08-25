@@ -6,10 +6,10 @@
  * every call is forwarded upstream, timed, and pushed to a browser dashboard over SSE.
  *
  *   node tooling/dev/api-monitor/server.mjs
- *   PORT=4000 UPSTREAM=http://localhost:3000 node tooling/dev/api-monitor/server.mjs
+ *   pnpm dev:api-monitor          # dashboard + proxy on http://localhost:4985
  *
- * Dashboard   http://localhost:4000/
- * Proxy       http://localhost:4000/api/v1/...   ->   UPSTREAM/api/v1/...
+ * Dashboard   http://localhost:4985/
+ * Proxy       http://localhost:4985/api/v1/...   ->   UPSTREAM/api/v1/...
  *
  * Dev-only. Bodies are buffered in memory (capped, ring-buffered) and Authorization /
  * Cookie values are truncated before they ever reach the browser.
@@ -17,8 +17,16 @@
 import http from 'node:http';
 import { URL } from 'node:url';
 
-const PORT = Number(process.env.PORT || 4000);
-const UPSTREAM = process.env.UPSTREAM || 'http://localhost:3000';
+/**
+ * Fixed port — deliberately not configurable.
+ *
+ * It sits next to the DB viewer's 4984 so this repo's loopback dev tools occupy one obvious
+ * band, and it is NOT read from the environment: a bare `PORT` is the API server's own variable
+ * (env schema, default 3000), so a shell that exports it for the API would silently move this
+ * proxy too. A constant cannot drift, and the dashboard URL is always the same one.
+ */
+const PORT = 4985;
+const UPSTREAM = process.env.API_MONITOR_UPSTREAM || 'http://localhost:3000';
 const MAX_CALLS = Number(process.env.MAX_CALLS || 2000);
 const MAX_BODY = Number(process.env.MAX_BODY || 24_000);
 

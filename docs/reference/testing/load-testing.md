@@ -113,14 +113,20 @@ When k6 runs on the **same host** as the API (the common local setup), the load 
 
 ## Live API monitor (local)
 
-`pnpm dev:api-monitor` starts a recording reverse proxy on **:4000** that forwards to the API on
-:3000 and serves a live dashboard of everything passing through it. Point a load run at :4000
+`pnpm dev:api-monitor` starts a recording reverse proxy on **:4985** that forwards to the API on
+:3000 and serves a live dashboard of everything passing through it. Point a load run at :4985
 instead of :3000 and each call appears as it happens, grouped per route.
 
 ```bash
-pnpm dev:api-monitor                 # proxy + dashboard on http://localhost:4000
-BASE_URL=http://localhost:4000 VUS=50 k6 run src/tests/load/k6/scenarios/fe-user-journey.js
+pnpm dev:api-monitor                 # proxy + dashboard on http://localhost:4985
+BASE_URL=http://localhost:4985 VUS=50 k6 run src/tests/load/k6/scenarios/fe-user-journey.js
 ```
+
+**Port 4985 is fixed and not configurable.** It sits beside the DB viewer's 4984 so the loopback
+dev tools occupy one obvious band, and it is deliberately not read from the environment: a bare
+`PORT` is the API server's own variable (env schema, default 3000), so a shell exporting it for
+the API would silently move this proxy too. `API_MONITOR_UPSTREAM` (default
+`http://localhost:3000`) still points it at a different API when you need to.
 
 Node built-ins only — no dependencies. Loopback development tool: it records full request and
 response bodies in memory, so never point it at anything but a local API.
