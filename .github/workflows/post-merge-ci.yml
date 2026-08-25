@@ -446,6 +446,56 @@ jobs:
       merge_commit_sha: ${{ github.sha }}
       github_environment: development
 
+  resolve-success:
+    name: Close ci-failure issue
+    needs:
+      - docker-build-push
+      - matrix-tests
+      - deploy
+      - release-please
+    # The exact negation of `notify-failure` below, plus an explicit cancellation
+    # guard: a cancelled run proves nothing about the health of the tree, so it
+    # must not close the incident. `skipped` IS acceptable -- path filters and
+    # release gating legitimately skip these jobs on a healthy run.
+    if: |
+      !cancelled() &&
+      needs.docker-build-push.result != 'failure' &&
+      needs.docker-build-push.result != 'cancelled' &&
+      needs.matrix-tests.result != 'failure' &&
+      needs.matrix-tests.result != 'cancelled' &&
+      needs.deploy.result != 'failure' &&
+      needs.deploy.result != 'cancelled' &&
+      needs.release-please.result != 'failure' &&
+      needs.release-please.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Close the open ci-failure issue
+        # `notify-failure` opens one issue per branch and comments repeats onto it,
+        # but nothing ever closed it -- a recovered branch left the incident open
+        # until a human noticed. Closing on the first clean run makes an open
+        # ci-failure issue mean "this branch is red right now".
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Post-merge CI failing on ${REF_NAME}"
+          existing="$(gh issue list --repo "$GH_REPOSITORY" --state open --label ci-failure \
+            --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            echo "No open ci-failure issue to close."
+            exit 0
+          fi
+          gh issue close "$existing" --repo "$GH_REPOSITORY" \
+            --comment "Post-merge CI is green again on \`${REF_NAME}\` — closing automatically. Run: ${WORKFLOW_URL}"
+          echo "Closed ci-failure issue #${existing}."
+
   notify-failure:
     name: Notify failure
     needs:

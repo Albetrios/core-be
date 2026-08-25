@@ -39,22 +39,28 @@ export class AuthMeContextService {
   }): Promise<AuthMeContextData> {
     const { userPublicId, activeOrganizationPublicId, globalRole } = options;
 
-    const user = await this.userService.getMe(userPublicId);
-    const organizationsPage = await this.organizationService.list({}, userPublicId, globalRole);
-
-    let activeOrganization: OrganizationOutput | null = null;
-    let myPermissions: string[] = [];
-    if (activeOrganizationPublicId) {
-      activeOrganization = await this.organizationService.getByPublicId(
-        activeOrganizationPublicId,
-        userPublicId,
-        globalRole,
-      );
-      myPermissions = await this.authorizationService.resolveUserOrganizationPermissions(
-        userPublicId,
-        activeOrganizationPublicId,
-      );
-    }
+    // All four reads are independent — every input comes from `options` (the caller's public id,
+    // the active-org claim, the global role), and none consumes another's result. Issued
+    // sequentially this route paid four round trips back to back; batched it pays one wall-clock
+    // wait. That matters disproportionately here because `/auth/me/context` is on the critical
+    // path of every page load, so its latency is multiplied across the whole session.
+    const [user, organizationsPage, activeOrganization, myPermissions] = await Promise.all([
+      this.userService.getMe(userPublicId),
+      this.organizationService.list({}, userPublicId, globalRole),
+      activeOrganizationPublicId
+        ? this.organizationService.getByPublicId(
+            activeOrganizationPublicId,
+            userPublicId,
+            globalRole,
+          )
+        : Promise.resolve<OrganizationOutput | null>(null),
+      activeOrganizationPublicId
+        ? this.authorizationService.resolveUserOrganizationPermissions(
+            userPublicId,
+            activeOrganizationPublicId,
+          )
+        : Promise.resolve<string[]>([]),
+    ]);
 
     return {
       user,
@@ -73,7 +79,8 @@ export class AuthMeContextService {
    *
    * @remarks
    * - **Algorithm:** the same two reads `getContext` performs for the active org —
-   *   `OrganizationService.getByPublicId` + `AuthorizationService.resolveUserOrganizationPermissions`.
+   *   `OrganizationService.getByPublicId` + `AuthorizationService.resolveUserOrganizationPermissions`
+   *   — issued concurrently, since neither consumes the other's result.
    * - **Failure modes:** propagates `NotFoundError` when the organization is not
    *   accessible to the caller.
    * - **Side effects:** none (read-only); permission resolution is Redis-cached.
@@ -93,15 +100,15 @@ export class AuthMeContextService {
     global_role: GlobalRole | null;
   }> {
     const { userPublicId, organizationPublicId, globalRole } = options;
-    const activeOrganization = await this.organizationService.getByPublicId(
-      organizationPublicId,
-      userPublicId,
-      globalRole,
-    );
-    const myPermissions = await this.authorizationService.resolveUserOrganizationPermissions(
-      userPublicId,
-      organizationPublicId,
-    );
+    // Independent of each other — both read from `options` only — so they go out together
+    // rather than one after the other. This runs inline on every organization switch.
+    const [activeOrganization, myPermissions] = await Promise.all([
+      this.organizationService.getByPublicId(organizationPublicId, userPublicId, globalRole),
+      this.authorizationService.resolveUserOrganizationPermissions(
+        userPublicId,
+        organizationPublicId,
+      ),
+    ]);
     return {
       active_organization: activeOrganization,
       my_permissions: myPermissions,

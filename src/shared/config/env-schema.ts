@@ -343,6 +343,22 @@ const envSchemaBase = z.object({
    */
   TEST_MODE: booleanString('false'),
   /**
+   * Category-B. Makes `POST /auth/email/login` additionally accept {@link STATIC_VERIFICATION_CODE}
+   * for an already-EXISTING user, in place of the one-time code that `send-code` issues.
+   *
+   * Exists so local work and load tests can authenticate without the `send-code` round trip —
+   * which carries a per-email resend cooldown, its own rate limit, and the 300 ms
+   * anti-enumeration floor, none of which say anything useful about the app under test.
+   *
+   * Defaults false, so the behaviour does not exist unless a developer opts in. A refine permits
+   * `true` ONLY on the `local` and `development` targets — an allowlist rather than a
+   * "not production" test, so a target added to the enum later is refused by default instead of
+   * silently inheriting a master login code. It never creates accounts, never skips the
+   * account-active check, and never bypasses the per-user attempt cap: an unknown email still
+   * 401s exactly as before.
+   */
+  AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED: booleanString('false'),
+  /**
    * Category-B. ioredis ready-check on the cache / BullMQ connections. Defaults true (on); the test
    * harness sets `REDIS_READY_CHECK_ENABLED=false` (the per-worker singletons churn across
    * createTestApp instances and a reconnect ready-check rejects against a closing stream). Read via
@@ -1438,6 +1454,17 @@ export const envSchema = envSchemaBase
       'TEST_MODE must be false in production (it gates test-only affordances that must never be reachable on a deployed runtime).',
     path: ['TEST_MODE'],
   })
+  .refine(
+    (data) =>
+      !data.AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED ||
+      data.NODE_ENV === 'local' ||
+      data.NODE_ENV === 'development',
+    {
+      message:
+        "AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED may only be true on the 'local' or 'development' targets (it makes email login accept a well-known master code, so a deployed runtime must only ever accept the one-time codes issued by send-code). Stated as an allowlist rather than a not-production test so a target added to the enum later is refused by default.",
+      path: ['AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED'],
+    },
+  )
   .refine((data) => data.NODE_ENV !== 'production' || data.REDIS_READY_CHECK_ENABLED === true, {
     message:
       'REDIS_READY_CHECK_ENABLED must be true in production (the ready-check must stay on outside the test harness).',
