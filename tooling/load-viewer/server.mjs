@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Local API monitor — a Bull-Board-style live view of API HTTP traffic.
+ * Local load viewer — a Bull-Board-style live view of API HTTP traffic during a load run.
  *
  * Runs a recording reverse proxy: point a client at this port instead of the API and
  * every call is forwarded upstream, timed, and pushed to a browser dashboard over SSE.
  *
- *   node tooling/dev/api-monitor/server.mjs
- *   pnpm dev:api-monitor          # dashboard + proxy on http://localhost:4985
+ *   node tooling/load-viewer/server.mjs
+ *   pnpm load:viewer          # dashboard + proxy on http://localhost:4985
  *
  * Dashboard   http://localhost:4985/
  * Proxy       http://localhost:4985/api/v1/...   ->   UPSTREAM/api/v1/...
@@ -26,7 +26,7 @@ import { URL } from 'node:url';
  * proxy too. A constant cannot drift, and the dashboard URL is always the same one.
  */
 const PORT = 4985;
-const UPSTREAM = process.env.API_MONITOR_UPSTREAM || 'http://localhost:3000';
+const UPSTREAM = process.env.LOAD_VIEWER_UPSTREAM || 'http://localhost:3000';
 const MAX_CALLS = Number(process.env.MAX_CALLS || 2000);
 const MAX_BODY = Number(process.env.MAX_BODY || 24_000);
 
@@ -36,7 +36,7 @@ const upstream = new URL(UPSTREAM);
 const calls = [];
 let seq = 0;
 /**
- * Run metadata posted by the load script itself (`POST /__monitor/run`).
+ * Run metadata posted by the load script itself (`POST /__viewer/run`).
  *
  * The dashboard used to GUESS the command from traffic shape and got it wrong — it
  * reported `VUS=78 ITERATIONS=1` for a `VUS=100 RAMP=30s` run, because peak overlap
@@ -164,13 +164,13 @@ function buildStats() {
  * Dedicated keep-alive agent. The default global agent proved unable to sustain ~20
  * concurrent journeys: sockets were reused after the upstream had closed them and the
  * proxy surfaced `socket hang up`, which looked exactly like an API failure and made
- * the monitor lie about the thing it exists to measure.
+ * the viewer lie about the thing it exists to measure.
  */
 const agent = new http.Agent({
   // keepAlive is deliberately OFF. Reused sockets are the classic source of
   // intermittent "socket hang up" in a Node proxy: the upstream closes an idle
   // connection, the agent hands that same socket to the next request, and it dies
-  // mid-flight. That flakiness is fatal here, because the monitor's whole job is to
+  // mid-flight. That flakiness is fatal here, because the viewer's whole job is to
   // report on someone else's reliability — it must not invent failures of its own.
   // A fresh connection per request costs a little throughput and buys determinism.
   keepAlive: false,
@@ -287,7 +287,7 @@ function handleProxy(req, res) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
-  if (url.pathname === '/__monitor/stream') {
+  if (url.pathname === '/__viewer/stream') {
     res.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
@@ -299,20 +299,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/__monitor/calls') {
+  if (url.pathname === '/__viewer/calls') {
     const limit = Number(url.searchParams.get('limit') || 300);
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ calls: calls.slice(-limit), total: calls.length }));
     return;
   }
 
-  if (url.pathname === '/__monitor/stats') {
+  if (url.pathname === '/__viewer/stats') {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ stats: buildStats(), total: calls.length }));
     return;
   }
 
-  if (url.pathname === '/__monitor/clear' && req.method === 'POST') {
+  if (url.pathname === '/__viewer/clear' && req.method === 'POST') {
     calls.length = 0;
     seq = 0;
     runMeta = null;
@@ -323,7 +323,7 @@ const server = http.createServer((req, res) => {
   }
 
   // The load script announces its own parameters here at setup time.
-  if (url.pathname === '/__monitor/run') {
+  if (url.pathname === '/__viewer/run') {
     if (req.method === 'POST') {
       const chunks = [];
       req.on('data', (c) => chunks.push(c));
@@ -403,7 +403,7 @@ function warmUpstream(count = 8) {
 
 server.listen(PORT, async () => {
   process.stdout.write(
-    `\n  API monitor listening\n` +
+    `\n  Load viewer listening\n` +
       `    dashboard   http://localhost:${PORT}/\n` +
       `    proxying    http://localhost:${PORT}/api/*  ->  ${UPSTREAM}/api/*\n`,
   );
@@ -418,7 +418,7 @@ const DASHBOARD_HTML = /* html */ `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>API Monitor</title>
+<title>Load Viewer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -589,7 +589,7 @@ th .info .tip{right:-4px;text-transform:none}
 </head>
 <body>
 <header>
-  <div class="brand">API <span>Monitor</span></div>
+  <div class="brand">Load <span>Viewer</span></div>
   <div class="live"><span class="led" id="led"></span><span id="livetxt">connecting</span></div>
   <div class="spacer"></div>
   <input type="search" id="q" placeholder="filter path…" aria-label="Filter by path">
@@ -661,8 +661,8 @@ th .info .tip{right:-4px;text-transform:none}
 <span class="c"># 2. API with the TEST_MODE OTP echo</span>
 <span class="p">$</span> <span class="e">TEST_MODE=true</span> pnpm dev
 
-<span class="c"># 3. this monitor (proxies :${PORT} -> ${UPSTREAM})</span>
-<span class="p">$</span> node tooling/dev/api-monitor/server.mjs</pre>
+<span class="c"># 3. this load viewer (proxies :${PORT} -> ${UPSTREAM})</span>
+<span class="p">$</span> node tooling/load-viewer/server.mjs</pre>
       </details>
     </div>
 
@@ -750,7 +750,7 @@ function fmtDur(ms){
 }
 
 /**
- * The monitor cannot know what was typed in another terminal, so it infers the client
+ * The viewer cannot know what was typed in another terminal, so it infers the client
  * from the User-Agent of recorded traffic and shows the command that produces it.
  */
 function renderCommand(){
@@ -840,7 +840,7 @@ function renderDetail(){
 }
 
 async function renderStats(){
-  const r=await fetch('/__monitor/stats');const {stats}=await r.json();
+  const r=await fetch('/__viewer/stats');const {stats}=await r.json();
   if(!stats.length){statsPane.innerHTML='<div class="empty">No traffic recorded yet.</div>';return}
   // Bar encodes share of TOTAL time, not p95 — it answers "where did the time go",
   // which is the question a totals column invites.
@@ -881,7 +881,7 @@ document.getElementById('pause').addEventListener('click',e=>{
   paused=!paused;e.target.classList.toggle('on',paused);e.target.textContent=paused?'Resume':'Pause';
 });
 document.getElementById('clear').addEventListener('click',async()=>{
-  await fetch('/__monitor/clear',{method:'POST'});
+  await fetch('/__viewer/clear',{method:'POST'});
   all=[];selected=null;renderFeed();renderDetail();renderStats();
 });
 function setTab(t){
@@ -896,11 +896,11 @@ document.getElementById('tabStats').addEventListener('click',()=>setTab('stats')
 document.getElementById('tabDetail').addEventListener('click',()=>setTab('detail'));
 
 Promise.all([
-  fetch('/__monitor/calls?limit=8000').then(r=>r.json()),
-  fetch('/__monitor/run').then(r=>r.json()).catch(()=>({run:null}))
+  fetch('/__viewer/calls?limit=8000').then(r=>r.json()),
+  fetch('/__viewer/run').then(r=>r.json()).catch(()=>({run:null}))
 ]).then(([c,r])=>{all=c.calls||[];runMeta=r.run||null;renderFeed();renderStats()});
 
-const es=new EventSource('/__monitor/stream');
+const es=new EventSource('/__viewer/stream');
 es.onopen=()=>{led.classList.add('on');livetxt.textContent='live'};
 es.onerror=()=>{led.classList.remove('on');livetxt.textContent='reconnecting'};
 es.addEventListener('cleared',()=>{all=[];runMeta=null;selected=null;renderFeed();renderDetail();renderStats()});
