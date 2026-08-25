@@ -1883,6 +1883,7 @@ src/
     │   │   │   ├── billing.js
     │   │   │   ├── comprehensive-journey.js
     │   │   │   ├── daily-ops.js
+    │   │   │   ├── fe-user-journey.js
     │   │   │   ├── health-breakpoint.js
     │   │   │   ├── health-stress.js
     │   │   │   ├── health.js
@@ -2082,7 +2083,8 @@ src/
     │   │   ├── env-schema-default-format.unit.test.ts
     │   │   ├── env-schema.unit.test.ts
     │   │   ├── env-var-registry.policy.unit.test.ts
-    │   │   └── env.config.unit.test.ts
+    │   │   ├── env.config.unit.test.ts
+    │   │   └── static-verification-code-gate.unit.test.ts
     │   ├── database/
     │   │   └── role-least-privilege-migration.policy.unit.test.ts
     │   ├── errors/

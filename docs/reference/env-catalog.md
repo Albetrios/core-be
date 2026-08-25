@@ -5,7 +5,7 @@
 
 Allowed values + description come from the explicit registry; the **default** and **required/optional**
 status are read from each Zod field, so this can never disagree with what boots. Registry coverage:
-**12 / 232** variables migrated to an explicit `{ allowed, description }` entry.
+**12 / 233** variables migrated to an explicit `{ allowed, description }` entry.
 
 | Variable | Allowed values | Default | In registry | Description |
 | --- | --- | --- | :---: | --- |
@@ -24,6 +24,7 @@ status are read from each Zod field, so this can never disagree with what boots.
 | `AUTH_SESSION_CLEANUP_CRON` | — | — *(optional)* |  | — |
 | `AUTH_SESSION_MAX_AGE_DAYS` | — | `7` |  | — |
 | `AUTH_SESSION_RETENTION_DAYS` | — | `30` |  | — |
+| `AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED` | — | `false` |  | — |
 | `BILLING_DUNNING_GRACE_DAYS` | — | `14` |  | — |
 | `BLOCK_DISPOSABLE_EMAIL` | — | `true` |  | — |
 | `CAPTCHA_BYPASS_ALLOWED` | — | `false` |  | — |

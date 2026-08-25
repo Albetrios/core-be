@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Redis } from 'ioredis';
 import { UnauthorizedError } from '@/shared/errors/index.js';
 import { mockedRedisSet } from '@/tests/helpers/redis-mock.helper.js';
 import { EmailLoginService } from '@/domains/auth/sub-domains/auth-method/email-login.service.js';
+import { STATIC_VERIFICATION_CODE } from '@/domains/auth/sub-domains/auth-method/verification-code.js';
 import type { UserService } from '@/domains/user/user.service.js';
 
 vi.mock('@/domains/auth/shared/complete-first-factor-auth.js', () => ({
@@ -386,6 +387,107 @@ describe('EmailLoginService', () => {
     await expect(
       service.login({ email: user.email, code: 'ZZZZZZ' }, '127.0.0.1'),
     ).rejects.toThrow();
+  });
+
+  /**
+   * AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED — the local/development escape hatch that lets a
+   * caller log in without the `send-code` round trip. The env schema permits the flag only on the
+   * `local` and `development` targets, so these paths cannot exist on a deployed production
+   * runtime; what the suite pins is that switching it on skips ONLY the stored-code lookup and
+   * weakens nothing else.
+   */
+  describe('login with AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED', () => {
+    const FIXED = STATIC_VERIFICATION_CODE;
+    type StaticGate = { AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED?: boolean };
+
+    beforeEach(() => {
+      (env as StaticGate).AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED = true;
+    });
+
+    afterEach(() => {
+      (env as StaticGate).AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED = false;
+    });
+
+    it('authenticates an existing user without any stored code being consumed', async () => {
+      vi.mocked(userService.findByEmail).mockResolvedValue(user as never);
+      // No token row exists — send-code was never called. The fixed-code branch must not need one.
+      vi.mocked(verificationTokenRepository.consumeOtpForUser).mockResolvedValue(null);
+
+      const result = await service.login({ email: user.email, code: FIXED }, '127.0.0.1', 'vitest');
+
+      if (!('access_token' in result)) throw new Error('expected access token result');
+      expect(verificationTokenRepository.consumeOtpForUser).not.toHaveBeenCalled();
+    });
+
+    // Matched through normalizeVerificationCode, the same helper a real code goes through, so a
+    // lowercase entry behaves like the uppercase one. Separators and other lengths never reach
+    // this comparison — EmailLoginDto already constrains the field to 6 alphanumeric characters.
+    it('matches case-insensitively, as a real code does', async () => {
+      vi.mocked(userService.findByEmail).mockResolvedValue(user as never);
+      vi.mocked(verificationTokenRepository.consumeOtpForUser).mockResolvedValue(null);
+
+      const result = await service.login(
+        { email: user.email, code: 'test24' },
+        '127.0.0.1',
+        'vitest',
+      );
+
+      if (!('access_token' in result)) throw new Error('expected access token result');
+      expect(verificationTokenRepository.consumeOtpForUser).not.toHaveBeenCalled();
+    });
+
+    it('still rejects a code that is not the fixed one, falling back to the stored-code lookup', async () => {
+      vi.mocked(userService.findByEmail).mockResolvedValue(user as never);
+      vi.mocked(verificationTokenRepository.consumeOtpForUser).mockResolvedValue(null);
+
+      await expect(
+        service.login({ email: user.email, code: 'ZZZZZZ' }, '127.0.0.1'),
+      ).rejects.toThrow(UnauthorizedError);
+      // The wrong code took the normal path, so the stored-code lookup still ran.
+      expect(verificationTokenRepository.consumeOtpForUser).toHaveBeenCalled();
+    });
+
+    it('never creates an account — an unknown email is still rejected', async () => {
+      vi.mocked(userService.findByEmail).mockResolvedValue(null as never);
+
+      await expect(
+        service.login({ email: 'nobody@example.com', code: FIXED }, '127.0.0.1'),
+      ).rejects.toThrow(UnauthorizedError);
+      expect(userService.createForEmailCode).not.toHaveBeenCalled();
+    });
+
+    it('does not bypass the per-user verify-attempt cap', async () => {
+      vi.mocked(userService.findByEmail).mockResolvedValue(user as never);
+      // Over the cap: incrementWithExpiryOnFirst returns a count above the allowed maximum.
+      vi.mocked(redis.eval).mockResolvedValueOnce(999 as never);
+
+      await expect(service.login({ email: user.email, code: FIXED }, '127.0.0.1')).rejects.toThrow(
+        UnauthorizedError,
+      );
+    });
+
+    it('does not bypass the account-active assertion', async () => {
+      vi.mocked(userService.findByEmail).mockResolvedValue({
+        ...user,
+        status: 'SUSPENDED',
+      } as never);
+      vi.mocked(verificationTokenRepository.consumeOtpForUser).mockResolvedValue(null);
+
+      await expect(
+        service.login({ email: user.email, code: FIXED }, '127.0.0.1'),
+      ).rejects.toThrow();
+    });
+
+    it('has no effect at all when the flag is off (the default)', async () => {
+      (env as StaticGate).AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED = false;
+      vi.mocked(userService.findByEmail).mockResolvedValue(user as never);
+      vi.mocked(verificationTokenRepository.consumeOtpForUser).mockResolvedValue(null);
+
+      await expect(service.login({ email: user.email, code: FIXED }, '127.0.0.1')).rejects.toThrow(
+        UnauthorizedError,
+      );
+      expect(verificationTokenRepository.consumeOtpForUser).toHaveBeenCalled();
+    });
   });
 
   it('login enforces the constant-time floor on the known-account wrong-code branch (anti-enumeration)', async () => {

@@ -21,6 +21,8 @@ import {
   VERIFICATION_CODE_TTL_MINUTES,
   generateVerificationCode,
   hashVerificationCode,
+  normalizeVerificationCode,
+  STATIC_VERIFICATION_CODE,
 } from '@/domains/auth/sub-domains/auth-method/verification-code.js';
 import type { EmailSendCodeResult } from '@/domains/auth/auth.types.js';
 import type { UserService } from '@/domains/user/user.service.js';
@@ -352,16 +354,32 @@ export class EmailLoginService {
         // sec-r5-L2 + code scoping: consumeOtpForUser is bound to (user.id, EMAIL_CODE) so a code from
         // another flow or another user never matches/burns, and its atomic UPDATE prevents two
         // concurrent logins from both producing a session.
-        const record = await this.verificationTokenRepository.consumeOtpForUser(
-          user.id,
-          EMAIL_CODE_TOKEN_TYPE,
-          hashVerificationCode({
-            tokenType: EMAIL_CODE_TOKEN_TYPE,
-            userId: user.id,
-            code: parsed.code,
-          }),
-        );
-        if (!record) throw new UnauthorizedError('errors:invalidOrExpiredVerificationCode');
+        // Local/dev escape hatch: while AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED is on, the
+        // well-known STATIC_VERIFICATION_CODE is also accepted, so callers can log in without the
+        // `send-code` round trip. The env schema permits that flag only on the `local` and
+        // `development` targets, so this branch cannot exist on a deployed production runtime.
+        // Everything protective around it still runs — the user must already exist (resolved
+        // above), the per-user attempt cap has already been charged, and the account-active
+        // assertion below is unchanged. It only skips the stored-code lookup itself.
+        const usedStaticCode =
+          env.AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED &&
+          normalizeVerificationCode(parsed.code) === STATIC_VERIFICATION_CODE;
+
+        if (!usedStaticCode) {
+          // sec-r5-L2 + code scoping: consumeOtpForUser is bound to (user.id, EMAIL_CODE) so a code from
+          // another flow or another user never matches/burns, and its atomic UPDATE prevents two
+          // concurrent logins from both producing a session.
+          const record = await this.verificationTokenRepository.consumeOtpForUser(
+            user.id,
+            EMAIL_CODE_TOKEN_TYPE,
+            hashVerificationCode({
+              tokenType: EMAIL_CODE_TOKEN_TYPE,
+              userId: user.id,
+              code: parsed.code,
+            }),
+          );
+          if (!record) throw new UnauthorizedError('errors:invalidOrExpiredVerificationCode');
+        }
         // Single-use across the whole concurrent set: redeeming any one code invalidates the rest
         // (the just-consumed row already has used_at, so it is excluded by the isNull filter).
         await this.verificationTokenRepository.invalidateAllForUser(user.id, EMAIL_CODE_TOKEN_TYPE);

@@ -208,6 +208,7 @@
     "chaos:down": "docker compose --profile chaos stop toxiproxy",
     "chaos:provision": "tsx src/tests/chaos/provision-proxies.ts",
     "load:bench": "pnpm test:bench",
+    "load:monitor": "node ./tooling/load-test-monitor/server.mjs",
     "commitlint": "commitlint",
     "prepare": "husky",
     "test:smoke": "vitest run --config tooling/vitest/smoke.config.ts",
