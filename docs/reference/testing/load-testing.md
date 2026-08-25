@@ -270,7 +270,7 @@ Walks the complete front-end user journey once per virtual user, so **VUs are us
 50 people each performing the journey a single time, not 50 people looping.
 
 - **File**: `src/tests/load/k6/scenarios/fe-user-journey.js`
-- **Auth**: `AUTH=code` (default) logs in with `TEST_STATIC_VERIFICATION_CODE`; `AUTH=password` uses
+- **Auth**: `AUTH=code` (default) logs in with `AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED`; `AUTH=password` uses
   `POST /auth/login`; `AUTH=otp` does the real `send-code` → read `debug_verification_code` → login
   round trip (needs `TEST_MODE=true`).
 - **Credentials**: the pool at `src/tests/load/k6/data/credential-pool.json` — build it with
@@ -284,12 +284,12 @@ Walks the complete front-end user journey once per virtual user, so **VUs are us
 | `VUS` | `50` | Virtual users; each performs the journey once |
 | `POOL` | — | `DATABASE_POOL_MAX` the API was started with; printed in the header for the record |
 | `AUTH` | `code` | `code` \| `password` \| `otp` |
-| `STATIC_CODE` | `TEST24` | Must match the API's `TEST_STATIC_VERIFICATION_CODE` |
+| `STATIC_CODE` | `TEST24` | Must match the API's `AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED` |
 | `STAGGER` | `5` | Milliseconds between VU starts, to avoid a synthetic thundering herd |
 | `RESULT_TAG` | — | Label recorded with the run |
 
 **`send-code` is measured but not depended on.** The journey issues it because the real client always
-does and its cost belongs in the numbers, but login presents `TEST_STATIC_VERIFICATION_CODE` rather
+does and its cost belongs in the numbers, but login presents `AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED` rather
 than the code `send-code` issued, so the two calls stay independent and a non-200 on `send-code` does
 not abort the journey.
 
@@ -304,10 +304,10 @@ today. When reading the report, treat step 09 as a **caching target**, not as pr
 subtract it before quoting a per-user total as what a real session costs — see point 3 under
 [Trusting a result](#trusting-a-result).
 
-Requires the API started with `TEST_MODE=true` and a matching `TEST_STATIC_VERIFICATION_CODE`:
+Requires the API started with `TEST_MODE=true` and `AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED` turned on:
 
 ```bash
-TEST_MODE=true TEST_STATIC_VERIFICATION_CODE=TEST24 DATABASE_POOL_MAX=50 pnpm dev
+TEST_MODE=true AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED=true DATABASE_POOL_MAX=50 pnpm dev
 # then
 BASE_URL=http://localhost:3000 VUS=50 POOL=50 k6 run src/tests/load/k6/scenarios/fe-user-journey.js
 ```

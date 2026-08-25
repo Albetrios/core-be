@@ -71,7 +71,7 @@ const POOL = __ENV.POOL || 'unknown';
  *
  *   code (default) — ONE call to `POST /auth/email/login` with the static verification
  *                    code, as a distinct pre-seeded user. No send-code, no argon2.
- *                    Needs the API started with TEST_STATIC_VERIFICATION_CODE set.
+ *                    Needs the API started with AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED set.
  *   password       — ONE call to `POST /auth/login` with email + password from the pool.
  *                    Real argon2 verification, so it costs more than `code`.
  *   otp            — the real signup flow: `send-code` then `email/login`, creating a
@@ -94,11 +94,11 @@ const POOL = __ENV.POOL || 'unknown';
 const AUTH = (__ENV.AUTH || 'code').toLowerCase();
 /**
  * The static code accepted by `POST /auth/email/login` when the API runs with a matching
- * `TEST_STATIC_VERIFICATION_CODE`. Lets a VU authenticate in ONE call with no `send-code`
+ * `AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED`. Lets a VU authenticate in ONE call with no `send-code`
  * round trip — so no per-email resend cooldown, no send-code rate limit, and none of the
  * 300 ms anti-enumeration floor that call always pays.
  *
- * The API's env schema refuses any value for `TEST_STATIC_VERIFICATION_CODE` in production,
+ * The API's env schema refuses any value for `AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED` in production,
  * so this path exists on local and development runtimes only.
  */
 const STATIC_CODE = __ENV.STATIC_CODE || 'TEST24';
@@ -115,7 +115,7 @@ const STEPS = [
       ? [['02-login', 'POST', '/auth/login']]
       : [
           // send-code is measured as its own route because the real app always calls it, even
-          // though login below uses TEST_STATIC_VERIFICATION_CODE and never reads the code this
+          // though login below uses AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED and never reads the code this
           // issues. Keeping it in the journey keeps its cost (mail enqueue + the
           // anti-enumeration floor) visible instead of hiding it behind the static-code shortcut.
           ['02-send-code', 'POST', '/auth/email/send-code'],
@@ -250,7 +250,7 @@ function authenticate(json, email) {
     } else {
       // The app always asks for a code, so the journey does too — its cost stays measured.
       // A non-200 here is not fatal: login does not depend on this call, because it presents
-      // TEST_STATIC_VERIFICATION_CODE rather than whatever code this issued.
+      // AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED rather than whatever code this issued.
       record(
         '02-send-code',
         http.post(`${API_PREFIX}/auth/email/send-code`, JSON.stringify({ email: cred.email }), {
@@ -269,7 +269,7 @@ function authenticate(json, email) {
       );
       if (!record('03-code-login', login, [200])) {
         // A 401 here almost always means the API was started without a matching
-        // TEST_STATIC_VERIFICATION_CODE, not that the journey found a real defect.
+        // AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED, not that the journey found a real defect.
         return undefined;
       }
       token = JSON.parse(login.body).data?.access_token;

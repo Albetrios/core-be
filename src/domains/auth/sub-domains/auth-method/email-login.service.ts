@@ -22,6 +22,7 @@ import {
   generateVerificationCode,
   hashVerificationCode,
   normalizeVerificationCode,
+  STATIC_VERIFICATION_CODE,
 } from '@/domains/auth/sub-domains/auth-method/verification-code.js';
 import type { EmailSendCodeResult } from '@/domains/auth/auth.types.js';
 import type { UserService } from '@/domains/user/user.service.js';
@@ -353,17 +354,18 @@ export class EmailLoginService {
         // sec-r5-L2 + code scoping: consumeOtpForUser is bound to (user.id, EMAIL_CODE) so a code from
         // another flow or another user never matches/burns, and its atomic UPDATE prevents two
         // concurrent logins from both producing a session.
-        // Local/dev escape hatch: when TEST_STATIC_VERIFICATION_CODE is configured and matches,
-        // accept without a stored token so callers can log in without the `send-code` round trip.
-        // The env schema refuses any value in production, so this branch cannot exist on a
-        // deployed runtime. Everything protective around it still runs — the user must already
-        // exist (resolved above), the per-user attempt cap has already been charged, and the
-        // account-active assertion below is unchanged. It only skips the code lookup itself.
-        const usedFixedCode =
-          env.TEST_STATIC_VERIFICATION_CODE !== undefined &&
-          normalizeVerificationCode(parsed.code) === env.TEST_STATIC_VERIFICATION_CODE;
+        // Local/dev escape hatch: while AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED is on, the
+        // well-known STATIC_VERIFICATION_CODE is also accepted, so callers can log in without the
+        // `send-code` round trip. The env schema permits that flag only on the `local` and
+        // `development` targets, so this branch cannot exist on a deployed production runtime.
+        // Everything protective around it still runs — the user must already exist (resolved
+        // above), the per-user attempt cap has already been charged, and the account-active
+        // assertion below is unchanged. It only skips the stored-code lookup itself.
+        const usedStaticCode =
+          env.AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED &&
+          normalizeVerificationCode(parsed.code) === STATIC_VERIFICATION_CODE;
 
-        if (!usedFixedCode) {
+        if (!usedStaticCode) {
           // sec-r5-L2 + code scoping: consumeOtpForUser is bound to (user.id, EMAIL_CODE) so a code from
           // another flow or another user never matches/burns, and its atomic UPDATE prevents two
           // concurrent logins from both producing a session.

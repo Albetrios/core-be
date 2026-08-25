@@ -3,6 +3,7 @@ import type { Redis } from 'ioredis';
 import { UnauthorizedError } from '@/shared/errors/index.js';
 import { mockedRedisSet } from '@/tests/helpers/redis-mock.helper.js';
 import { EmailLoginService } from '@/domains/auth/sub-domains/auth-method/email-login.service.js';
+import { STATIC_VERIFICATION_CODE } from '@/domains/auth/sub-domains/auth-method/verification-code.js';
 import type { UserService } from '@/domains/user/user.service.js';
 
 vi.mock('@/domains/auth/shared/complete-first-factor-auth.js', () => ({
@@ -389,20 +390,22 @@ describe('EmailLoginService', () => {
   });
 
   /**
-   * TEST_STATIC_VERIFICATION_CODE — the local/development escape hatch that lets a caller log in
-   * without the `send-code` round trip. The env schema refines it to `undefined` in production,
-   * so these paths cannot exist on a deployed runtime; what the suite pins is that switching it
-   * on skips ONLY the stored-code lookup and weakens nothing else.
+   * AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED — the local/development escape hatch that lets a
+   * caller log in without the `send-code` round trip. The env schema permits the flag only on the
+   * `local` and `development` targets, so these paths cannot exist on a deployed production
+   * runtime; what the suite pins is that switching it on skips ONLY the stored-code lookup and
+   * weakens nothing else.
    */
-  describe('login with TEST_STATIC_VERIFICATION_CODE', () => {
-    const FIXED = 'TEST24';
+  describe('login with AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED', () => {
+    const FIXED = STATIC_VERIFICATION_CODE;
+    type StaticGate = { AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED?: boolean };
 
     beforeEach(() => {
-      (env as { TEST_STATIC_VERIFICATION_CODE?: string }).TEST_STATIC_VERIFICATION_CODE = FIXED;
+      (env as StaticGate).AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED = true;
     });
 
     afterEach(() => {
-      delete (env as { TEST_STATIC_VERIFICATION_CODE?: string }).TEST_STATIC_VERIFICATION_CODE;
+      (env as StaticGate).AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED = false;
     });
 
     it('authenticates an existing user without any stored code being consumed', async () => {
@@ -475,8 +478,8 @@ describe('EmailLoginService', () => {
       ).rejects.toThrow();
     });
 
-    it('has no effect at all when the env var is unset (the default)', async () => {
-      delete (env as { TEST_STATIC_VERIFICATION_CODE?: string }).TEST_STATIC_VERIFICATION_CODE;
+    it('has no effect at all when the flag is off (the default)', async () => {
+      (env as StaticGate).AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED = false;
       vi.mocked(userService.findByEmail).mockResolvedValue(user as never);
       vi.mocked(verificationTokenRepository.consumeOtpForUser).mockResolvedValue(null);
 

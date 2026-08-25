@@ -24,6 +24,7 @@ status are read from each Zod field, so this can never disagree with what boots.
 | `AUTH_SESSION_CLEANUP_CRON` | — | — *(optional)* |  | — |
 | `AUTH_SESSION_MAX_AGE_DAYS` | — | `7` |  | — |
 | `AUTH_SESSION_RETENTION_DAYS` | — | `30` |  | — |
+| `AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED` | — | `false` |  | — |
 | `BILLING_DUNNING_GRACE_DAYS` | — | `14` |  | — |
 | `BLOCK_DISPOSABLE_EMAIL` | — | `true` |  | — |
 | `CAPTCHA_BYPASS_ALLOWED` | — | `false` |  | — |
@@ -212,7 +213,6 @@ status are read from each Zod field, so this can never disagree with what boots.
 | `STRIPE_WEBHOOK_TOLERANCE_SECONDS` | — | `150` |  | — |
 | `TEAM_ORGANIZATION_ENABLED` | — | `true` |  | — |
 | `TEST_MODE` | — | `false` |  | — |
-| `TEST_STATIC_VERIFICATION_CODE` | — | — *(optional)* |  | — |
 | `TOMBSTONE_RETENTION_DAYS` | — | `90` |  | — |
 | `TRUST_PROXY` | false \| 0, or integer 1–10 | `false` | ✓ | Number of reverse-proxy hops Fastify may trust for X-Forwarded-* headers. |
 | `TRUST_PROXY_REQUIRED` | — | `true` |  | — |
