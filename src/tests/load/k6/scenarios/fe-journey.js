@@ -126,6 +126,7 @@ const STEPS = [
   ['06-create-org', 'POST', '/tenancy/organizations'],
   ['07-onboarding-complete', 'POST', '/users/me/onboarding/complete'],
   ['08-switch-org', 'POST', '/auth/switch-to-organization'],
+  ['09-me-context-2', 'GET', '/auth/me/context'],
   ['10-list-orgs', 'GET', '/tenancy/organizations'],
   ['11-org-by-slug', 'GET', '/tenancy/organizations/by-slug/:slug'],
   ['12-unread-count', 'GET', '/notify/notifications/unread-count'],
@@ -365,12 +366,20 @@ export function feJourney() {
     }
   }
 
+  // 09 — context re-read after the switch. NOTE: core-fe does NOT make this call —
+  // switch-to-organization already returns the active-org context inline and the client writes it
+  // straight into its cache (setQueryData). It is measured here on purpose, as the benchmark for
+  // the "repeat /auth/me/context" path: of its four reads only `my_permissions` is Redis-cached
+  // today, so this step is what any caching work on the other three has to beat.
+  record(
+    '09-me-context-2',
+    http.get(`${API_PREFIX}/auth/me/context`, { headers: auth, tags: { name: '09-me-context-2' } }),
+    [200],
+  );
+
   let allOk = orgOk;
 
-  // 10-14 — workspace and dashboard reads. No context re-read here: switch-to-organization
-  // above already returns the active-org context inline and core-fe writes it straight into its
-  // cache (setQueryData) rather than re-fetching, so a GET /auth/me/context at this point would
-  // measure a request the app never makes.
+  // 10-14 — workspace and dashboard reads.
   const reads = [
     ['10-list-orgs', '/tenancy/organizations'],
     ['11-org-by-slug', `/tenancy/organizations/by-slug/${slug}`],

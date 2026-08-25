@@ -269,8 +269,9 @@ Walks the complete front-end user journey once per virtual user, so **VUs are us
   round trip (needs `TEST_MODE=true`).
 - **Credentials**: the pool at `src/tests/load/k6/data/credential-pool.json` — build it with
   `pnpm db:seed:loadtest`.
-- **Routes**: guest refresh → send-code → login → me/context → profile patch → create org →
-  onboarding complete → switch org → workspace and dashboard reads → authed refresh → logout.
+- **Routes** (16): guest refresh → send-code → login → me/context → profile patch → create org →
+  onboarding complete → switch org → me/context again → workspace and dashboard reads →
+  authed refresh → logout.
 
 | Env | Default | Purpose |
 | --- | ------- | ------- |
@@ -286,7 +287,15 @@ does and its cost belongs in the numbers, but login presents `AUTH_FIXED_VERIFIC
 than the code `send-code` issued, so the two calls stay independent and a non-200 on `send-code` does
 not abort the journey.
 
-**There is deliberately no second `me/context` after the org switch** — see point 3 under
+**The second `me/context` after the org switch is a benchmark, not a fidelity claim.** core-fe does
+**not** make that call — `switch-to-organization` already returns the active-org context inline and
+the client writes it into its cache with `setQueryData` (verified against live responses: the switch
+payload's `active_organization` and `my_permissions` are byte-identical to what the re-read returns,
+and `organizations[]` differs only by the `is_active` flag). The step exists because that route is
+the largest single consumer of API time in the run — 100 calls / ~16% of total — which makes it the
+benchmark any caching work has to beat. Of its four reads only `my_permissions` is Redis-cached
+today. When reading the report, treat step 09 as a **caching target**, not as production traffic, and
+subtract it before quoting a per-user total as what a real session costs — see point 3 under
 [Trusting a result](#trusting-a-result).
 
 Requires the API started with `TEST_MODE=true` and a matching `AUTH_FIXED_VERIFICATION_CODE`:
