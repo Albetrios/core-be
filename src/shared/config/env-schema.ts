@@ -13,7 +13,6 @@
 import { createHash, createPrivateKey, createPublicKey } from 'node:crypto';
 import { validateProductionRedisTopology } from '@/infrastructure/cache/redis-url.parse.util.js';
 import { type EnvVarSpec, envVar, toSchemaShape } from '@/shared/config/env-var-registry.js';
-import { DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS } from '@/shared/constants/security.constants.js';
 import { PERMISSION_CACHE_RECOMPUTE_LOCK_TTL_SECONDS } from '@/shared/constants/ttl.constants.js';
 import { z } from 'zod';
 
@@ -363,20 +362,6 @@ const envSchemaBase = z.object({
         'must be 6 characters from the verification-code charset (ABCDEFGHJKMNPQRSTUVWXYZ23456789)',
     })
     .optional(),
-  /**
-   * Category-B. Wall-clock floor (ms) that the silent-success auth endpoints hold every response
-   * to, so the known-account and unknown-account branches cannot be told apart by latency.
-   *
-   * Defaults to the hardened 300 ms, and a refine forbids anything below that in production — the
-   * floor only works while it exceeds the slower (known-account) branch, so a deployed runtime may
-   * raise it but never lower it. Exists as a knob purely so local work and load tests can drop it
-   * and measure what these endpoints actually cost, instead of measuring the padding.
-   */
-  AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS: z.coerce
-    .number()
-    .int()
-    .min(0)
-    .default(DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS),
   /**
    * Category-B. ioredis ready-check on the cache / BullMQ connections. Defaults true (on); the test
    * harness sets `REDIS_READY_CHECK_ENABLED=false` (the per-worker singletons churn across
@@ -1479,16 +1464,6 @@ export const envSchema = envSchemaBase
       message:
         'AUTH_FIXED_VERIFICATION_CODE must be unset in production (it is a master email login code — a deployed runtime must only ever accept the one-time codes issued by send-code).',
       path: ['AUTH_FIXED_VERIFICATION_CODE'],
-    },
-  )
-  .refine(
-    (data) =>
-      data.NODE_ENV !== 'production' ||
-      data.AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS >=
-        DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS,
-    {
-      message: `AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS must be >= ${DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS} in production (below the known-account branch's own duration the floor stops masking it, turning the silent-success response into an account-existence timing oracle).`,
-      path: ['AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS'],
     },
   )
   .refine((data) => data.NODE_ENV !== 'production' || data.REDIS_READY_CHECK_ENABLED === true, {

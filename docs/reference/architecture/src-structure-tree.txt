@@ -2262,7 +2262,6 @@ src/
     │   │   │   └── timeout-error.util.unit.test.ts
     │   │   ├── security/
     │   │   │   ├── allowed-origins.util.unit.test.ts
-    │   │   │   ├── anti-enumeration-floor.guard.unit.test.ts
     │   │   │   ├── anti-enumeration.util.unit.test.ts
     │   │   │   ├── bearer-token.util.unit.test.ts
     │   │   │   ├── encryption.util.unit.test.ts

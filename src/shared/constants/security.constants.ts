@@ -81,14 +81,3 @@ export const IP_FAILED_LOGIN_WINDOW_SECONDS = 15 * 60;
  * to reuse detection / family revocation. Kept short to bound the relaxation of reuse detection.
  */
 export const REFRESH_TOKEN_REUSE_GRACE_MS = 10_000;
-
-/**
- * Hardened default (milliseconds) for the silent-success anti-enumeration floor, and the lower
- * bound a production runtime is allowed to configure.
- *
- * @remarks
- * Lives here rather than beside `enforceMinimumDuration` so `env-schema.ts` can bound
- * `AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS` against it without importing a module that itself
- * reads the parsed env — the schema must stay loadable before `getEnv()` has ever run.
- */
-export const DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS = 300;

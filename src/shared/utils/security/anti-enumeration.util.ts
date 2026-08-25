@@ -1,6 +1,4 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { env } from '@/shared/config/env.config.js';
-import { DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS } from '@/shared/constants/security.constants.js';
 
 /**
  * Minimum wall-clock duration (milliseconds) that email-dispatch endpoints with a
@@ -16,13 +14,8 @@ import { DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS } from '@/shared/constants
  *
  * Chosen to comfortably exceed the typical two-write known-account path under normal load
  * while adding only sub-second latency to a low-frequency, unauthenticated endpoint.
- *
- * Configurable via `AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS` so local work and load tests can
- * lower it and measure what these endpoints actually cost rather than measuring the padding. The
- * env schema refuses anything below {@link DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS} in
- * production, so a deployed runtime can only ever raise it.
  */
-export const ANTI_ENUMERATION_MINIMUM_DURATION_MS = DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS;
+export const ANTI_ENUMERATION_MINIMUM_DURATION_MS = 300;
 
 /**
  * Holds the current request to a constant minimum duration so that the existing-account and
@@ -42,7 +35,7 @@ export const ANTI_ENUMERATION_MINIMUM_DURATION_MS = DEFAULT_ANTI_ENUMERATION_MIN
  */
 export async function enforceMinimumDuration(
   startedAtMillis: number,
-  minimumMillis: number = env.AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS,
+  minimumMillis: number = ANTI_ENUMERATION_MINIMUM_DURATION_MS,
 ): Promise<void> {
   const remainingMillis = minimumMillis - (Date.now() - startedAtMillis);
   if (remainingMillis > 0) {
