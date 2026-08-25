@@ -13,6 +13,7 @@
 import { createHash, createPrivateKey, createPublicKey } from 'node:crypto';
 import { validateProductionRedisTopology } from '@/infrastructure/cache/redis-url.parse.util.js';
 import { type EnvVarSpec, envVar, toSchemaShape } from '@/shared/config/env-var-registry.js';
+import { DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS } from '@/shared/constants/security.constants.js';
 import { PERMISSION_CACHE_RECOMPUTE_LOCK_TTL_SECONDS } from '@/shared/constants/ttl.constants.js';
 import { z } from 'zod';
 
@@ -342,6 +343,40 @@ const envSchemaBase = z.object({
    * test harness sets it true. A test-only capability must additionally check `env.TEST_MODE`.
    */
   TEST_MODE: booleanString('false'),
+  /**
+   * Category-B. A fixed email verification code accepted by `POST /auth/email/login` for any
+   * EXISTING user, in place of the one-time code that `send-code` issues.
+   *
+   * Exists so local work and load tests can authenticate without the `send-code` round trip —
+   * which carries a per-email resend cooldown, its own rate limit, and the 300 ms
+   * anti-enumeration floor, none of which say anything useful about the app under test.
+   *
+   * Unset by default, so the feature does not exist unless a developer opts in. A refine
+   * forbids any value in production, so a deployed runtime fails to boot rather than silently
+   * accepting a master code. It never creates accounts, never skips the account-active check,
+   * and never bypasses the per-user attempt cap — an unknown email still 401s exactly as before.
+   */
+  AUTH_FIXED_VERIFICATION_CODE: z
+    .string()
+    .regex(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/, {
+      message:
+        'must be 6 characters from the verification-code charset (ABCDEFGHJKMNPQRSTUVWXYZ23456789)',
+    })
+    .optional(),
+  /**
+   * Category-B. Wall-clock floor (ms) that the silent-success auth endpoints hold every response
+   * to, so the known-account and unknown-account branches cannot be told apart by latency.
+   *
+   * Defaults to the hardened 300 ms, and a refine forbids anything below that in production — the
+   * floor only works while it exceeds the slower (known-account) branch, so a deployed runtime may
+   * raise it but never lower it. Exists as a knob purely so local work and load tests can drop it
+   * and measure what these endpoints actually cost, instead of measuring the padding.
+   */
+  AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS),
   /**
    * Category-B. ioredis ready-check on the cache / BullMQ connections. Defaults true (on); the test
    * harness sets `REDIS_READY_CHECK_ENABLED=false` (the per-worker singletons churn across
@@ -1438,6 +1473,24 @@ export const envSchema = envSchemaBase
       'TEST_MODE must be false in production (it gates test-only affordances that must never be reachable on a deployed runtime).',
     path: ['TEST_MODE'],
   })
+  .refine(
+    (data) => data.NODE_ENV !== 'production' || data.AUTH_FIXED_VERIFICATION_CODE === undefined,
+    {
+      message:
+        'AUTH_FIXED_VERIFICATION_CODE must be unset in production (it is a master email login code — a deployed runtime must only ever accept the one-time codes issued by send-code).',
+      path: ['AUTH_FIXED_VERIFICATION_CODE'],
+    },
+  )
+  .refine(
+    (data) =>
+      data.NODE_ENV !== 'production' ||
+      data.AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS >=
+        DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS,
+    {
+      message: `AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS must be >= ${DEFAULT_ANTI_ENUMERATION_MINIMUM_DURATION_MS} in production (below the known-account branch's own duration the floor stops masking it, turning the silent-success response into an account-existence timing oracle).`,
+      path: ['AUTH_ANTI_ENUMERATION_MINIMUM_DURATION_MS'],
+    },
+  )
   .refine((data) => data.NODE_ENV !== 'production' || data.REDIS_READY_CHECK_ENABLED === true, {
     message:
       'REDIS_READY_CHECK_ENABLED must be true in production (the ready-check must stay on outside the test harness).',

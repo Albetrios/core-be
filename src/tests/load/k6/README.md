@@ -47,6 +47,7 @@ Org-scoped routes are flat — they carry **no** `/organizations/{organization_i
 | RLS concurrency | `scenarios/rls-concurrency-beyond-pool.js` | `TEST_TOKEN`, `TEST_ORG_ID` (optional `DATABASE_POOL_MAX`, `BEYOND_POOL_FACTOR`, `BEYOND_POOL_VUS`) | `pnpm load:rls-concurrency`          |
 | Admin           | `scenarios/admin.js`           | `ADMIN_TOKEN`                                            | `pnpm load:admin` (after `pnpm tool:admin-token`) |
 | **User journey** | `scenarios/user-journey.js`  | credential pool (see below)                              | `pnpm load:user-journey`                          |
+| **core-fe journey** | `scenarios/fe-journey.js` | credential pool + API on `TEST_MODE=true` with `AUTH_FIXED_VERIFICATION_CODE` | `VUS=50 POOL=50 k6 run src/tests/load/k6/scenarios/fe-journey.js` — the full front-end journey, one pass per VU (VUs are users). Knobs: `VUS`, `POOL`, `AUTH` (`code`\|`password`\|`otp`), `FIXED_CODE`, `STAGGER`, `RESULT_TAG` |
 | **Session journey** | `scenarios/session-refresh-journey.js` | `DEMO_EMAIL`, `DEMO_PASSWORD` (or use defaults) | `pnpm load:session-journey` — login → Bearer read → cookie+CSRF refresh → rotated-token read → logout → refresh 401 |
 | Login burst (rate limit) | `scenarios/login-burst-rate-limit.js` | none (dedicated non-existent identity; optional `BURST_EMAIL`) | `pnpm load:login-burst` — brute-force burst must yield only 401/429 and ≥1 429 proves the limiter engaged (hardened target). Local dev runs `RATE_LIMIT_RELAXED_CAPS=true`, so pass `EXPECT_RATE_LIMIT=false` there. Kept OUT of the nightly gate (per-IP residue) |
 
@@ -54,8 +55,12 @@ Org-scoped routes are flat — they carry **no** `/organizations/{organization_i
 
 - **TEST_TOKEN + TEST_ORG_ID**: `pnpm tool:load-test-credentials` (server up, full seed) — prints values for copy-paste.
 - **ADMIN_TOKEN**: `pnpm tool:admin-token` — prints a JWT with role `super_admin` for load-test use.
-- **Credential pool** (user-journey): `pnpm db:seed:loadtest` — no server needed; writes `src/tests/load/k6/data/credential-pool.json` automatically. Each VU logs in as a distinct user so tokens are minted once in `setup()` via `helpers/pool.js`.
+- **Credential pool** (user-journey, fe-journey): `pnpm db:seed:loadtest` — no server needed; writes `src/tests/load/k6/data/credential-pool.json` automatically. Each VU logs in as a distinct user so tokens are minted once in `setup()` via `helpers/pool.js`.
 
 **Rate limit:** High-concurrency scenarios (`api-stress`, `rls-concurrency`) exceed the default global limit of `RATE_LIMIT_MAX` (100) requests per `RATE_LIMIT_WINDOW_MS` (60s) per IP, so the server returns `429` and k6 marks the requests as failed. Start the API with `RATE_LIMIT_MAX=10000 pnpm dev` (or `pnpm dev:loadtest`) before running them. The nightly CI workflow already boots the API at `RATE_LIMIT_MAX=10000`.
+
+**MFA accounts are excluded from the pool.** The generator filters out `users.is_mfa_enabled` and members of any organization with `security_policy.mfa_required`, mirroring the login gate. Those accounts return HTTP 200 with an `mfa_required` envelope rather than an `access_token`, so a VU drawing one reads no token and silently abandons its journey — quietly understating concurrency instead of failing loudly.
+
+**Before reporting a before/after**, read [Trusting a result](../../../../docs/reference/testing/load-testing.md#trusting-a-result). Run-to-run variance on a co-located box has been measured at 2.07x, so a single-run comparison proves nothing.
 
 Full details (env, how to run each scenario): [docs/reference/testing/load-testing.md](../../../../docs/reference/testing/load-testing.md).

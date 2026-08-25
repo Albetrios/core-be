@@ -42,6 +42,52 @@ describe('AuthMeContextService.getContext', () => {
     expect(data.organizations).toHaveLength(2);
   });
 
+  /**
+   * `/auth/me/context` is on the critical path of every page load, and its four reads are
+   * independent — every input comes from the caller's own arguments. They must therefore be in
+   * flight together, not chained. Each stub blocks until every one of them has been entered:
+   * if any read waits for an earlier one to resolve, the barrier is never met and this times out.
+   */
+  it('issues its four independent reads concurrently, not one after another', async () => {
+    const READS = 4;
+    let entered = 0;
+    let releaseAll: () => void;
+    const allEntered = new Promise<void>((resolve) => {
+      releaseAll = resolve;
+    });
+    const arrive = async <T>(value: T): Promise<T> => {
+      entered += 1;
+      if (entered === READS) releaseAll();
+      await allEntered;
+      return value;
+    };
+
+    const activeOrganization = { id: 'org_active', type: 'TEAM' };
+    const userService = { getMe: vi.fn(() => arrive({ id: 'usr_1' })) };
+    const organizationService = {
+      list: vi.fn(() => arrive({ items: [activeOrganization] })),
+      getByPublicId: vi.fn(() => arrive(activeOrganization)),
+    };
+    const authorizationService = {
+      resolveUserOrganizationPermissions: vi.fn(() => arrive(['organization:read'])),
+    };
+    const service = new AuthMeContextService(
+      userService as never,
+      organizationService as never,
+      authorizationService as never,
+    );
+
+    const data = await service.getContext({
+      userPublicId: 'usr_1',
+      activeOrganizationPublicId: 'org_active',
+      globalRole: undefined,
+    });
+
+    expect(entered).toBe(READS);
+    expect(data.activeOrganization).toBe(activeOrganization);
+    expect(data.myPermissions).toEqual(['organization:read']);
+  });
+
   it('returns a null active organization and no permissions when no active org is in scope', async () => {
     const userService = { getMe: vi.fn().mockResolvedValue({ id: 'usr_1' }) };
     const organizationService = {

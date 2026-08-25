@@ -111,6 +111,71 @@ When k6 runs on the **same host** as the API (the common local setup), the load 
 
 **For true capacity numbers**, run k6 from a **separate host** (so the generator never steals the server's CPU), size the API box to **cores ≥ replicas (+~2 for OS/IO)**, scale processes with `cluster-run.mjs` / `DEPLOYMENT_API_REPLICA_COUNT`, and keep Postgres/Redis on low-latency links (not a localhost port-forward). Treat single-box numbers as **lower bounds and regression signals**, not absolute capacity.
 
+## Live API monitor (local)
+
+`pnpm dev:api-monitor` starts a recording reverse proxy on **:4000** that forwards to the API on
+:3000 and serves a live dashboard of everything passing through it. Point a load run at :4000
+instead of :3000 and each call appears as it happens, grouped per route.
+
+```bash
+pnpm dev:api-monitor                 # proxy + dashboard on http://localhost:4000
+BASE_URL=http://localhost:4000 VUS=50 k6 run src/tests/load/k6/scenarios/fe-journey.js
+```
+
+Node built-ins only — no dependencies. Loopback development tool: it records full request and
+response bodies in memory, so never point it at anything but a local API.
+
+| Endpoint | Purpose |
+| -------- | ------- |
+| `/` | Dashboard — per-route calls, ok/error/429 counts, avg, p95, max, total time |
+| `/__monitor/stream` | Server-sent events feed of calls as they land |
+| `/__monitor/stats` | Per-route aggregates as JSON |
+| `/__monitor/calls` | Recorded calls (`?limit=`) with headers and bodies |
+| `/__monitor/clear` | `POST` — reset counters between runs |
+
+Because it sits in the request path it adds a small amount of latency and a second event loop to the
+same box; treat its timings as directionally accurate and compare monitor-to-monitor, not
+monitor-to-direct.
+
+## Trusting a result
+
+A load-test number is only worth reporting once you know it reproduces. On a co-located single-box
+setup this repo has measured a **2.07x spread between two runs of an identical configuration**
+(2,697 ms vs 5,590 ms per journey). Any single-run comparison smaller than that is indistinguishable
+from noise.
+
+**Before reporting a before/after, satisfy all four:**
+
+1. **Replicate each side at least twice.** A one-shot A/B has produced a confident 3.7x "improvement"
+   here that disappeared entirely when the faster side was re-run — the first number was an outlier,
+   not a result.
+2. **Control for ordering.** Journeys that create rows (organizations, memberships, audit entries)
+   leave the database bigger than they found it, so a later run is working against more data than an
+   earlier one. Run the pair in both orders; if the effect survives the reversal it is real, and if it
+   only appears in one order it was the data growth.
+3. **Check the journey against what the client actually calls.** A step the real client never issues
+   inflates the route it targets and adds load that does not exist in production. `POST
+   /auth/switch-to-organization` returns the active-org context inline and core-fe writes it straight
+   into its cache, so a `GET /auth/me/context` after a switch measures a request the app never makes.
+4. **Hold the auth method constant, and know what it costs.** `POST /auth/login` verifies with
+   argon2id — roughly 100 ms of deliberate CPU per call. Node runs one thread, so 50 concurrent
+   password logins queue several seconds of CPU that inflates *every other route in the run* and can
+   trip `overloadGuardMiddleware` into shedding 503s. A journey using password auth and one using
+   email-code auth are not comparable, and the difference between them is not an application change.
+
+**Diagnosing a failing journey**
+
+| Symptom | Usual cause |
+| ------- | ----------- |
+| Login returns `401` for every pool user | Seed data is missing, not a broken feature — the anti-enumeration path returns an **identical** 401 for an unknown email as for a wrong code. Check `auth.users` before debugging the auth code. |
+| Login returns `200` but the VU stops right after | The body is an `mfa_required` envelope with `mfa_session_token`, not an `access_token`. See the MFA note under [Obtaining credentials](#obtaining-credentials). |
+| Every route inflates by a similar factor | Queueing on the single Node event loop, not a slow endpoint. Uniform inflation is the signature. |
+| Only `/auth/refresh` fails, with 429 | `REFRESH_RATE_LIMIT` is a hardcoded 30/min **per IP** and does not honour `RATE_LIMIT_RELAXED_CAPS`, so every VU on one host shares one budget. The limiter working, not the endpoint failing. |
+
+**Report the whole picture.** A journey-level "success rate" counts only VUs that completed *every*
+step, so one rate-limited step at the end can read as a 6% success rate while all business routes were
+100% healthy. Quote per-route results alongside it.
+
 ## Post-run settle check (drain + assert clean)
 
 After a load (or e2e) batch, `pnpm load:settle-check` proves the async fabric finished every job the run started — nothing stuck in a queue, the event-bus / outbox side effects flushed, and nothing dead-lettered. Run it against the **same** API + worker the load test hit (workers must be running so the backlog can drain):
@@ -141,7 +206,7 @@ The same signals are observable live via `GET /readyz` (verbose), `GET /metrics`
 - **Autocannon** (single endpoint): `pnpm test:bench` — hits `http://localhost:3000/readyz`.
 - **k6 health**: `pnpm load:health` — runs `src/tests/load/k6/scenarios/health.js` (`/livez` and `/readyz`). No env vars needed.
 
-## Scenarios (all seven)
+## Scenarios (all eight)
 
 ### 1. Health
 
@@ -193,6 +258,45 @@ The same signals are observable live via `GET /readyz` (verbose), `GET /metrics`
 - **Env**: `ADMIN_TOKEN` (required)
 - **Run**: `pnpm load:admin` with `ADMIN_TOKEN`, or `ADMIN_TOKEN=<token> k6 run src/tests/load/k6/scenarios/admin.js`. Obtain token via: `pnpm tool:admin-token` (see below).
 
+### 8. core-fe full journey
+
+Walks the complete front-end user journey once per virtual user, so **VUs are users** — 50 VUs means
+50 people each performing the journey a single time, not 50 people looping.
+
+- **File**: `src/tests/load/k6/scenarios/fe-journey.js`
+- **Auth**: `AUTH=code` (default) logs in with `AUTH_FIXED_VERIFICATION_CODE`; `AUTH=password` uses
+  `POST /auth/login`; `AUTH=otp` does the real `send-code` → read `debug_verification_code` → login
+  round trip (needs `TEST_MODE=true`).
+- **Credentials**: the pool at `src/tests/load/k6/data/credential-pool.json` — build it with
+  `pnpm db:seed:loadtest`.
+- **Routes**: guest refresh → send-code → login → me/context → profile patch → create org →
+  onboarding complete → switch org → workspace and dashboard reads → authed refresh → logout.
+
+| Env | Default | Purpose |
+| --- | ------- | ------- |
+| `VUS` | `50` | Virtual users; each performs the journey once |
+| `POOL` | — | `DATABASE_POOL_MAX` the API was started with; printed in the header for the record |
+| `AUTH` | `code` | `code` \| `password` \| `otp` |
+| `FIXED_CODE` | `TEST24` | Must match the API's `AUTH_FIXED_VERIFICATION_CODE` |
+| `STAGGER` | `5` | Milliseconds between VU starts, to avoid a synthetic thundering herd |
+| `RESULT_TAG` | — | Label recorded with the run |
+
+**`send-code` is measured but not depended on.** The journey issues it because the real client always
+does and its cost belongs in the numbers, but login presents `AUTH_FIXED_VERIFICATION_CODE` rather
+than the code `send-code` issued, so the two calls stay independent and a non-200 on `send-code` does
+not abort the journey.
+
+**There is deliberately no second `me/context` after the org switch** — see point 3 under
+[Trusting a result](#trusting-a-result).
+
+Requires the API started with `TEST_MODE=true` and a matching `AUTH_FIXED_VERIFICATION_CODE`:
+
+```bash
+TEST_MODE=true AUTH_FIXED_VERIFICATION_CODE=TEST24 DATABASE_POOL_MAX=50 pnpm dev
+# then
+BASE_URL=http://localhost:3000 VUS=50 POOL=50 k6 run src/tests/load/k6/scenarios/fe-journey.js
+```
+
 ### Org-scoped / RLS-heavy (informational, CI nightly)
 
 Org-scoped scenarios resolve the tenant from the token's `org` claim — no org path segment and no
@@ -224,6 +328,7 @@ CI runs a subset in the **org-scoped routes** job step (see `scheduled-k6-load-s
 ## Obtaining credentials
 
 - **TEST_TOKEN and TEST_ORG_ID**: Run `pnpm tool:load-test-credentials` (with server up and full seed). It logs in as the demo user, lists organizations, and prints `TEST_TOKEN` and `TEST_ORG_ID` for copy-paste.
+- **Credential pool**: Run `pnpm db:seed:loadtest` (bulk seed + pool export). The generator **excludes MFA accounts** — both `users.is_mfa_enabled` and membership of an organization whose `security_policy.mfa_required` is true, mirroring the login gate in `completeFirstFactorAuth`. Such an account returns HTTP 200 with an `mfa_required` envelope instead of an `access_token`, so a VU drawing one would read no token and quietly abandon its journey. The bulk seeder sets `mfa_required` on a share of its organizations, so without the filter roughly a third of the pool is unusable.
 - **ADMIN_TOKEN**: Run `pnpm tool:admin-token`. It prints a JWT signed with role `super_admin` for load-test use only (no real admin user required in DB).
 
 ## Optional env (all scenarios)

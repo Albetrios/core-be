@@ -13,6 +13,7 @@
     "dev": "tsx watch src/server.ts",
     "dev:loadtest": "RATE_LIMIT_MAX=10000 TEST_MODE=true tsx watch src/server.ts",
     "dev:worker": "tsx watch src/worker.ts",
+    "dev:api-monitor": "node ./tooling/dev/api-monitor/server.mjs",
     "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
     "build:check": "node tooling/ci/check-dist-imports.mjs",
     "start": "node dist/src/server.js",
