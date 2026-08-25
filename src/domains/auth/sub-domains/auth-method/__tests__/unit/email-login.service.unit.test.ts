@@ -389,20 +389,20 @@ describe('EmailLoginService', () => {
   });
 
   /**
-   * AUTH_FIXED_VERIFICATION_CODE — the local/development escape hatch that lets a caller log in
+   * TEST_STATIC_VERIFICATION_CODE — the local/development escape hatch that lets a caller log in
    * without the `send-code` round trip. The env schema refines it to `undefined` in production,
    * so these paths cannot exist on a deployed runtime; what the suite pins is that switching it
    * on skips ONLY the stored-code lookup and weakens nothing else.
    */
-  describe('login with AUTH_FIXED_VERIFICATION_CODE', () => {
+  describe('login with TEST_STATIC_VERIFICATION_CODE', () => {
     const FIXED = 'TEST24';
 
     beforeEach(() => {
-      (env as { AUTH_FIXED_VERIFICATION_CODE?: string }).AUTH_FIXED_VERIFICATION_CODE = FIXED;
+      (env as { TEST_STATIC_VERIFICATION_CODE?: string }).TEST_STATIC_VERIFICATION_CODE = FIXED;
     });
 
     afterEach(() => {
-      delete (env as { AUTH_FIXED_VERIFICATION_CODE?: string }).AUTH_FIXED_VERIFICATION_CODE;
+      delete (env as { TEST_STATIC_VERIFICATION_CODE?: string }).TEST_STATIC_VERIFICATION_CODE;
     });
 
     it('authenticates an existing user without any stored code being consumed', async () => {
@@ -476,7 +476,7 @@ describe('EmailLoginService', () => {
     });
 
     it('has no effect at all when the env var is unset (the default)', async () => {
-      delete (env as { AUTH_FIXED_VERIFICATION_CODE?: string }).AUTH_FIXED_VERIFICATION_CODE;
+      delete (env as { TEST_STATIC_VERIFICATION_CODE?: string }).TEST_STATIC_VERIFICATION_CODE;
       vi.mocked(userService.findByEmail).mockResolvedValue(user as never);
       vi.mocked(verificationTokenRepository.consumeOtpForUser).mockResolvedValue(null);
 

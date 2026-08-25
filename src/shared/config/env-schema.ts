@@ -343,7 +343,7 @@ const envSchemaBase = z.object({
    */
   TEST_MODE: booleanString('false'),
   /**
-   * Category-B. A fixed email verification code accepted by `POST /auth/email/login` for any
+   * Category-B. A static email verification code accepted by `POST /auth/email/login` for any
    * EXISTING user, in place of the one-time code that `send-code` issues.
    *
    * Exists so local work and load tests can authenticate without the `send-code` round trip —
@@ -355,7 +355,7 @@ const envSchemaBase = z.object({
    * accepting a master code. It never creates accounts, never skips the account-active check,
    * and never bypasses the per-user attempt cap — an unknown email still 401s exactly as before.
    */
-  AUTH_FIXED_VERIFICATION_CODE: z
+  TEST_STATIC_VERIFICATION_CODE: z
     .string()
     .regex(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/, {
       message:
@@ -1459,11 +1459,11 @@ export const envSchema = envSchemaBase
     path: ['TEST_MODE'],
   })
   .refine(
-    (data) => data.NODE_ENV !== 'production' || data.AUTH_FIXED_VERIFICATION_CODE === undefined,
+    (data) => data.NODE_ENV !== 'production' || data.TEST_STATIC_VERIFICATION_CODE === undefined,
     {
       message:
-        'AUTH_FIXED_VERIFICATION_CODE must be unset in production (it is a master email login code — a deployed runtime must only ever accept the one-time codes issued by send-code).',
-      path: ['AUTH_FIXED_VERIFICATION_CODE'],
+        'TEST_STATIC_VERIFICATION_CODE must be unset in production (it is a master email login code — a deployed runtime must only ever accept the one-time codes issued by send-code).',
+      path: ['TEST_STATIC_VERIFICATION_CODE'],
     },
   )
   .refine((data) => data.NODE_ENV !== 'production' || data.REDIS_READY_CHECK_ENABLED === true, {

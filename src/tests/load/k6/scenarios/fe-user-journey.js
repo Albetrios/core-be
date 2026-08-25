@@ -58,8 +58,8 @@ import { credentialPool } from '../helpers/pool.js';
  * REQUIRES the API with TEST_MODE=true (the OTP echo lets a VU complete its own signup).
  *
  * Usage:
- *   VUS=1  k6 run fe-journey.js       # 1 user,  16 calls
- *   VUS=50 k6 run fe-journey.js       # 50 users, 800 calls, 50 signups + 50 orgs
+ *   VUS=1  k6 run fe-user-journey.js       # 1 user,  16 calls
+ *   VUS=50 k6 run fe-user-journey.js       # 50 users, 800 calls, 50 signups + 50 orgs
  */
 
 const VUS = Number(__ENV.VUS || 1);
@@ -69,9 +69,9 @@ const POOL = __ENV.POOL || 'unknown';
 /**
  * How each VU authenticates.
  *
- *   code (default) — ONE call to `POST /auth/email/login` with the fixed verification
+ *   code (default) — ONE call to `POST /auth/email/login` with the static verification
  *                    code, as a distinct pre-seeded user. No send-code, no argon2.
- *                    Needs the API started with AUTH_FIXED_VERIFICATION_CODE set.
+ *                    Needs the API started with TEST_STATIC_VERIFICATION_CODE set.
  *   password       — ONE call to `POST /auth/login` with email + password from the pool.
  *                    Real argon2 verification, so it costs more than `code`.
  *   otp            — the real signup flow: `send-code` then `email/login`, creating a
@@ -93,15 +93,15 @@ const POOL = __ENV.POOL || 'unknown';
  */
 const AUTH = (__ENV.AUTH || 'code').toLowerCase();
 /**
- * The fixed code accepted by `POST /auth/email/login` when the API runs with a matching
- * `AUTH_FIXED_VERIFICATION_CODE`. Lets a VU authenticate in ONE call with no `send-code`
+ * The static code accepted by `POST /auth/email/login` when the API runs with a matching
+ * `TEST_STATIC_VERIFICATION_CODE`. Lets a VU authenticate in ONE call with no `send-code`
  * round trip — so no per-email resend cooldown, no send-code rate limit, and none of the
  * 300 ms anti-enumeration floor that call always pays.
  *
- * The API's env schema refuses any value for `AUTH_FIXED_VERIFICATION_CODE` in production,
+ * The API's env schema refuses any value for `TEST_STATIC_VERIFICATION_CODE` in production,
  * so this path exists on local and development runtimes only.
  */
-const FIXED_CODE = __ENV.FIXED_CODE || 'TEST24';
+const STATIC_CODE = __ENV.STATIC_CODE || 'TEST24';
 
 /** The sixteen routes each user walks, in order. */
 const STEPS = [
@@ -115,9 +115,9 @@ const STEPS = [
       ? [['02-login', 'POST', '/auth/login']]
       : [
           // send-code is measured as its own route because the real app always calls it, even
-          // though login below uses AUTH_FIXED_VERIFICATION_CODE and never reads the code this
+          // though login below uses TEST_STATIC_VERIFICATION_CODE and never reads the code this
           // issues. Keeping it in the journey keeps its cost (mail enqueue + the
-          // anti-enumeration floor) visible instead of hiding it behind the fixed-code shortcut.
+          // anti-enumeration floor) visible instead of hiding it behind the static-code shortcut.
           ['02-send-code', 'POST', '/auth/email/send-code'],
           ['03-code-login', 'POST', '/auth/email/login'],
         ]),
@@ -174,7 +174,7 @@ export function setup() {
   http.post(
     `${__ENV.BASE_URL || ''}/__monitor/run`,
     JSON.stringify({
-      command: `BASE_URL=${__ENV.BASE_URL || 'http://localhost:3000'} VUS=${VUS} \\\n    k6 run src/tests/load/k6/scenarios/fe-journey.js`,
+      command: `BASE_URL=${__ENV.BASE_URL || 'http://localhost:3000'} VUS=${VUS} \\\n    k6 run src/tests/load/k6/scenarios/fe-user-journey.js`,
       vus: VUS,
       mode: `${VUS} users x 1 pass x ${STEPS.length} routes (auth: ${AUTH})`,
       stepsPerJourney: STEPS.length,
@@ -250,7 +250,7 @@ function authenticate(json, email) {
     } else {
       // The app always asks for a code, so the journey does too — its cost stays measured.
       // A non-200 here is not fatal: login does not depend on this call, because it presents
-      // AUTH_FIXED_VERIFICATION_CODE rather than whatever code this issued.
+      // TEST_STATIC_VERIFICATION_CODE rather than whatever code this issued.
       record(
         '02-send-code',
         http.post(`${API_PREFIX}/auth/email/send-code`, JSON.stringify({ email: cred.email }), {
@@ -260,16 +260,16 @@ function authenticate(json, email) {
         [200],
       );
 
-      // Fixed-code login: a code the API is configured to accept, so nothing is read from
+      // Static-code login: a code the API is configured to accept, so nothing is read from
       // `debug_verification_code` and the two calls stay independent.
       const login = http.post(
         `${API_PREFIX}/auth/email/login`,
-        JSON.stringify({ email: cred.email, code: FIXED_CODE }),
+        JSON.stringify({ email: cred.email, code: STATIC_CODE }),
         { headers: json, tags: { name: '03-code-login' } },
       );
       if (!record('03-code-login', login, [200])) {
         // A 401 here almost always means the API was started without a matching
-        // AUTH_FIXED_VERIFICATION_CODE, not that the journey found a real defect.
+        // TEST_STATIC_VERIFICATION_CODE, not that the journey found a real defect.
         return undefined;
       }
       token = JSON.parse(login.body).data?.access_token;
@@ -301,7 +301,7 @@ export function feJourney() {
   });
   record('01-refresh-guest', guest, [200, 401, 403]);
 
-  // 02 — authenticate (password, fixed code, or the two-call OTP signup).
+  // 02 — authenticate (password, static code, or the two-call OTP signup).
   const token = authenticate(json, email);
   if (!token) return void journeyComplete.add(false);
   let auth = { ...json, Authorization: `Bearer ${token}` };
@@ -445,7 +445,7 @@ export function handleSummary(data) {
         ? ' (send-code + email/login)'
         : AUTH === 'password'
           ? ' (single /auth/login, argon2)'
-          : ` (send-code measured, then /auth/email/login with fixed code ${FIXED_CODE})`
+          : ` (send-code measured, then /auth/email/login with static code ${STATIC_CODE})`
     }`,
   );
   L.push('='.repeat(W));

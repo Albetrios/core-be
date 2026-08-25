@@ -353,15 +353,15 @@ export class EmailLoginService {
         // sec-r5-L2 + code scoping: consumeOtpForUser is bound to (user.id, EMAIL_CODE) so a code from
         // another flow or another user never matches/burns, and its atomic UPDATE prevents two
         // concurrent logins from both producing a session.
-        // Local/dev escape hatch: when AUTH_FIXED_VERIFICATION_CODE is configured and matches,
+        // Local/dev escape hatch: when TEST_STATIC_VERIFICATION_CODE is configured and matches,
         // accept without a stored token so callers can log in without the `send-code` round trip.
         // The env schema refuses any value in production, so this branch cannot exist on a
         // deployed runtime. Everything protective around it still runs — the user must already
         // exist (resolved above), the per-user attempt cap has already been charged, and the
         // account-active assertion below is unchanged. It only skips the code lookup itself.
         const usedFixedCode =
-          env.AUTH_FIXED_VERIFICATION_CODE !== undefined &&
-          normalizeVerificationCode(parsed.code) === env.AUTH_FIXED_VERIFICATION_CODE;
+          env.TEST_STATIC_VERIFICATION_CODE !== undefined &&
+          normalizeVerificationCode(parsed.code) === env.TEST_STATIC_VERIFICATION_CODE;
 
         if (!usedFixedCode) {
           // sec-r5-L2 + code scoping: consumeOtpForUser is bound to (user.id, EMAIL_CODE) so a code from
