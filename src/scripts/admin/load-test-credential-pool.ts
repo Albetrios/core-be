@@ -20,7 +20,7 @@
 import '@/shared/config/load-env-files.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { and, eq, isNull, like } from 'drizzle-orm';
+import { and, eq, isNull, like, sql } from 'drizzle-orm';
 import { closeDatabase } from '@/infrastructure/database/connection.js';
 import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
 import { users } from '@/domains/user/user.schema.js';
@@ -69,6 +69,15 @@ async function run(env: NodeJS.ProcessEnv): Promise<void> {
   // A user round-robined into multiple orgs by the bulk seeder yields multiple entries,
   // which is fine — k6 VUs that collide on the same user just share org context rather
   // than failing.
+  //
+  // MFA accounts are excluded, and the two exclusions below mirror `completeFirstFactorAuth`'s
+  // gate exactly (`user.is_mfa_enabled || organizationRequiresMfa`). For such an account the
+  // first factor succeeds with HTTP 200 but the body is an `mfa_required` envelope carrying an
+  // `mfa_session_token` instead of an `access_token` — so a k6 VU that draws one reads no token
+  // and silently abandons its journey partway. That does not fail loudly; it just removes VUs
+  // from every route after login, quietly understating concurrency and skewing every number in
+  // the run. The bulk seeder sets `security_policy.mfa_required` on a share of its organizations,
+  // so without this filter a third of the pool is unusable.
   const rows = await database
     .select({
       email: users.email,
@@ -84,6 +93,9 @@ async function run(env: NodeJS.ProcessEnv): Promise<void> {
         like(organizations.slug, BULK_ORG_SLUG_PATTERN),
         eq(memberships.status, 'ACTIVE'),
         isNull(memberships.deleted_at),
+        eq(users.is_mfa_enabled, false),
+        // Same SECURITY DEFINER resolver the login path uses, so this can never drift from it.
+        sql`NOT tenancy.user_has_organization_requiring_mfa(${users.id})`,
       ),
     );
 
