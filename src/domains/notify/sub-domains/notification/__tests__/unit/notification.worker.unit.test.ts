@@ -41,8 +41,9 @@ vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
   withUserDatabaseContext: (...parameters: unknown[]) => withUserDatabaseContextMock(...parameters),
 }));
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: (...parameters: unknown[]) => withOrganizationContextMock(...parameters),
+vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
+  withOrganizationDatabaseContext: (...parameters: unknown[]) =>
+    withOrganizationContextMock(...parameters),
 }));
 
 vi.mock('@/domains/notify/sub-domains/notification/notification.repository.js', () => ({
@@ -312,7 +313,7 @@ describe('notification.worker', () => {
         expect.any(Function),
       );
       expect(findByIdMock).toHaveBeenCalledWith(42, null);
-      // No tenant scope means withOrganizationContext is never touched.
+      // No tenant scope means withOrganizationDatabaseContext is never touched.
       expect(withOrganizationContextMock).not.toHaveBeenCalled();
       expect(result).toEqual({ channels: ['in_app:persisted'] });
     });
@@ -328,7 +329,7 @@ describe('notification.worker', () => {
       );
     });
 
-    it('uses withOrganizationContext (not the user-scope path) when organizationPublicId is set and no repo is injected', async () => {
+    it('uses withOrganizationDatabaseContext (not the user-scope path) when organizationPublicId is set and no repo is injected', async () => {
       const findByIdMock = vi.fn().mockResolvedValue(buildNotificationRow({ data: {} }));
       createWorkerNotificationRepositoryMock.mockReturnValue({
         findUserPublicIdForNotificationDispatch: vi.fn(),

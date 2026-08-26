@@ -1,6 +1,6 @@
 import type Stripe from 'stripe';
 import type { WorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
-import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
+import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import type { StripeWebhookEventRepository } from './stripe-webhook-event.repository.js';
 
@@ -128,7 +128,7 @@ export async function runWithOrganizationPublicIdForStripeWebhook<T>(
   organizationPublicId: string,
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
 ): Promise<T> {
-  return withOrganizationContext(organizationPublicId, callback);
+  return withOrganizationDatabaseContext(organizationPublicId, callback);
 }
 
 /**

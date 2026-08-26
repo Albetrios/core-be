@@ -299,7 +299,7 @@ export class WebhookDeliveryAttemptRepository {
   }
 }
 
-/** Worker-only factory — requires an explicit handle from `withOrganizationContext`. */
+/** Worker-only factory — requires an explicit handle from `withOrganizationDatabaseContext`. */
 export function createWorkerWebhookDeliveryAttemptRepository(
   databaseHandle: WorkerDatabaseHandle,
 ): WebhookDeliveryAttemptRepository {

@@ -6,6 +6,7 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import { applyApplicationDatabaseRole } from '@/tests/helpers/application-database-role.helper.js';
 import {
   grantCoreBeAppRoleForTests,
   executeAsCoreBeAppGlobalAdmin,
@@ -97,18 +98,16 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
 
     let caught: unknown;
     try {
-      await withGlobalRetentionCleanupDatabaseContext(
-        async (databaseHandle) => {
-          // No app.current_organization_id set — only global_retention_cleanup
-          // is active. Before the fix this would succeed. After the fix, RLS
-          // rejects it.
-          await databaseHandle.execute(
-            drizzleSql`INSERT INTO audit.logs (organization_id, action, resource_type, ip_address, user_agent, metadata)
+      await withGlobalRetentionCleanupDatabaseContext(async (databaseHandle) => {
+        await applyApplicationDatabaseRole(databaseHandle);
+        // No app.current_organization_id set — only global_retention_cleanup
+        // is active. Before the fix this would succeed. After the fix, RLS
+        // rejects it.
+        await databaseHandle.execute(
+          drizzleSql`INSERT INTO audit.logs (organization_id, action, resource_type, ip_address, user_agent, metadata)
                        VALUES (${organization.id}, 'test.d1.retention', 'test', '127.0.0.1', 'vitest', '{}'::jsonb)`,
-          );
-        },
-        { useApplicationDatabaseRole: true },
-      );
+        );
+      });
     } catch (error) {
       caught = error;
     }

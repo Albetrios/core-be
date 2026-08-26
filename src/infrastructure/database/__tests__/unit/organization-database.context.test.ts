@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
-import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
+import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import {
   getActiveOrganizationRlsCheckoutCount,
   type OrganizationRlsCheckoutHoldSample,
@@ -20,29 +20,73 @@ vi.mock('@/infrastructure/database/connection.js', () => ({
   },
 }));
 
-describe('withOrganizationContext', () => {
+describe('withOrganizationDatabaseContext', () => {
+  const originalRuntime = process.env.CORE_BE_RUNTIME;
+
   beforeEach(() => {
     resetOrganizationRlsCheckoutCountForTests();
   });
 
   afterEach(() => {
     resetOrganizationRlsCheckoutCountForTests();
+    if (originalRuntime === undefined) {
+      delete process.env.CORE_BE_RUNTIME;
+    } else {
+      process.env.CORE_BE_RUNTIME = originalRuntime;
+    }
+  });
+
+  it('keeps the connection-level HTTP timeouts outside worker runtime (only set_config runs)', async () => {
+    delete process.env.CORE_BE_RUNTIME;
+    mockExecute.mockClear();
+
+    await withOrganizationDatabaseContext('org_public_http_timeout', async () => undefined);
+
+    // Exactly one execute: SET LOCAL app.current_organization_id. No SET LOCAL
+    // statement_timeout / lock_timeout — HTTP units of work keep the 5s cap (PR #1122).
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it('lifts statement and lock timeouts to the worker budget in worker runtime', async () => {
+    process.env.CORE_BE_RUNTIME = 'worker';
+    mockExecute.mockClear();
+
+    await withOrganizationDatabaseContext('org_public_worker_timeout', async () => undefined);
+
+    // set_config + SET LOCAL statement_timeout + SET LOCAL lock_timeout.
+    expect(mockExecute).toHaveBeenCalledTimes(3);
   });
 
   it('pins ALS so getRequestDatabase returns the same handle passed to the callback', async () => {
-    await withOrganizationContext('org_public_test', async (databaseHandle) => {
+    await withOrganizationDatabaseContext('org_public_test', async (databaseHandle) => {
       expect(getRequestDatabase()).toBe(databaseHandle);
-      expect(databaseHandle).toBe(mockTransactionHandle);
+      // The handle is a scope-guarded proxy over the transaction handle — calls delegate through.
+      await databaseHandle.execute('SELECT 1' as never);
+      expect(mockExecute).toHaveBeenCalledWith('SELECT 1');
     });
 
     expect(mockExecute).toHaveBeenCalled();
     expect(getRequestDatabase()).not.toBe(mockTransactionHandle);
   });
 
+  it('throws when the handle is used after the context callback has ended', async () => {
+    let escapedHandle:
+      | Parameters<Parameters<typeof withOrganizationDatabaseContext>[1]>[0]
+      | undefined;
+
+    await withOrganizationDatabaseContext('org_public_escape', async (databaseHandle) => {
+      escapedHandle = databaseHandle;
+    });
+
+    expect(() => escapedHandle?.execute('SELECT 1' as never)).toThrow(
+      /Database handle used after its context ended/,
+    );
+  });
+
   it('counts a pooled checkout for the unit of work and releases it afterwards', async () => {
     expect(getActiveOrganizationRlsCheckoutCount()).toBe(0);
 
-    await withOrganizationContext('org_public_checkout', async () => {
+    await withOrganizationDatabaseContext('org_public_checkout', async () => {
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
     });
 
@@ -50,9 +94,9 @@ describe('withOrganizationContext', () => {
   });
 
   it('does not open a second checkout when the same organization is reused in a nested context', async () => {
-    await withOrganizationContext('org_public_nested', async () => {
+    await withOrganizationDatabaseContext('org_public_nested', async () => {
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
-      await withOrganizationContext('org_public_nested', async () => {
+      await withOrganizationDatabaseContext('org_public_nested', async () => {
         expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
       });
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
@@ -67,7 +111,7 @@ describe('withOrganizationContext', () => {
       samples.push(sample);
     });
 
-    await withOrganizationContext('org_public_hold', async () => undefined);
+    await withOrganizationDatabaseContext('org_public_hold', async () => undefined);
 
     expect(samples).toHaveLength(1);
     expect(samples[0]?.path).toBe('scoped_context');
@@ -81,7 +125,7 @@ describe('withOrganizationContext', () => {
     });
 
     await expect(
-      withOrganizationContext('org_public_throw', async () => {
+      withOrganizationDatabaseContext('org_public_throw', async () => {
         throw new Error('unit-of-work failed');
       }),
     ).rejects.toThrow('unit-of-work failed');

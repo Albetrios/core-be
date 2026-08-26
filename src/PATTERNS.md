@@ -15,8 +15,8 @@ Prevent cross-tenant data leaks. Every read and write performed under an organiz
 ### Where it lives
 
 - HTTP layer: [src/shared/middlewares/tenant/tenant.middleware.ts](src/shared/middlewares/tenant/tenant.middleware.ts) — reads `X-Organization-Id`, validates its format, and decorates `request.organizationId`. The **authoritative** active organization is the signed `org` JWT claim; routes carry no `{organization_id}` path segment.
-- Database layer: [src/infrastructure/database/contexts/tenant-database.context.ts](src/infrastructure/database/contexts/tenant-database.context.ts) and [organization-database.context.ts](src/infrastructure/database/contexts/organization-database.context.ts) — open a Drizzle transaction and `SET LOCAL app.current_organization_id = $1`. RLS policies on org-scoped tables read that GUC.
-- Worker layer: [src/infrastructure/queue/worker-runtime/worker-processor.util.ts](src/infrastructure/queue/worker-runtime/worker-processor.util.ts) — `runTenantScopedWorkerJob` requires `organizationPublicId` in the job payload and wraps the processor body in `withOrganizationContext` so RLS sees the same GUC the HTTP layer would have set.
+- Database layer: [src/infrastructure/database/contexts/organization-database.context.ts](src/infrastructure/database/contexts/organization-database.context.ts) and [organization-database.context.ts](src/infrastructure/database/contexts/organization-database.context.ts) — open a Drizzle transaction and `SET LOCAL app.current_organization_id = $1`. RLS policies on org-scoped tables read that GUC.
+- Worker layer: [src/infrastructure/queue/worker-runtime/worker-processor.util.ts](src/infrastructure/queue/worker-runtime/worker-processor.util.ts) — `runTenantScopedWorkerJob` requires `organizationPublicId` in the job payload and wraps the processor body in `withOrganizationDatabaseContext` so RLS sees the same GUC the HTTP layer would have set.
 
 ### Implementation
 
@@ -140,14 +140,14 @@ Postgres Row-Level Security is the **defense-in-depth** layer for tenant isolati
 
 ### Where it lives
 
-- Context wrappers: [src/infrastructure/database/contexts/](src/infrastructure/database/contexts/) — `withOrganizationContext`, `withGlobalRetentionCleanupDatabaseContext`, `withUserDatabaseContext`, `withSessionRetentionCleanupDatabaseContext`.
+- Context wrappers: [src/infrastructure/database/contexts/](src/infrastructure/database/contexts/) — `withOrganizationDatabaseContext`, `withGlobalRetentionCleanupDatabaseContext`, `withUserDatabaseContext`, `withSessionRetentionCleanupDatabaseContext`.
 - Worker runtime: `runTenantScopedWorkerJob`, `runGlobalRetentionWorkerJob`, `runUserScopedWorkerJob` in [src/infrastructure/queue/worker-runtime/worker-processor.util.ts](src/infrastructure/queue/worker-runtime/worker-processor.util.ts).
 - Migration: `migrations/00000000000000_init.sql` (consolidated baseline; defines the `app.global_retention_cleanup` RLS bypass policies) and other RLS-policy migrations under [migrations/](migrations/).
 
 ### Implementation
 
 - HTTP requests get RLS via `tenant.middleware` + `organization-rls-transaction.middleware` opening a request-scoped transaction with `SET LOCAL app.current_organization_id = $1`.
-- Workers get RLS via `runTenantScopedWorkerJob` which **requires** `organizationPublicId` in the job payload and opens its own `withOrganizationContext` transaction. Workers are forbidden from importing `request-database.context.ts` (enforced by `worker-database-guard.util.ts` and global tests).
+- Workers get RLS via `runTenantScopedWorkerJob` which **requires** `organizationPublicId` in the job payload and opens its own `withOrganizationDatabaseContext` transaction. Workers are forbidden from importing `request-database.context.ts` (enforced by `worker-database-guard.util.ts` and global tests).
 - Global-scope workers (cross-org sweeps) use `withGlobalRetentionCleanupDatabaseContext`, which sets a different GUC that RLS policies recognize as "global retention" — strictly limited to retention/cleanup operations.
 
 ### Each context grants only what a policy names

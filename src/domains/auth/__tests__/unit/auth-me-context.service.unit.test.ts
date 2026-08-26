@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 // The service establishes the user RLS context once so its three same-guc reads share a single
 // pooled checkout. That helper opens a real transaction, which a unit test has no database for —
 // so it is mocked to run the callback inline, matching how authorization.service.unit.test.ts
-// mocks tenant-database.context. What is under test here is the ORDER of the reads, not the
+// mocks organization-database.context. What is under test here is the ORDER of the reads, not the
 // context plumbing; the plumbing is covered by src/tests/security/rls.
 vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
   withUserDatabaseContext: vi.fn(async <T>(_userPublicId: string, callback: () => Promise<T>) =>

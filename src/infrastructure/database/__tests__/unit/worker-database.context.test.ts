@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
-import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
+import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import {
   withGlobalRetentionCleanupDatabaseContext,
   withSystemTableRetentionContext,
@@ -53,9 +53,9 @@ describe('worker database context', () => {
     expect(() => getRequestDatabase()).toThrow(WorkerDatabaseContextError);
   });
 
-  it('withOrganizationContext sets organization worker context kind', async () => {
+  it('withOrganizationDatabaseContext sets organization worker context kind', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
-    await withOrganizationContext('org_public_test', async () => {
+    await withOrganizationDatabaseContext('org_public_test', async () => {
       expect(getWorkerDatabaseContext()?.kind).toBe('organization');
       expect(getWorkerDatabaseContext()?.organizationPublicId).toBe('org_public_test');
     });
@@ -87,7 +87,7 @@ describe('worker database context', () => {
 
   it('assertWorkerForceRlsTableAccess allows organization context for tenant tables', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
-    await withOrganizationContext('org_public_test', async () => {
+    await withOrganizationDatabaseContext('org_public_test', async () => {
       expect(() =>
         assertWorkerForceRlsTableAccess({ schemaName: 'billing', tableName: 'subscriptions' }),
       ).not.toThrow();

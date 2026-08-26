@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type Stripe from 'stripe';
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: vi.fn(
+vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
+  withOrganizationDatabaseContext: vi.fn(
     async (_organizationPublicId: string, callback: (handle: unknown) => Promise<unknown>) =>
       callback({ tag: 'pinned-handle' }),
   ),

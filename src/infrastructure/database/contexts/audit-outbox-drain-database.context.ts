@@ -10,6 +10,7 @@ import {
   type WorkerContextDatabaseHandle,
 } from '@/infrastructure/database/utils/database-handle.types.js';
 import { applyWorkerStatementTimeout } from '@/infrastructure/database/contexts/worker-statement-timeout.util.js';
+import { createScopeGuardedDatabaseHandle } from '@/infrastructure/database/contexts/scope-guarded-database-handle.util.js';
 
 /**
  * Runs `callback` inside a single Postgres transaction with
@@ -37,12 +38,17 @@ export async function withAuditOutboxDrainDatabaseContext<T>(
 ): Promise<T> {
   return runWithWorkerDatabaseContext({ kind: 'audit_outbox_drain' }, () =>
     database.transaction(async (transaction) => {
-      const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-      await applyWorkerStatementTimeout(databaseHandle);
-      await setLocalDatabaseConfig(databaseHandle, 'app.audit_outbox_drain', 'true');
-      return runWithPinnedDatabaseHandle(databaseHandle, () =>
-        callback(brandWorkerContextDatabaseHandle(databaseHandle)),
-      );
+      const rawDatabaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+      await applyWorkerStatementTimeout(rawDatabaseHandle);
+      await setLocalDatabaseConfig(rawDatabaseHandle, 'app.audit_outbox_drain', 'true');
+      const guard = createScopeGuardedDatabaseHandle(rawDatabaseHandle);
+      try {
+        return await runWithPinnedDatabaseHandle(guard.databaseHandle, () =>
+          callback(brandWorkerContextDatabaseHandle(guard.databaseHandle)),
+        );
+      } finally {
+        guard.dispose();
+      }
     }),
   );
 }

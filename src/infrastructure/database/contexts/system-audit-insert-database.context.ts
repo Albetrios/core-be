@@ -1,4 +1,3 @@
-import { sql as drizzleSql } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
 import {
   runWithPinnedDatabaseHandle,
@@ -10,17 +9,7 @@ import {
   brandWorkerContextDatabaseHandle,
   type WorkerContextDatabaseHandle,
 } from '@/infrastructure/database/utils/database-handle.types.js';
-
-/** Options for {@link withSystemAuditInsertContext}. */
-export type SystemAuditInsertContextOptions = {
-  /**
-   * When true, `SET LOCAL ROLE core_be_app` so tests connected as the superuser
-   * `core` owner role still exercise the RLS WITH CHECK predicate the
-   * application sees in production. Without this, the harness's superuser
-   * bypass silently masks RLS regressions in writes.
-   */
-  useApplicationDatabaseRole?: boolean;
-};
+import { createScopeGuardedDatabaseHandle } from '@/infrastructure/database/contexts/scope-guarded-database-handle.util.js';
 
 /**
  * Runs a callback inside a transaction with `SET LOCAL app.system_audit_insert = 'true'`
@@ -43,18 +32,19 @@ export type SystemAuditInsertContextOptions = {
  */
 export async function withSystemAuditInsertContext<T>(
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
-  options?: SystemAuditInsertContextOptions,
 ): Promise<T> {
   return runWithWorkerDatabaseContext({ kind: 'system_table' }, () =>
     database.transaction(async (transaction) => {
-      const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-      if (options?.useApplicationDatabaseRole === true) {
-        await databaseHandle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
+      const rawDatabaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+      await setLocalDatabaseConfig(rawDatabaseHandle, 'app.system_audit_insert', 'true');
+      const guard = createScopeGuardedDatabaseHandle(rawDatabaseHandle);
+      try {
+        return await runWithPinnedDatabaseHandle(guard.databaseHandle, () =>
+          callback(brandWorkerContextDatabaseHandle(guard.databaseHandle)),
+        );
+      } finally {
+        guard.dispose();
       }
-      await setLocalDatabaseConfig(databaseHandle, 'app.system_audit_insert', 'true');
-      return runWithPinnedDatabaseHandle(databaseHandle, () =>
-        callback(brandWorkerContextDatabaseHandle(databaseHandle)),
-      );
     }),
   );
 }

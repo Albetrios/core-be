@@ -1,4 +1,3 @@
-import { sql as drizzleSql } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
 import {
   runWithPinnedDatabaseHandle,
@@ -11,6 +10,7 @@ import {
   type WorkerContextDatabaseHandle,
 } from '@/infrastructure/database/utils/database-handle.types.js';
 import { applyWorkerStatementTimeout } from '@/infrastructure/database/contexts/worker-statement-timeout.util.js';
+import { createScopeGuardedDatabaseHandle } from '@/infrastructure/database/contexts/scope-guarded-database-handle.util.js';
 
 /**
  * Runs a callback inside a Postgres transaction with the worker statement-timeout
@@ -38,43 +38,84 @@ export async function withSystemTableRetentionContext<T>(
 ): Promise<T> {
   return runWithWorkerDatabaseContext({ kind: 'system_table' }, () =>
     database.transaction(async (transaction) => {
-      const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-      await applyWorkerStatementTimeout(databaseHandle);
-      return runWithPinnedDatabaseHandle(databaseHandle, () =>
-        callback(brandWorkerContextDatabaseHandle(databaseHandle)),
-      );
+      const rawDatabaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+      await applyWorkerStatementTimeout(rawDatabaseHandle);
+      const guard = createScopeGuardedDatabaseHandle(rawDatabaseHandle);
+      try {
+        return await runWithPinnedDatabaseHandle(guard.databaseHandle, () =>
+          callback(brandWorkerContextDatabaseHandle(guard.databaseHandle)),
+        );
+      } finally {
+        guard.dispose();
+      }
     }),
   );
 }
 
-/** Options for {@link withGlobalRetentionCleanupDatabaseContext}. */
-export type GlobalRetentionCleanupDatabaseContextOptions = {
-  /** When true, `SET LOCAL ROLE core_be_app` for tests that connect as a privileged owner role. */
-  useApplicationDatabaseRole?: boolean;
-};
-
 /**
  * Runs a callback inside a transaction with `SET LOCAL app.global_retention_cleanup = true`
  * so tombstone and cross-tenant retention workers can access FORCE RLS tables under `core_be_app`.
+ *
+ * @remarks
+ * - **SECURITY:** this GUC is an RLS bypass — every tenant policy ORs it in. Only
+ *   retention/tombstone workers may enter this wrapper; never call it from a
+ *   request path. Tests that connect as a privileged owner role and need the
+ *   application role apply `SET LOCAL ROLE` themselves as the first statement of
+ *   the callback (see `src/tests/helpers/application-database-role.helper.ts`).
+ * - **Failure modes:** transaction rolls back if the callback throws; the GUC dies
+ *   with the transaction. The callback's handle is scope-guarded — use after the
+ *   callback settles throws.
  */
 export async function withGlobalRetentionCleanupDatabaseContext<T>(
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
-  options?: GlobalRetentionCleanupDatabaseContextOptions,
 ): Promise<T> {
   return runWithWorkerDatabaseContext({ kind: 'global_retention_cleanup' }, () =>
     database.transaction(async (transaction) => {
-      const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-      if (options?.useApplicationDatabaseRole === true) {
-        await databaseHandle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
-      }
+      const rawDatabaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
       // sec-D2: lift the connection-level HTTP statement_timeout (5 s) for
       // background work — retention deletes that cascade through audit/
       // session tables would otherwise be killed mid-statement.
-      await applyWorkerStatementTimeout(databaseHandle);
-      await setLocalDatabaseConfig(databaseHandle, 'app.global_retention_cleanup', 'true');
-      return runWithPinnedDatabaseHandle(databaseHandle, () =>
-        callback(brandWorkerContextDatabaseHandle(databaseHandle)),
-      );
+      await applyWorkerStatementTimeout(rawDatabaseHandle);
+      await setLocalDatabaseConfig(rawDatabaseHandle, 'app.global_retention_cleanup', 'true');
+      const guard = createScopeGuardedDatabaseHandle(rawDatabaseHandle);
+      try {
+        return await runWithPinnedDatabaseHandle(guard.databaseHandle, () =>
+          callback(brandWorkerContextDatabaseHandle(guard.databaseHandle)),
+        );
+      } finally {
+        guard.dispose();
+      }
+    }),
+  );
+}
+
+/**
+ * Allows cross-user session retention deletes from the cleanup worker
+ * (`SET LOCAL app.session_retention_cleanup = 'true'`).
+ *
+ * @remarks
+ * - **SECURITY:** cross-user bypass on `auth.sessions` — worker-only, retention
+ *   sibling of {@link withGlobalRetentionCleanupDatabaseContext}; never call it
+ *   from a request path.
+ * - **Notes:** sec-D2 — worker-only wrapper, so the HTTP 5 s statement_timeout is
+ *   lifted so the cascade-delete does not abort on production-sized session tables.
+ */
+export async function withSessionRetentionCleanupDatabaseContext<T>(
+  callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
+): Promise<T> {
+  return runWithWorkerDatabaseContext({ kind: 'session_retention_cleanup' }, () =>
+    database.transaction(async (transaction) => {
+      const rawDatabaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+      await applyWorkerStatementTimeout(rawDatabaseHandle);
+      await setLocalDatabaseConfig(rawDatabaseHandle, 'app.session_retention_cleanup', 'true');
+      const guard = createScopeGuardedDatabaseHandle(rawDatabaseHandle);
+      try {
+        return await runWithPinnedDatabaseHandle(guard.databaseHandle, () =>
+          callback(brandWorkerContextDatabaseHandle(guard.databaseHandle)),
+        );
+      } finally {
+        guard.dispose();
+      }
     }),
   );
 }

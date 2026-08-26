@@ -9,6 +9,7 @@ import {
   executeAsCoreBeAppTenant,
 } from '@/tests/helpers/rls-matrix.helper.js';
 import { withSystemAuditInsertContext } from '@/infrastructure/database/contexts/system-audit-insert-database.context.js';
+import { applyApplicationDatabaseRole } from '@/tests/helpers/application-database-role.helper.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
 /**
@@ -127,10 +128,10 @@ describe('Security: audit.outbox INSERT RLS (audit R10)', () => {
   it('R10 FIX: core_be_app under system-audit-insert context CAN INSERT the tenantless outbox row', async () => {
     let caught: unknown;
     try {
-      await withSystemAuditInsertContext(
-        (databaseHandle) => databaseHandle.execute(outboxInsertSql(null)),
-        { useApplicationDatabaseRole: true },
-      );
+      await withSystemAuditInsertContext(async (databaseHandle) => {
+        await applyApplicationDatabaseRole(databaseHandle);
+        await databaseHandle.execute(outboxInsertSql(null));
+      });
     } catch (error) {
       caught = error;
     }

@@ -54,8 +54,8 @@ vi.mock(
   }),
 );
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: async (
+vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
+  withOrganizationDatabaseContext: async (
     _organizationPublicId: string,
     callback: (databaseHandle: never) => unknown,
   ) => callback({} as never),

@@ -6,6 +6,7 @@ import { createTestOrganization } from '@/tests/factories/organization.factory.j
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { grantCoreBeAppRoleForTests } from '@/tests/helpers/rls-matrix.helper.js';
 import { withSystemAuditInsertContext } from '@/infrastructure/database/contexts/system-audit-insert-database.context.js';
+import { applyApplicationDatabaseRole } from '@/tests/helpers/application-database-role.helper.js';
 
 /**
  * Regression for sec-r5-async-queue-1.
@@ -24,9 +25,10 @@ import { withSystemAuditInsertContext } from '@/infrastructure/database/contexts
  * arm requires `organization_id IS NULL`, a process that flips this GUC
  * cannot impersonate a tenant — only tenantless rows can be written.
  *
- * These tests MUST run under `SET LOCAL ROLE core_be_app` (provided by the
- * context helper's `useApplicationDatabaseRole` option) so the harness's
- * superuser `core` role bypass does not silently mask RLS regressions.
+ * These tests MUST run under `SET LOCAL ROLE core_be_app` (applied via the
+ * `applyApplicationDatabaseRole` test helper as the first statement of each
+ * context callback) so the harness's superuser `core` role bypass does not
+ * silently mask RLS regressions.
  */
 async function isSystemAuditInsertArmApplied(): Promise<boolean> {
   const rows = await sql<{ with_check: string | null }[]>`
@@ -60,15 +62,13 @@ describe('Security: audit.logs INSERT system-audit arm (sec-r5-async-queue-1)', 
 
     let caught: unknown;
     try {
-      await withSystemAuditInsertContext(
-        async (databaseHandle) => {
-          await databaseHandle.execute(
-            drizzleSql`INSERT INTO audit.logs (organization_id, actor_user_id, action, resource_type, metadata, severity)
-                       VALUES (NULL, NULL, 'test.r5.system_audit', 'test', '{}'::jsonb, 'INFO')`,
-          );
-        },
-        { useApplicationDatabaseRole: true },
-      );
+      await withSystemAuditInsertContext(async (databaseHandle) => {
+        await applyApplicationDatabaseRole(databaseHandle);
+        await databaseHandle.execute(
+          drizzleSql`INSERT INTO audit.logs (organization_id, actor_user_id, action, resource_type, metadata, severity)
+                     VALUES (NULL, NULL, 'test.r5.system_audit', 'test', '{}'::jsonb, 'INFO')`,
+        );
+      });
     } catch (error) {
       caught = error;
     }
@@ -92,18 +92,16 @@ describe('Security: audit.logs INSERT system-audit arm (sec-r5-async-queue-1)', 
 
     let caught: unknown;
     try {
-      await withSystemAuditInsertContext(
-        async (databaseHandle) => {
-          // Attempt to pin a real tenant on the row while only the
-          // system-audit-insert GUC is active. The new arm requires
-          // organization_id IS NULL — RLS must reject this.
-          await databaseHandle.execute(
-            drizzleSql`INSERT INTO audit.logs (organization_id, actor_user_id, action, resource_type, metadata, severity)
-                       VALUES (${organization.id}, NULL, 'test.r5.impersonate', 'test', '{}'::jsonb, 'INFO')`,
-          );
-        },
-        { useApplicationDatabaseRole: true },
-      );
+      await withSystemAuditInsertContext(async (databaseHandle) => {
+        await applyApplicationDatabaseRole(databaseHandle);
+        // Attempt to pin a real tenant on the row while only the
+        // system-audit-insert GUC is active. The new arm requires
+        // organization_id IS NULL — RLS must reject this.
+        await databaseHandle.execute(
+          drizzleSql`INSERT INTO audit.logs (organization_id, actor_user_id, action, resource_type, metadata, severity)
+                     VALUES (${organization.id}, NULL, 'test.r5.impersonate', 'test', '{}'::jsonb, 'INFO')`,
+        );
+      });
     } catch (error) {
       caught = error;
     }

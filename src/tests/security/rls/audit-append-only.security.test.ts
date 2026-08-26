@@ -6,6 +6,7 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import { applyApplicationDatabaseRole } from '@/tests/helpers/application-database-role.helper.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import {
   grantCoreBeAppRoleForTests,
@@ -135,12 +136,10 @@ describe('Security: audit.logs is append-only at the DB layer (sec-U3)', () => {
     const organization = await createTestOrganization({ ownerUserId: owner.id });
     const rowId = await seedAuditRowForOrganization(organization.id);
 
-    await withGlobalRetentionCleanupDatabaseContext(
-      async (databaseHandle) => {
-        await databaseHandle.execute(drizzleSql`DELETE FROM audit.logs WHERE id = ${rowId}`);
-      },
-      { useApplicationDatabaseRole: true },
-    );
+    await withGlobalRetentionCleanupDatabaseContext(async (databaseHandle) => {
+      await applyApplicationDatabaseRole(databaseHandle);
+      await databaseHandle.execute(drizzleSql`DELETE FROM audit.logs WHERE id = ${rowId}`);
+    });
 
     const after = await database.select({ id: logs.id }).from(logs).where(eq(logs.id, rowId));
     expect(after).toHaveLength(0);

@@ -384,7 +384,7 @@ export class SubscriptionRepository {
   }
 }
 
-/** Worker-only factory — requires an explicit handle from `withOrganizationContext`. */
+/** Worker-only factory — requires an explicit handle from `withOrganizationDatabaseContext`. */
 export function createWorkerSubscriptionRepository(
   databaseHandle: WorkerDatabaseHandle,
 ): SubscriptionRepository {

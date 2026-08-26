@@ -13,7 +13,7 @@ import {
   brandWorkerContextDatabaseHandle,
   type WorkerContextDatabaseHandle,
 } from '@/infrastructure/database/utils/database-handle.types.js';
-import { applyWorkerStatementTimeout } from '@/infrastructure/database/contexts/worker-statement-timeout.util.js';
+import { createScopeGuardedDatabaseHandle } from '@/infrastructure/database/contexts/scope-guarded-database-handle.util.js';
 
 /**
  * Sets `app.current_user_id` (auth.users public_id) for user-scoped RLS policies.
@@ -28,6 +28,8 @@ import { applyWorkerStatementTimeout } from '@/infrastructure/database/contexts/
  * see it (FK / RLS subquery) nor preserve atomicity. Only when no handle is pinned (e.g. a
  * plain authenticated HTTP request without `X-Organization-Id`) does it open its own
  * transaction. `SET LOCAL` resets at transaction end, matching the existing org-session path.
+ * Fresh transactions hand the callback a scope-guarded handle — using it after the
+ * callback settles throws instead of silently querying outside the transaction.
  */
 export async function withUserDatabaseContext<T>(
   userPublicId: string,
@@ -45,11 +47,16 @@ export async function withUserDatabaseContext<T>(
     }
 
     return database.transaction(async (transaction) => {
-      const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-      await setLocalDatabaseConfig(databaseHandle, 'app.current_user_id', userPublicId);
-      return runWithPinnedDatabaseHandle(databaseHandle, () =>
-        callback(brandWorkerContextDatabaseHandle(databaseHandle)),
-      );
+      const rawDatabaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+      await setLocalDatabaseConfig(rawDatabaseHandle, 'app.current_user_id', userPublicId);
+      const guard = createScopeGuardedDatabaseHandle(rawDatabaseHandle);
+      try {
+        return await runWithPinnedDatabaseHandle(guard.databaseHandle, () =>
+          callback(brandWorkerContextDatabaseHandle(guard.databaseHandle)),
+        );
+      } finally {
+        guard.dispose();
+      }
     });
   });
 }
@@ -62,9 +69,20 @@ export async function withSessionPublicIdDatabaseContext<T>(
   callback: (databaseHandle: RequestScopedPostgresDatabase) => Promise<T>,
 ): Promise<T> {
   return database.transaction(async (transaction) => {
-    const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-    await setLocalDatabaseConfig(databaseHandle, 'app.current_session_public_id', sessionPublicId);
-    return runWithPinnedDatabaseHandle(databaseHandle, () => callback(databaseHandle));
+    const rawDatabaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+    await setLocalDatabaseConfig(
+      rawDatabaseHandle,
+      'app.current_session_public_id',
+      sessionPublicId,
+    );
+    const guard = createScopeGuardedDatabaseHandle(rawDatabaseHandle);
+    try {
+      return await runWithPinnedDatabaseHandle(guard.databaseHandle, () =>
+        callback(guard.databaseHandle),
+      );
+    } finally {
+      guard.dispose();
+    }
   });
 }
 
@@ -76,29 +94,15 @@ export async function withSessionTokenHashDatabaseContext<T>(
   callback: (databaseHandle: RequestScopedPostgresDatabase) => Promise<T>,
 ): Promise<T> {
   return database.transaction(async (transaction) => {
-    const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-    await setLocalDatabaseConfig(databaseHandle, 'app.current_session_token_hash', tokenHash);
-    return runWithPinnedDatabaseHandle(databaseHandle, () => callback(databaseHandle));
-  });
-}
-
-/**
- * Allows cross-user session retention deletes from the cleanup worker.
- */
-export async function withSessionRetentionCleanupDatabaseContext<T>(
-  callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
-): Promise<T> {
-  return runWithWorkerDatabaseContext({ kind: 'session_retention_cleanup' }, () =>
-    database.transaction(async (transaction) => {
-      const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-      // sec-D2: this wrapper is worker-only (cross-user session retention
-      // deletes). Lift the HTTP 5 s statement_timeout so the cascade-delete
-      // does not abort on production-sized session tables.
-      await applyWorkerStatementTimeout(databaseHandle);
-      await setLocalDatabaseConfig(databaseHandle, 'app.session_retention_cleanup', 'true');
-      return runWithPinnedDatabaseHandle(databaseHandle, () =>
-        callback(brandWorkerContextDatabaseHandle(databaseHandle)),
+    const rawDatabaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+    await setLocalDatabaseConfig(rawDatabaseHandle, 'app.current_session_token_hash', tokenHash);
+    const guard = createScopeGuardedDatabaseHandle(rawDatabaseHandle);
+    try {
+      return await runWithPinnedDatabaseHandle(guard.databaseHandle, () =>
+        callback(guard.databaseHandle),
       );
-    }),
-  );
+    } finally {
+      guard.dispose();
+    }
+  });
 }

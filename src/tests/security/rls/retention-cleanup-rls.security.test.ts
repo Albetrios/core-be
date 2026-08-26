@@ -9,6 +9,7 @@ import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestWebhook } from '@/tests/factories/webhook.factory.js';
 import { deleteInBatchesByCondition } from '@/infrastructure/database/utils/batch-delete.util.js';
 import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import { applyApplicationDatabaseRole } from '@/tests/helpers/application-database-role.helper.js';
 import { webhooks } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
 import { grantCoreBeAppRoleForTests } from '@/tests/helpers/rls-matrix.helper.js';
 
@@ -78,16 +79,17 @@ describe('Security: retention cleanup RLS', () => {
     expect(withoutRetentionGuc.deletedCount).toBe(0);
 
     const withRetentionGuc = await withGlobalRetentionCleanupDatabaseContext(
-      async (databaseHandle) =>
-        deleteInBatchesByCondition({
+      async (databaseHandle) => {
+        await applyApplicationDatabaseRole(databaseHandle);
+        return deleteInBatchesByCondition({
           databaseHandle,
           table: webhooks,
           idColumn: webhooks.id,
           whereCondition: and(isNotNull(webhooks.deleted_at), lt(webhooks.deleted_at, cutoffDate))!,
           logContext: 'retention-cleanup-rls-test-with-guc',
           tableLabel: 'notify.webhooks',
-        }),
-      { useApplicationDatabaseRole: true },
+        });
+      },
     );
 
     expect(withRetentionGuc.deletedCount).toBe(1);

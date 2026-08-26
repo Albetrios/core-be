@@ -3,6 +3,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import { applyApplicationDatabaseRole } from '@/tests/helpers/application-database-role.helper.js';
 import {
   grantCoreBeAppRoleForTests,
   executeAsCoreBeAppTenant,
@@ -93,15 +94,14 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
 
     let caught: unknown;
     try {
-      await withGlobalRetentionCleanupDatabaseContext(
-        async (databaseHandle) =>
-          databaseHandle.execute(
-            drizzleSql.raw(
-              `UPDATE "billing"."subscriptions" SET organization_id = ${organizationAInternalId} WHERE id = ${rowIds.organizationB} RETURNING id`,
-            ),
+      await withGlobalRetentionCleanupDatabaseContext(async (databaseHandle) => {
+        await applyApplicationDatabaseRole(databaseHandle);
+        await databaseHandle.execute(
+          drizzleSql.raw(
+            `UPDATE "billing"."subscriptions" SET organization_id = ${organizationAInternalId} WHERE id = ${rowIds.organizationB} RETURNING id`,
           ),
-        { useApplicationDatabaseRole: true },
-      );
+        );
+      });
     } catch (error) {
       caught = error;
     }
@@ -116,18 +116,16 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
   it('still allows a retention-context DELETE via the USING bypass (positive control)', async () => {
     const rowIds = fixture.rowIdsByTable.get(tableKey('billing', 'subscriptions'))!;
 
-    const deletedCount = await withGlobalRetentionCleanupDatabaseContext(
-      async (databaseHandle) => {
-        const result = await databaseHandle.execute(
-          drizzleSql.raw(
-            `DELETE FROM "billing"."subscriptions" WHERE id = ${rowIds.organizationB} RETURNING id`,
-          ),
-        );
-        const rows = Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? []);
-        return rows.length;
-      },
-      { useApplicationDatabaseRole: true },
-    );
+    const deletedCount = await withGlobalRetentionCleanupDatabaseContext(async (databaseHandle) => {
+      await applyApplicationDatabaseRole(databaseHandle);
+      const result = await databaseHandle.execute(
+        drizzleSql.raw(
+          `DELETE FROM "billing"."subscriptions" WHERE id = ${rowIds.organizationB} RETURNING id`,
+        ),
+      );
+      const rows = Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? []);
+      return rows.length;
+    });
 
     expect(deletedCount).toBe(1);
   });

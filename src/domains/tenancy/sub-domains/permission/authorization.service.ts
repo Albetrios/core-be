@@ -1,4 +1,4 @@
-import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
+import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { ConfigurationError } from '@/shared/errors/index.js';
 import {
@@ -45,10 +45,10 @@ function getPermissionRepository(): PermissionRepository {
  * Redis cache entirely (no read, no write).
  *
  * @remarks
- * - **Algorithm:** runs the 5-table join under {@link withOrganizationContext} so RLS is
+ * - **Algorithm:** runs the 5-table join under {@link withOrganizationDatabaseContext} so RLS is
  *   satisfied; never consults or writes the `perm:*` cache.
  * - **Failure modes:** database errors bubble up.
- * - **Side effects:** transient Postgres GUC mutation via `withOrganizationContext` only.
+ * - **Side effects:** transient Postgres GUC mutation via `withOrganizationDatabaseContext` only.
  * - **Notes:** used by privilege-escalation guards (sec-r5-L3) where a stale, up-to-5-minute
  *   cached set could let a just-revoked code still be granted. Most callers should prefer the
  *   cached {@link resolvePermissionsWithRepository} path.
@@ -58,7 +58,7 @@ async function resolvePermissionsFromDatabase(
   userPublicId: string,
   organizationPublicId: string,
 ): Promise<string[]> {
-  return withOrganizationContext(organizationPublicId, async (databaseHandle) =>
+  return withOrganizationDatabaseContext(organizationPublicId, async (databaseHandle) =>
     repository.findPermissionCodesForUserInOrganization(
       userPublicId,
       organizationPublicId,
@@ -96,14 +96,14 @@ async function resolvePermissionsWithRepository(
  *   per-(user, organization) Redis recompute lock via
  *   {@link withPermissionCacheRecomputeLock}, then runs the 5-table join
  *   (`role_permissions → roles → memberships → users + organizations`) under
- *   {@link withOrganizationContext} so RLS is satisfied; the lock wrapper then
+ *   {@link withOrganizationDatabaseContext} so RLS is satisfied; the lock wrapper then
  *   writes the result to the cache (TTL plus jitter) guarded on the lock nonce.
  * - **Failure modes:** `ConfigurationError` if {@link configureAuthorization}
  *   has not been invoked; Redis errors degrade to a direct database lookup
  *   (logged); database errors bubble up.
  * - **Side effects:** reads and writes Redis under the `perm:*` keyspace;
  *   takes a brief recompute lock; transient Postgres GUC mutation through
- *   `withOrganizationContext`.
+ *   `withOrganizationDatabaseContext`.
  * - **Notes:** module-level wrapper around the class-based
  *   {@link AuthorizationService} so legacy preHandlers without DI can still
  *   call it. Cache entries are invalidated via
@@ -188,7 +188,7 @@ export class AuthorizationService {
    * - **Algorithm:** delegates to {@link resolvePermissionsFromDatabase} — no `perm:*` cache
    *   read or write.
    * - **Failure modes:** database errors surface to the caller.
-   * - **Side effects:** transient Postgres GUC mutation via `withOrganizationContext`.
+   * - **Side effects:** transient Postgres GUC mutation via `withOrganizationDatabaseContext`.
    * - **Notes:** sec-r5-L3 — used by {@link assertCallerCanGrantPermissionCodes} so a
    *   privilege-escalation check never trusts a stale (up-to-5-minute) cached set.
    */

@@ -114,7 +114,7 @@ describe('worker database guard — request-database.context pattern (audit #5)'
   it('does not match an unrelated database import', () => {
     expect(
       requestContextRule?.pattern.test(
-        importLine('@/infrastructure/database/contexts/tenant-database.context.js'),
+        importLine('@/infrastructure/database/contexts/organization-database.context.js'),
       ),
     ).toBe(false);
   });

@@ -9,7 +9,7 @@ import { SESSION_CLEANUP_QUEUE_NAME } from '@/domains/auth/sub-domains/auth-sess
 import { sessions } from '@/domains/auth/sub-domains/auth-session/auth-session.schema.js';
 import { lt, or, eq, and } from 'drizzle-orm';
 import { deleteInBatchesByCondition } from '@/infrastructure/database/utils/batch-delete.util.js';
-import { withSessionRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
+import { withSessionRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { env } from '@/shared/config/env.config.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';

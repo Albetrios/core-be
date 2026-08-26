@@ -54,8 +54,8 @@ vi.mock('@/shared/utils/security/webhook-url.util.js', () => ({
   validateWebhookUrl: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: vi.fn(
+vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
+  withOrganizationDatabaseContext: vi.fn(
     (_organizationPublicId: string, callback: (databaseHandle: unknown) => Promise<unknown>) =>
       callback({}),
   ),

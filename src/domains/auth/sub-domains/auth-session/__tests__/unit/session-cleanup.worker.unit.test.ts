@@ -37,7 +37,7 @@ vi.mock('@/infrastructure/database/utils/batch-delete.util.js', () => ({
     deleteInBatchesByConditionMock(...parameters),
 }));
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
+vi.mock('@/infrastructure/database/contexts/retention-database.context.js', () => ({
   withSessionRetentionCleanupDatabaseContext: (callback: (databaseHandle: unknown) => unknown) =>
     withSessionRetentionCleanupDatabaseContextMock(callback),
 }));

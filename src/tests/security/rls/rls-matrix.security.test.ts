@@ -295,7 +295,7 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
 
   describe('permission resolution under ORG-only FORCE RLS (no app.current_user_id)', () => {
     // Regression guard: requireOrganizationPermission resolves permissions inside
-    // withOrganizationContext, which sets app.current_organization_id but NOT
+    // withOrganizationDatabaseContext, which sets app.current_organization_id but NOT
     // app.current_user_id. Under the non-superuser core_be_app role with FORCE RLS,
     // a direct auth.users join returned zero rows → empty permission set → 403 on all
     // org PERM-gated routes in production (CI runs as a superuser and never saw it).

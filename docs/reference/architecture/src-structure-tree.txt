@@ -1126,7 +1126,8 @@ src/
     │   │   │   ├── assert-connection-budget.unit.test.ts
     │   │   │   ├── assert-database-rls-safety.unit.test.ts
     │   │   │   ├── assert-database-tls-safety.unit.test.ts
-    │   │   │   ├── tenant-database.context.test.ts
+    │   │   │   ├── organization-database.context.test.ts
+    │   │   │   ├── scope-guarded-database-handle.unit.test.ts
     │   │   │   ├── worker-context-database-handle.unit.test.ts
     │   │   │   └── worker-database.context.test.ts
     │   ├── contexts/
@@ -1135,8 +1136,8 @@ src/
     │   │   ├── organization-database.context.ts
     │   │   ├── request-database.context.ts
     │   │   ├── retention-database.context.ts
+    │   │   ├── scope-guarded-database-handle.util.ts
     │   │   ├── system-audit-insert-database.context.ts
-    │   │   ├── tenant-database.context.ts
     │   │   ├── user-database.context.ts
     │   │   ├── worker-database-guard.util.ts
     │   │   ├── worker-database.context.error.ts
@@ -1792,6 +1793,7 @@ src/
     │   │   └── unit/
     │   │   │   ├── test-api-prefix.helper.unit.test.ts
     │   │   │   └── test-http-inject.helper.unit.test.ts
+    │   ├── application-database-role.helper.ts
     │   ├── audit-log-partition.helper.ts
     │   ├── fast-check-property.util.ts
     │   ├── object-storage-mock.helper.ts
