@@ -9,6 +9,8 @@ import {
   requireAuth,
   requirePrincipal,
   resolveActiveOrganizationId,
+  resolvePrincipalDatabaseScope,
+  requireOrganizationPrincipalDatabaseScope,
 } from '@/shared/utils/http/request.util.js';
 import type { ApiKeyAuthContext, UserAuthContext } from '@/shared/types/index.js';
 import type { FastifyRequest } from 'fastify';
@@ -136,6 +138,71 @@ describe('request.util', () => {
         auth: userPrincipal,
       });
       expect(() => resolveActiveOrganizationId(request)).toThrow(ValidationError);
+    });
+  });
+});
+
+describe('principal database scope minters', () => {
+  const pathOrg = 'org_a1b2c3d4e5f6g7h8i9j0k';
+  const claimOrg = 'org_z9y8x7w6v5u4t3s2r1q0p';
+
+  describe('resolvePrincipalDatabaseScope', () => {
+    it('mints user + organization scope from a user principal with an org claim', () => {
+      const request = mockRequest({ auth: { ...userPrincipal, organizationPublicId: claimOrg } });
+      const scope = resolvePrincipalDatabaseScope(request);
+      expect(scope.userPublicId).toBe(userPrincipal.userId);
+      expect(scope.organizationPublicId).toBe(claimOrg);
+      expect(scope.source).toBe('token');
+    });
+
+    it('mints a user-only scope when no organization is in scope', () => {
+      const request = mockRequest({ auth: userPrincipal });
+      const scope = resolvePrincipalDatabaseScope(request);
+      expect(scope.userPublicId).toBe(userPrincipal.userId);
+      expect(scope.organizationPublicId).toBeUndefined();
+    });
+
+    it('prefers the {organization_id} path param over the claim (permission-check precedence)', () => {
+      const request = mockRequest({
+        params: { organization_id: pathOrg } as Record<string, string>,
+        auth: { ...userPrincipal, organizationPublicId: claimOrg },
+      });
+      expect(resolvePrincipalDatabaseScope(request).organizationPublicId).toBe(pathOrg);
+    });
+
+    it('mints an organization-only scope for an API-key principal (no user identity)', () => {
+      const request = mockRequest({
+        auth: { ...apiKeyPrincipal, organizationPublicId: claimOrg },
+      });
+      const scope = resolvePrincipalDatabaseScope(request);
+      expect(scope.userPublicId).toBeUndefined();
+      expect(scope.organizationPublicId).toBe(claimOrg);
+    });
+
+    it('throws UnauthorizedError when unauthenticated', () => {
+      expect(() => resolvePrincipalDatabaseScope(mockRequest())).toThrow(UnauthorizedError);
+    });
+
+    it('throws ValidationError for a malformed path organization id', () => {
+      const request = mockRequest({
+        params: { organization_id: 'not-a-public-id' } as Record<string, string>,
+        auth: { ...userPrincipal, organizationPublicId: claimOrg },
+      });
+      expect(() => resolvePrincipalDatabaseScope(request)).toThrow(ValidationError);
+    });
+  });
+
+  describe('requireOrganizationPrincipalDatabaseScope', () => {
+    it('returns the scope when an organization is in scope', () => {
+      const request = mockRequest({ auth: { ...userPrincipal, organizationPublicId: claimOrg } });
+      expect(requireOrganizationPrincipalDatabaseScope(request).organizationPublicId).toBe(
+        claimOrg,
+      );
+    });
+
+    it('throws ForbiddenError when no organization is in scope', () => {
+      const request = mockRequest({ auth: userPrincipal });
+      expect(() => requireOrganizationPrincipalDatabaseScope(request)).toThrow(ForbiddenError);
     });
   });
 });

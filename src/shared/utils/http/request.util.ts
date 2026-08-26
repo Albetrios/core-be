@@ -2,6 +2,11 @@ import type { FastifyRequest } from 'fastify';
 import { ForbiddenError, UnauthorizedError } from '@/shared/errors/index.js';
 import type { ApiKeyAuthContext, AuthContext, UserAuthContext } from '@/shared/types/index.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+  type PrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 
 /** Returns the per-request id Fastify generates (used for log correlation, audit fields, idempotency). */
 export function getRequestIdentifier(request: FastifyRequest): string {
@@ -92,4 +97,56 @@ export function resolveActiveOrganizationId(request: FastifyRequest): string {
     throw new ForbiddenError('errors:organizationContextRequired');
   }
   return validatePublicIdParam(organizationId, 'organization_id');
+}
+
+/**
+ * Mints the {@link PrincipalDatabaseScope} for the authenticated request — the single
+ * token-derived identity object services relay into `withPrincipalDatabaseContext`.
+ *
+ * @remarks
+ * - **Algorithm:** requires an authenticated principal. A user principal yields
+ *   `userPublicId` plus, when an organization is in scope, `organizationPublicId`
+ *   resolved with the SAME path-param-else-claim precedence (and validation) as
+ *   {@link resolveActiveOrganizationId}. An API-key principal yields only the
+ *   organization pinned to the key — API keys have no user identity.
+ * - **Failure modes:** {@link UnauthorizedError} when unauthenticated;
+ *   `ValidationError` when a path-supplied organization id is malformed.
+ * - **Side effects:** none.
+ * - **Notes:** organization presence is OPTIONAL here — use
+ *   {@link requireOrganizationPrincipalDatabaseScope} for org-scoped routes.
+ */
+export function resolvePrincipalDatabaseScope(request: FastifyRequest): PrincipalDatabaseScope {
+  const auth = requirePrincipal(request);
+  if (auth.kind === 'apiKey') {
+    return createPrincipalDatabaseScope({
+      organizationPublicId: validatePublicIdParam(auth.organizationPublicId, 'organization_id'),
+      source: 'token',
+    });
+  }
+  const params = request.params as Record<string, string> | undefined;
+  const organizationId = params?.organization_id ?? auth.organizationPublicId;
+  return createPrincipalDatabaseScope({
+    userPublicId: auth.userId,
+    organizationPublicId:
+      organizationId === undefined
+        ? undefined
+        : validatePublicIdParam(organizationId, 'organization_id'),
+    source: 'token',
+  });
+}
+
+/**
+ * Mints an {@link OrganizationPrincipalDatabaseScope} — like
+ * {@link resolvePrincipalDatabaseScope} but guarantees an organization is in scope,
+ * throwing {@link ForbiddenError} (`errors:organizationContextRequired`) otherwise.
+ * The accessor org-scoped controllers hand to org-scoped service methods.
+ */
+export function requireOrganizationPrincipalDatabaseScope(
+  request: FastifyRequest,
+): OrganizationPrincipalDatabaseScope {
+  const scope = resolvePrincipalDatabaseScope(request);
+  if (scope.organizationPublicId === undefined) {
+    throw new ForbiddenError('errors:organizationContextRequired');
+  }
+  return scope as OrganizationPrincipalDatabaseScope;
 }

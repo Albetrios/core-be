@@ -1126,6 +1126,7 @@ src/
     │   │   │   ├── assert-connection-budget.unit.test.ts
     │   │   │   ├── assert-database-rls-safety.unit.test.ts
     │   │   │   ├── assert-database-tls-safety.unit.test.ts
+    │   │   │   ├── principal-database.context.test.ts
     │   │   │   ├── tenant-database.context.test.ts
     │   │   │   ├── worker-context-database-handle.unit.test.ts
     │   │   │   └── worker-database.context.test.ts
@@ -1133,6 +1134,7 @@ src/
     │   │   ├── audit-outbox-drain-database.context.ts
     │   │   ├── global-admin-database.context.ts
     │   │   ├── organization-database.context.ts
+    │   │   ├── principal-database.context.ts
     │   │   ├── request-database.context.ts
     │   │   ├── retention-database.context.ts
     │   │   ├── system-audit-insert-database.context.ts
@@ -2103,6 +2105,7 @@ src/
     │   │   │   ├── connection-url.util.unit.test.ts
     │   │   │   ├── connection.options.unit.test.ts
     │   │   │   ├── migration-execution-mode.unit.test.ts
+    │   │   │   ├── principal-scope-minting.policy.unit.test.ts
     │   │   │   ├── retention-database.context.unit.test.ts
     │   │   │   ├── transaction.util.db.unit.test.ts
     │   │   │   └── worker-database-guard.unit.test.ts

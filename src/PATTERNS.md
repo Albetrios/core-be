@@ -140,7 +140,8 @@ Postgres Row-Level Security is the **defense-in-depth** layer for tenant isolati
 
 ### Where it lives
 
-- Context wrappers: [src/infrastructure/database/contexts/](src/infrastructure/database/contexts/) — `withOrganizationContext`, `withGlobalRetentionCleanupDatabaseContext`, `withUserDatabaseContext`, `withSessionRetentionCleanupDatabaseContext`.
+- Context wrappers: [src/infrastructure/database/contexts/](src/infrastructure/database/contexts/) — `withPrincipalDatabaseContext` (token-minted identity scope; the common wrapper authenticated HTTP paths are migrating to), `withOrganizationContext`, `withGlobalRetentionCleanupDatabaseContext`, `withUserDatabaseContext`, `withSessionRetentionCleanupDatabaseContext`.
+- Principal scope minting: `resolvePrincipalDatabaseScope` / `requireOrganizationPrincipalDatabaseScope` in [src/shared/utils/http/request.util.ts](src/shared/utils/http/request.util.ts) — controllers mint a branded `PrincipalDatabaseScope` from the verified token (path-param-else-claim precedence, both `user` and `apiKey` principal kinds); services relay it into `withPrincipalDatabaseContext` and can never fabricate one from raw strings (factory confinement pinned by `principal-scope-minting.policy.unit.test.ts`). Provenance is edge-only: each legitimate "top" (request, worker payload, provisioning) gets its own minter; bypass GUCs have no minter and no path through the principal wrapper.
 - Worker runtime: `runTenantScopedWorkerJob`, `runGlobalRetentionWorkerJob`, `runUserScopedWorkerJob` in [src/infrastructure/queue/worker-runtime/worker-processor.util.ts](src/infrastructure/queue/worker-runtime/worker-processor.util.ts).
 - Migration: `migrations/00000000000000_init.sql` (consolidated baseline; defines the `app.global_retention_cleanup` RLS bypass policies) and other RLS-policy migrations under [migrations/](migrations/).
 

@@ -6,6 +6,19 @@ vi.mock('@/infrastructure/database/contexts/organization-database.context.js', (
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 const { i18nLocaleCacheSpies } = vi.hoisted(() => ({
   i18nLocaleCacheSpies: {
     get: vi.fn(),
@@ -24,12 +37,21 @@ vi.mock(
 );
 
 import { NotFoundError } from '@/shared/errors/index.js';
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import { OrganizationSettingsService } from '@/domains/tenancy/sub-domains/organization/organization-settings/organization-settings.service.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { OrganizationSettingsRepository } from '@/domains/tenancy/sub-domains/organization/organization-settings/organization-settings.repository.js';
 
 const now = new Date('2026-01-01T00:00:00.000Z');
 const organization = { id: 1, public_id: 'org_public_abc', name: 'Test Org' };
+const scope = createPrincipalDatabaseScope({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_public_abc',
+  source: 'token',
+}) as OrganizationPrincipalDatabaseScope;
 const settingsRow = {
   is_email_notifications_enabled: true,
   default_locale: 'en',
@@ -64,7 +86,7 @@ describe('OrganizationSettingsService', () => {
 
   describe('get', () => {
     it('returns serialized settings when row exists', async () => {
-      const result = await service.get('org_public_abc');
+      const result = await service.get(scope);
       expect(result).toMatchObject({
         organization_id: 'org_public_abc',
         is_email_notifications_enabled: true,
@@ -74,27 +96,27 @@ describe('OrganizationSettingsService', () => {
 
     it('upserts and returns defaults when settings row is missing', async () => {
       vi.mocked(settingsRepository.findByOrganizationId).mockResolvedValue(null);
-      await service.get('org_public_abc');
+      await service.get(scope);
       expect(settingsRepository.upsert).toHaveBeenCalledWith(organization.id, {});
     });
 
     it('throws NotFoundError when organization is missing', async () => {
       vi.mocked(organizationRepository.findByPublicId).mockResolvedValue(null);
-      await expect(service.get('org_public_abc')).rejects.toBeInstanceOf(NotFoundError);
+      await expect(service.get(scope)).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('propagates repository errors', async () => {
       vi.mocked(settingsRepository.findByOrganizationId).mockRejectedValue(
         new Error('DB connection failed'),
       );
-      await expect(service.get('org_public_abc')).rejects.toThrow('DB connection failed');
+      await expect(service.get(scope)).rejects.toThrow('DB connection failed');
     });
   });
 
   describe('update', () => {
     it('validates and upserts settings with provided fields', async () => {
       const result = await service.update(
-        'org_public_abc',
+        scope,
         { is_email_notifications_enabled: false },
         'user_public',
       );
@@ -107,16 +129,12 @@ describe('OrganizationSettingsService', () => {
 
     it('throws NotFoundError when organization is missing', async () => {
       vi.mocked(organizationRepository.findByPublicId).mockResolvedValue(null);
-      await expect(service.update('org_public_abc', {}, 'user_public')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(service.update(scope, {}, 'user_public')).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('propagates upsert errors', async () => {
       vi.mocked(settingsRepository.upsert).mockRejectedValue(new Error('Upsert failed'));
-      await expect(service.update('org_public_abc', {}, 'user_public')).rejects.toThrow(
-        'Upsert failed',
-      );
+      await expect(service.update(scope, {}, 'user_public')).rejects.toThrow('Upsert failed');
     });
   });
 
@@ -181,13 +199,13 @@ describe('OrganizationSettingsService', () => {
 
   describe('update — sec-M1 cache invalidation', () => {
     it('invalidates the i18n locale cache when default_locale is changed', async () => {
-      await service.update('org_public_abc', { default_locale: 'es' }, undefined);
+      await service.update(scope, { default_locale: 'es' }, undefined);
       expect(i18nLocaleCacheSpies.invalidate).toHaveBeenCalledWith('org_public_abc');
     });
 
     it('does NOT invalidate when default_locale is absent from the patch', async () => {
       i18nLocaleCacheSpies.invalidate.mockClear();
-      await service.update('org_public_abc', { is_email_notifications_enabled: false }, undefined);
+      await service.update(scope, { is_email_notifications_enabled: false }, undefined);
       expect(i18nLocaleCacheSpies.invalidate).not.toHaveBeenCalled();
     });
   });
