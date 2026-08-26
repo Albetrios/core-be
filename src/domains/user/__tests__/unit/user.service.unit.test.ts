@@ -13,9 +13,25 @@ import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock
 import { env } from '@/shared/config/env.config.js';
 import { ensurePersonalOrganizationPublicId } from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
 
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    const inner = vi.fn((callback: () => Promise<unknown>) => callback()) as unknown as (
+      ...parameters: unknown[]
+    ) => unknown;
+    return {
+      ...actual,
+      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+        inner(...parameters),
+      ),
+    };
+  },
+);
+
 /**
  * UserService wraps repository calls in `withUserDatabaseContext` /
- * `withGlobalAdminDatabaseContext` (see `softDeleteUserWithOffboarding`, `updatePassword`,
+ * `withMaintenanceDatabaseContext` (see `softDeleteUserWithOffboarding`, `updatePassword`,
  * `updateMfaEnabled`, admin listing). Those helpers open a real `database.transaction()` and would
  * hang in pure unit tests with mocked repositories. Run the inner callback directly so the test
  * exercises service logic without touching Postgres. Matches the pattern in
@@ -25,10 +41,6 @@ vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
   withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
     callback(),
   ),
-}));
-
-vi.mock('@/infrastructure/database/contexts/global-admin-database.context.js', () => ({
-  withGlobalAdminDatabaseContext: vi.fn((callback: () => Promise<unknown>) => callback()),
 }));
 
 vi.mock('@/shared/utils/infrastructure/postgres-error.util.js', () => ({

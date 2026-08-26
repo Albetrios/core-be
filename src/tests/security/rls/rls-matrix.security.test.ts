@@ -418,7 +418,7 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
 
     it('exposes audit.logs across tenants under the app.global_admin escape hatch (audit #21)', async () => {
       // The admin audit-log listing (AuditService.listForAdmin) reads cross-tenant under
-      // withGlobalAdminDatabaseContext. The tenant-isolation policy must honour app.global_admin
+      // withMaintenanceDatabaseContext. The tenant-isolation policy must honour app.global_admin
       // so the listing is RLS-correct under the least-privilege role instead of relying on the
       // table-owner bypass.
       const userA = await createTestUser();

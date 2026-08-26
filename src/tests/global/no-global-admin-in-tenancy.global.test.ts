@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
  * `app.current_organization_id` (`organizations_tenant_isolation`) and `app.current_user_id`
  * (`organizations_user_discovery` / `memberships_user_self_discovery`). Unlike the `auth.*` and
  * `audit.logs` policies, **none of them carries an `app.global_admin` arm** — so
- * `withGlobalAdminDatabaseContext` grants exactly nothing on tenancy tables while looking like it
+ * `withMaintenanceDatabaseContext` grants exactly nothing on tenancy tables while looking like it
  * grants everything.
  *
  * That mismatch shipped three times:
@@ -31,12 +31,11 @@ describe('Global: tenancy code never uses the global-admin RLS escape hatch', ()
   const SKIP_DIRECTORIES = new Set<string>(['__tests__', '__snapshots__', 'node_modules', 'dist']);
 
   /**
-   * Matches an actual import of the hatch, not prose. Both a named import and a namespace/default
-   * import of the context module count; a `withGlobalAdminDatabaseContext` mention inside a `//` or
-   * `/** *\/` comment does not.
+   * Matches an actual use of the global-admin maintenance scope, not prose: the
+   * `MAINTENANCE_SCOPE.global_admin` singleton is the only way to enter the hatch
+   * since the family unification, so referencing it outside a comment IS the use.
    */
-  const GLOBAL_ADMIN_IMPORT =
-    /^\s*import\s[\s\S]*?from\s+['"][^'"]*global-admin-database\.context\.js['"]/gm;
+  const GLOBAL_ADMIN_USE = /^(?!\s*(?:\/\/|\*|\/\*)).*MAINTENANCE_SCOPE\.global_admin/gm;
 
   async function* walkTypeScriptFiles(root: string): AsyncGenerator<string> {
     const entries = await fs.readdir(root, { withFileTypes: true });
@@ -54,15 +53,15 @@ describe('Global: tenancy code never uses the global-admin RLS escape hatch', ()
     }
   }
 
-  it('no file under src/domains/tenancy imports withGlobalAdminDatabaseContext', async () => {
+  it('no file under src/domains/tenancy uses MAINTENANCE_SCOPE.global_admin', async () => {
     const repositoryRoot = process.cwd();
     const tenancyRoot = join(repositoryRoot, 'src', 'domains', 'tenancy');
 
     const violations: string[] = [];
     for await (const filePath of walkTypeScriptFiles(tenancyRoot)) {
       const source = await fs.readFile(filePath, 'utf8');
-      GLOBAL_ADMIN_IMPORT.lastIndex = 0;
-      if (GLOBAL_ADMIN_IMPORT.test(source)) {
+      GLOBAL_ADMIN_USE.lastIndex = 0;
+      if (GLOBAL_ADMIN_USE.test(source)) {
         violations.push(relative(repositoryRoot, filePath));
       }
     }

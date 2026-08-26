@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
 import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
-import {
-  withGlobalRetentionCleanupDatabaseContext,
-  withSystemTableRetentionContext,
-} from '@/infrastructure/database/contexts/retention-database.context.js';
+import { withSystemTableRetentionContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/worker-database.context.error.js';
 import {
   assertWorkerDatabaseContext,
@@ -61,9 +62,9 @@ describe('worker database context', () => {
     });
   });
 
-  it('withGlobalRetentionCleanupDatabaseContext sets global_retention_cleanup kind', async () => {
+  it('withMaintenanceDatabaseContext sets global_retention_cleanup kind', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
-    await withGlobalRetentionCleanupDatabaseContext(async () => {
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, async () => {
       expect(getWorkerDatabaseContext()?.kind).toBe('global_retention_cleanup');
     });
   });

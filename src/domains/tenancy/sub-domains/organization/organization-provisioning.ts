@@ -164,7 +164,7 @@ async function provisionOrganization(
   // RLS context (`app.current_organization_id` = this id): every tenant-isolation WITH CHECK then
   // passes naturally — the org row (`public_id = app.current_organization_id`) and its child rows
   // (roles, role_permissions, memberships, all `organization_id`-scoped to the just-inserted org).
-  // This replaces `withGlobalAdminDatabaseContext`, which was both improper on a self-service
+  // This replaces `withMaintenanceDatabaseContext`, which was both improper on a self-service
   // login/signup path AND ineffective: the tenancy policies never honor `app.global_admin` (only
   // auth/audit do), so the org INSERT failed its WITH CHECK with SQLSTATE 42501 under the
   // non-superuser `core_be_app` role in deployed environments.

@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { eq } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
@@ -8,7 +12,6 @@ import { WebhookRepository } from '@/domains/notify/sub-domains/webhook/webhook.
 import { WebhookDeliveryAttemptRepository } from '@/domains/notify/sub-domains/webhook/webhook-delivery/webhook-delivery-attempt.repository.js';
 import { webhook_delivery_attempts } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
 import { runWebhookDeliveryAttemptRetentionJob } from '@/domains/notify/sub-domains/webhook/workers/webhook-delivery-attempt-retention.processor.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
@@ -59,8 +62,9 @@ describe('runWebhookDeliveryAttemptRetentionJob (database, audit-#3)', () => {
       .set({ created_at: fortyDaysAgo })
       .where(eq(webhook_delivery_attempts.id, old.id));
 
-    const result = await withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
-      runWebhookDeliveryAttemptRetentionJob(databaseHandle),
+    const result = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.global_retention_cleanup,
+      (databaseHandle) => runWebhookDeliveryAttemptRetentionJob(databaseHandle),
     );
 
     expect(result.deletedCount).toBe(1);

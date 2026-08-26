@@ -23,7 +23,7 @@ import { api_keys } from '@/domains/tenancy/sub-domains/organization/organizatio
  *   is permitted on INSERT — they are read/delete contexts only (sec-r4-D1).
  * - **SELECT** (USING): tenant context, `app.global_retention_cleanup`, and the
  *   cross-tenant admin escape hatch `app.global_admin` (used by admin audit-log
- *   listing via `withGlobalAdminDatabaseContext`) are all permitted for reads.
+ *   listing via `withMaintenanceDatabaseContext`) are all permitted for reads.
  * - **DELETE** (USING): `app.global_retention_cleanup` only; admin is not on DELETE.
  *
  * Storage: the migrations create this as a plain table (`id bigserial PRIMARY KEY`). High-volume
@@ -126,7 +126,7 @@ export const logs = auditSchema
         // `app.system_audit_insert='true'` AND `organization_id IS NULL`.
         // Because the arm requires `organization_id IS NULL`, a process that
         // flips this GUC cannot write to any tenant's audit log — only
-        // tenantless rows. Used by `withSystemAuditInsertContext` for DLQ
+        // tenantless rows. Used by `withMaintenanceDatabaseContext` for DLQ
         // replay and other system-level emitters that have no tenant.
         withCheck: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations

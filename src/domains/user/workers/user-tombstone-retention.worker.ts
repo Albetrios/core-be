@@ -1,5 +1,8 @@
 import { Worker } from 'bullmq';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import {
   getRetentionWorkerOptions,
@@ -17,7 +20,7 @@ import { USER_TOMBSTONE_RETENTION_QUEUE_NAME } from './user-tombstone-retention.
  *
  * @remarks
  * - **Algorithm:** every scheduled tick wraps {@link runUserTombstoneRetentionJob} in
- *   `withGlobalRetentionCleanupDatabaseContext` so the cleanup runs against the global retention
+ *   `withMaintenanceDatabaseContext` so the cleanup runs against the global retention
  *   session (no per-tenant RLS).
  * - **Failure modes:** rows blocked by FK (e.g. an `organizations.owner_user_id` reference)
  *   surface as `blockedCount` and remain for human cleanup; unexpected Postgres errors propagate
@@ -32,7 +35,7 @@ export function createUserTombstoneRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     USER_TOMBSTONE_RETENTION_QUEUE_NAME,
     async () =>
-      withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
         runUserTombstoneRetentionJob(databaseHandle),
       ),
     {

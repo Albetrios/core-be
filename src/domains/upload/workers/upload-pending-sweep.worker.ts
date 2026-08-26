@@ -1,5 +1,8 @@
 import { Worker } from 'bullmq';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import {
   getRetentionWorkerOptions,
@@ -17,7 +20,7 @@ import { UPLOAD_PENDING_SWEEP_QUEUE_NAME } from './upload-pending-sweep.constant
  *
  * @remarks
  * - **Algorithm:** wraps each job in
- *   {@link withGlobalRetentionCleanupDatabaseContext} so RLS allows
+ *   {@link withMaintenanceDatabaseContext} so RLS allows
  *   cross-tenant scans, then delegates to {@link runUploadPendingSweepJob}.
  * - **Failure modes:** processor errors are bubbled to BullMQ for retry;
  *   stalled jobs are surfaced via a `stalled` log warning. The DLQ + Sentry
@@ -32,7 +35,7 @@ export function createUploadPendingSweepWorker(): WorkerHandle {
   const worker = new Worker(
     UPLOAD_PENDING_SWEEP_QUEUE_NAME,
     async () =>
-      withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
         runUploadPendingSweepJob(databaseHandle),
       ),
     {

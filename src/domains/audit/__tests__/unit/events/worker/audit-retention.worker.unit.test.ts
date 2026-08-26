@@ -1,5 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    const inner = ((callback: (databaseHandle: unknown) => unknown) =>
+      withGlobalRetentionCleanupDatabaseContextMock(callback)) as unknown as (
+      ...parameters: unknown[]
+    ) => unknown;
+    return {
+      ...actual,
+      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+        inner(...parameters),
+      ),
+    };
+  },
+);
+
 /**
  * BullMQ registration for the audit-retention worker — the sibling of
  * `audit-outbox-drain.worker.unit.test.ts`.
@@ -52,11 +69,6 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-close.util.js', () => ({
     queueName,
     close: async () => undefined,
   }),
-}));
-
-vi.mock('@/infrastructure/database/contexts/retention-database.context.js', () => ({
-  withGlobalRetentionCleanupDatabaseContext: (callback: (databaseHandle: unknown) => unknown) =>
-    withGlobalRetentionCleanupDatabaseContextMock(callback),
 }));
 
 vi.mock('@/domains/audit/workers/audit-retention.processor.js', () => ({
@@ -130,7 +142,7 @@ describe('audit-retention.worker', () => {
    * delete nothing while reporting success. The context wrapper is the only thing that makes a
    * global purge visible, and the handle it yields must be the one the job runs on.
    */
-  it('runs the purge inside withGlobalRetentionCleanupDatabaseContext', async () => {
+  it('runs the purge inside withMaintenanceDatabaseContext', async () => {
     const { createAuditRetentionWorker } = await import(WORKER_MODULE);
 
     createAuditRetentionWorker();

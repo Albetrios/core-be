@@ -1,11 +1,14 @@
 import { Worker } from 'bullmq';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import {
   getRetentionWorkerOptions,
   RETENTION_WORKER_CONCURRENCY,
 } from '@/infrastructure/queue/worker-runtime/worker-options.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { USER_DATA_EXPORT_RETENTION_QUEUE_NAME } from '@/domains/user/sub-domains/user-data-export/workers/user-data-export-retention.constants.js';
 import { runUserDataExportRetentionJob } from '@/domains/user/sub-domains/user-data-export/workers/user-data-export-retention.processor.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
@@ -17,7 +20,7 @@ import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
  *
  * @remarks
  * - **Algorithm:** every scheduled tick wraps the processor in
- *   `withGlobalRetentionCleanupDatabaseContext`, which strips per-tenant RLS so the cleanup runs
+ *   `withMaintenanceDatabaseContext`, which strips per-tenant RLS so the cleanup runs
  *   against the global retention session.
  * - **Failure modes:** unexpected errors propagate to BullMQ retries / DLQ; `stalled` events are
  *   logged for observability.
@@ -29,7 +32,7 @@ export function createUserDataExportRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     USER_DATA_EXPORT_RETENTION_QUEUE_NAME,
     async () =>
-      withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
         runUserDataExportRetentionJob(databaseHandle),
       ),
     {

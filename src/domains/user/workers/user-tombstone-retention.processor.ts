@@ -18,7 +18,7 @@ import { env } from '@/shared/config/env.config.js';
  *   are counted as blocked rather than failing the job.
  * - **Side effects:** deletes from `auth.users` (and any cascade-bound child tables), emits
  *   structured `info` start/end logs under `user-tombstone-retention.*`.
- * - **Notes:** runs inside `withGlobalRetentionCleanupDatabaseContext` (no per-tenant RLS) and is
+ * - **Notes:** runs inside `withMaintenanceDatabaseContext` (no per-tenant RLS) and is
  *   idempotent — re-running with no fresh tombstones is a no-op.
  */
 export async function runUserTombstoneRetentionJob(databaseHandle: WorkerDatabaseHandle): Promise<{

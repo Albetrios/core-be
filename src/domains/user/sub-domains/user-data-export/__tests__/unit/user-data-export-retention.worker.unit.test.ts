@@ -1,10 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    const inner = ((callback: (databaseHandle: unknown) => unknown) =>
+      withGlobalRetentionCleanupDatabaseContextMock(callback)) as unknown as (
+      ...parameters: unknown[]
+    ) => unknown;
+    return {
+      ...actual,
+      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+        inner(...parameters),
+      ),
+    };
+  },
+);
+
 /**
  * Worker-level suite for the `user-data-export-retention` scheduled cleanup.
  *
  * The invariant that matters here is the database context: expired export bundles are deleted
- * across every tenant, so the job must run inside `withGlobalRetentionCleanupDatabaseContext`
+ * across every tenant, so the job must run inside `withMaintenanceDatabaseContext`
  * (which strips per-tenant RLS) and must receive that wrapper's handle — never a request-scoped one.
  */
 const workerState = vi.hoisted(() => ({
@@ -50,11 +67,6 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-close.util.js', () => ({
     queueName,
     close: async () => undefined,
   }),
-}));
-
-vi.mock('@/infrastructure/database/contexts/retention-database.context.js', () => ({
-  withGlobalRetentionCleanupDatabaseContext: (callback: (databaseHandle: unknown) => unknown) =>
-    withGlobalRetentionCleanupDatabaseContextMock(callback),
 }));
 
 vi.mock(

@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import {
   grantCoreBeAppRoleForTests,
   executeAsCoreBeAppTenant,
@@ -93,7 +96,8 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
 
     let caught: unknown;
     try {
-      await withGlobalRetentionCleanupDatabaseContext(
+      await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.global_retention_cleanup,
         async (databaseHandle) =>
           databaseHandle.execute(
             drizzleSql.raw(
@@ -116,7 +120,8 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
   it('still allows a retention-context DELETE via the USING bypass (positive control)', async () => {
     const rowIds = fixture.rowIdsByTable.get(tableKey('billing', 'subscriptions'))!;
 
-    const deletedCount = await withGlobalRetentionCleanupDatabaseContext(
+    const deletedCount = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.global_retention_cleanup,
       async (databaseHandle) => {
         const result = await databaseHandle.execute(
           drizzleSql.raw(

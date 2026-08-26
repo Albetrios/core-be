@@ -15,11 +15,14 @@
  *   pnpm ops:stripe:reconcile
  */
 import '@/shared/config/load-env-files.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { isNotNull } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { getStripeClient, isStripeConfigured } from '@/infrastructure/payment/stripe.client.js';
 import { closeDatabase } from '@/infrastructure/database/connection.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { subscriptions } from '@/domains/billing/sub-domains/subscription/subscription.schema.js';
 
 /** Stripe subscription status treated as the canonical "active" state for reconciliation. */
@@ -71,29 +74,32 @@ async function listStripeActiveSubscriptions(): Promise<StripeSubscriptionRecord
 }
 
 async function listLocalStripeSubscriptions(): Promise<LocalSubscriptionRecord[]> {
-  return withGlobalRetentionCleanupDatabaseContext(async (databaseHandle) => {
-    const rows = await databaseHandle
-      .select({
-        publicId: subscriptions.public_id,
-        organizationId: subscriptions.organization_id,
-        providerSubscriptionId: subscriptions.provider_subscription_id,
-        status: subscriptions.status,
-      })
-      .from(subscriptions)
-      .where(isNotNull(subscriptions.provider_subscription_id));
+  return withMaintenanceDatabaseContext(
+    MAINTENANCE_SCOPE.global_retention_cleanup,
+    async (databaseHandle) => {
+      const rows = await databaseHandle
+        .select({
+          publicId: subscriptions.public_id,
+          organizationId: subscriptions.organization_id,
+          providerSubscriptionId: subscriptions.provider_subscription_id,
+          status: subscriptions.status,
+        })
+        .from(subscriptions)
+        .where(isNotNull(subscriptions.provider_subscription_id));
 
-    return rows
-      .filter((row): row is typeof row & { providerSubscriptionId: string } =>
-        Boolean(row.providerSubscriptionId),
-      )
-      .map((row) => ({
-        publicId: row.publicId,
-        organizationId: row.organizationId,
-        providerSubscriptionId: row.providerSubscriptionId,
-        status: row.status,
-        normalizedStatus: row.status.toLowerCase(),
-      }));
-  });
+      return rows
+        .filter((row): row is typeof row & { providerSubscriptionId: string } =>
+          Boolean(row.providerSubscriptionId),
+        )
+        .map((row) => ({
+          publicId: row.publicId,
+          organizationId: row.organizationId,
+          providerSubscriptionId: row.providerSubscriptionId,
+          status: row.status,
+          normalizedStatus: row.status.toLowerCase(),
+        }));
+    },
+  );
 }
 
 function buildReconciliationReport({

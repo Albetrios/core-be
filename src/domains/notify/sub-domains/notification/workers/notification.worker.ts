@@ -1,4 +1,8 @@
 import { Worker, type Job } from 'bullmq';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import { getDefaultWorkerOptions } from '@/infrastructure/queue/worker-runtime/worker-options.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
@@ -27,7 +31,6 @@ import {
 } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
-import { withGlobalAdminDatabaseContext } from '@/infrastructure/database/contexts/global-admin-database.context.js';
 import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
 
@@ -172,11 +175,14 @@ export async function processNotificationDispatchJob(
   // `notifications_owner_access` policy authorises the read on its intended branch.
   const loadNotificationForScope = async () => {
     if (organizationPublicId === null || organizationPublicId === undefined) {
-      const userPublicId = await withGlobalAdminDatabaseContext(async (databaseHandle) => {
-        const repository =
-          notificationRepository ?? createWorkerNotificationRepository(databaseHandle);
-        return repository.findUserPublicIdForNotificationDispatch(notificationId);
-      });
+      const userPublicId = await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.global_admin,
+        async (databaseHandle) => {
+          const repository =
+            notificationRepository ?? createWorkerNotificationRepository(databaseHandle);
+          return repository.findUserPublicIdForNotificationDispatch(notificationId);
+        },
+      );
       if (!userPublicId) {
         throw new Error(`notification.user_unknown:${String(notificationId)}`);
       }
@@ -260,7 +266,7 @@ async function processTenantScopedNotificationJob(
  *   `runTenantScopedWorkerJob` (`withOrganizationContext`) so RLS pins reads to the org;
  *   tenant-less notifications delegate directly to {@link processNotificationDispatchJob}
  *   which then enters its own `loadNotificationForScope` flow — resolving the recipient
- *   public id under `withGlobalAdminDatabaseContext` and pinning `withUserDatabaseContext`
+ *   public id under `withMaintenanceDatabaseContext` and pinning `withUserDatabaseContext`
  *   for the load (sec-re-01: the prior wiring wrapped this branch in
  *   `runGlobalRetentionWorkerJob` and injected a repository, which short-circuited the new
  *   `loadNotificationForScope` flow — making the sec-D #10 user-context fix dead code).
@@ -288,7 +294,7 @@ export function createNotificationWorker(): WorkerHandle {
       return runWithPropagatedTraceContext({ traceparent, tracestate }, job.name, () => {
         // sec-re-01: tenant-less notifications delegate directly to
         // processNotificationDispatchJob so it can enter its own loadNotificationForScope
-        // flow (withGlobalAdminDatabaseContext → withUserDatabaseContext). The prior
+        // flow (withMaintenanceDatabaseContext → withUserDatabaseContext). The prior
         // wiring wrapped this branch in runGlobalRetentionWorkerJob AND injected a
         // repository, which short-circuited the new flow and left the sec-D #10 fix
         // dead code.

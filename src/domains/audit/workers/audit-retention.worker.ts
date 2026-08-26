@@ -1,11 +1,14 @@
 import { Worker } from 'bullmq';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import {
   getRetentionWorkerOptions,
   RETENTION_WORKER_CONCURRENCY,
 } from '@/infrastructure/queue/worker-runtime/worker-options.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { AUDIT_RETENTION_QUEUE_NAME } from '@/domains/audit/workers/audit-retention.constants.js';
 import { runAuditRetentionJob } from '@/domains/audit/workers/audit-retention.processor.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
@@ -16,7 +19,7 @@ import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
  * Repeatable schedule is registered in `src/infrastructure/queue/scheduler.ts`.
  *
  * @remarks
- * - **Algorithm:** wraps each job in {@link withGlobalRetentionCleanupDatabaseContext}
+ * - **Algorithm:** wraps each job in {@link withMaintenanceDatabaseContext}
  *   (sets `app.global_retention_cleanup=true` so the tenant-isolation policy on
  *   `audit.logs` permits cross-tenant deletes) and delegates to `runAuditRetentionJob`.
  * - **Failure modes:** processor errors are bubbled to BullMQ for retry; stalled
@@ -32,7 +35,7 @@ export function createAuditRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     AUDIT_RETENTION_QUEUE_NAME,
     async () =>
-      withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
         runAuditRetentionJob(databaseHandle),
       ),
     {

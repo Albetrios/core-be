@@ -1,5 +1,8 @@
 import { Worker } from 'bullmq';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import {
   getRetentionWorkerOptions,
@@ -18,7 +21,7 @@ import { WEBHOOK_TOMBSTONE_RETENTION_QUEUE_NAME } from './webhook-tombstone-rete
  *
  * @remarks
  * - **Algorithm:** wraps {@link runWebhookTombstoneRetentionJob} in
- *   `withGlobalRetentionCleanupDatabaseContext` so the BullMQ processor sees tombstones across
+ *   `withMaintenanceDatabaseContext` so the BullMQ processor sees tombstones across
  *   tenants.
  * - **Failure modes:** stalled jobs are logged via the `stalled` listener; processor errors
  *   propagate through BullMQ retries and the queue DLQ.
@@ -31,7 +34,7 @@ export function createWebhookTombstoneRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     WEBHOOK_TOMBSTONE_RETENTION_QUEUE_NAME,
     async () =>
-      withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
         runWebhookTombstoneRetentionJob(databaseHandle),
       ),
     {

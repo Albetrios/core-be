@@ -1,5 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    const inner = ((callback: (databaseHandle: unknown) => unknown) =>
+      withAuditOutboxDrainDatabaseContextMock(callback)) as unknown as (
+      ...parameters: unknown[]
+    ) => unknown;
+    return {
+      ...actual,
+      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+        inner(...parameters),
+      ),
+    };
+  },
+);
+
 const workerState = vi.hoisted(() => ({
   processor: undefined as (() => Promise<unknown>) | undefined,
   options: undefined as Record<string, unknown> | undefined,
@@ -43,11 +60,6 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-close.util.js', () => ({
   }),
 }));
 
-vi.mock('@/infrastructure/database/contexts/audit-outbox-drain-database.context.js', () => ({
-  withAuditOutboxDrainDatabaseContext: (callback: (databaseHandle: unknown) => unknown) =>
-    withAuditOutboxDrainDatabaseContextMock(callback),
-}));
-
 vi.mock('@/domains/audit/workers/audit-outbox-drain.processor.js', () => ({
   runAuditOutboxDrainJob: (...args: unknown[]) => runAuditOutboxDrainJobMock(...args),
 }));
@@ -89,7 +101,7 @@ describe('audit-outbox-drain.worker', () => {
     expect(workerState.options).toEqual(expect.objectContaining({ concurrency: 1 }));
   });
 
-  it('drains the outbox inside withAuditOutboxDrainDatabaseContext', async () => {
+  it('drains the outbox inside withMaintenanceDatabaseContext', async () => {
     const { createAuditOutboxDrainWorker } = await import(WORKER_MODULE);
 
     createAuditOutboxDrainWorker();

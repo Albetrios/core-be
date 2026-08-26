@@ -1131,13 +1131,12 @@ src/
     │   │   │   ├── worker-context-database-handle.unit.test.ts
     │   │   │   └── worker-database.context.test.ts
     │   ├── contexts/
-    │   │   ├── audit-outbox-drain-database.context.ts
-    │   │   ├── global-admin-database.context.ts
+    │   │   ├── maintenance-database.context.ts
     │   │   ├── organization-database.context.ts
     │   │   ├── principal-database.context.ts
     │   │   ├── request-database.context.ts
     │   │   ├── retention-database.context.ts
-    │   │   ├── system-audit-insert-database.context.ts
+    │   │   ├── session-database.context.ts
     │   │   ├── tenant-database.context.ts
     │   │   ├── user-database.context.ts
     │   │   ├── worker-database-guard.util.ts
@@ -2104,9 +2103,11 @@ src/
     │   │   │   ├── capped-count.util.db.unit.test.ts
     │   │   │   ├── connection-url.util.unit.test.ts
     │   │   │   ├── connection.options.unit.test.ts
+    │   │   │   ├── maintenance-context-confinement.policy.unit.test.ts
     │   │   │   ├── migration-execution-mode.unit.test.ts
     │   │   │   ├── principal-scope-minting.policy.unit.test.ts
     │   │   │   ├── retention-database.context.unit.test.ts
+    │   │   │   ├── session-context-confinement.policy.unit.test.ts
     │   │   │   ├── transaction.util.db.unit.test.ts
     │   │   │   └── worker-database-guard.unit.test.ts
     │   │   ├── mail/

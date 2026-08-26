@@ -20,7 +20,7 @@ import { env } from '@/shared/config/env.config.js';
  *   was tombstone-deleted, so attempts for long-lived ACTIVE webhooks accumulated forever (each
  *   row retains the full event `payload` and `response_body` — unbounded growth + indefinite PII
  *   retention). This time-based sweep closes that gap. Runs under
- *   `withGlobalRetentionCleanupDatabaseContext` so it sees rows across tenants — never call it
+ *   `withMaintenanceDatabaseContext` so it sees rows across tenants — never call it
  *   with a request-scoped handle.
  */
 export async function runWebhookDeliveryAttemptRetentionJob(

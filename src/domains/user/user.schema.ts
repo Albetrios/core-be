@@ -19,7 +19,7 @@ import { authSchema } from '@/infrastructure/database/pg-schemas.js';
  * can be reused after offboarding. Trigram indexes power admin search by email and display name;
  * lockout fields drive failed-login throttling. FORCE RLS-gated (audit #7) by `app.current_user_id`
  * (owner self-access via `withUserDatabaseContext`) or `app.global_admin` (cross-user admin via
- * `withGlobalAdminDatabaseContext`); pre-session reads go through the `auth.resolve_user_*`
+ * `withMaintenanceDatabaseContext`); pre-session reads go through the `auth.resolve_user_*`
  * SECURITY DEFINER resolvers.
  */
 export const users = authSchema

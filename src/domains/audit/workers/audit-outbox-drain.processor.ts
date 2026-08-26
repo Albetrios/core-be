@@ -1,4 +1,5 @@
 import { inArray, sql as drizzleSql } from 'drizzle-orm';
+import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { createDrainAuditOutboxRepository } from '@/domains/audit/audit-outbox.repository.js';
 import type { AuditOutboxRow } from '@/domains/audit/audit-outbox.schema.js';
 import { logs } from '@/domains/audit/audit.schema.js';
@@ -268,7 +269,7 @@ async function drainOutboxRow(options: {
  * Drains a batch of PENDING `audit.outbox` rows into `audit.logs`.
  *
  * @remarks
- * Runs inside the drain transaction opened by {@link withAuditOutboxDrainDatabaseContext}.
+ * Runs inside the drain transaction opened by {@link withMaintenanceDatabaseContext}.
  * The job:
  *  1. Claims up to `batchSize` rows via FOR UPDATE SKIP LOCKED (concurrent drain instances
  *     never double-process — bumps `attempt_count` atomically on claim).

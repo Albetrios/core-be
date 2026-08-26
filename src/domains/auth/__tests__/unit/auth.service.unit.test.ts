@@ -59,13 +59,20 @@ vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
   withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
     callback(),
   ),
-  withSessionPublicIdDatabaseContext: vi.fn(
-    (_sessionPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-  withSessionTokenHashDatabaseContext: vi.fn(
-    (_tokenHash: string, callback: () => Promise<unknown>) => callback(),
-  ),
 }));
+
+vi.mock(
+  '@/infrastructure/database/contexts/session-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withSessionDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+        callback(),
+      ),
+    };
+  },
+);
 
 const user = {
   id: 1,

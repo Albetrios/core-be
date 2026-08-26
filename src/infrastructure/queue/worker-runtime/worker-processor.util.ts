@@ -1,7 +1,10 @@
 import { Worker, type Job, type WorkerOptions } from 'bullmq';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import type { WorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
 import { brandWorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
 import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
@@ -55,8 +58,9 @@ export async function runTenantScopedWorkerJob<TJob, TResult>(
 export async function runGlobalRetentionWorkerJob<TResult>(
   processor: (databaseHandle: WorkerDatabaseHandle) => Promise<TResult>,
 ): Promise<TResult> {
-  return withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
-    processor(brandWorkerContextDatabaseHandle(databaseHandle)),
+  return withMaintenanceDatabaseContext(
+    MAINTENANCE_SCOPE.global_retention_cleanup,
+    (databaseHandle) => processor(brandWorkerContextDatabaseHandle(databaseHandle)),
   );
 }
 

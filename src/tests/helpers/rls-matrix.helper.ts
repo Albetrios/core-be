@@ -1,4 +1,5 @@
 import { sql as drizzleSql } from 'drizzle-orm';
+import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { sql } from '@/infrastructure/database/connection.js';
 import { database } from '@/infrastructure/database/connection.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
@@ -198,7 +199,7 @@ export async function countRowsAsUser(
 
 /**
  * Runs `callback` as the least-privilege `core_be_app` role with `app.global_admin = 'true'`, the
- * admin escape hatch set in production by {@link withGlobalAdminDatabaseContext}. Used to prove the
+ * admin escape hatch set in production by {@link withMaintenanceDatabaseContext}. Used to prove the
  * cross-user admin branch of the `auth.users` / `auth.auth_methods` policies (audit #7) under a
  * non-superuser connection.
  */

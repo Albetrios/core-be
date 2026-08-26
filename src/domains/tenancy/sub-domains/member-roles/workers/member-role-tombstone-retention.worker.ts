@@ -1,5 +1,8 @@
 import { Worker } from 'bullmq';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import {
   getRetentionWorkerOptions,
@@ -19,7 +22,7 @@ import { MEMBER_ROLE_TOMBSTONE_RETENTION_QUEUE_NAME } from './member-role-tombst
  * - **Algorithm:** constructs a BullMQ `Worker` for the
  *   `MEMBER_ROLE_TOMBSTONE_RETENTION_QUEUE_NAME` queue that runs
  *   {@link runMemberRoleTombstoneRetentionJob} under
- *   {@link withGlobalRetentionCleanupDatabaseContext} so the cleanup bypasses
+ *   {@link withMaintenanceDatabaseContext} so the cleanup bypasses
  *   per-organization RLS.
  * - **Failure modes:** processor exceptions trigger BullMQ retry/backoff;
  *   stalled jobs are logged via the `stalled` listener; the queue's DLQ
@@ -34,7 +37,7 @@ export function createMemberRoleTombstoneRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     MEMBER_ROLE_TOMBSTONE_RETENTION_QUEUE_NAME,
     async () =>
-      withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
         runMemberRoleTombstoneRetentionJob(databaseHandle),
       ),
     {

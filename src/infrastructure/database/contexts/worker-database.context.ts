@@ -109,7 +109,7 @@ export function assertWorkerDatabaseContext(
   const context = getWorkerDatabaseContext();
   if (context === undefined) {
     throw new WorkerDatabaseContextError(
-      'Worker process must not use unpinned database access. Wrap the job in a context helper (withOrganizationContext, runTenantScopedWorkerJob, withGlobalRetentionCleanupDatabaseContext, withUserDatabaseContext, withSessionRetentionCleanupDatabaseContext, withSystemTableWorkerContext, or withSystemTableRetentionContext) and pass databaseHandle into createWorker*Repository() factories.',
+      'Worker process must not use unpinned database access. Wrap the job in a context helper (withOrganizationContext, runTenantScopedWorkerJob, withPrincipalDatabaseContext, withUserDatabaseContext, withMaintenanceDatabaseContext, withSessionDatabaseContext, withSystemTableWorkerContext, or withSystemTableRetentionContext) and pass databaseHandle into createWorker*Repository() factories.',
     );
   }
 

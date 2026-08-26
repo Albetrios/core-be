@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
@@ -8,7 +12,6 @@ import {
   grantCoreBeAppRoleForTests,
   executeAsCoreBeAppTenant,
 } from '@/tests/helpers/rls-matrix.helper.js';
-import { withSystemAuditInsertContext } from '@/infrastructure/database/contexts/system-audit-insert-database.context.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
 /**
@@ -27,7 +30,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
  * harness never caught it because tests run as the superuser `core` owner role, which bypasses RLS.
  *
  * The fix opens the matching context inside `AuditService.record`: org rows under
- * `withOrganizationDatabaseContext`, tenantless rows under `withSystemAuditInsertContext`. These
+ * `withOrganizationDatabaseContext`, tenantless rows under `withMaintenanceDatabaseContext`. These
  * tests prove the policy behavior under `SET LOCAL ROLE core_be_app`.
  */
 
@@ -127,7 +130,8 @@ describe('Security: audit.outbox INSERT RLS (audit R10)', () => {
   it('R10 FIX: core_be_app under system-audit-insert context CAN INSERT the tenantless outbox row', async () => {
     let caught: unknown;
     try {
-      await withSystemAuditInsertContext(
+      await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.system_audit_insert,
         (databaseHandle) => databaseHandle.execute(outboxInsertSql(null)),
         { useApplicationDatabaseRole: true },
       );
@@ -137,7 +141,7 @@ describe('Security: audit.outbox INSERT RLS (audit R10)', () => {
 
     expect(
       caught,
-      'tenantless INSERT under withSystemAuditInsertContext must succeed',
+      'tenantless INSERT under withMaintenanceDatabaseContext must succeed',
     ).toBeUndefined();
     const rows = await sql<{ count: string }[]>`
       SELECT COUNT(*)::text AS count FROM audit.outbox

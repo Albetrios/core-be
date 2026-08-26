@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { eq } from 'drizzle-orm';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
@@ -6,7 +10,6 @@ import { createTestOrganization } from '@/tests/factories/organization.factory.j
 import { UploadRepository, markConfirmedByInternalId } from '@/domains/upload/upload.repository.js';
 import { uploads } from '@/domains/upload/upload.schema.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 
 describe('UploadRepository (database)', () => {
   const repository = new UploadRepository();
@@ -17,7 +20,7 @@ describe('UploadRepository (database)', () => {
 
   /** Run the worker-scoped confirm the way the pending-sweep worker does (global retention context). */
   const confirm = (id: number, finalKey: string) =>
-    withGlobalRetentionCleanupDatabaseContext((handle) =>
+    withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (handle) =>
       markConfirmedByInternalId(handle, id, finalKey),
     );
 

@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { database } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import {
   grantCoreBeAppRoleForTests,
   executeAsCoreBeAppGlobalAdmin,
@@ -97,7 +100,8 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
 
     let caught: unknown;
     try {
-      await withGlobalRetentionCleanupDatabaseContext(
+      await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.global_retention_cleanup,
         async (databaseHandle) => {
           // No app.current_organization_id set — only global_retention_cleanup
           // is active. Before the fix this would succeed. After the fix, RLS

@@ -1,4 +1,8 @@
 import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
@@ -27,7 +31,6 @@ import type { UploadService } from '@/domains/upload/upload.service.js';
 import type { UserDataExportService } from '@/domains/user/sub-domains/user-data-export/user-data-export.service.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
-import { withGlobalAdminDatabaseContext } from '@/infrastructure/database/contexts/global-admin-database.context.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { runInsertWithPublicIdentifierRetry } from '@/shared/utils/infrastructure/postgres-error.util.js';
 
@@ -568,7 +571,7 @@ export class UserService {
     const parsed = validateListUsers(query);
     // Admin cross-user listing must read every row → global-admin context (route is guarded by
     // requireRole(SUPER_ADMIN, ADMIN), so entering the admin RLS escape hatch is authorized).
-    const result = await withGlobalAdminDatabaseContext(() =>
+    const result = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
       this.repository.findMany(
         omitUndefined({
           after: parsed.after,
@@ -590,7 +593,7 @@ export class UserService {
 
   async getUser(publicId: string): Promise<UserOutput> {
     // Admin read of another user → global-admin context (route guarded by requireRole).
-    const user = await withGlobalAdminDatabaseContext(() =>
+    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
       this.repository.findByPublicId(publicId),
     );
     if (!user) throw new NotFoundError('User');
@@ -608,7 +611,7 @@ export class UserService {
    * super-admin, change the env allowlist, not this endpoint.
    */
   private async assertTargetNotProtectedAdmin(targetPublicId: string): Promise<void> {
-    const target = await withGlobalAdminDatabaseContext(() =>
+    const target = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
       this.repository.findByPublicId(targetPublicId),
     );
     if (!target) throw new NotFoundError('User');
@@ -623,7 +626,7 @@ export class UserService {
     if (parsed.status !== undefined && parsed.status !== 'ACTIVE') {
       await this.assertTargetNotProtectedAdmin(publicId);
     }
-    const user = await withGlobalAdminDatabaseContext(() =>
+    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
       this.repository.adminUpdate(publicId, omitUndefined(parsed)),
     );
     if (!user) throw new NotFoundError('User');
@@ -640,7 +643,9 @@ export class UserService {
 
   async suspendUser(publicId: string): Promise<UserOutput> {
     await this.assertTargetNotProtectedAdmin(publicId);
-    const user = await withGlobalAdminDatabaseContext(() => this.repository.suspend(publicId));
+    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+      this.repository.suspend(publicId),
+    );
     if (!user) throw new NotFoundError('User');
     await this.revokeAllSessionsForDeactivatedUser(publicId);
     return this.toUserOutput(user);
@@ -659,7 +664,9 @@ export class UserService {
   }
 
   async unsuspendUser(publicId: string): Promise<UserOutput> {
-    const user = await withGlobalAdminDatabaseContext(() => this.repository.unsuspend(publicId));
+    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+      this.repository.unsuspend(publicId),
+    );
     if (!user) throw new NotFoundError('User');
     return this.toUserOutput(user);
   }

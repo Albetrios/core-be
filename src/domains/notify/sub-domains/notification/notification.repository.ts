@@ -280,7 +280,7 @@ export class NotificationRepository {
  * `global_admin` (sec-D #10 SECURITY DEFINER user-id lookup for tenant-less
  * notifications), or `user` (sec-D #10 narrow per-user load for tenant-less
  * notifications). Retention cleanup uses a raw batch-delete under
- * `withGlobalRetentionCleanupDatabaseContext` (not this factory), so
+ * `withMaintenanceDatabaseContext` (not this factory), so
  * `global_retention_cleanup` is intentionally NOT an accepted context here.
  */
 export function createWorkerNotificationRepository(

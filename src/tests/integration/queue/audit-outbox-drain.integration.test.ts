@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { eq } from 'drizzle-orm';
 import { audit_outbox } from '@/domains/audit/audit-outbox.schema.js';
 import { logs } from '@/domains/audit/audit.schema.js';
@@ -8,7 +12,6 @@ import {
 } from '@/domains/audit/workers/audit-outbox-drain.processor.js';
 import { users } from '@/domains/user/user.schema.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { withAuditOutboxDrainDatabaseContext } from '@/infrastructure/database/contexts/audit-outbox-drain-database.context.js';
 import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/request-database.context.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 
@@ -16,7 +19,7 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 const ACTOR_PUBLIC_ID = 'usr_auditoutboxdrain00001';
 
 async function pendingOutboxCount(): Promise<number> {
-  return withAuditOutboxDrainDatabaseContext((databaseHandle) =>
+  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.audit_outbox_drain, (databaseHandle) =>
     countPendingAuditOutboxRows(databaseHandle),
   );
 }
@@ -44,8 +47,9 @@ describe('Integration: audit transactional outbox drain', () => {
 
     expect(await pendingOutboxCount()).toBe(1);
 
-    const result = await withAuditOutboxDrainDatabaseContext((databaseHandle) =>
-      runAuditOutboxDrainJob(databaseHandle),
+    const result = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.audit_outbox_drain,
+      (databaseHandle) => runAuditOutboxDrainJob(databaseHandle),
     );
 
     // The drain actually emptied the queue — the assertion the unused
@@ -75,8 +79,9 @@ describe('Integration: audit transactional outbox drain', () => {
       resource_type: 'user',
     });
 
-    const result = await withAuditOutboxDrainDatabaseContext((databaseHandle) =>
-      runAuditOutboxDrainJob(databaseHandle),
+    const result = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.audit_outbox_drain,
+      (databaseHandle) => runAuditOutboxDrainJob(databaseHandle),
     );
 
     expect(result).toEqual({ drained: 0, transientFailed: 0, permanentlyFailed: 1 });
@@ -115,10 +120,10 @@ describe('Integration: audit transactional outbox drain', () => {
 
     // Two independent drain contexts (two worker replicas) racing the same backlog.
     const [resultA, resultB] = await Promise.all([
-      withAuditOutboxDrainDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.audit_outbox_drain, (databaseHandle) =>
         runAuditOutboxDrainJob(databaseHandle),
       ),
-      withAuditOutboxDrainDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.audit_outbox_drain, (databaseHandle) =>
         runAuditOutboxDrainJob(databaseHandle),
       ),
     ]);
@@ -156,7 +161,8 @@ describe('Integration: audit transactional outbox drain', () => {
       .from(users)
       .where(eq(users.public_id, ACTOR_PUBLIC_ID));
 
-    const failedThenRecovered = await withAuditOutboxDrainDatabaseContext(
+    const failedThenRecovered = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.audit_outbox_drain,
       async (databaseHandle) => {
         let failed = false;
         try {

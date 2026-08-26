@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 
 const executeMock = vi.fn().mockResolvedValue(undefined);
 const transactionMock = vi.fn();
@@ -9,9 +13,7 @@ vi.mock('@/infrastructure/database/connection.js', () => ({
   },
 }));
 
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
-
-describe('withGlobalRetentionCleanupDatabaseContext', () => {
+describe('withMaintenanceDatabaseContext', () => {
   it('sets app.global_retention_cleanup and passes transaction handle to callback', async () => {
     const callback = vi.fn().mockResolvedValue('ok');
     const databaseHandle = { execute: executeMock };
@@ -20,7 +22,10 @@ describe('withGlobalRetentionCleanupDatabaseContext', () => {
       async (callback: (transaction: unknown) => Promise<unknown>) => callback(databaseHandle),
     );
 
-    const result = await withGlobalRetentionCleanupDatabaseContext(callback);
+    const result = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.global_retention_cleanup,
+      callback,
+    );
 
     expect(result).toBe('ok');
     expect(executeMock).toHaveBeenCalled();

@@ -18,7 +18,7 @@ const PURGE_BATCH_SIZE = 500;
  *   (lifecycle rules will eventually reap the object); database errors propagate to BullMQ.
  * - **Side effects:** deletes from `auth.user_data_exports` and the S3 GDPR prefix; emits
  *   `info` start/end logs and per-failure `warn` logs.
- * - **Notes:** runs inside `withGlobalRetentionCleanupDatabaseContext` (no per-tenant RLS); idempotent
+ * - **Notes:** runs inside `withMaintenanceDatabaseContext` (no per-tenant RLS); idempotent
  *   — re-running yields zero deletions once cleanup is complete.
  */
 export async function runUserDataExportRetentionJob(

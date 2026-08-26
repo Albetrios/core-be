@@ -34,7 +34,7 @@ const organizationRepository = new OrganizationRepository();
  * "no organization" exactly as they did when the underlying query returned no rows.
  *
  * @remarks
- * The resolver replaces a `withGlobalAdminDatabaseContext` wrapper. That wrapper worked — the
+ * The resolver replaces a `withMaintenanceDatabaseContext` wrapper. That wrapper worked — the
  * `auth.users` policy does carry an `app.global_admin` arm — but it opened the admin escape hatch
  * on a self-service login path (the same objection recorded in `provisionOrganization`) and cost a
  * second transaction on every login, refresh, and `getMe`. The resolver needs neither.

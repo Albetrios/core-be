@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { database } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import {
   grantCoreBeAppRoleForTests,
@@ -30,7 +33,7 @@ import {
  *
  * Together these make audit tampering visible at the DB layer: an UPDATE
  * throws, a non-retention DELETE silently affects zero rows (still in place),
- * and only the retention worker (`withGlobalRetentionCleanupDatabaseContext`)
+ * and only the retention worker (`withMaintenanceDatabaseContext`)
  * can purge old rows.
  */
 async function isPolicySplitMigrationApplied(): Promise<boolean> {
@@ -135,7 +138,8 @@ describe('Security: audit.logs is append-only at the DB layer (sec-U3)', () => {
     const organization = await createTestOrganization({ ownerUserId: owner.id });
     const rowId = await seedAuditRowForOrganization(organization.id);
 
-    await withGlobalRetentionCleanupDatabaseContext(
+    await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.global_retention_cleanup,
       async (databaseHandle) => {
         await databaseHandle.execute(drizzleSql`DELETE FROM audit.logs WHERE id = ${rowId}`);
       },

@@ -27,7 +27,7 @@ const FORBIDDEN_PATTERNS: { pattern: RegExp; message: string }[] = [
  * rule ONLY. `audit-outbox-drain.processor.ts` imports the `RequestScopedPostgresDatabase` TYPE
  * and the low-level `setLocalDatabaseConfig` GUC setter — it never calls `getRequestDatabase()`
  * (the strongest rule, which stays enforced for every file). It runs under
- * `withAuditOutboxDrainDatabaseContext`, setting `app.global_admin` / `app.system_audit_insert`
+ * `withMaintenanceDatabaseContext`, setting `app.global_admin` / `app.system_audit_insert`
  * GUCs explicitly on its own pinned drain handle, so there is no request-scoped RLS fallback.
  * Verified during the security audit; arming the (previously dead) regex re-exposed this file.
  */

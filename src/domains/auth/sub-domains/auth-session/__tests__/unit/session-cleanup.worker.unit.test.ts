@@ -1,5 +1,22 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    const inner = ((callback: (databaseHandle: unknown) => unknown) =>
+      withSessionRetentionCleanupDatabaseContextMock(callback)) as unknown as (
+      ...parameters: unknown[]
+    ) => unknown;
+    return {
+      ...actual,
+      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+        inner(...parameters),
+      ),
+    };
+  },
+);
+
 const workerState = vi.hoisted(() => ({
   processor: undefined as (() => Promise<unknown>) | undefined,
   options: undefined as Record<string, unknown> | undefined,
@@ -35,11 +52,6 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-close.util.js', () => ({
 vi.mock('@/infrastructure/database/utils/batch-delete.util.js', () => ({
   deleteInBatchesByCondition: (...parameters: unknown[]) =>
     deleteInBatchesByConditionMock(...parameters),
-}));
-
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withSessionRetentionCleanupDatabaseContext: (callback: (databaseHandle: unknown) => unknown) =>
-    withSessionRetentionCleanupDatabaseContextMock(callback),
 }));
 
 vi.mock('@/shared/config/env.config.js', () => ({

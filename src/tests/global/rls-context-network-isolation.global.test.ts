@@ -14,7 +14,7 @@ const DATABASE_CONTEXT_WRAPPERS = [
   'withOrganizationDatabaseContext',
   'withOrganizationContext',
   'withUserDatabaseContext',
-  'withGlobalAdminDatabaseContext',
+  'withMaintenanceDatabaseContext',
   'withTransaction',
 ] as const;
 

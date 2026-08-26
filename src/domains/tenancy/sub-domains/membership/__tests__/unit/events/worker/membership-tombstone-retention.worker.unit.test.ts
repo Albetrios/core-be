@@ -1,5 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    const inner = ((callback: (databaseHandle: unknown) => unknown) =>
+      withGlobalRetentionCleanupDatabaseContextMock(callback)) as unknown as (
+      ...parameters: unknown[]
+    ) => unknown;
+    return {
+      ...actual,
+      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+        inner(...parameters),
+      ),
+    };
+  },
+);
+
 const workerState = vi.hoisted(() => ({
   processor: undefined as (() => Promise<unknown>) | undefined,
   options: undefined as Record<string, unknown> | undefined,
@@ -41,11 +58,6 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-close.util.js', () => ({
     queueName,
     close: async () => undefined,
   }),
-}));
-
-vi.mock('@/infrastructure/database/contexts/retention-database.context.js', () => ({
-  withGlobalRetentionCleanupDatabaseContext: (callback: (databaseHandle: unknown) => unknown) =>
-    withGlobalRetentionCleanupDatabaseContextMock(callback),
 }));
 
 vi.mock(
@@ -95,7 +107,7 @@ describe('membership-tombstone-retention.worker', () => {
     expect(workerState.options).toEqual(expect.objectContaining({ concurrency: 1 }));
   });
 
-  it('processor calls withGlobalRetentionCleanupDatabaseContext and runs job inside it', async () => {
+  it('processor calls withMaintenanceDatabaseContext and runs job inside it', async () => {
     const { createMembershipTombstoneRetentionWorker } = await import(
       '@/domains/tenancy/sub-domains/membership/workers/membership-tombstone-retention.worker.js'
     );

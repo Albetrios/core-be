@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { sql as drizzleSql, and, eq, isNotNull, lt } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { database } from '@/infrastructure/database/connection.js';
@@ -8,7 +12,6 @@ import { createTestOrganization } from '@/tests/factories/organization.factory.j
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestWebhook } from '@/tests/factories/webhook.factory.js';
 import { deleteInBatchesByCondition } from '@/infrastructure/database/utils/batch-delete.util.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { webhooks } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
 import { grantCoreBeAppRoleForTests } from '@/tests/helpers/rls-matrix.helper.js';
 
@@ -77,7 +80,8 @@ describe('Security: retention cleanup RLS', () => {
 
     expect(withoutRetentionGuc.deletedCount).toBe(0);
 
-    const withRetentionGuc = await withGlobalRetentionCleanupDatabaseContext(
+    const withRetentionGuc = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.global_retention_cleanup,
       async (databaseHandle) =>
         deleteInBatchesByCondition({
           databaseHandle,

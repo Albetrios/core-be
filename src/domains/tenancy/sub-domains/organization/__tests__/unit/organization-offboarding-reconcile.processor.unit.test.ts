@@ -1,19 +1,30 @@
 import { describe, it, expect, vi } from 'vitest';
+import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/maintenance-database.context.js';
 
-vi.mock('@/infrastructure/database/contexts/retention-database.context.js', () => ({
-  withGlobalRetentionCleanupDatabaseContext: vi.fn(),
-}));
 vi.mock('@/infrastructure/observability/sentry/sentry.js', () => ({
   captureException: vi.fn(),
 }));
 
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { captureException } from '@/infrastructure/observability/sentry/sentry.js';
 import { runOrganizationOffboardingReconcileJob } from '@/domains/tenancy/sub-domains/organization/workers/organization-offboarding-reconcile.processor.js';
 
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    const inner = vi.fn() as unknown as (...parameters: unknown[]) => unknown;
+    return {
+      ...actual,
+      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+        inner(...parameters),
+      ),
+    };
+  },
+);
+
 describe('runOrganizationOffboardingReconcileJob (TEN-06)', () => {
   it('re-drives every stuck offboarding and counts the results', async () => {
-    vi.mocked(withGlobalRetentionCleanupDatabaseContext).mockResolvedValue([
+    vi.mocked(withMaintenanceDatabaseContext).mockResolvedValue([
       { public_id: 'org_a' },
       { public_id: 'org_b' },
     ] as never);
@@ -27,7 +38,7 @@ describe('runOrganizationOffboardingReconcileJob (TEN-06)', () => {
   });
 
   it('counts a per-row failure without aborting the rest of the batch', async () => {
-    vi.mocked(withGlobalRetentionCleanupDatabaseContext).mockResolvedValue([
+    vi.mocked(withMaintenanceDatabaseContext).mockResolvedValue([
       { public_id: 'org_a' },
       { public_id: 'org_b' },
     ] as never);
@@ -51,7 +62,7 @@ describe('runOrganizationOffboardingReconcileJob (TEN-06)', () => {
   });
 
   it('no-ops when nothing is stuck', async () => {
-    vi.mocked(withGlobalRetentionCleanupDatabaseContext).mockResolvedValue([] as never);
+    vi.mocked(withMaintenanceDatabaseContext).mockResolvedValue([] as never);
     const service = { resumeOffboarding: vi.fn() };
 
     const result = await runOrganizationOffboardingReconcileJob(service);

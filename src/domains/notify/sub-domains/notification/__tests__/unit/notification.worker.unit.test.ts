@@ -2,6 +2,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { processNotificationDispatchJob } from '@/domains/notify/sub-domains/notification/workers/notification.worker.js';
 import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
 
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    const inner = ((...parameters: unknown[]) =>
+      withGlobalAdminDatabaseContextMock(...parameters)) as unknown as (
+      ...parameters: unknown[]
+    ) => unknown;
+    return {
+      ...actual,
+      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+        inner(...parameters),
+      ),
+    };
+  },
+);
+
 const recordOutboxEmailMock = vi.fn();
 const dispatchOutboxEmailMock = vi.fn();
 const isMailConfiguredMock = vi.fn();
@@ -30,11 +47,6 @@ vi.mock(
 
 vi.mock('@/infrastructure/database/contexts/worker-database.context.js', () => ({
   withSystemTableWorkerContext: (callback: () => Promise<unknown>) => callback(),
-}));
-
-vi.mock('@/infrastructure/database/contexts/global-admin-database.context.js', () => ({
-  withGlobalAdminDatabaseContext: (...parameters: unknown[]) =>
-    withGlobalAdminDatabaseContextMock(...parameters),
 }));
 
 vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({

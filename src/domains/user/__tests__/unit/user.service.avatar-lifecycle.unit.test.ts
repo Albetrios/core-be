@@ -6,6 +6,22 @@ import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock
 import { buildUserAvatarKeyPrefix } from '@/domains/upload/upload.constants.js';
 import { ValidationError, NotFoundError } from '@/shared/errors/index.js';
 
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    const inner = vi.fn((callback: () => Promise<unknown>) => callback()) as unknown as (
+      ...parameters: unknown[]
+    ) => unknown;
+    return {
+      ...actual,
+      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+        inner(...parameters),
+      ),
+    };
+  },
+);
+
 /**
  * Avatar attach / replace / detach and the reclamation of the object left behind.
  *
@@ -19,10 +35,6 @@ vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
   withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
     callback(),
   ),
-}));
-
-vi.mock('@/infrastructure/database/contexts/global-admin-database.context.js', () => ({
-  withGlobalAdminDatabaseContext: vi.fn((callback: () => Promise<unknown>) => callback()),
 }));
 
 vi.mock('@/shared/utils/infrastructure/postgres-error.util.js', () => ({

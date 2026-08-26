@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, lt, sql as drizzleSql } from 'drizzle-orm';
+import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
 import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
 import { assertWorkerRlsGucSet } from '@/infrastructure/database/contexts/worker-database-guard.util.js';
@@ -73,7 +74,7 @@ export async function insertAuditOutboxRow(input: AuditOutboxInsertInput): Promi
 
 /**
  * Repository factory exposed to the audit-outbox drain worker. Takes the pinned
- * drain-context database handle (from {@link withAuditOutboxDrainDatabaseContext})
+ * drain-context database handle (from {@link withMaintenanceDatabaseContext})
  * and returns the read/update queries the worker needs.
  *
  * @remarks

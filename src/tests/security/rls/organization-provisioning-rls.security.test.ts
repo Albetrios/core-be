@@ -11,7 +11,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 /**
  * Regression for the personal-org provisioning RLS failure (SQLSTATE 42501,
  * `email_login.user.personal_org_provision_failed`). Provisioning ran the owner-bootstrap under
- * `withGlobalAdminDatabaseContext`, but the tenancy policies never honor `app.global_admin` (only
+ * `withMaintenanceDatabaseContext`, but the tenancy policies never honor `app.global_admin` (only
  * `auth`/`audit` do) — so the `tenancy.organizations` INSERT's WITH CHECK was rejected under the
  * non-superuser `core_be_app` role in deployed environments, while passing locally where the DB
  * connects as a BYPASSRLS superuser. The fix runs the bootstrap under the NEW org's own context

@@ -6,6 +6,23 @@ import type { UserService } from '@/domains/user/user.service.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      // Dispatch per kind so the per-context spies keep their original assertions.
+      withMaintenanceDatabaseContext: vi.fn((scope: { kind: string }, ...parameters: unknown[]) => {
+        const inner = (scope.kind === 'global_admin'
+          ? globalAdminContextMock
+          : systemAuditInsertContextMock) as unknown as (...innerParameters: unknown[]) => unknown;
+        return inner(...parameters);
+      }),
+    };
+  },
+);
+
 vi.mock('@/infrastructure/observability/sentry/sentry.js', () => ({
   captureMessage: vi.fn(),
 }));
@@ -42,19 +59,11 @@ const globalAdminContextMock = vi.hoisted(() =>
   vi.fn((callback: () => Promise<unknown>) => callback()),
 );
 
-vi.mock('@/infrastructure/database/contexts/global-admin-database.context.js', () => ({
-  withGlobalAdminDatabaseContext: globalAdminContextMock,
-}));
-
 // sec-R10: tenantless audit rows now reserve their outbox slot under the system-audit-insert
 // context. The unit test just runs the callback (the RLS gate is exercised in the security suite).
 const systemAuditInsertContextMock = vi.hoisted(() =>
   vi.fn((callback: () => Promise<unknown>) => callback()),
 );
-
-vi.mock('@/infrastructure/database/contexts/system-audit-insert-database.context.js', () => ({
-  withSystemAuditInsertContext: systemAuditInsertContextMock,
-}));
 
 describe('AuditService', () => {
   const repository = {

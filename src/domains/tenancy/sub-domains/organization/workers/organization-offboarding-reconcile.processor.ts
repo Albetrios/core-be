@@ -1,5 +1,8 @@
 import { and, isNotNull, isNull, lt, ne } from 'drizzle-orm';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { captureException } from '@/infrastructure/observability/sentry/sentry.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
@@ -58,19 +61,21 @@ export async function runOrganizationOffboardingReconcileJob(
     Date.now() - ORGANIZATION_OFFBOARDING_STUCK_AFTER_MINUTES * MILLISECONDS_PER_MINUTE,
   );
 
-  const stuck = await withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
-    databaseHandle
-      .select({ public_id: organizations.public_id })
-      .from(organizations)
-      .where(
-        and(
-          isNotNull(organizations.deletion_started_at),
-          isNull(organizations.deleted_at),
-          lt(organizations.deletion_started_at, cutoff),
-          ne(organizations.type, 'PERSONAL'),
-        ),
-      )
-      .limit(ORGANIZATION_OFFBOARDING_RECONCILE_BATCH),
+  const stuck = await withMaintenanceDatabaseContext(
+    MAINTENANCE_SCOPE.global_retention_cleanup,
+    (databaseHandle) =>
+      databaseHandle
+        .select({ public_id: organizations.public_id })
+        .from(organizations)
+        .where(
+          and(
+            isNotNull(organizations.deletion_started_at),
+            isNull(organizations.deleted_at),
+            lt(organizations.deletion_started_at, cutoff),
+            ne(organizations.type, 'PERSONAL'),
+          ),
+        )
+        .limit(ORGANIZATION_OFFBOARDING_RECONCILE_BATCH),
   );
 
   let resumed = 0;

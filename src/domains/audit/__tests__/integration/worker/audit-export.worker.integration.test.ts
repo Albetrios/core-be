@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 import { gunzipSync } from 'node:zlib';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { database } from '@/infrastructure/database/connection.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
@@ -90,8 +93,9 @@ describe('audit-export.worker — S3 NDJSON export', () => {
       created_at: createdAt,
     });
 
-    const result = await withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
-      runAuditExportJob(databaseHandle),
+    const result = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.global_retention_cleanup,
+      (databaseHandle) => runAuditExportJob(databaseHandle),
     );
 
     expect(result.exportedOrganizations).toBe(1);
@@ -166,8 +170,9 @@ describe('audit-export.worker — S3 NDJSON export', () => {
       },
     ]);
 
-    const result = await withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
-      runAuditExportJob(databaseHandle),
+    const result = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.global_retention_cleanup,
+      (databaseHandle) => runAuditExportJob(databaseHandle),
     );
 
     expect(result.exportedOrganizations).toBe(2);
@@ -226,8 +231,9 @@ describe('audit-export.worker — S3 NDJSON export', () => {
       return null;
     });
 
-    const result = await withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
-      runAuditExportJob(databaseHandle),
+    const result = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.global_retention_cleanup,
+      (databaseHandle) => runAuditExportJob(databaseHandle),
     );
 
     expect(result.exportedOrganizations).toBe(0);
@@ -251,8 +257,9 @@ describe('audit-export.worker — S3 NDJSON export', () => {
       created_at: todayLogTime,
     });
 
-    const result = await withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
-      runAuditExportJob(databaseHandle),
+    const result = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.global_retention_cleanup,
+      (databaseHandle) => runAuditExportJob(databaseHandle),
     );
 
     expect(result).toEqual({ exportedOrganizations: 0, skipped: 0 });

@@ -140,7 +140,7 @@ Postgres Row-Level Security is the **defense-in-depth** layer for tenant isolati
 
 ### Where it lives
 
-- Context wrappers: [src/infrastructure/database/contexts/](src/infrastructure/database/contexts/) — `withPrincipalDatabaseContext` (token-minted identity scope; the common wrapper authenticated HTTP paths are migrating to), `withOrganizationContext`, `withGlobalRetentionCleanupDatabaseContext`, `withUserDatabaseContext`, `withSessionRetentionCleanupDatabaseContext`.
+- Context wrappers: [src/infrastructure/database/contexts/](src/infrastructure/database/contexts/) — `withPrincipalDatabaseContext` (token-minted identity scope; the common wrapper authenticated HTTP paths are migrating to), `withOrganizationContext`, `withUserDatabaseContext`, `withSessionDatabaseContext` (pre-auth session artifacts), and `withMaintenanceDatabaseContext` with the static `MAINTENANCE_SCOPE.<kind>` singletons (the whole bypass family: global_retention_cleanup, session_retention_cleanup, global_admin, system_audit_insert, audit_outbox_drain).
 - Principal scope minting: `resolvePrincipalDatabaseScope` (organization always present — the personal/team-organization invariant) / `requireUserPrincipalDatabaseScope` (additionally guarantees a real end user) in [src/shared/utils/http/request.util.ts](src/shared/utils/http/request.util.ts) — controllers mint a branded `PrincipalDatabaseScope` from the verified token (path-param-else-claim precedence, both `user` and `apiKey` principal kinds); services relay it into `withPrincipalDatabaseContext` and can never fabricate one from raw strings (factory confinement pinned by `principal-scope-minting.policy.unit.test.ts`). Provenance is edge-only: each legitimate "top" (request, worker payload, provisioning) gets its own minter; bypass GUCs have no minter and no path through the principal wrapper.
 - Worker runtime: `runTenantScopedWorkerJob`, `runGlobalRetentionWorkerJob`, `runUserScopedWorkerJob` in [src/infrastructure/queue/worker-runtime/worker-processor.util.ts](src/infrastructure/queue/worker-runtime/worker-processor.util.ts).
 - Migration: `migrations/00000000000000_init.sql` (consolidated baseline; defines the `app.global_retention_cleanup` RLS bypass policies) and other RLS-policy migrations under [migrations/](migrations/).
@@ -149,7 +149,7 @@ Postgres Row-Level Security is the **defense-in-depth** layer for tenant isolati
 
 - HTTP requests get RLS via `tenant.middleware` + `organization-rls-transaction.middleware` opening a request-scoped transaction with `SET LOCAL app.current_organization_id = $1`.
 - Workers get RLS via `runTenantScopedWorkerJob` which **requires** `organizationPublicId` in the job payload and opens its own `withOrganizationContext` transaction. Workers are forbidden from importing `request-database.context.ts` (enforced by `worker-database-guard.util.ts` and global tests).
-- Global-scope workers (cross-org sweeps) use `withGlobalRetentionCleanupDatabaseContext`, which sets a different GUC that RLS policies recognize as "global retention" — strictly limited to retention/cleanup operations.
+- Global-scope workers (cross-org sweeps) use `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, …)`, which sets a different GUC that RLS policies recognize as "global retention" — strictly limited to retention/cleanup operations.
 
 ### Each context grants only what a policy names
 
@@ -159,8 +159,8 @@ A context sets **one** GUC. It grants access only on tables whose policies test 
 | --- | --- | --- |
 | `withOrganizationDatabaseContext` | `app.current_organization_id` | tenant-scoped tables (`organizations_tenant_isolation` and the per-table `*_tenant_isolation` policies) |
 | `withUserDatabaseContext` | `app.current_user_id` | user-owned rows — `auth.users`, `auth.auth_methods`, uploads/notifications, **and the tenancy discovery policies** (`organizations_user_discovery`, `memberships_user_self_discovery`) |
-| `withGlobalAdminDatabaseContext` | `app.global_admin` | **`auth.*` and `audit.logs` ONLY** |
-| `withGlobalRetentionCleanupDatabaseContext` | `app.global_retention_cleanup` | retention-sweep tables only |
+| `MAINTENANCE_SCOPE.global_admin` | `app.global_admin` | **`auth.*` and `audit.logs` ONLY** |
+| `MAINTENANCE_SCOPE.global_retention_cleanup` | `app.global_retention_cleanup` | retention-sweep tables only |
 
 **`app.global_admin` grants nothing on `tenancy.*`.** No tenancy policy carries that arm — the tenancy tables are reachable only through the active-org GUC or the user GUC. Reading `tenancy.organizations` / `tenancy.memberships` under the admin context returns zero rows; writing fails its `WITH CHECK`. This shipped to production three times (organization provisioning, active-org resolution at login, and the `OrganizationRepository` user-id resolvers) before being pinned by [no-global-admin-in-tenancy.global.test.ts](src/tests/global/no-global-admin-in-tenancy.global.test.ts) and [tenancy-global-admin-invisibility.security.test.ts](src/tests/security/rls/tenancy-global-admin-invisibility.security.test.ts).
 
