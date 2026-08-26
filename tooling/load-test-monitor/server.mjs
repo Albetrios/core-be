@@ -14,6 +14,7 @@
  * Dev-only. Bodies are buffered in memory (capped, ring-buffered) and Authorization /
  * Cookie values are truncated before they ever reach the browser.
  */
+import { execFile } from 'node:child_process';
 import http from 'node:http';
 import { URL } from 'node:url';
 
@@ -25,6 +26,38 @@ import { URL } from 'node:url';
  * (env schema, default 3000), so a shell that exports it for the API would silently move this
  * proxy too. A constant cannot drift, and the dashboard URL is always the same one.
  */
+/**
+ * The git branch the API is serving, refreshed at most once a second.
+ *
+ * Which branch produced a number is the first thing you need when comparing two runs, and it is
+ * the easiest thing to lose track of: `tsx watch` reloads on checkout, so the branch can change
+ * under a long session without the dashboard showing it. Read live rather than captured at boot,
+ * so an A/B that switches branches between runs reports each one correctly.
+ *
+ * Failure is non-fatal and expected — the repo may be in detached HEAD during a rebase, or git may
+ * not be on PATH. The board then shows an em dash rather than a stale or invented value.
+ */
+let branchName = null;
+let branchReadAt = 0;
+function readBranch() {
+  // Awaited rather than fired-and-forgotten: a background refresh serves the PREVIOUS branch on
+  // the first poll after a checkout, which is exactly the poll that matters when an A/B switches
+  // branches between runs. `git rev-parse` is a few milliseconds and runs at most once a second.
+  if (Date.now() - branchReadAt < 1000) return Promise.resolve(branchName);
+  branchReadAt = Date.now();
+  return new Promise((resolve) => {
+    execFile(
+      'git',
+      ['rev-parse', '--abbrev-ref', 'HEAD'],
+      { cwd: process.cwd() },
+      (error, stdout) => {
+        branchName = error ? null : stdout.trim() || null;
+        resolve(branchName);
+      },
+    );
+  });
+}
+
 const PORT = 4985;
 const UPSTREAM = process.env.LOAD_MONITOR_UPSTREAM || 'http://localhost:3000';
 const MAX_CALLS = Number(process.env.MAX_CALLS || 2000);
@@ -284,7 +317,7 @@ function handleProxy(req, res) {
 
 /* ─────────────────────────── server ─────────────────────────── */
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
   if (url.pathname === '/__monitor/stream') {
@@ -307,8 +340,9 @@ const server = http.createServer((req, res) => {
   }
 
   if (url.pathname === '/__monitor/stats') {
+    const branch = await readBranch();
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ stats: buildStats(), total: calls.length }));
+    res.end(JSON.stringify({ stats: buildStats(), total: calls.length, branch }));
     return;
   }
 
@@ -639,6 +673,7 @@ th .info .tip{right:-4px;text-transform:none}
         <div class="kpi"><div class="k">routes<i class="info" tabindex="0" aria-label="What does routes mean?"><span class="tip">Distinct method + route pairs seen. Volatile path segments are normalized (<code>org_a1b2</code> becomes <code>:id</code>), so one endpoint counts once no matter how many ids passed through it.</span></i></div><div class="v" id="k-routes">0</div></div>
 
         <div class="kpi"><div class="k">pool max<i class="info" tabindex="0" aria-label="What is pool max?"><span class="tip"><b>DATABASE_POOL_MAX</b> on the API at the time of this run &mdash; the number of Postgres connections one API process may hold. Reported by the load script, which reads it off the live API process.</span></i></div><div class="v" id="k-pool">&mdash;</div></div>
+        <div class="kpi"><div class="k">branch<i class="info" tabindex="0" aria-label="What is branch?"><span class="tip">The git branch checked out for the API right now, read live rather than at boot &mdash; <code>tsx watch</code> reloads on checkout, so an A/B that switches branches between runs reports each one correctly. <b>Which branch produced a number is the first thing you need when comparing two runs.</b> An em dash means git could not be read (detached HEAD mid-rebase, or git not on PATH).</span></i></div><div class="v" id="k-branch" style="font-size:13px;word-break:break-all">&mdash;</div></div>
 
         <div class="kpi"><div class="k">journeys<i class="info" tabindex="0" aria-label="What does journeys mean?"><span class="tip">Complete walks through the flow, counted from <code>/auth/email/send-code</code> &mdash; it fires exactly once per journey. <b>This is why call counts exceed your VU count:</b> in duration or ramp mode each user loops, so 100 users produce far more than 100 journeys.</span></i></div><div class="v" id="k-journeys">0</div></div>
 
@@ -840,7 +875,8 @@ function renderDetail(){
 }
 
 async function renderStats(){
-  const r=await fetch('/__monitor/stats');const {stats}=await r.json();
+  const r=await fetch('/__monitor/stats');const {stats,branch}=await r.json();
+  document.getElementById('k-branch').textContent=branch||'\u2014';
   if(!stats.length){statsPane.innerHTML='<div class="empty">No traffic recorded yet.</div>';return}
   // Bar encodes share of TOTAL time, not p95 — it answers "where did the time go",
   // which is the question a totals column invites.
