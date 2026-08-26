@@ -1,3 +1,4 @@
+import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { GlobalRole } from '@/shared/constants/roles.constants.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
@@ -39,21 +40,34 @@ export class AuthMeContextService {
   }): Promise<AuthMeContextData> {
     const { userPublicId, activeOrganizationPublicId, globalRole } = options;
 
-    // All four reads are independent — every input comes from `options` (the caller's public id,
-    // the active-org claim, the global role), and none consumes another's result. Issued
-    // sequentially this route paid four round trips back to back; batched it pays one wall-clock
-    // wait. That matters disproportionately here because `/auth/me/context` is on the critical
-    // path of every page load, so its latency is multiplied across the whole session.
-    const [user, organizationsPage, activeOrganization, myPermissions] = await Promise.all([
-      this.userService.getMe(userPublicId),
-      this.organizationService.list({}, userPublicId, globalRole),
-      activeOrganizationPublicId
-        ? this.organizationService.getByPublicId(
-            activeOrganizationPublicId,
-            userPublicId,
-            globalRole,
-          )
-        : Promise.resolve<OrganizationOutput | null>(null),
+    // The four reads are independent — every input comes from `options`, and none consumes
+    // another's result — but they do NOT all want the same database context, and that, not
+    // their ordering, is what this route costs.
+    //
+    // `getMe`, `list` and `getByPublicId` each open `withUserDatabaseContext(userPublicId)`:
+    // the SAME guc, the SAME value. Called separately that is three transactions, three
+    // `SELECT set_config(...)` round trips and three pooled checkouts held at once — measured
+    // at six BEGINs for one request. Opening the user context ONCE lets all three take the
+    // reuse branch in `withUserDatabaseContext` and share a single checkout, which is the
+    // amplification that made a 50-connection pool starve at 50 users.
+    //
+    // They serialize on that one connection, so this trades a little latency at low load for a
+    // 3x cut in connections held per request — the resource that actually runs out first.
+    // `resolveUserOrganizationPermissions` stays outside: it drives a DIFFERENT guc
+    // (`app.current_organization_id`), so it must keep its own transaction and can still
+    // overlap with the block below.
+    const [userScoped, myPermissions] = await Promise.all([
+      withUserDatabaseContext(userPublicId, async () => ({
+        user: await this.userService.getMe(userPublicId),
+        organizationsPage: await this.organizationService.list({}, userPublicId, globalRole),
+        activeOrganization: activeOrganizationPublicId
+          ? await this.organizationService.getByPublicId(
+              activeOrganizationPublicId,
+              userPublicId,
+              globalRole,
+            )
+          : null,
+      })),
       activeOrganizationPublicId
         ? this.authorizationService.resolveUserOrganizationPermissions(
             userPublicId,
@@ -61,6 +75,7 @@ export class AuthMeContextService {
           )
         : Promise.resolve<string[]>([]),
     ]);
+    const { user, organizationsPage, activeOrganization } = userScoped;
 
     return {
       user,
