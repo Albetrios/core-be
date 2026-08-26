@@ -17,6 +17,10 @@ import {
   seedPermissions,
 } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
 import { createTestSubscription } from '@/domains/billing/__tests__/factories/subscription.factory.js';
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { PlanService } from '@/domains/billing/sub-domains/plan/plan.service.js';
@@ -42,6 +46,12 @@ const BILLING_PERMISSIONS = ['subscription:read', 'subscription:manage'] as cons
 
 /** Rows in the "large" list. Big enough that an N+1 is unmistakable, small enough to seed fast. */
 const LARGE_LIST_ROW_COUNT = 25;
+
+const budgetScope = createPrincipalDatabaseScope({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_budget',
+  source: 'token',
+}) as OrganizationPrincipalDatabaseScope;
 
 describe('Performance: billing list routes stay O(1) in cross-domain work', () => {
   let app: FastifyInstance;
@@ -91,8 +101,8 @@ describe('Performance: billing list routes stay O(1) in cross-domain work', () =
     const single = buildCountingService(1);
     const large = buildCountingService(LARGE_LIST_ROW_COUNT);
 
-    const singleResult = await single.service.list('org_budget');
-    const largeResult = await large.service.list('org_budget');
+    const singleResult = await single.service.list(budgetScope);
+    const largeResult = await large.service.list(budgetScope);
 
     expect(singleResult).toHaveLength(1);
     expect(largeResult).toHaveLength(LARGE_LIST_ROW_COUNT);

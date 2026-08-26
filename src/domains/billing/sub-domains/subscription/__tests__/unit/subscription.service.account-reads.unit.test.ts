@@ -15,6 +15,19 @@ vi.mock('@/infrastructure/database/contexts/organization-database.context.js', (
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 const stripeMocks = vi.hoisted(() => ({
   isStripeConfigured: vi.fn(() => false),
   createStripeSetupIntent: vi.fn().mockResolvedValue('seti_secret_123'),
@@ -26,6 +39,10 @@ const stripeMocks = vi.hoisted(() => ({
 vi.mock('@/infrastructure/payment/stripe.client.js', () => stripeMocks);
 
 import { NotFoundError, UnprocessableEntityError } from '@/shared/errors/index.js';
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { SubscriptionRepository } from '@/domains/billing/sub-domains/subscription/subscription.repository.js';
@@ -80,11 +97,17 @@ beforeEach(() => {
   stripeMocks.retrieveStripeSubscriptionPaymentClientSecret.mockResolvedValue('pi_secret_456');
 });
 
+const scope = createPrincipalDatabaseScope({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_public',
+  source: 'token',
+}) as OrganizationPrincipalDatabaseScope;
+
 describe('SubscriptionService.listInvoices — fail-open read', () => {
   it('returns the empty page with the DEFAULT limit when Stripe is unconfigured, without calling Stripe', async () => {
     const { service } = buildService({});
 
-    const page = await service.listInvoices('org_public', {});
+    const page = await service.listInvoices(scope, {});
 
     expect(page).toEqual({
       items: [],
@@ -100,7 +123,7 @@ describe('SubscriptionService.listInvoices — fail-open read', () => {
     stripeMocks.isStripeConfigured.mockReturnValue(true);
     const { service } = buildService({ activeSubscription: null });
 
-    const page = await service.listInvoices('org_public', { limit: 5 });
+    const page = await service.listInvoices(scope, { limit: 5 });
 
     expect(page.items).toEqual([]);
     expect(page.limit).toBe(5);
@@ -115,7 +138,7 @@ describe('SubscriptionService.listInvoices — fail-open read', () => {
     });
     const { service } = buildService({});
 
-    const page = await service.listInvoices('org_public', { limit: 2, after: 'in_prev' });
+    const page = await service.listInvoices(scope, { limit: 2, after: 'in_prev' });
 
     expect(stripeMocks.listStripeInvoices).toHaveBeenCalledWith('cus_live', {
       limit: 2,
@@ -135,7 +158,7 @@ describe('SubscriptionService.listInvoices — fail-open read', () => {
     });
     const { service } = buildService({});
 
-    const page = await service.listInvoices('org_public', { limit: 2 });
+    const page = await service.listInvoices(scope, { limit: 2 });
 
     expect(page.has_more).toBe(false);
     expect(page.next_cursor).toBeNull();
@@ -146,7 +169,7 @@ describe('SubscriptionService.listPaymentMethods — fail-open read', () => {
   it('returns [] when Stripe is unconfigured, without calling Stripe', async () => {
     const { service } = buildService({});
 
-    await expect(service.listPaymentMethods('org_public')).resolves.toEqual([]);
+    await expect(service.listPaymentMethods(scope)).resolves.toEqual([]);
     expect(stripeMocks.listStripePaymentMethods).not.toHaveBeenCalled();
   });
 
@@ -167,7 +190,7 @@ describe('SubscriptionService.listPaymentMethods — fail-open read', () => {
     stripeMocks.retrieveStripeCustomerDefaultPaymentMethodId.mockResolvedValue('pm_b');
     const { service } = buildService({});
 
-    const methods = (await service.listPaymentMethods('org_public')) as Array<{
+    const methods = (await service.listPaymentMethods(scope)) as Array<{
       id: string;
       is_default: boolean;
     }>;
@@ -183,7 +206,7 @@ describe('SubscriptionService.createPaymentMethodSetup — fail-closed write', (
   it('refuses with 422 when the org has no provider customer (nothing to attach a card to)', async () => {
     const { service } = buildService({ activeSubscription: null });
 
-    await expect(service.createPaymentMethodSetup('org_public')).rejects.toBeInstanceOf(
+    await expect(service.createPaymentMethodSetup(scope)).rejects.toBeInstanceOf(
       UnprocessableEntityError,
     );
     expect(stripeMocks.createStripeSetupIntent).not.toHaveBeenCalled();
@@ -192,7 +215,7 @@ describe('SubscriptionService.createPaymentMethodSetup — fail-closed write', (
   it('degrades to a null client_secret when Stripe is unconfigured, without calling Stripe', async () => {
     const { service } = buildService({});
 
-    await expect(service.createPaymentMethodSetup('org_public')).resolves.toEqual({
+    await expect(service.createPaymentMethodSetup(scope)).resolves.toEqual({
       client_secret: null,
     });
     expect(stripeMocks.createStripeSetupIntent).not.toHaveBeenCalled();
@@ -202,7 +225,7 @@ describe('SubscriptionService.createPaymentMethodSetup — fail-closed write', (
     stripeMocks.isStripeConfigured.mockReturnValue(true);
     const { service } = buildService({});
 
-    const result = await service.createPaymentMethodSetup('org_public', 'client-key-1');
+    const result = await service.createPaymentMethodSetup(scope, 'client-key-1');
 
     const [customerId, options] = stripeMocks.createStripeSetupIntent.mock.calls[0] as [
       string,
@@ -220,7 +243,7 @@ describe('SubscriptionService.createPaymentMethodSetup — fail-closed write', (
     stripeMocks.isStripeConfigured.mockReturnValue(true);
     const { service } = buildService({});
 
-    await service.createPaymentMethodSetup('org_public');
+    await service.createPaymentMethodSetup(scope);
 
     const options = stripeMocks.createStripeSetupIntent.mock.calls[0]?.[1] as Record<
       string,
@@ -234,7 +257,7 @@ describe('SubscriptionService.getPaymentSetup', () => {
   it('404s for an unknown subscription id', async () => {
     const { service } = buildService({ byPublicId: null });
 
-    await expect(service.getPaymentSetup('org_public', 'sub_missing')).rejects.toBeInstanceOf(
+    await expect(service.getPaymentSetup(scope, 'sub_missing')).rejects.toBeInstanceOf(
       NotFoundError,
     );
   });
@@ -245,7 +268,7 @@ describe('SubscriptionService.getPaymentSetup', () => {
     });
     stripeMocks.isStripeConfigured.mockReturnValue(true);
 
-    await expect(service.getPaymentSetup('org_public', 'sub_x')).resolves.toEqual({
+    await expect(service.getPaymentSetup(scope, 'sub_x')).resolves.toEqual({
       client_secret: null,
     });
     expect(stripeMocks.retrieveStripeSubscriptionPaymentClientSecret).not.toHaveBeenCalled();
@@ -257,7 +280,7 @@ describe('SubscriptionService.getPaymentSetup', () => {
     });
     stripeMocks.isStripeConfigured.mockReturnValue(true);
 
-    await expect(service.getPaymentSetup('org_public', 'sub_x')).resolves.toEqual({
+    await expect(service.getPaymentSetup(scope, 'sub_x')).resolves.toEqual({
       client_secret: null,
     });
   });
@@ -268,7 +291,7 @@ describe('SubscriptionService.getPaymentSetup', () => {
     });
     stripeMocks.isStripeConfigured.mockReturnValue(true);
 
-    await expect(service.getPaymentSetup('org_public', 'sub_x')).resolves.toEqual({
+    await expect(service.getPaymentSetup(scope, 'sub_x')).resolves.toEqual({
       client_secret: 'pi_secret_456',
     });
     expect(stripeMocks.retrieveStripeSubscriptionPaymentClientSecret).toHaveBeenCalledWith(

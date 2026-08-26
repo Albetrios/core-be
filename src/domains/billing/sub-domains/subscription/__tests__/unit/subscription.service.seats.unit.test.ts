@@ -13,6 +13,23 @@ vi.mock('@/infrastructure/database/contexts/organization-database.context.js', (
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { PlanService } from '@/domains/billing/sub-domains/plan/plan.service.js';
@@ -43,6 +60,12 @@ function baseRow(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+const scope = createPrincipalDatabaseScope({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_public',
+  source: 'token',
+}) as OrganizationPrincipalDatabaseScope;
 
 describe('SubscriptionService seat counters (REQ-4)', () => {
   const organizationService = {
@@ -87,7 +110,7 @@ describe('SubscriptionService seat counters (REQ-4)', () => {
       baseRow({ public_id: 'sub_2', seats: 50, plan_included_seats: 10 }),
     ] as never);
 
-    const rows = await service.list('org_public');
+    const rows = await service.list(scope);
 
     // First row: no purchased seats → falls back to plan.included_seats.
     expect(rows[0]!.seats_total).toBe(10);
@@ -103,7 +126,7 @@ describe('SubscriptionService seat counters (REQ-4)', () => {
     vi.mocked(repository.findByPublicId).mockResolvedValue(
       baseRow({ seats: null, plan_included_seats: null }) as never,
     );
-    const row = await service.get('org_public', 'sub_public');
+    const row = await service.get(scope, 'sub_public');
     expect(row.seats_total).toBeNull();
     expect(row.seats_used).toBe(3);
   });

@@ -48,7 +48,7 @@ describe('createSubscriptionController', () => {
       mockRequest({ params: { organization_id: organizationPublicId } }),
       mockReply(),
     );
-    expect(service.list).toHaveBeenCalledWith(organizationPublicId);
+    expect(service.list).toHaveBeenCalledWith(expect.objectContaining({ organizationPublicId }));
     expect(response).toMatchObject({ data: [] });
   });
 
@@ -58,7 +58,10 @@ describe('createSubscriptionController', () => {
       mockReply(),
     );
     // The Stripe cursor + limit are validated in the service; the controller forwards request.query.
-    expect(service.listInvoices).toHaveBeenCalledWith(organizationPublicId, { limit: 25 });
+    expect(service.listInvoices).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId }),
+      { limit: 25 },
+    );
     expect(response).toMatchObject({
       data: [{ id: 'in_2' }],
       meta: { pagination: { per_page: 25, next: 'in_2', has_more: true } },
@@ -72,7 +75,10 @@ describe('createSubscriptionController', () => {
       }),
       mockReply(),
     );
-    expect(service.get).toHaveBeenCalledWith(organizationPublicId, subscriptionPublicId);
+    expect(service.get).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId }),
+      subscriptionPublicId,
+    );
   });
 
   it('createSubscription forwards the idempotency key to service.create', async () => {
@@ -89,7 +95,7 @@ describe('createSubscriptionController', () => {
     // lets a retry/double-click mint a second paid subscription. (Asserting positions 0 and 3
     // directly because the 3rd arg — acting user public id — is undefined for this mock auth.)
     const createCall = vi.mocked(service.create).mock.calls[0];
-    expect(createCall?.[0]).toBe(organizationPublicId);
+    expect(createCall?.[0]).toMatchObject({ organizationPublicId });
     expect(createCall?.[3]).toBe('idem-key-123456789012');
   });
 
@@ -114,7 +120,7 @@ describe('createSubscriptionController', () => {
       mockReply(),
     );
     expect(service.changePlan).toHaveBeenCalledWith(
-      organizationPublicId,
+      expect.objectContaining({ organizationPublicId }),
       subscriptionPublicId,
       expect.anything(),
       'idem-key-123456789012',
@@ -130,7 +136,7 @@ describe('createSubscriptionController', () => {
       mockReply(),
     );
     expect(service.cancel).toHaveBeenCalledWith(
-      organizationPublicId,
+      expect.objectContaining({ organizationPublicId }),
       subscriptionPublicId,
       'idem-key-123456789012',
     );
@@ -145,7 +151,7 @@ describe('createSubscriptionController', () => {
       mockReply(),
     );
     expect(service.resume).toHaveBeenCalledWith(
-      organizationPublicId,
+      expect.objectContaining({ organizationPublicId }),
       subscriptionPublicId,
       'idem-key-123456789012',
     );

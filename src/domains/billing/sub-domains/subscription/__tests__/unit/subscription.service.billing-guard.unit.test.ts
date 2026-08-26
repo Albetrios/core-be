@@ -13,6 +13,19 @@ vi.mock('@/infrastructure/database/contexts/organization-database.context.js', (
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 // audit-#B4: run the create critical section transparently — the lock itself is covered in
 // redis-lock.util.unit.test.ts; here it must not open a real Redis connection.
 vi.mock('@/infrastructure/cache/redis-lock.util.js', () => ({
@@ -20,6 +33,10 @@ vi.mock('@/infrastructure/cache/redis-lock.util.js', () => ({
   RedisLockUnavailableError: class RedisLockUnavailableError extends Error {},
 }));
 
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { PlanService } from '@/domains/billing/sub-domains/plan/plan.service.js';
@@ -74,12 +91,18 @@ const BILLING_REJECTION = {
   messageKey: 'errors:personalOrganizationNoBilling',
 };
 
+const personalScope = createPrincipalDatabaseScope({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_personal',
+  source: 'token',
+}) as OrganizationPrincipalDatabaseScope;
+
 describe('SubscriptionService — personal-org billing guard', () => {
   it('create rejects a PERSONAL organization with 422 before any plan lookup or Stripe call', async () => {
     const { service, planService, paymentProvider, repository } = buildService();
     await expect(
       service.create(
-        'org_personal',
+        personalScope,
         { plan_id: 'pln_test', billing_cycle: 'monthly' },
         'creator_public',
         'idem-personal-billing-key',
@@ -93,14 +116,14 @@ describe('SubscriptionService — personal-org billing guard', () => {
   it('changePlan rejects a PERSONAL organization with 422 before the subscription lookup', async () => {
     const { service, repository } = buildService();
     await expect(
-      service.changePlan('org_personal', 'sub_x', { plan_id: 'pln_test' }, 'idem-key'),
+      service.changePlan(personalScope, 'sub_x', { plan_id: 'pln_test' }, 'idem-key'),
     ).rejects.toMatchObject(BILLING_REJECTION);
     expect(vi.mocked(repository.findByPublicId)).not.toHaveBeenCalled();
   });
 
   it('cancel rejects a PERSONAL organization with 422 before the subscription lookup', async () => {
     const { service, repository } = buildService();
-    await expect(service.cancel('org_personal', 'sub_x', 'idem-key')).rejects.toMatchObject(
+    await expect(service.cancel(personalScope, 'sub_x', 'idem-key')).rejects.toMatchObject(
       BILLING_REJECTION,
     );
     expect(vi.mocked(repository.findByPublicId)).not.toHaveBeenCalled();
@@ -108,7 +131,7 @@ describe('SubscriptionService — personal-org billing guard', () => {
 
   it('resume rejects a PERSONAL organization with 422 before the subscription lookup', async () => {
     const { service, repository } = buildService();
-    await expect(service.resume('org_personal', 'sub_x', 'idem-key')).rejects.toMatchObject(
+    await expect(service.resume(personalScope, 'sub_x', 'idem-key')).rejects.toMatchObject(
       BILLING_REJECTION,
     );
     expect(vi.mocked(repository.findByPublicId)).not.toHaveBeenCalled();

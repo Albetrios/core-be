@@ -14,7 +14,24 @@ vi.mock('@/infrastructure/database/contexts/organization-database.context.js', (
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 import { NotFoundError, UnprocessableEntityError } from '@/shared/errors/index.js';
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { PlanService } from '@/domains/billing/sub-domains/plan/plan.service.js';
@@ -97,6 +114,12 @@ function buildService() {
   return { service, organizationService, planService, repository, paymentProvider };
 }
 
+const scope = createPrincipalDatabaseScope({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_public',
+  source: 'token',
+}) as OrganizationPrincipalDatabaseScope;
+
 describe('SubscriptionService cancel / resume / changePlan guards', () => {
   let context: ReturnType<typeof buildService>;
 
@@ -107,7 +130,7 @@ describe('SubscriptionService cancel / resume / changePlan guards', () => {
   it('cancel still calls Stripe and persists when subscription has provider id', async () => {
     const { service, repository, paymentProvider } = context;
 
-    await service.cancel('org_public', 'sub_public');
+    await service.cancel(scope, 'sub_public');
 
     expect(paymentProvider.cancelSubscriptionAtPeriodEnd).toHaveBeenCalledWith(
       'sub_provider',
@@ -131,7 +154,7 @@ describe('SubscriptionService cancel / resume / changePlan guards', () => {
       status: 'CANCELED',
     } as never);
 
-    await service.cancel('org_public', 'sub_public');
+    await service.cancel(scope, 'sub_public');
 
     // Immediate Stripe cancel (not at-period-end, which is a no-op on an incomplete sub)...
     expect(paymentProvider.cancelSubscriptionImmediately).toHaveBeenCalledWith(
@@ -151,7 +174,7 @@ describe('SubscriptionService cancel / resume / changePlan guards', () => {
     const { service, repository, paymentProvider } = context;
     vi.mocked(repository.findByPublicId).mockResolvedValueOnce(null);
 
-    await expect(service.cancel('org_public', 'sub_public')).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.cancel(scope, 'sub_public')).rejects.toBeInstanceOf(NotFoundError);
     expect(paymentProvider.cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
     expect(repository.update).not.toHaveBeenCalled();
   });
@@ -193,7 +216,7 @@ describe('SubscriptionService cancel / resume / changePlan guards', () => {
   it('resume calls Stripe and clears cancel_at_period_end without force-writing status (sec-B4)', async () => {
     const { service, repository, paymentProvider } = context;
 
-    await service.resume('org_public', 'sub_public');
+    await service.resume(scope, 'sub_public');
 
     expect(paymentProvider.resumeSubscription).toHaveBeenCalledWith('sub_provider', undefined);
     expect(repository.update).toHaveBeenCalledWith(
@@ -215,7 +238,7 @@ describe('SubscriptionService cancel / resume / changePlan guards', () => {
       provider_subscription_id: null,
     } as never);
 
-    await service.changePlan('org_public', 'sub_public', { plan_id: 'plan_public' });
+    await service.changePlan(scope, 'sub_public', { plan_id: 'plan_public' });
 
     expect(paymentProvider.updateSubscriptionPrice).not.toHaveBeenCalled();
     expect(repository.update).toHaveBeenCalled();
@@ -231,7 +254,7 @@ describe('SubscriptionService cancel / resume / changePlan guards', () => {
         status: terminalStatus,
       } as never);
 
-      await expect(service.cancel('org_public', 'sub_public')).rejects.toBeInstanceOf(
+      await expect(service.cancel(scope, 'sub_public')).rejects.toBeInstanceOf(
         UnprocessableEntityError,
       );
       expect(paymentProvider.cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
@@ -248,7 +271,7 @@ describe('SubscriptionService cancel / resume / changePlan guards', () => {
         status: terminalStatus,
       } as never);
 
-      await expect(service.resume('org_public', 'sub_public')).rejects.toBeInstanceOf(
+      await expect(service.resume(scope, 'sub_public')).rejects.toBeInstanceOf(
         UnprocessableEntityError,
       );
       expect(paymentProvider.resumeSubscription).not.toHaveBeenCalled();
@@ -266,7 +289,7 @@ describe('SubscriptionService cancel / resume / changePlan guards', () => {
       } as never);
 
       await expect(
-        service.changePlan('org_public', 'sub_public', { plan_id: 'plan_public' }),
+        service.changePlan(scope, 'sub_public', { plan_id: 'plan_public' }),
       ).rejects.toBeInstanceOf(UnprocessableEntityError);
       expect(paymentProvider.updateSubscriptionPrice).not.toHaveBeenCalled();
       expect(repository.update).not.toHaveBeenCalled();
