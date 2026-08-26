@@ -448,6 +448,56 @@ describe('AuthService', () => {
     );
   });
 
+  /**
+   * `switchToOrganization`'s two user-scoped reads — the user record and the membership gate —
+   * both run under `app.current_user_id` set to the SAME value, so they must share ONE context
+   * and therefore one pooled checkout. Splitting them back into a context each is invisible in
+   * the response and only shows up as connection pressure under load, so it is pinned here.
+   *
+   * The session rebind is asserted to run AFTER that context closes. It writes under
+   * `app.current_session_public_id` — a different guc — so it needs its own transaction; nesting
+   * it would hold the user checkout open across it and make the request peak at two concurrent
+   * connections instead of taking them one after another.
+   */
+  it('runs both user-scoped reads in ONE database context and rebinds the session outside it', async () => {
+    const resolve = await import(
+      '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
+    );
+    const databaseContext = await import(
+      '@/infrastructure/database/contexts/user-database.context.js'
+    );
+    vi.mocked(resolve.findUserActiveOrganizationByPublicId).mockResolvedValue({
+      id: 9,
+      public_id: 'org_team',
+    });
+
+    const order: string[] = [];
+    vi.mocked(databaseContext.withUserDatabaseContext).mockImplementation(
+      // The real signature hands the callback a pinned database handle; the mock never touches
+      // it, so it is passed through as `never` rather than fabricating a fake handle.
+      (async (_userPublicId: string, callback: (handle: never) => Promise<unknown>) => {
+        order.push('context:open');
+        const result = await callback(undefined as never);
+        order.push('context:close');
+        return result;
+      }) as unknown as typeof databaseContext.withUserDatabaseContext,
+    );
+    vi.mocked(authSessionService.rebindAccessToken).mockImplementation(async () => {
+      order.push('session:rebind');
+      return undefined;
+    });
+
+    await service.switchToOrganization({
+      userPublicId: user.public_id,
+      sessionPublicId: 'session_public',
+      organizationPublicId: 'org_team',
+    });
+
+    // One context for the whole route. Two would mean the same guc set twice, in two checkouts.
+    expect(databaseContext.withUserDatabaseContext).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['context:open', 'context:close', 'session:rebind']);
+  });
+
   it('switchToPersonal self-heals the personal org via ensurePersonalOrganization (no 404 when personal is enabled)', async () => {
     const resolve = await import(
       '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'

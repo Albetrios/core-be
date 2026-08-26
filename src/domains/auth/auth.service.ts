@@ -27,6 +27,7 @@ import type { AuthSessionService } from './sub-domains/auth-session/auth-session
 import type { MfaService } from './sub-domains/auth-mfa/auth-mfa.service.js';
 import type { AuthMethodService } from './sub-domains/auth-method/auth-method.service.js';
 import { validateLogin } from './auth.validator.js';
+import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { completeFirstFactorAuth } from './shared/complete-first-factor-auth.js';
 import {
   resolveDefaultActiveOrganizationPublicId,
@@ -371,10 +372,25 @@ export class AuthService {
     sessionPublicId: string;
     organizationPublicId: string;
   }): Promise<{ access_token: string; organization_public_id: string }> {
-    const user = await this.userService.requireUserRecordByPublicId(userPublicId);
-    if (user.status !== 'ACTIVE') throw new UnauthorizedError('errors:accountNotActive');
-    const resolved = await findUserActiveOrganizationByPublicId(user.id, organizationPublicId);
-    if (!resolved) throw new ForbiddenError('errors:insufficientOrganizationPermissions');
+    // Both reads below run under `app.current_user_id` set to the SAME value, so they share one
+    // context instead of opening a transaction each. `findUserActiveOrganizationByPublicId` takes
+    // an INTERNAL id and resolves it back to the public id we already hold — inside the shared
+    // context that resolve is a plain query on an open checkout rather than a second BEGIN.
+    //
+    // `mintForActiveOrganization` stays OUTSIDE deliberately. It re-binds the session under
+    // `app.current_session_public_id`, a different guc, so it must own its transaction — and
+    // nesting it here would hold this checkout open across it, making the request peak at two
+    // concurrent connections instead of taking them one after another.
+    const { user, resolved } = await withUserDatabaseContext(userPublicId, async () => {
+      const record = await this.userService.requireUserRecordByPublicId(userPublicId);
+      if (record.status !== 'ACTIVE') throw new UnauthorizedError('errors:accountNotActive');
+      const organization = await findUserActiveOrganizationByPublicId(
+        record.id,
+        organizationPublicId,
+      );
+      if (!organization) throw new ForbiddenError('errors:insufficientOrganizationPermissions');
+      return { user: record, resolved: organization };
+    });
     return this.mintForActiveOrganization(user, sessionPublicId, resolved);
   }
 
