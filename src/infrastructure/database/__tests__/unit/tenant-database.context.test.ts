@@ -21,12 +21,19 @@ vi.mock('@/infrastructure/database/connection.js', () => ({
 }));
 
 describe('withOrganizationContext', () => {
+  const originalRuntime = process.env.CORE_BE_RUNTIME;
+
   beforeEach(() => {
     resetOrganizationRlsCheckoutCountForTests();
   });
 
   afterEach(() => {
     resetOrganizationRlsCheckoutCountForTests();
+    if (originalRuntime === undefined) {
+      delete process.env.CORE_BE_RUNTIME;
+    } else {
+      process.env.CORE_BE_RUNTIME = originalRuntime;
+    }
   });
 
   it('pins ALS so getRequestDatabase returns the same handle passed to the callback', async () => {
@@ -59,6 +66,27 @@ describe('withOrganizationContext', () => {
     });
 
     expect(getActiveOrganizationRlsCheckoutCount()).toBe(0);
+  });
+
+  it('keeps the connection-level HTTP timeouts outside worker runtime (only set_config runs)', async () => {
+    delete process.env.CORE_BE_RUNTIME;
+    mockExecute.mockClear();
+
+    await withOrganizationContext('org_public_http_timeout', async () => undefined);
+
+    // Exactly one execute: SET LOCAL app.current_organization_id. No SET LOCAL
+    // statement_timeout / lock_timeout — HTTP units of work keep the 5s cap.
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it('lifts statement and lock timeouts to the worker budget in worker runtime', async () => {
+    process.env.CORE_BE_RUNTIME = 'worker';
+    mockExecute.mockClear();
+
+    await withOrganizationContext('org_public_worker_timeout', async () => undefined);
+
+    // set_config + SET LOCAL statement_timeout + SET LOCAL lock_timeout.
+    expect(mockExecute).toHaveBeenCalledTimes(3);
   });
 
   it('reports a scoped_context hold-time sample to the registered observer', async () => {

@@ -6,6 +6,7 @@ import {
   type RequestScopedPostgresDatabase,
 } from '@/infrastructure/database/contexts/request-database.context.js';
 import {
+  isWorkerRuntime,
   runWithWorkerDatabaseContext,
   workerDatabaseContextForOrganization,
 } from '@/infrastructure/database/contexts/worker-database.context.js';
@@ -62,11 +63,14 @@ export async function withOrganizationContext<T>(
           // sec-re-16: lift the HTTP 5s `statement_timeout` to the worker budget
           // so tenant-scoped worker jobs match the policy applied by sibling
           // context wrappers (`withGlobalRetentionCleanupDatabaseContext`,
-          // `withUserDatabaseContext`). Today's tenant-scoped jobs run single-
-          // row CRUD where the HTTP timeout is fine; the omission would surface
-          // as silently-canceled work the moment a future job (e.g. a bulk
-          // backfill inside an org scope) crossed the HTTP budget.
-          await applyWorkerStatementTimeout(databaseHandle);
+          // `withUserDatabaseContext`). Worker runtime only: this wrapper also
+          // serves every HTTP-path `withOrganizationDatabaseContext` unit of
+          // work, which must keep the connection-level HTTP caps — lifting
+          // them here would let one pathological request hold a pool checkout
+          // for the full worker budget.
+          if (isWorkerRuntime()) {
+            await applyWorkerStatementTimeout(databaseHandle);
+          }
           return runWithPinnedOrganizationDatabaseSession(
             organizationPublicId,
             databaseHandle,
