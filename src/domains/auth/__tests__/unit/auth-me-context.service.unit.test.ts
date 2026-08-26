@@ -43,33 +43,45 @@ describe('AuthMeContextService.getContext', () => {
   });
 
   /**
-   * `/auth/me/context` is on the critical path of every page load, and its four reads are
-   * independent — every input comes from the caller's own arguments. They must therefore be in
-   * flight together, not chained. Each stub blocks until every one of them has been entered:
-   * if any read waits for an earlier one to resolve, the barrier is never met and this times out.
+   * The route's reads split by DATABASE CONTEXT, not by dependency.
+   *
+   * `getMe`, `list` and `getByPublicId` all want `app.current_user_id` set to the same value, so
+   * they share one `withUserDatabaseContext` and therefore one pooled checkout — they serialize
+   * on it deliberately, and asserting they run concurrently would pin the opposite of the design.
+   * `resolveUserOrganizationPermissions` drives `app.current_organization_id` instead, so it owns
+   * a separate transaction and MUST still overlap the user-scoped block; chaining it after would
+   * add its latency to every page load for nothing. This pins that overlap.
    */
-  it('issues its four independent reads concurrently, not one after another', async () => {
-    const READS = 4;
-    let entered = 0;
-    let releaseAll: () => void;
-    const allEntered = new Promise<void>((resolve) => {
-      releaseAll = resolve;
+  it('overlaps the permission read with the user-scoped reads', async () => {
+    let permissionsEntered = false;
+    let userReadsFinished = false;
+    let releasePermissions: () => void;
+    const permissionsGate = new Promise<void>((resolve) => {
+      releasePermissions = resolve;
     });
-    const arrive = async <T>(value: T): Promise<T> => {
-      entered += 1;
-      if (entered === READS) releaseAll();
-      await allEntered;
-      return value;
-    };
 
     const activeOrganization = { id: 'org_active', type: 'TEAM' };
-    const userService = { getMe: vi.fn(() => arrive({ id: 'usr_1' })) };
+    const userService = {
+      getMe: vi.fn(async () => {
+        // Blocks until the permission read has been entered. If the two were chained rather than
+        // overlapped, nothing would ever release this and the test would time out.
+        await permissionsGate;
+        return { id: 'usr_1' };
+      }),
+    };
     const organizationService = {
-      list: vi.fn(() => arrive({ items: [activeOrganization] })),
-      getByPublicId: vi.fn(() => arrive(activeOrganization)),
+      list: vi.fn(async () => ({ items: [activeOrganization] })),
+      getByPublicId: vi.fn(async () => {
+        userReadsFinished = true;
+        return activeOrganization;
+      }),
     };
     const authorizationService = {
-      resolveUserOrganizationPermissions: vi.fn(() => arrive(['organization:read'])),
+      resolveUserOrganizationPermissions: vi.fn(async () => {
+        permissionsEntered = true;
+        releasePermissions();
+        return ['organization:read'];
+      }),
     };
     const service = new AuthMeContextService(
       userService as never,
@@ -83,7 +95,8 @@ describe('AuthMeContextService.getContext', () => {
       globalRole: undefined,
     });
 
-    expect(entered).toBe(READS);
+    expect(permissionsEntered).toBe(true);
+    expect(userReadsFinished).toBe(true);
     expect(data.activeOrganization).toBe(activeOrganization);
     expect(data.myPermissions).toEqual(['organization:read']);
   });
