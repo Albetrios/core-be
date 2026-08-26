@@ -5,6 +5,7 @@ import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { createTestApp } from '@/tests/helpers/test-app.js';
 import { injectAuthenticated } from '@/tests/helpers/test-http-inject.helper.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
+import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { generateTestToken, generateTestTokenAndSession } from '@/tests/helpers/test-auth.js';
 import {
@@ -50,8 +51,16 @@ describe('Security: object-ownership BOLA matrix', () => {
   async function twoUsers() {
     const victim = await createTestUser();
     const attacker = await createTestUser();
-    const victimToken = await generateTestToken({ userId: victim.public_id });
-    const attackerToken = await generateTestToken({ userId: attacker.public_id });
+    const victimOrganization = await createTestOrganization({ ownerUserId: victim.id });
+    const attackerOrganization = await createTestOrganization({ ownerUserId: attacker.id });
+    const victimToken = await generateTestToken({
+      userId: victim.public_id,
+      organizationPublicId: victimOrganization.public_id,
+    });
+    const attackerToken = await generateTestToken({
+      userId: attacker.public_id,
+      organizationPublicId: attackerOrganization.public_id,
+    });
     return { victim, attacker, victimToken, attackerToken };
   }
 

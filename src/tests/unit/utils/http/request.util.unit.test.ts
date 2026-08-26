@@ -10,7 +10,7 @@ import {
   requirePrincipal,
   resolveActiveOrganizationId,
   resolvePrincipalDatabaseScope,
-  requireOrganizationPrincipalDatabaseScope,
+  requireUserPrincipalDatabaseScope,
 } from '@/shared/utils/http/request.util.js';
 import type { ApiKeyAuthContext, UserAuthContext } from '@/shared/types/index.js';
 import type { FastifyRequest } from 'fastify';
@@ -155,11 +155,9 @@ describe('principal database scope minters', () => {
       expect(scope.source).toBe('token');
     });
 
-    it('mints a user-only scope when no organization is in scope', () => {
+    it('throws ForbiddenError for a stale/malformed token with no org claim (personal/team invariant)', () => {
       const request = mockRequest({ auth: userPrincipal });
-      const scope = resolvePrincipalDatabaseScope(request);
-      expect(scope.userPublicId).toBe(userPrincipal.userId);
-      expect(scope.organizationPublicId).toBeUndefined();
+      expect(() => resolvePrincipalDatabaseScope(request)).toThrow(ForbiddenError);
     });
 
     it('prefers the {organization_id} path param over the claim (permission-check precedence)', () => {
@@ -192,17 +190,19 @@ describe('principal database scope minters', () => {
     });
   });
 
-  describe('requireOrganizationPrincipalDatabaseScope', () => {
-    it('returns the scope when an organization is in scope', () => {
+  describe('requireUserPrincipalDatabaseScope', () => {
+    it('returns the common scope with the user guaranteed for a user principal', () => {
       const request = mockRequest({ auth: { ...userPrincipal, organizationPublicId: claimOrg } });
-      expect(requireOrganizationPrincipalDatabaseScope(request).organizationPublicId).toBe(
-        claimOrg,
-      );
+      const scope = requireUserPrincipalDatabaseScope(request);
+      expect(scope.userPublicId).toBe(userPrincipal.userId);
+      expect(scope.organizationPublicId).toBe(claimOrg);
     });
 
-    it('throws ForbiddenError when no organization is in scope', () => {
-      const request = mockRequest({ auth: userPrincipal });
-      expect(() => requireOrganizationPrincipalDatabaseScope(request)).toThrow(ForbiddenError);
+    it('rejects an API-key principal (user-owned resources need a real end user)', () => {
+      const request = mockRequest({
+        auth: { ...apiKeyPrincipal, organizationPublicId: claimOrg },
+      });
+      expect(() => requireUserPrincipalDatabaseScope(request)).toThrow(UnauthorizedError);
     });
   });
 });

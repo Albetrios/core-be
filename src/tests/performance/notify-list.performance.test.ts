@@ -5,6 +5,7 @@ import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { createTestApp } from '@/tests/helpers/test-app.js';
 import { injectAuthenticated } from '@/tests/helpers/test-http-inject.helper.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
+import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestNotification } from '@/tests/factories/notification.factory.js';
 import { generateTestToken } from '@/tests/helpers/test-auth.js';
@@ -52,7 +53,11 @@ describe('Performance: notification inbox', () => {
         title: `Inbox budget notification ${index}`,
       });
     }
-    const token = await generateTestToken({ userId: user.public_id });
+    const organization = await createTestOrganization({ ownerUserId: user.id });
+    const token = await generateTestToken({
+      userId: user.public_id,
+      organizationPublicId: organization.public_id,
+    });
     return { user, token };
   }
 

@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UnauthorizedError } from '@/shared/errors/index.js';
+import {
+  createPrincipalDatabaseScope,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import { NotificationService } from '@/domains/notify/sub-domains/notification/notification.service.js';
 import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
@@ -14,7 +18,30 @@ vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 const user = { id: 1, public_id: 'user_public' };
+const scope = createPrincipalDatabaseScope({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_public',
+  source: 'token',
+}) as UserPrincipalDatabaseScope;
+const missingUserScope = createPrincipalDatabaseScope({
+  userPublicId: 'missing',
+  organizationPublicId: 'org_public',
+  source: 'token',
+}) as UserPrincipalDatabaseScope;
 const notification = {
   id: 2,
   public_id: 'notif_public',
@@ -54,7 +81,7 @@ describe('NotificationService', () => {
   });
 
   it('listForUser returns keyset paginated notifications', async () => {
-    const result = await service.listForUser('user_public', { limit: 50 });
+    const result = await service.listForUser(scope, { limit: 50 });
     expect(result.items).toHaveLength(1);
     expect(result.has_more).toBe(false);
     expect(result.next_cursor).toBeNull();
@@ -62,7 +89,7 @@ describe('NotificationService', () => {
   });
 
   it('listForUser forwards keyset options to the repository', async () => {
-    await service.listForUser('user_public', {
+    await service.listForUser(scope, {
       after: 'cursor_prev',
       limit: 25,
       include_total: true,
@@ -75,24 +102,24 @@ describe('NotificationService', () => {
   });
 
   it('get returns notification for user', async () => {
-    const result = await service.get('notif_public', 'user_public');
+    const result = await service.get('notif_public', scope);
     expect(result?.public_id).toBe('notif_public');
   });
 
   it('resolveUserId throws when user missing', async () => {
     vi.mocked(userService.findUserRecordByPublicId).mockResolvedValue(null);
-    await expect(service.listForUser('missing', { limit: 50 })).rejects.toBeInstanceOf(
+    await expect(service.listForUser(missingUserScope, { limit: 50 })).rejects.toBeInstanceOf(
       UnauthorizedError,
     );
   });
 
   it('markRead updates notification', async () => {
-    await service.markRead('notif_public', 'user_public');
+    await service.markRead('notif_public', scope);
     expect(repository.markRead).toHaveBeenCalled();
   });
 
   it('getUnreadCount returns count', async () => {
-    const result = await service.getUnreadCount('user_public');
+    const result = await service.getUnreadCount(scope);
     expect(result).toBe(3);
   });
 
@@ -105,8 +132,8 @@ describe('NotificationService', () => {
   });
 
   it('markAllRead and deleteNotification delegate to repository', async () => {
-    await service.markAllRead('user_public');
-    await service.deleteNotification('notif_public', 'user_public');
+    await service.markAllRead(scope);
+    await service.deleteNotification('notif_public', scope);
     expect(repository.markAllReadForUser).toHaveBeenCalled();
     expect(repository.deleteByPublicIdForUser).toHaveBeenCalled();
   });

@@ -33,7 +33,11 @@ describe('Pagination caps — integration', () => {
 
   it('GET /notifications rejects limit above 100', async () => {
     const user = await createTestUser();
-    const token = await generateTestToken({ userId: user.public_id });
+    const organization = await createTestOrganization({ ownerUserId: user.id });
+    const token = await generateTestToken({
+      userId: user.public_id,
+      organizationPublicId: organization.public_id,
+    });
     const response = await injectAuthenticated(app, {
       method: 'GET',
       url: testApiPath('/notify/notifications'),

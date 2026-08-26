@@ -100,8 +100,10 @@ describe('Notify Domain — Integration', () => {
     });
 
     it('should return notifications for authenticated user', async () => {
-      const user = await createTestUser();
-      const token = await generateTestToken({ userId: user.public_id });
+      // Personal/team-organization invariant: every real bearer carries an `org`
+      // claim, and the principal scope minter rejects org-less (stale) tokens.
+      const { user, token } = await createAuthorizedNotifyContext();
+      void user;
       const response = await injectAuthenticated(app, {
         url: testApiPath('/notify/notifications'),
         token,
@@ -148,8 +150,7 @@ describe('Notify Domain — Integration', () => {
     });
 
     it('should return unread count for authenticated user', async () => {
-      const user = await createTestUser();
-      const token = await generateTestToken({ userId: user.public_id });
+      const { token } = await createAuthorizedNotifyContext();
       const response = await injectAuthenticated(app, {
         url: testApiPath('/notify/notifications/unread-count'),
         token,

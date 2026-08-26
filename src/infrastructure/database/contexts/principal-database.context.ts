@@ -41,7 +41,7 @@ export type PrincipalScopeSource = 'token' | 'job' | 'provisioning';
  * @remarks
  * The brand is compile-time only — services and repositories can relay a scope but
  * cannot construct one from raw strings. Only the confined minters build it:
- * `resolvePrincipalDatabaseScope` / `requireOrganizationPrincipalDatabaseScope`
+ * `resolvePrincipalDatabaseScope` / `requireUserPrincipalDatabaseScope`
  * (request layer, claim-precedence) and, in later phases, the worker-payload and
  * provisioning minters. Enforced by
  * `src/tests/unit/infrastructure/database/principal-scope-minting.policy.unit.test.ts`.
@@ -55,11 +55,21 @@ export interface PrincipalDatabaseScope {
 
 /**
  * A {@link PrincipalDatabaseScope} guaranteed to carry an organization — what
- * org-scoped service methods accept, produced by
- * `requireOrganizationPrincipalDatabaseScope`.
+ * org-scoped service methods accept. Under the personal/team organization model
+ * every authenticated principal has an active organization, so this is what the
+ * single request minter `resolvePrincipalDatabaseScope` returns.
  */
 export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
   readonly organizationPublicId: string;
+};
+
+/**
+ * The common token scope narrowed to a real end user: `userPublicId` guaranteed
+ * alongside the always-present organization — produced by
+ * `requireUserPrincipalDatabaseScope` for user-owned resources (API keys rejected).
+ */
+export type UserPrincipalDatabaseScope = OrganizationPrincipalDatabaseScope & {
+  readonly userPublicId: string;
 };
 
 /**

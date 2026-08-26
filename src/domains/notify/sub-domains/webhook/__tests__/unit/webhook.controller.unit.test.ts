@@ -60,7 +60,10 @@ describe('createWebhookController', () => {
       mockReply(),
     );
     expect(service.list).toHaveBeenCalledWith(
-      expect.objectContaining({ organization_public_id: organizationPublicId, limit: 25 }),
+      expect.objectContaining({
+        scope: expect.objectContaining({ organizationPublicId }),
+        limit: 25,
+      }),
     );
 
     await controller.getWebhook(
@@ -114,7 +117,7 @@ describe('createWebhookController', () => {
     );
     expect(service.listDeliveryAttempts).toHaveBeenCalledWith(
       expect.objectContaining({
-        organization_public_id: organizationPublicId,
+        scope: expect.objectContaining({ organizationPublicId }),
         webhook_public_id: webhookPublicId,
         limit: 10,
       }),
@@ -139,7 +142,7 @@ describe('createWebhookController', () => {
     );
     expect(service.listDeliveryAttempts).toHaveBeenCalledWith(
       expect.objectContaining({
-        organization_public_id: organizationPublicId,
+        scope: expect.objectContaining({ organizationPublicId }),
         webhook_public_id: webhookPublicId,
         limit: 25,
       }),
@@ -157,7 +160,7 @@ describe('createWebhookController', () => {
       );
       expect(service.list).toHaveBeenCalledWith(
         expect.objectContaining({
-          organization_public_id: organizationPublicId,
+          scope: expect.objectContaining({ organizationPublicId }),
           after: 'cursor-token',
           limit: 5,
           include_total: true,
@@ -320,7 +323,7 @@ describe('createWebhookController', () => {
       );
       expect(service.listDeliveryAttempts).toHaveBeenCalledWith(
         expect.objectContaining({
-          organization_public_id: organizationPublicId,
+          scope: expect.objectContaining({ organizationPublicId }),
           webhook_public_id: webhookPublicId,
           after: 'cursor-attempt',
           limit: 50,

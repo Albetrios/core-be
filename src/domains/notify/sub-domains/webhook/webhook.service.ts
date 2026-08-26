@@ -24,7 +24,10 @@ import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js'
 import { safeWebhookUrlForLogs } from '@/shared/utils/security/safe-webhook-url-for-logs.util.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { WEBHOOK_USER_AGENT_PREFIX } from '@/shared/constants/project-identity.constants.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  withPrincipalDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import { WEBHOOK_ORGANIZATION_FANOUT_CONCURRENCY } from '@/domains/notify/sub-domains/webhook/webhook-delivery/webhook-delivery.constants.js';
 import { PAGINATION } from '@/shared/constants/pagination.constants.js';
 import { MILLISECONDS_PER_HOUR } from '@/shared/constants/ttl.constants.js';
@@ -60,10 +63,10 @@ function generateWebhookSigningSecret(): string {
  * - **Algorithm:** consumed by the repository keyset-pagination layer.
  * - **Failure modes:** invalid `after` cursors raise inside the repository.
  * - **Side effects:** none (read-only).
- * - **Notes:** organization scoping is enforced via `withOrganizationDatabaseContext`.
+ * - **Notes:** organization scoping is enforced via `withPrincipalDatabaseContext` (token-minted scope).
  */
 export interface WebhookListOptions {
-  organization_public_id: string;
+  scope: OrganizationPrincipalDatabaseScope;
   after?: string;
   limit?: number;
   include_total?: boolean;
@@ -88,7 +91,8 @@ export interface WebhookDeliveryAttemptListOptions extends WebhookListOptions {
  * Application-layer service for webhook configuration and outbound delivery.
  *
  * @remarks
- * - **Algorithm:** every read/write runs inside `withOrganizationDatabaseContext` so Postgres
+ * - **Algorithm:** every read/write runs inside `withPrincipalDatabaseContext` with the
+ *   controller-minted token scope so Postgres
  *   RLS pins access to the requesting organization. Mutations validate the URL via the SSRF /
  *   allowlist guard, encrypt the secret (`encryptFieldSecret`), and serialise responses through
  *   {@link WebhookSerializer} so secrets never leak. `requestWebhookDelivery` persists a
@@ -114,8 +118,9 @@ export class WebhookService {
   ) {}
 
   async list(options: WebhookListOptions) {
-    const { organization_public_id } = options;
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const { scope } = options;
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const result = await this.webhookRepository.listByOrganization(
@@ -133,8 +138,9 @@ export class WebhookService {
     });
   }
 
-  async get(organization_public_id: string, webhook_public_id: string) {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async get(scope: OrganizationPrincipalDatabaseScope, webhook_public_id: string) {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const webhook = await this.webhookRepository.findByPublicId(
@@ -147,13 +153,14 @@ export class WebhookService {
   }
 
   async create(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     created_by_user_public_id: string | undefined,
   ) {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateCreateWebhook(body);
     await resolveAndPinWebhookUrl(parsed.url);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       // sec-N4: enforce the per-organization webhook cap before insert. Race-
@@ -189,16 +196,17 @@ export class WebhookService {
   }
 
   async update(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     webhook_public_id: string,
     body: unknown,
     updated_by_user_public_id: string | undefined,
   ) {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateWebhook(body);
     if (parsed.url !== undefined) {
       await resolveAndPinWebhookUrl(parsed.url);
     }
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
 
@@ -312,8 +320,9 @@ export class WebhookService {
     return new NotFoundError('Webhook');
   }
 
-  async delete(organization_public_id: string, webhook_public_id: string) {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async delete(scope: OrganizationPrincipalDatabaseScope, webhook_public_id: string) {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const deleted = await this.webhookRepository.softDelete(webhook_public_id, organization.id);
@@ -405,8 +414,9 @@ export class WebhookService {
   }
 
   async listDeliveryAttempts(options: WebhookDeliveryAttemptListOptions) {
-    const { organization_public_id, webhook_public_id } = options;
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const { scope, webhook_public_id } = options;
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const webhookId = await this.deliveryAttemptRepository.getWebhookId(
@@ -425,20 +435,29 @@ export class WebhookService {
     });
   }
 
-  async testWebhook(options: {
-    organization_public_id: string;
-    webhook_public_id: string;
-    requestId?: string;
-  }) {
-    const { organization_public_id, webhook_public_id, requestId } = options;
-    // Phase 1 (DB context): resolve the webhook under RLS scope.
-    const webhook = await withOrganizationDatabaseContext(organization_public_id, async () => {
-      const organization =
-        await this.organizationService.requireOrganizationByPublicId(organization_public_id);
+  /** Phase 1 of {@link WebhookService.testWebhook}: resolve the webhook row under RLS scope. */
+  private async resolveWebhookForTest(
+    scope: OrganizationPrincipalDatabaseScope,
+    webhook_public_id: string,
+  ) {
+    return withPrincipalDatabaseContext(scope, async () => {
+      const organization = await this.organizationService.requireOrganizationByPublicId(
+        scope.organizationPublicId,
+      );
       const found = await this.webhookRepository.findByPublicId(webhook_public_id, organization.id);
       if (!found) throw new NotFoundError('Webhook');
       return found;
     });
+  }
+
+  async testWebhook(options: {
+    scope: OrganizationPrincipalDatabaseScope;
+    webhook_public_id: string;
+    requestId?: string;
+  }) {
+    const { scope, webhook_public_id, requestId } = options;
+    // Phase 1 (DB context): resolve the webhook under RLS scope.
+    const webhook = await this.resolveWebhookForTest(scope, webhook_public_id);
 
     // Pins DNS to a single SSRF-validated resolution and enforces the production allowlist.
     // Throws ValidationError (4xx) before any attempt is recorded if the URL is now unsafe —
@@ -465,11 +484,11 @@ export class WebhookService {
         level: 'error',
         extra: {
           webhookPublicId: webhook.public_id,
-          organizationPublicId: organization_public_id,
+          organizationPublicId: scope.organizationPublicId,
         },
       });
       logger.error(
-        { webhookPublicId: webhook.public_id, organizationPublicId: organization_public_id },
+        { webhookPublicId: webhook.public_id, organizationPublicId: scope.organizationPublicId },
         'webhook.test.empty_signing_secret',
       );
       throw new ConfigurationError(
@@ -546,7 +565,7 @@ export class WebhookService {
         : responseBody;
 
     // Phase 2 (DB context): record the delivery attempt under RLS scope (network already done).
-    await withOrganizationDatabaseContext(organization_public_id, async () => {
+    await withPrincipalDatabaseContext(scope, async () => {
       await this.deliveryAttemptRepository.create({
         webhook_id: webhook.id,
         event_type: 'webhook.test',

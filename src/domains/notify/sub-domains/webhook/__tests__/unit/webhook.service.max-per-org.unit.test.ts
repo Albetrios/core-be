@@ -7,6 +7,19 @@ vi.mock('@/infrastructure/database/contexts/organization-database.context.js', (
 }));
 
 vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
+vi.mock(
   '@/domains/notify/sub-domains/webhook/webhook-delivery/events/webhook-delivery-emit.js',
   () => ({ emitWebhookDeliveryRequested: vi.fn().mockResolvedValue(undefined) }),
 );
@@ -26,6 +39,10 @@ vi.mock('@/shared/utils/security/field-secret-encryption.util.js', async () => (
 
 import { ConflictError } from '@/shared/errors/index.js';
 import { WebhookService } from '@/domains/notify/sub-domains/webhook/webhook.service.js';
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { WebhookRepository } from '@/domains/notify/sub-domains/webhook/webhook.repository.js';
 import type { WebhookDeliveryAttemptRepository } from '@/domains/notify/sub-domains/webhook/webhook-delivery/webhook-delivery-attempt.repository.js';
@@ -46,6 +63,12 @@ import type { WebhookDeliveryAttemptRepository } from '@/domains/notify/sub-doma
  */
 describe('WebhookService.create — per-organization cap (sec-N4)', () => {
   const organization = { id: 1, public_id: 'org_public' };
+  const scope = createPrincipalDatabaseScope({
+    userPublicId: 'user_public',
+    organizationPublicId: 'org_public',
+    source: 'token',
+  }) as OrganizationPrincipalDatabaseScope;
+
   const webhook = {
     id: 2,
     public_id: 'webhook_public',
@@ -86,7 +109,7 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
   it('allows create when the org is below the cap', async () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockResolvedValue(5);
     await service.create(
-      'org_public',
+      scope,
       {
         url: 'https://example.com/hook',
         events: ['subscription.updated'],
@@ -101,7 +124,7 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockResolvedValue(25);
     await expect(
       service.create(
-        'org_public',
+        scope,
         {
           url: 'https://example.com/hook',
           events: ['subscription.updated'],
@@ -117,7 +140,7 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockResolvedValue(30);
     await expect(
       service.create(
-        'org_public',
+        scope,
         {
           url: 'https://example.com/hook',
           events: ['subscription.updated'],

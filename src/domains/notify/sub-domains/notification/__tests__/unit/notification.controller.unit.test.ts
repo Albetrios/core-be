@@ -6,7 +6,12 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): never {
   return {
-    auth: { kind: 'user' as const, userId: generatePublicId('user'), role: 'user' },
+    auth: {
+      kind: 'user' as const,
+      userId: generatePublicId('user'),
+      role: 'user',
+      organizationPublicId: generatePublicId('organization'),
+    },
     params: {},
     body: {},
     headers: {},
@@ -41,7 +46,7 @@ describe('createNotificationController', () => {
       {} as FastifyReply,
     );
     expect(service.listForUser).toHaveBeenCalledWith(
-      expect.any(String),
+      expect.objectContaining({ source: 'token' }),
       expect.objectContaining({ limit: 25, include_total: false }),
     );
     expect(
@@ -61,7 +66,10 @@ describe('createNotificationController', () => {
       mockRequest({ params: { notification_id: notificationId } }),
       {} as FastifyReply,
     );
-    expect(service.get).toHaveBeenCalledWith(notificationId, expect.any(String));
+    expect(service.get).toHaveBeenCalledWith(
+      notificationId,
+      expect.objectContaining({ source: 'token' }),
+    );
   });
 
   it('markNotificationRead updates row', async () => {
