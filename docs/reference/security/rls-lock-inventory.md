@@ -1,5 +1,7 @@
 # RLS lock inventory
 
+Architecture overview (scopes, layers, GUC catalog): [rls-architecture.md](rls-architecture.md).
+
 Every automated lock that pins the database-context / RLS architecture. "Lock" means a
 test or guard that fails when the invariant drifts — changing the invariant requires
 editing the lock deliberately.

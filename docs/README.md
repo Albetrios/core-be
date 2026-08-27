@@ -162,6 +162,7 @@ Grouped index: **[deployment/README.md](deployment/README.md)** (`setup/`, `ci-c
 | [reference/security/secrets-management.md](reference/security/secrets-management.md) | Secret storage, encryption key, and rotation. |
 | [reference/security/data-classification.md](reference/security/data-classification.md) | Data sensitivity tiers and handling rules. |
 | [reference/security/audit-logs.md](reference/security/audit-logs.md) | Audit log model and retention. |
+| [reference/security/rls-architecture.md](reference/security/rls-architecture.md) | RLS scopes, layers, GUC catalog, and the old→new wrapper evolution. |
 | [reference/security/rls-lock-inventory.md](reference/security/rls-lock-inventory.md) | Every automated lock pinning the RLS / database-context architecture. |
 | [reference/security/audit-export.md](reference/security/audit-export.md) | Audit log export workflow. |
 | [reference/security/system-tables-without-tenant-rls.md](reference/security/system-tables-without-tenant-rls.md) | System/shared tables intentionally outside tenant RLS. |
