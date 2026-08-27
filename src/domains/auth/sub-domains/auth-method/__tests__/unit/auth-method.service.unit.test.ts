@@ -45,24 +45,28 @@ vi.mock('@/infrastructure/database/transaction.js', () => ({
   withTransaction: vi.fn((callback: (transaction: unknown) => unknown) => callback({})),
 }));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  runWithPinnedDatabaseHandle: vi.fn((_handle: unknown, callback: () => unknown) => callback()),
-  getRequestDatabase: vi.fn(() => ({})),
-  setLocalDatabaseConfig: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
+  '@/infrastructure/database/contexts/database-context-runtime.js',
   async (importOriginal) => {
     const actual = await importOriginal<Record<string, unknown>>();
     return {
       ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
+      runWithPinnedDatabaseHandle: vi.fn((_handle: unknown, callback: () => unknown) => callback()),
+      getRequestDatabase: vi.fn(() => ({})),
+      setLocalDatabaseConfig: vi.fn().mockResolvedValue(undefined),
     };
   },
 );
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = {
   id: 1,

@@ -2,7 +2,7 @@ import { asc, eq } from 'drizzle-orm';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   createDrainAuditOutboxRepository,

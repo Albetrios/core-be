@@ -8,7 +8,7 @@ import { UploadService } from '@/domains/upload/upload.service.js';
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const PENDING_CAP = 3;

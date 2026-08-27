@@ -40,7 +40,7 @@ import {
   resolveVerifiedOrganizationPrincipalScope,
   resolveVerifiedUserPrincipalScope,
 } from '@/shared/utils/identity/verified-principal-scope.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
 /** Inputs for {@link UploadService}'s private atomic PENDING-slot reservation. */
 interface ReservePendingUploadSlotParams {

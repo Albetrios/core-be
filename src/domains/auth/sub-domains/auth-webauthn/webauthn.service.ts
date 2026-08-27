@@ -47,7 +47,7 @@ import {
   validateWebauthnAuthenticateVerify,
   validateWebauthnRegisterVerify,
 } from './webauthn.validator.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedUserPrincipalScope } from '@/domains/auth/shared/verified-user-principal-scope.util.js';
 
 /**

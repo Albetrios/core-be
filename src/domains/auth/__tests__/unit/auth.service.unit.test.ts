@@ -55,31 +55,18 @@ vi.mock('@/domains/tenancy/sub-domains/organization/resolve-active-organization.
   ensurePersonalOrganizationPublicId: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
-
-vi.mock(
-  '@/infrastructure/database/contexts/session-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withSessionDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
-        callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+    withSessionDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = {
   id: 1,
@@ -477,9 +464,7 @@ describe('AuthService', () => {
     const resolve = await import(
       '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
     );
-    const databaseContext = await import(
-      '@/infrastructure/database/contexts/principal-database.context.js'
-    );
+    const databaseContext = await import('@/infrastructure/database/contexts/database-context.js');
     vi.mocked(resolve.findUserActiveOrganizationByPublicId).mockResolvedValue({
       id: 9,
       public_id: 'org_team',

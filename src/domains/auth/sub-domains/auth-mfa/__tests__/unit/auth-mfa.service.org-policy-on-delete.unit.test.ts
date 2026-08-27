@@ -1,18 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Redis } from 'ioredis';
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 import { ForbiddenError } from '@/shared/errors/index.js';
 import { MfaService } from '@/domains/auth/sub-domains/auth-mfa/auth-mfa.service.js';

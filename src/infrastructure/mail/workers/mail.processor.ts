@@ -18,7 +18,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const DEFAULT_MAIL_JOB_MAX_ATTEMPTS = MAIL_QUEUE_MAX_ATTEMPTS;
 

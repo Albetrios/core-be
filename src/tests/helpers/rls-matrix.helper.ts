@@ -1,5 +1,5 @@
 import { sql as drizzleSql } from 'drizzle-orm';
-import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/maintenance-database.context.js';
+import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { sql } from '@/infrastructure/database/connection.js';
 import { database } from '@/infrastructure/database/connection.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';

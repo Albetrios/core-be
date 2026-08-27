@@ -8,7 +8,7 @@ import { env } from '@/shared/config/env.config.js';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 

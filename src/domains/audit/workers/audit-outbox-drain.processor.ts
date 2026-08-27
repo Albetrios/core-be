@@ -1,13 +1,13 @@
 import { inArray, sql as drizzleSql } from 'drizzle-orm';
-import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/maintenance-database.context.js';
+import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { createDrainAuditOutboxRepository } from '@/domains/audit/audit-outbox.repository.js';
 import type { AuditOutboxRow } from '@/domains/audit/audit-outbox.schema.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import { users } from '@/domains/user/user.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { api_keys } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.schema.js';
-import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
-import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/request-database.context.js';
+import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { env } from '@/shared/config/env.config.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import {

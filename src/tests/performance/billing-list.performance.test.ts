@@ -20,7 +20,7 @@ import { createTestSubscription } from '@/domains/billing/__tests__/factories/su
 import {
   createPrincipalDatabaseScope,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { PlanService } from '@/domains/billing/sub-domains/plan/plan.service.js';

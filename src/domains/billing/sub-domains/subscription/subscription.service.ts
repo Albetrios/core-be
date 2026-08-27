@@ -102,7 +102,7 @@ import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js'
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { enqueueSubscriptionSeatSyncBestEffort } from './queues/subscription-seat-sync.queue.js';
 import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 

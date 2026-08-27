@@ -17,7 +17,7 @@ import { runStripeWebhookHandlerWithOrganizationContext } from './stripe-webhook
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /** Result row type from PlanRepository.findByStripePriceId; threaded through the sec-B9 fallback. */
 type MatchedPlanForCreate = Awaited<ReturnType<PlanRepository['findByStripePriceId']>>;

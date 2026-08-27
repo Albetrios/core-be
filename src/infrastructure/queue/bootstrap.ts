@@ -5,7 +5,7 @@
  */
 
 import type { Worker } from 'bullmq';
-import { isWorkerRuntime } from '@/infrastructure/database/contexts/worker-database.context.js';
+import { isWorkerRuntime } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { STRIPE_WEBHOOK_QUEUE_NAME } from '@/domains/billing/sub-domains/stripe-webhook/queues/stripe-webhook.queue.js';
 import { MAIL_QUEUE_NAME } from '@/infrastructure/mail/queues/mail.queue.js';
 import { attachDeadLetterAndAlerting } from '@/infrastructure/queue/dlq/dead-letter.js';

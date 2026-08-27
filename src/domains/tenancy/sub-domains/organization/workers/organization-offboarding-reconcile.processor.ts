@@ -1,10 +1,10 @@
 import { and, isNotNull, isNull, lt, ne } from 'drizzle-orm';
-import type { OrganizationPrincipalDatabaseScope } from '@/infrastructure/database/contexts/principal-database.context.js';
+import type { OrganizationPrincipalDatabaseScope } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveOrganizationJobScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { captureException } from '@/infrastructure/observability/sentry/sentry.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';

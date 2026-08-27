@@ -3,7 +3,7 @@ import { ConflictError, NotFoundError } from '@/shared/errors/index.js';
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { OrganizationNotificationPolicyRepository } from './organization-notification-policy.repository.js';
 import type { OrganizationNotificationPolicyOutput } from './organization-notification-policy.types.js';

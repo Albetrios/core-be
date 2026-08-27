@@ -5,7 +5,7 @@
  * Idempotency: the primary key is `organization_id`, so every insert uses `.onConflictDoNothing()`;
  * a re-run with the same registry is a no-op.
  */
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { organization_settings } from '@/domains/tenancy/sub-domains/organization/organization-settings/organization-settings.schema.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';
 import { generateBulkOrganizationSettings } from './organization-settings.faker.js';

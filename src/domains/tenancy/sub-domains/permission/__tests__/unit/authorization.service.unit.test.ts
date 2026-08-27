@@ -13,6 +13,19 @@ import { redisConnection } from '@/infrastructure/cache/redis.client.js';
 import { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permission/permission.repository.js';
 
+// The service paths under test run inside the real principal wrapper, which
+// opens a `database.transaction()` — passthrough so no Postgres is needed
+// (CI's unit/contract lanes run without a database service).
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
 describe('AuthorizationService', () => {
   const permissionRepository = {
     findPermissionCodesForUserInOrganization: vi

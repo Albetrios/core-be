@@ -4,18 +4,15 @@ vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', 
   invalidateOrganizationPermissions: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 import {
   ConflictError,
@@ -34,7 +31,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import {
   createPrincipalDatabaseScope,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const organization = { id: 1, public_id: generatePublicId('memberRole') };
 const roleRow = {

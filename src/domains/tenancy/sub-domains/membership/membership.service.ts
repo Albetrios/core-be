@@ -11,7 +11,7 @@ import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js'
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import {
   acquireResourceQuotaLock,
   RESOURCE_QUOTA_LOCK_NAMESPACE,

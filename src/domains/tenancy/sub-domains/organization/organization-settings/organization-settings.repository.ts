@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { organization_settings } from '@/domains/tenancy/sub-domains/organization/organization-settings/organization-settings.schema.js';
 
 /** BCP 47 locale tag persisted in `organization_settings.default_locale` (constrained to translated locales). */

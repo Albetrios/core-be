@@ -9,7 +9,7 @@
  * is only created for a user that has no export yet.
  */
 import { inArray } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { user_data_exports } from '@/domains/user/sub-domains/user-data-export/user-data-export.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';

@@ -1,17 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock(
-  '@/infrastructure/database/contexts/maintenance-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withMaintenanceDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+  };
+});
 
 const findDeadLetterJobsForAutoRetryMock = vi.fn();
 const markDeadLetterJobAutoRetryResolvedMock = vi.fn().mockResolvedValue(undefined);

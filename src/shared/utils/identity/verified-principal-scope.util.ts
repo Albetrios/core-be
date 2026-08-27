@@ -2,7 +2,7 @@ import {
   createPrincipalDatabaseScope,
   type OrganizationPrincipalDatabaseScope,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Mints a user-only principal scope from an id the calling flow has itself

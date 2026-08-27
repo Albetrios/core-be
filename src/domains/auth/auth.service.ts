@@ -35,7 +35,7 @@ import {
   ensurePersonalOrganization,
 } from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
 import type { UserAuthRecord } from '@/domains/user/user.types.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedUserPrincipalScope } from '@/domains/auth/shared/verified-user-principal-scope.util.js';
 
 const IP_FAILED_LOGIN_KEY_PREFIX = 'auth:failed_login:ip:';

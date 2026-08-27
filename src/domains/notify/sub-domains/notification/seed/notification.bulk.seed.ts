@@ -9,7 +9,7 @@
  * is a no-op. High-count inserts are batched in chunks of {@link INSERT_BATCH_SIZE}.
  */
 import { and, eq, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { notifications } from '@/domains/notify/sub-domains/notification/notification.schema.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';

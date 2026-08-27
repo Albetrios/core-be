@@ -6,11 +6,18 @@ import type { UserNotificationPreferencesRepository } from '@/domains/user/sub-d
 import {
   createPrincipalDatabaseScope,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getOrganizationRequestDatabaseSession: vi.fn().mockReturnValue(undefined),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getOrganizationRequestDatabaseSession: vi.fn().mockReturnValue(undefined),
+    };
+  },
+);
 
 vi.mock('@/infrastructure/database/transaction.js', () => ({
   withAtomicWrite: vi.fn((_callback: (databaseHandle: unknown) => Promise<unknown>) =>
@@ -18,18 +25,15 @@ vi.mock('@/infrastructure/database/transaction.js', () => ({
   ),
 }));
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = { id: 1, public_id: 'user_public', email: 'user@example.com' };
 const preferenceRow = {

@@ -7,18 +7,15 @@ vi.mock('@/domains/tenancy/sub-domains/permission/assert-grantable-permissions.u
   assertCallerCanGrantPermissionCodes: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 // Passthrough serializer (its own no-secret unit test covers shaping); keep the focus on the service.
 vi.mock(
@@ -35,7 +32,7 @@ import { OrganizationApiKeyService } from '@/domains/tenancy/sub-domains/organiz
 import {
   createPrincipalDatabaseScope,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const ORG = { id: 1, public_id: 'org_public' };
 const KEY_ROW = {

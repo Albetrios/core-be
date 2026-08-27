@@ -79,7 +79,7 @@ Log lines for ops:
 - `upload-pending-sweep.s3DeleteFailed` — best-effort S3 delete on an orphan returned `false`; the DB row is still hard-deleted.
 - `upload-pending-sweep.completed` — final counts (`scannedCount`, `autoConfirmedCount`, `failedCount`, `deletedCount`).
 
-Worker context: runs under `withGlobalRetentionCleanupDatabaseContext`, so the RLS tenant policy on `upload.uploads` is satisfied without per-tenant fan-out.
+Worker context: runs under `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup)`, so the RLS tenant policy on `upload.uploads` is satisfied without per-tenant fan-out.
 
 ## S3 bucket lifecycle policy (defense in depth)
 

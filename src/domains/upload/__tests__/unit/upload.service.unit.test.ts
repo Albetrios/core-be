@@ -12,18 +12,15 @@ import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permiss
 
 // UploadService now wraps repository work in the real principal wrapper, which
 // opens a `database.transaction()` — passthrough so this stays a pure unit test.
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 vi.mock('@/shared/config/env.config.js', () => ({
   getEnv: vi.fn(() => ({

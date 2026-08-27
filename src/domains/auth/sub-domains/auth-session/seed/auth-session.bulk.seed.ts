@@ -9,7 +9,7 @@
  */
 import { createHash } from 'node:crypto';
 import { inArray } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { sessions } from '@/domains/auth/sub-domains/auth-session/auth-session.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';

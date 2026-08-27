@@ -17,9 +17,17 @@ vi.mock('@/infrastructure/database/transaction.js', () => ({
   withTransaction: (callback: (transaction: unknown) => Promise<unknown>) => callback({}),
 }));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  runWithPinnedDatabaseHandle: (_handle: unknown, callback: () => Promise<unknown>) => callback(),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      runWithPinnedDatabaseHandle: (_handle: unknown, callback: () => Promise<unknown>) =>
+        callback(),
+    };
+  },
+);
 
 vi.mock('@/domains/tenancy/sub-domains/organization/resolve-active-organization.js', () => ({
   ensurePersonalOrganization: vi.fn().mockResolvedValue(undefined),

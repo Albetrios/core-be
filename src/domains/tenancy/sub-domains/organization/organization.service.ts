@@ -10,7 +10,7 @@ import { GLOBAL_ROLES, type GlobalRole } from '@/shared/constants/roles.constant
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from './organization.repository.js';
 import type {
   OrganizationBillingContext,

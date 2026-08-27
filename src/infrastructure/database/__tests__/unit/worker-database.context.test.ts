@@ -2,20 +2,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   createPrincipalDatabaseScope,
   withPrincipalDatabaseContext,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
-import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/worker-database.context.error.js';
+} from '@/infrastructure/database/contexts/database-context.js';
+import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   assertWorkerDatabaseContext,
   assertWorkerForceRlsTableAccess,
   getWorkerDatabaseContext,
   isWorkerRuntime,
   runWithWorkerDatabaseContext,
-} from '@/infrastructure/database/contexts/worker-database.context.js';
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 
 const mockExecute = vi.fn().mockResolvedValue(undefined);
 const mockTransactionHandle = { execute: mockExecute, tag: 'transaction-handle' };

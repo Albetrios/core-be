@@ -15,7 +15,7 @@ Prevent cross-tenant data leaks. Every read and write performed under an organiz
 ### Where it lives
 
 - HTTP layer: [src/shared/middlewares/tenant/tenant.middleware.ts](src/shared/middlewares/tenant/tenant.middleware.ts) — reads `X-Organization-Id`, validates its format, and decorates `request.organizationId`. The **authoritative** active organization is the signed `org` JWT claim; routes carry no `{organization_id}` path segment.
-- Database layer: [src/infrastructure/database/contexts/principal-database.context.ts](src/infrastructure/database/contexts/principal-database.context.ts) — `withPrincipalDatabaseContext(scope, …)` opens a Drizzle transaction and sets the identity GUCs (`app.current_organization_id` / `app.current_user_id`) from the token-minted principal scope in one `set_config` statement. RLS policies on org-scoped tables read those GUCs.
+- Database layer: [src/infrastructure/database/contexts/database-context.ts](src/infrastructure/database/contexts/database-context.ts) — `withPrincipalDatabaseContext(scope, …)` opens a Drizzle transaction and sets the identity GUCs (`app.current_organization_id` / `app.current_user_id`) from the token-minted principal scope in one `set_config` statement. RLS policies on org-scoped tables read those GUCs.
 - Worker layer: [src/infrastructure/queue/worker-runtime/worker-processor.util.ts](src/infrastructure/queue/worker-runtime/worker-processor.util.ts) — `runTenantScopedWorkerJob` requires `organizationPublicId` in the job payload and wraps the processor body in `withPrincipalDatabaseContext` (with a job-minted principal scope) so RLS sees the same GUC the HTTP layer would have set.
 
 ### Implementation
@@ -148,7 +148,7 @@ Postgres Row-Level Security is the **defense-in-depth** layer for tenant isolati
 ### Implementation
 
 - HTTP requests get RLS via `tenant.middleware` + `organization-rls-transaction.middleware` opening a request-scoped transaction with `SET LOCAL app.current_organization_id = $1`.
-- Workers get RLS via `runTenantScopedWorkerJob` which **requires** `organizationPublicId` in the job payload and opens its own `withPrincipalDatabaseContext` transaction (job-minted org scope). Workers are forbidden from importing `request-database.context.ts` (enforced by `worker-database-guard.util.ts` and global tests).
+- Workers get RLS via `runTenantScopedWorkerJob` which **requires** `organizationPublicId` in the job payload and opens its own `withPrincipalDatabaseContext` transaction (job-minted org scope). Workers are forbidden from importing `database-context-runtime.ts` (enforced by `worker-database-guard.unit.test.ts` and global tests).
 - Global-scope workers (cross-org sweeps) use `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, …)`, which sets a different GUC that RLS policies recognize as "global retention" — strictly limited to retention/cleanup operations.
 
 ### Each context grants only what a policy names
@@ -182,7 +182,7 @@ These four properties hold today and are what keep lock contention from becoming
 ### How to apply
 
 - New tenant-scoped table: add an RLS policy in its migration. The migration linter (`pnpm db:migrate:lint`) rejects schemas that omit RLS where it's required.
-- New worker: pick the right runner (`Tenant`, `Global`, `User`) and pass the right context payload. Don't call `getRequestDatabase()`; don't import from `request-database.context.ts`. The pre-commit `validate:domain` enforces this at the import-graph level.
+- New worker: pick the right runner (`Tenant`, `Global`, `User`) and pass the right context payload. Don't call `getRequestDatabase()`; don't import from `database-context-runtime.ts`. The pre-commit `validate:domain` enforces this at the import-graph level.
 
 ## transactional-outbox
 

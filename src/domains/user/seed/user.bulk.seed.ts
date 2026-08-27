@@ -6,7 +6,7 @@
  * only creates indices beyond those already present, so a re-run with the same counts is a no-op.
  */
 import { like } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { users } from '@/domains/user/user.schema.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';
 import { generateBulkUser } from './user.faker.js';

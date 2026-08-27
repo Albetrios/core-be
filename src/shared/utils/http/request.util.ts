@@ -6,7 +6,7 @@ import {
   createPrincipalDatabaseScope,
   type OrganizationPrincipalDatabaseScope,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /** Returns the per-request id Fastify generates (used for log correlation, audit fields, idempotency). */
 export function getRequestIdentifier(request: FastifyRequest): string {

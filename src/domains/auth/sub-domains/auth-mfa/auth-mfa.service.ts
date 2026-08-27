@@ -49,7 +49,7 @@ import {
   invalidateAllUnusedRecoveryCodesForUser,
 } from './auth-mfa-recovery-code.repository.js';
 import { generateMfaRecoveryCodes } from './auth-mfa-recovery-code.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedUserPrincipalScope } from '@/domains/auth/shared/verified-user-principal-scope.util.js';
 
 const ERROR_KEY_MFA_USER_NOT_FOUND = 'errors:mfaUserNotFound';

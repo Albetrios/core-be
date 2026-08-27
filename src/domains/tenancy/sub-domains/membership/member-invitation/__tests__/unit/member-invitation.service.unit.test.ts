@@ -17,18 +17,15 @@ vi.mock('@/core/events/event-bus.js', () => ({
   }),
 }));
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 vi.mock(
   '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.token.js',
@@ -48,7 +45,7 @@ import type { UserService } from '@/domains/user/user.service.js';
 import {
   createPrincipalDatabaseScope,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const now = new Date('2026-06-01T00:00:00.000Z');
 const futureDate = new Date('2026-06-15T00:00:00.000Z');

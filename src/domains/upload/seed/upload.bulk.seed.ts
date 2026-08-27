@@ -11,7 +11,7 @@
  * same counts is a no-op.
  */
 import { like } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { uploads } from '@/domains/upload/upload.schema.js';
 import {
   UPLOAD_PURPOSE_CONFIG,

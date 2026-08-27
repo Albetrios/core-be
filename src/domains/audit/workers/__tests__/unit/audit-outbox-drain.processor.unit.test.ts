@@ -19,9 +19,16 @@ vi.mock('@/domains/audit/audit-outbox.repository.js', () => ({
 
 const setLocalDatabaseConfigMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  setLocalDatabaseConfig: (...args: unknown[]) => setLocalDatabaseConfigMock(...args),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      setLocalDatabaseConfig: (...args: unknown[]) => setLocalDatabaseConfigMock(...args),
+    };
+  },
+);
 
 interface FakeDatabaseHandle {
   select: ReturnType<typeof vi.fn>;

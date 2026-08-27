@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const executeMock = vi.fn().mockResolvedValue(undefined);
 const transactionMock = vi.fn();

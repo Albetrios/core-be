@@ -5,7 +5,7 @@ import { setBusinessMetricCounts } from '@/infrastructure/observability/metrics/
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Refreshes business backlog gauges (`mail_outbox_pending`, `dlq_depth`) from Postgres

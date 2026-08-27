@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/maintenance-database.context.js';
+import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
 vi.mock('@/infrastructure/observability/sentry/sentry.js', () => ({
   captureException: vi.fn(),
@@ -8,19 +8,16 @@ vi.mock('@/infrastructure/observability/sentry/sentry.js', () => ({
 import { captureException } from '@/infrastructure/observability/sentry/sentry.js';
 import { runOrganizationOffboardingReconcileJob } from '@/domains/tenancy/sub-domains/organization/workers/organization-offboarding-reconcile.processor.js';
 
-vi.mock(
-  '@/infrastructure/database/contexts/maintenance-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    const inner = vi.fn() as unknown as (...parameters: unknown[]) => unknown;
-    return {
-      ...actual,
-      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
-        inner(...parameters),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const inner = vi.fn() as unknown as (...parameters: unknown[]) => unknown;
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+      inner(...parameters),
+    ),
+  };
+});
 
 describe('runOrganizationOffboardingReconcileJob (TEN-06)', () => {
   it('re-drives every stuck offboarding and counts the results', async () => {

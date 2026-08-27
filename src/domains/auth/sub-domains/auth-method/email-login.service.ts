@@ -37,7 +37,7 @@ import { withTransaction } from '@/infrastructure/database/transaction.js';
 import {
   runWithPinnedDatabaseHandle,
   type RequestScopedPostgresDatabase,
-} from '@/infrastructure/database/contexts/request-database.context.js';
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { validateEmailSendCode, validateEmailLogin } from '@/domains/auth/auth.validator.js';
 import {
   AUTH_EVENT,

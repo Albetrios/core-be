@@ -6,24 +6,21 @@ import type { UserSettingsRepository } from '@/domains/user/sub-domains/user-set
 import {
   createPrincipalDatabaseScope,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 // auth.user_settings is FORCE RLS, so the service wraps repository calls in
 // `withUserDatabaseContext`, which opens a real `database.transaction()` and would hit Postgres
 // (unavailable in the unit lane). Run the inner callback directly so this stays a pure unit test.
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = { id: 1, public_id: 'user_public' };
 const settingsRow = {

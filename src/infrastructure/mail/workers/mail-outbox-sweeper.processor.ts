@@ -10,7 +10,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const DEFAULT_SWEEP_BATCH_SIZE = 100;
 

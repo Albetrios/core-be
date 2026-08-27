@@ -2,9 +2,9 @@ import { and, desc, eq, isNull, lt, ne, type SQL } from 'drizzle-orm';
 import { countWithCap } from '@/infrastructure/database/utils/capped-count.util.js';
 import type { WorkerDatabaseHandle } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
-import { resolveRepositoryDatabaseHandle } from '@/infrastructure/database/contexts/worker-database-guard.util.js';
-import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
-import { assertWorkerDatabaseContext } from '@/infrastructure/database/contexts/worker-database.context.js';
+import { resolveRepositoryDatabaseHandle } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import { assertWorkerDatabaseContext } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   webhooks,
   webhook_delivery_attempts,

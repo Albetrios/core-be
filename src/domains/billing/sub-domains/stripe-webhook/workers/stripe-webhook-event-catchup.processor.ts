@@ -10,7 +10,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const CATCHUP_REQUEST_ID = 'stripe-webhook-event-catchup';
 

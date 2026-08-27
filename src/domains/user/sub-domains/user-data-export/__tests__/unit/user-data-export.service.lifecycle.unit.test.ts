@@ -6,6 +6,19 @@ import {
   UserDataExportCancelledError,
 } from '@/domains/user/sub-domains/user-data-export/user-data-export.types.js';
 
+// The service paths under test run inside the real principal wrapper, which
+// opens a `database.transaction()` — passthrough so no Postgres is needed
+// (CI's unit/contract lanes run without a database service).
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
 /**
  * `markProcessing` and the best-effort cleanup / observability branches.
  *

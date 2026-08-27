@@ -6,7 +6,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Per-run counters returned by {@link runStripeWebhookEventReclaimJob}:

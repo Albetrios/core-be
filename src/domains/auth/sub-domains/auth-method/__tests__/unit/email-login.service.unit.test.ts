@@ -20,10 +20,17 @@ vi.mock('@/infrastructure/database/transaction.js', () => ({
   withTransaction: vi.fn((callback: (transaction: unknown) => unknown) => callback({})),
 }));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  runWithPinnedDatabaseHandle: vi.fn((_handle: unknown, callback: () => unknown) => callback()),
-  getRequestDatabase: vi.fn(() => ({})),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      runWithPinnedDatabaseHandle: vi.fn((_handle: unknown, callback: () => unknown) => callback()),
+      getRequestDatabase: vi.fn(() => ({})),
+    };
+  },
+);
 
 vi.mock('@/core/events/event-bus.js', () => ({
   eventBus: {

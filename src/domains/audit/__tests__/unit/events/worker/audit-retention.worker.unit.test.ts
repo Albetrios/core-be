@@ -1,21 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock(
-  '@/infrastructure/database/contexts/maintenance-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    const inner = ((callback: (databaseHandle: unknown) => unknown) =>
-      withGlobalRetentionCleanupDatabaseContextMock(callback)) as unknown as (
-      ...parameters: unknown[]
-    ) => unknown;
-    return {
-      ...actual,
-      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
-        inner(...parameters),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const inner = ((callback: (databaseHandle: unknown) => unknown) =>
+    withGlobalRetentionCleanupDatabaseContextMock(callback)) as unknown as (
+    ...parameters: unknown[]
+  ) => unknown;
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+      inner(...parameters),
+    ),
+  };
+});
 
 /**
  * BullMQ registration for the audit-retention worker — the sibling of

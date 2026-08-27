@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAINTENANCE_CONTEXTS,
   type MaintenanceContextKind,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Policy: each maintenance (bypass) scope kind may only be referenced from the

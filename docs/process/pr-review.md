@@ -155,7 +155,7 @@ Use when reviewing as Cursor agent, Bugbot, or **pr-babysit**. Read [skill-index
 
 | Risk | Pattern / rule |
 | ---- | -------------- |
-| Worker request DB | `getRequestDatabase()` under `**/*.worker.ts`, `**/*.processor.ts` (importing types / `setLocalDatabaseConfig` from `request-database.context` is allowed) |
+| Worker request DB | `getRequestDatabase()` under `**/*.worker.ts`, `**/*.processor.ts` (importing types / `setLocalDatabaseConfig` from `database-context-runtime` is allowed) |
 | Controller DB | `database`, `drizzle`, `from(` in `**/*.controller.ts` |
 | Raw user strings | `throw new Error("` or `message: "` without `errors.` / `success.` keys in services/controllers |
 | Secrets | High-entropy literals, `sk_`, `Bearer` token literals in non-test files |

@@ -2,28 +2,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { processNotificationDispatchJob } from '@/domains/notify/sub-domains/notification/workers/notification.worker.js';
 import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
 
-vi.mock(
-  '@/infrastructure/database/contexts/maintenance-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      // Per-kind dispatch: only global_admin routes to its spy; system_table_worker
-      // (the queue-drain shell) is a plain passthrough so it never pollutes the
-      // global-admin call-count assertions.
-      withMaintenanceDatabaseContext: vi.fn(
-        (scope: { kind: string }, callback: (handle: unknown) => Promise<unknown>) =>
-          scope.kind === 'global_admin'
-            ? (
-                withGlobalAdminDatabaseContextMock as unknown as (
-                  ...parameters: unknown[]
-                ) => unknown
-              )(callback)
-            : callback({}),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Per-kind dispatch: only global_admin routes to its spy; system_table_worker
+    // (the queue-drain shell) is a plain passthrough so it never pollutes the
+    // global-admin call-count assertions.
+    withMaintenanceDatabaseContext: vi.fn(
+      (scope: { kind: string }, callback: (handle: unknown) => Promise<unknown>) =>
+        scope.kind === 'global_admin'
+          ? (
+              withGlobalAdminDatabaseContextMock as unknown as (...parameters: unknown[]) => unknown
+            )(callback)
+          : callback({}),
+    ),
+    // Arg-shift adapter: the org-branch spy keeps its (organizationPublicId, callback)
+    // signature so the existing implementations and assertions stay valid.
+    withPrincipalDatabaseContext: vi.fn(
+      (
+        scope: { organizationPublicId?: string; userPublicId?: string },
+        callback: (handle: unknown) => Promise<unknown>,
+      ) =>
+        scope.organizationPublicId !== undefined
+          ? withOrganizationContextMock(scope.organizationPublicId, callback)
+          : withUserDatabaseContextMock(scope.userPublicId, callback),
+    ),
+  };
+});
 
 const recordOutboxEmailMock = vi.fn();
 const dispatchOutboxEmailMock = vi.fn();
@@ -49,27 +55,6 @@ vi.mock(
     markNotificationEmailDispatched: (...parameters: unknown[]) =>
       markNotificationEmailDispatchedMock(...parameters),
   }),
-);
-
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      // Arg-shift adapter: the org-branch spy keeps its (organizationPublicId, callback)
-      // signature so the existing implementations and assertions stay valid.
-      withPrincipalDatabaseContext: vi.fn(
-        (
-          scope: { organizationPublicId?: string; userPublicId?: string },
-          callback: (handle: unknown) => Promise<unknown>,
-        ) =>
-          scope.organizationPublicId !== undefined
-            ? withOrganizationContextMock(scope.organizationPublicId, callback)
-            : withUserDatabaseContextMock(scope.userPublicId, callback),
-      ),
-    };
-  },
 );
 
 vi.mock('@/domains/notify/sub-domains/notification/notification.repository.js', () => ({

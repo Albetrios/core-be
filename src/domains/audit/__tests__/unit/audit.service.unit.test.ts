@@ -4,24 +4,24 @@ import type { AuditRepository } from '@/domains/audit/audit.repository.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
-vi.mock(
-  '@/infrastructure/database/contexts/maintenance-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      // Dispatch per kind so the per-context spies keep their original assertions.
-      withMaintenanceDatabaseContext: vi.fn((scope: { kind: string }, ...parameters: unknown[]) => {
-        const inner = (scope.kind === 'global_admin'
-          ? globalAdminContextMock
-          : systemAuditInsertContextMock) as unknown as (...innerParameters: unknown[]) => unknown;
-        return inner(...parameters);
-      }),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Dispatch per kind so the per-context spies keep their original assertions.
+    withMaintenanceDatabaseContext: vi.fn((scope: { kind: string }, ...parameters: unknown[]) => {
+      const inner = (scope.kind === 'global_admin'
+        ? globalAdminContextMock
+        : systemAuditInsertContextMock) as unknown as (...innerParameters: unknown[]) => unknown;
+      return inner(...parameters);
+    }),
+    withPrincipalDatabaseContext: vi.fn((_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 vi.mock('@/infrastructure/observability/sentry/sentry.js', () => ({
   captureMessage: vi.fn(),
@@ -43,18 +43,6 @@ vi.mock('@/domains/audit/audit-outbox.repository.js', () => ({
  * `listForOrganization`/`listForAdmin` still use the DB context wrappers — mock them
  * to invoke the inner callback so the tests run without Postgres.
  */
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn((_scope: unknown, callback: () => Promise<unknown>) =>
-        callback(),
-      ),
-    };
-  },
-);
 
 const globalAdminContextMock = vi.hoisted(() =>
   vi.fn((callback: () => Promise<unknown>) => callback()),

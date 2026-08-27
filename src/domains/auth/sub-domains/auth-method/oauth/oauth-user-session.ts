@@ -7,7 +7,7 @@ import { withTransaction } from '@/infrastructure/database/transaction.js';
 import {
   runWithPinnedDatabaseHandle,
   type RequestScopedPostgresDatabase,
-} from '@/infrastructure/database/contexts/request-database.context.js';
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { AuthMethodService } from '@/domains/auth/sub-domains/auth-method/auth-method.service.js';
 import type { AuthSessionService } from '@/domains/auth/sub-domains/auth-session/auth-session.service.js';

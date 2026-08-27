@@ -31,7 +31,7 @@ import type { AuditService } from '@/domains/audit/audit.service.js';
 import {
   withPrincipalDatabaseContext,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 function buildExportS3Key(userPublicId: string, exportPublicId: string): string {

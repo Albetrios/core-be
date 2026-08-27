@@ -7,7 +7,7 @@ import { validatePutUserNotificationPreferences } from './user-notification-pref
 import {
   withPrincipalDatabaseContext,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Read and replace the authenticated user's notification opt-ins per `(type, channel, organization?)`.

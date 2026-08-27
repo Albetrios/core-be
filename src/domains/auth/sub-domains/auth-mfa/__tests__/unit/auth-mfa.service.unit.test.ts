@@ -58,18 +58,15 @@ vi.mock('@/shared/utils/security/field-secret-encryption.util.js', () => ({
   decryptFieldSecret: (value: string) => value,
 }));
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = {
   id: 1,
@@ -616,7 +613,7 @@ describe('MfaService', () => {
     // returned, leaving a TOCTOU gap where a concurrent enroll could flip is_mfa_enabled
     // back to true between the revoke commit and the flag update.
     const { withPrincipalDatabaseContext } = await import(
-      '@/infrastructure/database/contexts/principal-database.context.js'
+      '@/infrastructure/database/contexts/database-context.js'
     );
 
     const callOrder: string[] = [];

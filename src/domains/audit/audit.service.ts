@@ -2,7 +2,7 @@ import type { AuditRepository } from './audit.repository.js';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { AuditLogFilters, AuditLogRecordInput } from './audit.types.js';
 import { validateListAuditLogsQuery } from './audit.validator.js';
 import { insertAuditOutboxRow } from './audit-outbox.repository.js';
@@ -14,7 +14,7 @@ import {
   resolveVerifiedOrganizationPrincipalScope,
   resolveVerifiedUserPrincipalScope,
 } from '@/shared/utils/identity/verified-principal-scope.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Collects the distinct internal user ids (actor + target) and organization ids referenced by a

@@ -2,7 +2,7 @@ import { UnauthorizedError } from '@/shared/errors/index.js';
 import {
   withPrincipalDatabaseContext,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { enqueueNotification } from '@/domains/notify/sub-domains/notification/queues/notification.queue.js';
 import { PAGINATION } from '@/shared/constants/pagination.constants.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';

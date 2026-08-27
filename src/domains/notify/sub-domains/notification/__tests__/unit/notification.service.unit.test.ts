@@ -3,7 +3,7 @@ import { UnauthorizedError } from '@/shared/errors/index.js';
 import {
   createPrincipalDatabaseScope,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { NotificationService } from '@/domains/notify/sub-domains/notification/notification.service.js';
 import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
@@ -12,18 +12,15 @@ vi.mock('@/domains/notify/sub-domains/notification/queues/notification.queue.js'
   enqueueNotification: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = { id: 1, public_id: 'user_public' };
 const scope = createPrincipalDatabaseScope({

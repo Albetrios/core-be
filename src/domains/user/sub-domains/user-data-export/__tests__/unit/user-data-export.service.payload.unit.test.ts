@@ -6,7 +6,7 @@ import { USER_DATA_EXPORT_STATUSES } from '@/domains/user/sub-domains/user-data-
 import {
   createPrincipalDatabaseScope,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Payload-shaping and download-URL branches of {@link UserDataExportService}.
@@ -30,18 +30,15 @@ vi.mock('@/domains/user/sub-domains/user-data-export/user-data-export.repository
   createWorkerUserDataExportRepository: () => workerExportRepository,
 }));
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const CREATED_AT = new Date('2026-01-01T00:00:00.000Z');
 const ONE_HOUR_MS = 60 * 60 * 1000;

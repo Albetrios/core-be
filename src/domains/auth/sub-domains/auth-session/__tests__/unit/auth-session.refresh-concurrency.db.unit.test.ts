@@ -8,7 +8,7 @@ import { sessions } from '@/domains/auth/sub-domains/auth-session/auth-session.s
 import {
   createSessionDatabaseScope,
   withSessionDatabaseContext,
-} from '@/infrastructure/database/contexts/session-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
 /**

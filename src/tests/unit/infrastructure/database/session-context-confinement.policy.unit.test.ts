@@ -27,7 +27,7 @@ describe('session-context confinement', () => {
       .split('\n')
       .filter(Boolean)
       .filter((filePath) => !/\.test\.ts$/.test(filePath))
-      .filter((filePath) => !filePath.includes('contexts/session-database.context.ts'))
+      .filter((filePath) => !filePath.includes('contexts/database-context.ts'))
       .filter(
         (filePath) => !ALLOWED_PATH_FRAGMENTS.some((fragment) => filePath.includes(fragment)),
       );

@@ -6,7 +6,7 @@ import {
   UserDataExportRepository,
   createWorkerUserDataExportRepository,
 } from '@/domains/user/sub-domains/user-data-export/user-data-export.repository.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**

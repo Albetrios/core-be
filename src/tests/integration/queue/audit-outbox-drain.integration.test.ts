@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { eq } from 'drizzle-orm';
 import { audit_outbox } from '@/domains/audit/audit-outbox.schema.js';
 import { logs } from '@/domains/audit/audit.schema.js';
@@ -12,7 +12,7 @@ import {
 } from '@/domains/audit/workers/audit-outbox-drain.processor.js';
 import { users } from '@/domains/user/user.schema.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/request-database.context.js';
+import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 
 /** Stable actor public id reused across runs (truncated by cleanupDatabase each test). */

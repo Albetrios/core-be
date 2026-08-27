@@ -22,18 +22,15 @@ vi.mock('@/infrastructure/database/resource-quota-lock.util.js', async (importOr
   acquireResourceQuotaLock: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 import {
   ConflictError,
   ForbiddenError,
@@ -52,7 +49,7 @@ import { isDisposableEmailBlocked } from '@/shared/utils/text/email.util.js';
 import {
   createPrincipalDatabaseScope,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const organization = { id: 1, public_id: 'org_public', owner_user_id: 99 };
 const role = { id: 2, public_id: 'role_public', name: 'Admin' };

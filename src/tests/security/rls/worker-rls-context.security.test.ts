@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { SubscriptionRepository } from '@/domains/billing/sub-domains/subscription/subscription.repository.js';
 import { createWorkerSubscriptionRepository } from '@/domains/billing/sub-domains/subscription/subscription.repository.js';
-import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/worker-database.context.error.js';
+import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 describe('Security: worker RLS database context', () => {

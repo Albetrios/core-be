@@ -7,7 +7,7 @@ import { generateRefreshSecret } from '@/domains/auth/auth.http.util.js';
 import {
   createSessionDatabaseScope,
   withSessionDatabaseContext,
-} from '@/infrastructure/database/contexts/session-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { AuthSessionRepository } from './auth-session.repository.js';
 import type { AuthSessionCreateData } from './auth-session.types.js';
 import {
@@ -16,7 +16,7 @@ import {
   setCachedSessionTokenValid,
 } from './session-token-cache.service.js';
 import { runReadWithTransientRetry } from '@/shared/utils/infrastructure/postgres-error.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedUserPrincipalScope } from '@/domains/auth/shared/verified-user-principal-scope.util.js';
 
 function hashAccessToken(rawToken: string): string {

@@ -3,7 +3,7 @@ import {
   type OrganizationPrincipalDatabaseScope,
   type PrincipalDatabaseScope,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { ConfigurationError } from '@/shared/errors/index.js';
 
 /**

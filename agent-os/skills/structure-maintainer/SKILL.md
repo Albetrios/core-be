@@ -81,7 +81,7 @@ src/infrastructure/
     pool/                     # Pool tuning helpers
     safety/                   # Statement timeout, RLS helpers
     utils/                    # Shared DB utilities
-    contexts/          # withOrganizationContext, withGlobalRetentionCleanupDatabaseContext, etc.
+    contexts/          # database-context.ts (3 scope patterns + dispatcher) + database-context-runtime.ts
     migration/         # migrate.ts, migration runner
   cache/
     redis.client.ts           # Redis connection (+ bullmq-redis.client.ts, redis-lock.util.ts,

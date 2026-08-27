@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { env } from '@/shared/config/env.config.js';
 import { sql } from '@/infrastructure/database/connection.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**

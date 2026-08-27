@@ -19,14 +19,21 @@ const mockUpdate = vi.fn(() => ({ set: mockSet }));
 const mockValues = vi.fn(() => ({ returning: mockReturning }));
 const mockInsert = vi.fn(() => ({ values: mockValues }));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getRequestDatabase: () => ({
-    select: mockSelect,
-    insert: mockInsert,
-    update: mockUpdate,
-    execute: mockExecute,
-  }),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getRequestDatabase: () => ({
+        select: mockSelect,
+        insert: mockInsert,
+        update: mockUpdate,
+        execute: mockExecute,
+      }),
+    };
+  },
+);
 
 describe('UserRepository', () => {
   const repository = new UserRepository();

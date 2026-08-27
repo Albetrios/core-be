@@ -8,18 +8,15 @@ const enqueueStripeWebhookByEventIdMock = vi.fn();
 const enqueueStripeWebhookByEventIdForReclaimMock = vi.fn();
 const setStripeWebhookEventsFailedCountMock = vi.fn();
 
-vi.mock(
-  '@/infrastructure/database/contexts/maintenance-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withMaintenanceDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+  };
+});
 
 vi.mock('@/domains/billing/sub-domains/stripe-webhook/stripe-webhook-event.repository.js', () => ({
   StripeWebhookEventRepository: class MockStripeWebhookEventRepository {

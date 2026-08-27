@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
  * never casually.
  */
 const ALLOWED_IMPORTER_SUFFIXES = [
-  'src/infrastructure/database/contexts/principal-database.context.ts',
+  'src/infrastructure/database/contexts/database-context.ts',
   'src/shared/utils/http/request.util.ts',
   'src/infrastructure/queue/worker-runtime/job-principal-scope.util.ts',
   'src/shared/utils/identity/verified-principal-scope.util.ts',

@@ -18,7 +18,7 @@ import '@/shared/config/load-env-files.js';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { isNotNull } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { getStripeClient, isStripeConfigured } from '@/infrastructure/payment/stripe.client.js';

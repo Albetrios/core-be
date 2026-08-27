@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 
 /**
  * Postgres advisory-lock namespaces (`classid`) for per-scope resource-creation quotas (audit-#8).

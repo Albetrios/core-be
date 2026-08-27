@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Queue, QueueEvents } from 'bullmq';
 

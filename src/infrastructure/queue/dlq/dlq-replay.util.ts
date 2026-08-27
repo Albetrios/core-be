@@ -2,7 +2,7 @@ import { Queue } from 'bullmq';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
-} from '@/infrastructure/database/contexts/maintenance-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { eq } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
 import { logs } from '@/domains/audit/audit.schema.js';

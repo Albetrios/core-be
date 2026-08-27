@@ -27,7 +27,7 @@ import { WEBHOOK_USER_AGENT_PREFIX } from '@/shared/constants/project-identity.c
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import { WEBHOOK_ORGANIZATION_FANOUT_CONCURRENCY } from '@/domains/notify/sub-domains/webhook/webhook-delivery/webhook-delivery.constants.js';
 import { PAGINATION } from '@/shared/constants/pagination.constants.js';
 import { MILLISECONDS_PER_HOUR } from '@/shared/constants/ttl.constants.js';

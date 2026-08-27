@@ -8,23 +8,20 @@ import { ValidationError, NotFoundError } from '@/shared/errors/index.js';
 import {
   createPrincipalDatabaseScope,
   type UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 
-vi.mock(
-  '@/infrastructure/database/contexts/maintenance-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    const inner = vi.fn((callback: () => Promise<unknown>) => callback()) as unknown as (
-      ...parameters: unknown[]
-    ) => unknown;
-    return {
-      ...actual,
-      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
-        inner(...parameters),
-      ),
-    };
-  },
-);
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 /**
  * Avatar attach / replace / detach and the reclamation of the object left behind.
@@ -55,19 +52,6 @@ const { loggerWarnMock } = vi.hoisted(() => ({ loggerWarnMock: vi.fn() }));
 vi.mock('@/shared/utils/infrastructure/logger.util.js', () => ({
   logger: { info: vi.fn(), warn: loggerWarnMock, error: vi.fn(), debug: vi.fn() },
 }));
-
-vi.mock(
-  '@/infrastructure/database/contexts/principal-database.context.js',
-  async (importOriginal) => {
-    const actual = await importOriginal<Record<string, unknown>>();
-    return {
-      ...actual,
-      withPrincipalDatabaseContext: vi.fn(
-        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-      ),
-    };
-  },
-);
 
 const USER_PUBLIC_ID = generatePublicId('user');
 const AVATAR_PREFIX = buildUserAvatarKeyPrefix(USER_PUBLIC_ID);

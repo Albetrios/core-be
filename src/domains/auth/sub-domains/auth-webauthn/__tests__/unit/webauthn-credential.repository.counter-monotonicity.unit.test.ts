@@ -41,11 +41,18 @@ const updateChain = {
   where: vi.fn().mockResolvedValue(undefined),
 };
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getRequestDatabase: () => ({
-    update: () => updateChain,
-  }),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getRequestDatabase: () => ({
+        update: () => updateChain,
+      }),
+    };
+  },
+);
 
 vi.mock('@/shared/utils/infrastructure/database-timestamp.util.js', () => ({
   databaseNowTimestamp: { __databaseNow: true },

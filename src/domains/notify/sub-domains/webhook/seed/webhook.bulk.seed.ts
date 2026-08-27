@@ -9,7 +9,7 @@
  * count-and-resume make a re-run with the same counts a no-op.
  */
 import { and, eq, like } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { encryptFieldSecret } from '@/shared/utils/security/field-secret-encryption.util.js';
 import { webhooks } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';

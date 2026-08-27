@@ -1,4 +1,4 @@
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { ConfigurationError } from '@/shared/errors/index.js';

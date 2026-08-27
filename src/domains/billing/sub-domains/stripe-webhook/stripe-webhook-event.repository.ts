@@ -1,9 +1,9 @@
 import { and, asc, eq, inArray, lt, or, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   assertWorkerDatabaseContext,
   isWorkerRuntime,
-} from '@/infrastructure/database/contexts/worker-database.context.js';
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   MILLISECONDS_PER_MINUTE,
   STRIPE_WEBHOOK_FAILED_COUNT_CAP,

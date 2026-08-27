@@ -7,7 +7,7 @@
  * `idx_org_notif_policy_unique(organization_id, notification_type, channel)` unique index, so
  * every insert uses `.onConflictDoNothing()` and a re-run with the same registry is a no-op.
  */
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { organization_notification_policies } from '@/domains/tenancy/sub-domains/organization/organization-notification-policy/organization-notification-policy.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';

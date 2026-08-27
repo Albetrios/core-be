@@ -3,9 +3,16 @@ import { describe, expect, it, vi } from 'vitest';
 // audit #40: findActiveByKeyPrefix bounds the per-request constant-time compare loop. Mock the
 // request database so the SECURITY DEFINER resolver returns more candidates than the cap.
 const dbMocks = vi.hoisted(() => ({ execute: vi.fn() }));
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getRequestDatabase: () => ({ execute: dbMocks.execute }),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getRequestDatabase: () => ({ execute: dbMocks.execute }),
+    };
+  },
+);
 
 import { OrganizationApiKeyRepository } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.repository.js';
 

@@ -1132,14 +1132,8 @@ src/
     │   │   │   ├── worker-context-database-handle.unit.test.ts
     │   │   │   └── worker-database.context.test.ts
     │   ├── contexts/
-    │   │   ├── maintenance-database.context.ts
-    │   │   ├── principal-database.context.ts
-    │   │   ├── request-database.context.ts
-    │   │   ├── session-database.context.ts
-    │   │   ├── worker-database-guard.util.ts
-    │   │   ├── worker-database.context.error.ts
-    │   │   ├── worker-database.context.ts
-    │   │   └── worker-statement-timeout.util.ts
+    │   │   ├── database-context-runtime.ts
+    │   │   └── database-context.ts
     │   ├── migration/
     │   │   ├── migrate.ts
     │   │   ├── migration-error-hint.ts

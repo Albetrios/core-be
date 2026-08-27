@@ -21,13 +21,20 @@ vi.mock('@/shared/utils/identity/public-id.util.js', () => ({
   generatePublicId: () => 'session_public_test_id',
 }));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getRequestDatabase: () => ({
-    select: mockSelect,
-    insert: mockInsert,
-    update: mockUpdate,
-  }),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getRequestDatabase: () => ({
+        select: mockSelect,
+        insert: mockInsert,
+        update: mockUpdate,
+      }),
+    };
+  },
+);
 
 describe('AuthSessionRepository', () => {
   const repository = new AuthSessionRepository();

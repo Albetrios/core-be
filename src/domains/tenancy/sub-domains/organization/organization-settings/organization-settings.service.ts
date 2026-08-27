@@ -3,7 +3,7 @@ import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js'
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/principal-database.context.js';
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { OrganizationSettingsRepository } from './organization-settings.repository.js';
 import type {

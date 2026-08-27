@@ -26,7 +26,7 @@ import { withTransaction } from '@/infrastructure/database/transaction.js';
 import {
   runWithPinnedDatabaseHandle,
   type RequestScopedPostgresDatabase,
-} from '@/infrastructure/database/contexts/request-database.context.js';
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import type { UserAuthRecord } from '@/domains/user/user.types.js';
 import type { AuthMethodCreateData } from './auth-method.types.js';
 import type { AuthMethodRepository } from './auth-method.repository.js';
@@ -38,7 +38,7 @@ import {
   validateResetPassword,
   validateChangePassword,
 } from '@/domains/auth/auth.validator.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedUserPrincipalScope } from '@/domains/auth/shared/verified-user-principal-scope.util.js';
 
 const PASSWORD_RESET_EXPIRES_IN_MINUTES = 60;

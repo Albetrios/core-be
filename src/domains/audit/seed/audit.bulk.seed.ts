@@ -14,7 +14,7 @@
  * so a re-run with the same counts is a no-op. Rows are inserted in chunks of {@link INSERT_BATCH_SIZE}.
  */
 import { and, count, eq, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { logs, type AuditLogInsert } from '@/domains/audit/audit.schema.js';
 import type { SeedContext, SeededOrg } from '@/scripts/seed/seed-contract.js';
 import { generateBulkAudit } from './audit.faker.js';
