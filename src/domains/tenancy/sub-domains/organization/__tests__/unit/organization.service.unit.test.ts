@@ -24,6 +24,11 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
       callback(),
     ),
+    // The tombstoning softDelete now runs under the retention maintenance context —
+    // passthrough so the suite stays Postgres-free (CI's unit lane has no database).
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
   };
 });
 
