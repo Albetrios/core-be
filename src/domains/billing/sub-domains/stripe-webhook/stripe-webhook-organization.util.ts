@@ -1,7 +1,7 @@
 import type Stripe from 'stripe';
 import type { WorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveOrganizationJobScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
+import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import type { StripeWebhookEventRepository } from './stripe-webhook-event.repository.js';
 
@@ -129,7 +129,10 @@ export async function runWithOrganizationPublicIdForStripeWebhook<T>(
   organizationPublicId: string,
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
 ): Promise<T> {
-  return withPrincipalDatabaseContext(resolveOrganizationJobScope(organizationPublicId), callback);
+  return withPrincipalDatabaseContext(
+    resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
+    callback,
+  );
 }
 
 /**

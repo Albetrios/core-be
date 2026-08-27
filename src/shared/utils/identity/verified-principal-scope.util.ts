@@ -1,47 +1,42 @@
 import {
   createPrincipalDatabaseScope,
   type OrganizationPrincipalDatabaseScope,
+  type PrincipalDatabaseScope,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
+/** Org shape → org-narrowed scope (optionally carrying the user too). */
+export function resolveVerifiedPrincipalScope(input: {
+  organizationPublicId: string;
+  userPublicId?: string;
+}): OrganizationPrincipalDatabaseScope;
+/** User-only shape → user-narrowed scope. */
+export function resolveVerifiedPrincipalScope(input: {
+  userPublicId: string;
+  organizationPublicId?: undefined;
+}): UserPrincipalDatabaseScope;
 /**
- * Mints a user-only principal scope from an id the calling flow has itself
- * verified or derived from an owned record — the pre-token / port-family
- * counterpart of the request minters (`source: 'provisioning'`).
+ * THE common verified/port-family minter (`source: 'provisioning'`): pass what the
+ * calling flow has itself verified — the other identity stays empty, and the wrapper
+ * later sets only the GUCs the scope carries. Overloads narrow the return type from
+ * the shape you pass, so org-required / user-required signatures still typecheck.
  *
  * @remarks
- * - **Algorithm:** wraps the verified user public id in a user-only scope.
- * - **Failure modes:** the factory's empty-scope guard only.
- * - **Side effects:** none.
- * - **Notes:** every importer is enumerated in
- *   `verified-scope-usage.policy.unit.test.ts` — the ledger of port-family
- *   sites still pending full scope-threading. Adding an importer is a
- *   deliberate policy-test edit, never casual.
+ * - **Algorithm:** wraps the verified id(s) in a principal scope with provisioning
+ *   provenance; the factory's empty-scope guard is the only failure mode.
+ * - **Notes:** authority comes from a record the caller owns or just authorized (an
+ *   invitation row, an API key row, a just-provisioned organization, a Stripe
+ *   mapping) — never from a token. Every importer is enumerated in
+ *   `verified-scope-usage.policy.unit.test.ts`; adding one is a deliberate
+ *   policy-test edit, never casual.
  */
-export function resolveVerifiedUserPrincipalScope(
-  userPublicId: string,
-): UserPrincipalDatabaseScope {
+export function resolveVerifiedPrincipalScope(input: {
+  organizationPublicId?: string | undefined;
+  userPublicId?: string | undefined;
+}): PrincipalDatabaseScope {
   return createPrincipalDatabaseScope({
-    userPublicId,
+    organizationPublicId: input.organizationPublicId,
+    userPublicId: input.userPublicId,
     source: 'provisioning',
-  }) as UserPrincipalDatabaseScope;
-}
-
-/**
- * Mints an organization-only principal scope from an id the calling flow
- * derived from an owned/authorized record (an invitation row, an API key row, a
- * just-provisioned organization, a Stripe mapping) — authority comes from that
- * record, not a token (`source: 'provisioning'`).
- *
- * @remarks
- * Same per-importer ledger discipline as
- * {@link resolveVerifiedUserPrincipalScope}.
- */
-export function resolveVerifiedOrganizationPrincipalScope(
-  organizationPublicId: string,
-): OrganizationPrincipalDatabaseScope {
-  return createPrincipalDatabaseScope({
-    organizationPublicId,
-    source: 'provisioning',
-  }) as OrganizationPrincipalDatabaseScope;
+  });
 }

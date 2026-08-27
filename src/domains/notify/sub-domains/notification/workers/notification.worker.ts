@@ -30,9 +30,9 @@ import {
 } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveOrganizationJobScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
+import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 type NotificationDispatchData = {
   channels?: ('email' | 'in_app')[];
@@ -187,12 +187,12 @@ export async function processNotificationDispatchJob(
         throw new Error(`notification.user_unknown:${String(notificationId)}`);
       }
       return withPrincipalDatabaseContext(
-        resolveVerifiedUserPrincipalScope(userPublicId),
+        resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
         loadNotification,
       );
     }
     return withPrincipalDatabaseContext(
-      resolveOrganizationJobScope(organizationPublicId),
+      resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
       loadNotification,
     );
   };

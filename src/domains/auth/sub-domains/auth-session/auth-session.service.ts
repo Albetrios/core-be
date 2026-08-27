@@ -17,7 +17,7 @@ import {
 } from './session-token-cache.service.js';
 import { runReadWithTransientRetry } from '@/shared/utils/infrastructure/postgres-error.util.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 function hashAccessToken(rawToken: string): string {
   return createHash('sha256').update(rawToken).digest('hex');
@@ -58,7 +58,7 @@ export class AuthSessionService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     return withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       (_databaseHandle) => this.sessionRepository.listByUserId(user.id),
     );
   }
@@ -70,7 +70,7 @@ export class AuthSessionService {
   async listForUserDataExport(options: { userPublicId: string; limit: number }) {
     const user = await this.userService.requireUserRecordByPublicId(options.userPublicId);
     return withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(options.userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
       (_databaseHandle) => this.sessionRepository.listForUserDataExport(user.id, options.limit),
     );
   }
@@ -79,7 +79,7 @@ export class AuthSessionService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     const revoked = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       (_databaseHandle) => this.sessionRepository.revoke(sessionPublicId, user.id),
     );
     if (!revoked) throw new NotFoundError('Session');
@@ -103,7 +103,7 @@ export class AuthSessionService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     const revokedSessions = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       (_databaseHandle) => this.sessionRepository.revokeAllByUserId(user.id),
     );
     await this.invalidateRevokedSessionCaches(revokedSessions);
@@ -136,7 +136,7 @@ export class AuthSessionService {
     if (!user) throw new NotFoundError('User');
     const currentTokenHash = hashAccessToken(currentAccessToken);
     const revokedSessions = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       (_databaseHandle) =>
         this.sessionRepository.revokeAllByUserIdExcept(user.id, currentTokenHash),
     );
@@ -151,7 +151,7 @@ export class AuthSessionService {
     if (!user) throw new NotFoundError('User');
     const refreshSecret = generateRefreshSecret();
     const { session, evictedSessions } = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       async (_databaseHandle) => {
         // Bound the user's concurrent live sessions. Under a per-user advisory lock (so concurrent
         // logins cannot overshoot), evict the oldest sessions beyond MAX_ACTIVE_SESSIONS_PER_USER - 1
@@ -426,7 +426,7 @@ export class AuthSessionService {
     const user = await this.userService.findById(userId);
     if (!user) return;
     const revokedSessions = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user.public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       (_databaseHandle) => this.sessionRepository.revokeAllByUserId(user.id),
     );
     await this.invalidateRevokedSessionCaches(revokedSessions);

@@ -17,7 +17,7 @@ import { sessions } from '@/domains/auth/sub-domains/auth-session/auth-session.s
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { createDomainContainers } from '@/worker-containers.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 describe('UserDataExportService (database)', () => {
   const service = createDomainContainers(createObjectStoragePortMock()).userDomain
@@ -67,7 +67,7 @@ describe('UserDataExportService (database)', () => {
     });
 
     const exported = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user.public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => service.buildExportPayload(user.public_id),
     );
 
@@ -86,8 +86,9 @@ describe('UserDataExportService (database)', () => {
 
   it('buildExportPayload throws when user is missing', async () => {
     await expect(
-      withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope('missing_public_id'), () =>
-        service.buildExportPayload('missing_public_id'),
+      withPrincipalDatabaseContext(
+        resolveVerifiedPrincipalScope({ userPublicId: 'missing_public_id' }),
+        () => service.buildExportPayload('missing_public_id'),
       ),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
@@ -103,7 +104,7 @@ describe('UserDataExportService (database)', () => {
     });
 
     const exported = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user.public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => service.buildExportPayload(user.public_id),
     );
 
@@ -119,7 +120,7 @@ describe('UserDataExportService (database)', () => {
     });
 
     const exported = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user.public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => service.buildExportPayload(user.public_id),
     );
 

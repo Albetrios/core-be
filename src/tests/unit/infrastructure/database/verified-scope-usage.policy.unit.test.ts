@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Policy: the verified-principal minters (`resolveVerifiedUserPrincipalScope` /
- * `resolveVerifiedOrganizationPrincipalScope`) create a principal scope from an
+ * Policy: the verified-principal minters (`resolveVerifiedPrincipalScope` /
+ * `resolveVerifiedPrincipalScope`) create a principal scope from an
  * id the CALLER has already authenticated or resolved — a port/pre-token
  * authority, not a request token. Every importer is therefore enumerated here:
  * a new import is a new claim of "I verified this identity myself" and must be

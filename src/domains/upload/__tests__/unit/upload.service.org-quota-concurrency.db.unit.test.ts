@@ -12,7 +12,7 @@ import type { UserService } from '@/domains/user/user.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const ORG_CAP = 3;
 const REQUESTS_PER_USER = 4;
@@ -116,7 +116,7 @@ describe('UploadService org pending-quota concurrency (database)', () => {
     }
 
     const orgPendingCount = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(owner.public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: owner.public_id }),
       () => repository.countPendingByOrganizationId(organization.id),
     );
     expect(orgPendingCount).toBe(ORG_CAP);

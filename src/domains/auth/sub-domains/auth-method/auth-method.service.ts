@@ -39,7 +39,7 @@ import {
   validateChangePassword,
 } from '@/domains/auth/auth.validator.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const PASSWORD_RESET_EXPIRES_IN_MINUTES = 60;
 
@@ -98,8 +98,9 @@ export class AuthMethodService {
     if (!user) throw new NotFoundError('User');
     // auth.auth_methods is FORCE RLS (audit #7); pin the owner context so the owner policy authorizes
     // the read for this user's own credentials.
-    return withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(userPublicId), () =>
-      this.authMethodRepository.listByUserId(user.id),
+    return withPrincipalDatabaseContext(
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      () => this.authMethodRepository.listByUserId(user.id),
     );
   }
 
@@ -122,7 +123,7 @@ export class AuthMethodService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     const methods = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.authMethodRepository.listByUserId(user.id),
     );
     return methods.some((method) => LOGIN_CAPABLE_METHOD_TYPES.has(String(method.method_type)));
@@ -149,7 +150,7 @@ export class AuthMethodService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     return withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       async () => {
         const methods = await this.authMethodRepository.listByUserId(user.id);
         if (methods.some((method) => LOGIN_CAPABLE_METHOD_TYPES.has(String(method.method_type)))) {
@@ -170,7 +171,7 @@ export class AuthMethodService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     return withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       async () => {
         // Serialize the count + insert under the same per-user credential-mutation advisory lock the
         // delete guard uses, so concurrent creates cannot both pass the cap check and overshoot
@@ -210,7 +211,7 @@ export class AuthMethodService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       async () => {
         const existing = await this.authMethodRepository.findByPublicIdForUser(
           methodPublicId,
@@ -249,8 +250,9 @@ export class AuthMethodService {
   async revokeAllForUser(userPublicId: string): Promise<void> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    await withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(userPublicId), () =>
-      this.authMethodRepository.revokeAllByUserId(user.id),
+    await withPrincipalDatabaseContext(
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      () => this.authMethodRepository.revokeAllByUserId(user.id),
     );
   }
 
@@ -269,8 +271,9 @@ export class AuthMethodService {
   async invalidateAllVerificationTokensForUser(userPublicId: string): Promise<void> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    await withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(userPublicId), () =>
-      this.verificationTokenRepository.invalidateAllByUser(user.id),
+    await withPrincipalDatabaseContext(
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      () => this.verificationTokenRepository.invalidateAllByUser(user.id),
     );
   }
 
@@ -295,8 +298,9 @@ export class AuthMethodService {
       data.provider_user_id,
     );
     if (!existing) {
-      await withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(ownerPublicId), () =>
-        this.authMethodRepository.create(data),
+      await withPrincipalDatabaseContext(
+        resolveVerifiedPrincipalScope({ userPublicId: ownerPublicId }),
+        () => this.authMethodRepository.create(data),
       );
     }
   }
@@ -324,13 +328,15 @@ export class AuthMethodService {
    *   `GET /auth/me/auth-methods` and is counted by the last-login-capable-credential guard.
    */
   async createEmailCodeMethod(userId: number, userPublicId: string): Promise<void> {
-    await withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(userPublicId), () =>
-      this.authMethodRepository.create({
-        user_id: userId,
-        method_type: AUTH_METHOD_TYPE.EMAIL_CODE,
-        is_primary: true,
-        created_by_user_id: userId,
-      }),
+    await withPrincipalDatabaseContext(
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      () =>
+        this.authMethodRepository.create({
+          user_id: userId,
+          method_type: AUTH_METHOD_TYPE.EMAIL_CODE,
+          is_primary: true,
+          created_by_user_id: userId,
+        }),
     );
   }
 

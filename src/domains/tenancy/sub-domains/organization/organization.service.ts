@@ -35,10 +35,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { isPostgresUniqueViolation } from '@/shared/utils/infrastructure/postgres-error.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import type { UploadService } from '@/domains/upload/upload.service.js';
-import {
-  resolveVerifiedOrganizationPrincipalScope,
-  resolveVerifiedUserPrincipalScope,
-} from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Structural port for the billing side of organization offboarding (route-audit-#2).
@@ -199,8 +196,9 @@ export class OrganizationService {
     userPublicId: string,
     userInternalId: number,
   ): Promise<number> {
-    return withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(userPublicId), () =>
-      this.repository.countActiveOwnedByUser(userInternalId),
+    return withPrincipalDatabaseContext(
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      () => this.repository.countActiveOwnedByUser(userInternalId),
     );
   }
 
@@ -310,7 +308,7 @@ export class OrganizationService {
     // tenancy.organizations is FORCE RLS — persist the Stripe customer id under the org GUC
     // so the update is not silently dropped when called from the payment provider outside HTTP.
     return withPrincipalDatabaseContext(
-      resolveVerifiedOrganizationPrincipalScope(organization_public_id),
+      resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
       async () => {
         const organization = await this.repository.findByPublicId(organization_public_id);
         if (!organization) throw new NotFoundError('Organization');
@@ -354,7 +352,7 @@ export class OrganizationService {
       limit: parsed.limit,
     });
     return withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user_public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user_public_id }),
       async () => {
         const result = this.isGlobalAdmin(global_role)
           ? await this.repository.findAll(pagination)
@@ -373,7 +371,7 @@ export class OrganizationService {
     global_role?: GlobalRole,
   ): Promise<OrganizationOutput> {
     return withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user_public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user_public_id }),
       async () => {
         await this.assertUserCanAccessOrganization(user_public_id, public_id, global_role);
         const organization = await this.repository.findByPublicId(public_id);
@@ -389,7 +387,7 @@ export class OrganizationService {
     global_role?: GlobalRole,
   ): Promise<OrganizationOutput> {
     return withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user_public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user_public_id }),
       async () => {
         const organization = await this.repository.findBySlug(slug);
         if (!organization) throw new NotFoundError('Organization');
@@ -418,7 +416,7 @@ export class OrganizationService {
      * existence check runs in the same wrap so the SELECT also sees the user GUC.
      */
     return withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(owner_user_public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: owner_user_public_id }),
       async () => {
         const ownerId = await this.repository.resolveUserIdByPublicId(owner_user_public_id);
         if (ownerId === null) throw new NotFoundError('User');

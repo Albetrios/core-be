@@ -6,7 +6,7 @@ import { database } from '@/infrastructure/database/connection.js';
 import { user_notification_preferences } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.schema.js';
 import { UserNotificationPreferencesRepository } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.repository.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 describe('UserNotificationPreferencesRepository (database)', () => {
   const repository = new UserNotificationPreferencesRepository();
@@ -143,8 +143,9 @@ describe('UserNotificationPreferencesRepository (database)', () => {
     const CONCURRENT_REPLACES = 8;
     const settled = await Promise.allSettled(
       Array.from({ length: CONCURRENT_REPLACES }, (_, index) =>
-        withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(user.public_id), () =>
-          repository.replaceAll(user.id, payload(index % 2 === 0), user.id),
+        withPrincipalDatabaseContext(
+          resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+          () => repository.replaceAll(user.id, payload(index % 2 === 0), user.id),
         ),
       ),
     );

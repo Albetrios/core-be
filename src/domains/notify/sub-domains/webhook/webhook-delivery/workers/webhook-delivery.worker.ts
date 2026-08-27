@@ -33,7 +33,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveOrganizationJobScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
+import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import { MILLISECONDS_PER_HOUR, TEN_SECONDS_MS } from '@/shared/constants/ttl.constants.js';
 import { env } from '@/shared/config/env.config.js';
 
@@ -180,7 +180,7 @@ async function claimWebhookDeliveryAttempt(options: {
   const { deliveryAttemptId, organizationPublicId, attemptNumber, deliveryAttemptRepository } =
     options;
   return withPrincipalDatabaseContext(
-    resolveOrganizationJobScope(organizationPublicId),
+    resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
     async (databaseHandle) => {
       const attemptRepository =
         deliveryAttemptRepository ?? createWorkerWebhookDeliveryAttemptRepository(databaseHandle);
@@ -232,7 +232,7 @@ async function recordWebhookDeliveryOutcome(options: {
 }): Promise<void> {
   const { deliveryAttemptId, organizationPublicId, outcome, deliveryAttemptRepository } = options;
   await withPrincipalDatabaseContext(
-    resolveOrganizationJobScope(organizationPublicId),
+    resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
     async (databaseHandle) => {
       const attemptRepository =
         deliveryAttemptRepository ?? createWorkerWebhookDeliveryAttemptRepository(databaseHandle);

@@ -8,7 +8,7 @@ import { PAGINATION } from '@/shared/constants/pagination.constants.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import type { NotificationRepository } from './notification.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Options forwarded from controllers/event handlers into {@link NotificationService.listForUser}.
@@ -80,7 +80,7 @@ export class NotificationService {
   async listForUserDataExport(options: { userPublicId: string; limit: number }) {
     const userId = await this.resolveUserId(options.userPublicId);
     return withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(options.userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
       () => this.repository.listForUserDataExport(userId, options.limit),
     );
   }

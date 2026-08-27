@@ -50,7 +50,7 @@ import {
 } from './auth-mfa-recovery-code.repository.js';
 import { generateMfaRecoveryCodes } from './auth-mfa-recovery-code.util.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const ERROR_KEY_MFA_USER_NOT_FOUND = 'errors:mfaUserNotFound';
 const ERROR_KEY_MFA_INVALID_OR_EXPIRED_CODE = 'errors:mfaInvalidOrExpiredCode';
@@ -144,7 +144,7 @@ export class MfaService {
       // auth.auth_methods is FORCE RLS (audit #7); pin the owner context for every credential
       // read/write — the MFA session already authenticated this user.
       const totpMethod = await withPrincipalDatabaseContext(
-        resolveVerifiedUserPrincipalScope(user.public_id),
+        resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
         () => this.authMethodService.findTotpByUserId(user.id),
       );
       if (!totpMethod?.encrypted_secret) {
@@ -160,8 +160,9 @@ export class MfaService {
         throw new UnauthorizedError(ERROR_KEY_MFA_INVALID_OR_EXPIRED_CODE);
       }
       await this.rejectReplayedTotpCode(user.id, parsed.totp_code);
-      await withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(user.public_id), () =>
-        this.authMethodService.updateAuthMethodLastUsedAt(totpMethod.id, user.id),
+      await withPrincipalDatabaseContext(
+        resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+        () => this.authMethodService.updateAuthMethodLastUsedAt(totpMethod.id, user.id),
       );
       verified = true;
     } else if (parsed.recovery_code) {
@@ -169,7 +170,7 @@ export class MfaService {
       // identifies the user, so consume the single-use code inside that user's context.
       const recoveryCode = parsed.recovery_code;
       const consumed = await withPrincipalDatabaseContext(
-        resolveVerifiedUserPrincipalScope(user.public_id),
+        resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
         () => consumeMfaRecoveryCode(user.id, recoveryCode),
       );
       if (!consumed) {
@@ -297,7 +298,7 @@ export class MfaService {
     // per-user budget is exhausted — concurrent guesses can no longer overspend it.
     await this.consumeMfaVerificationAttempt(user.id);
     const totpMethod = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user.public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => this.authMethodService.findTotpByUserId(user.id),
     );
     if (!totpMethod?.encrypted_secret) {
@@ -315,8 +316,9 @@ export class MfaService {
     await this.rejectReplayedTotpCode(user.id, parsed.code);
     // audit-#12: successful step-up clears the failure counter.
     await this.clearMfaVerificationFailures(user.id);
-    await withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(user.public_id), () =>
-      this.authMethodService.updateAuthMethodLastUsedAt(totpMethod.id, user.id),
+    await withPrincipalDatabaseContext(
+      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+      () => this.authMethodService.updateAuthMethodLastUsedAt(totpMethod.id, user.id),
     );
     return { verified: true };
   }
@@ -425,7 +427,7 @@ export class MfaService {
     const recoveryCodeHashes = plaintextRecoveryCodes.map(hashMfaRecoveryCode);
 
     const record = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user.public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       async () => {
         // Serialize against every other credential mutation for this user (deleteMfa takes the same
         // lock) so the revoke-old → insert-new → flip-is_mfa_enabled sequence can't interleave with a
@@ -494,7 +496,7 @@ export class MfaService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new UnauthorizedError(ERROR_KEY_MFA_USER_NOT_FOUND);
     await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user.public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       async () => {
         // route-audit C1 (deleteMfa sibling): serialize concurrent credential mutations for this user
         // so the "would this remove the last MFA factor?" count + revoke cannot interleave with a
@@ -539,7 +541,7 @@ export class MfaService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new UnauthorizedError(ERROR_KEY_MFA_USER_NOT_FOUND);
     const methods = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user.public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => this.authMethodService.listMfaMethodsByUserId(user.id),
     );
     return methods.map((method) => ({

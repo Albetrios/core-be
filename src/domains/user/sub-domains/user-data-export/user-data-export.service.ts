@@ -32,7 +32,7 @@ import {
   withPrincipalDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 function buildExportS3Key(userPublicId: string, exportPublicId: string): string {
   return `${USER_DATA_EXPORT_S3_PREFIX}/${userPublicId}/${exportPublicId}.json.gz`;
@@ -285,7 +285,7 @@ export class UserDataExportService {
     body: Buffer;
   }): Promise<void> {
     const s3Key = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(options.userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
       async (scopedDatabaseHandle) =>
         this.resolveExportArtifactS3Key(
           {
@@ -309,7 +309,7 @@ export class UserDataExportService {
 
     try {
       await withPrincipalDatabaseContext(
-        resolveVerifiedUserPrincipalScope(options.userPublicId),
+        resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
         async (scopedDatabaseHandle) => {
           await this.finalizeExportAfterUpload(
             {
@@ -433,7 +433,7 @@ export class UserDataExportService {
     let afterId = 0;
     for (;;) {
       const rows = await withPrincipalDatabaseContext(
-        resolveVerifiedUserPrincipalScope(userPublicId),
+        resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
         () =>
           this.exportRepository.findS3KeysByUserIdAfter(
             userInternalId,
@@ -454,7 +454,7 @@ export class UserDataExportService {
       }
     }
     const deletedCount = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.exportRepository.deleteAllByUserId(userInternalId),
     );
     if (deletedCount > 0) {

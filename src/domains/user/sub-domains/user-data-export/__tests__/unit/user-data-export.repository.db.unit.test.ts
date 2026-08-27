@@ -7,7 +7,7 @@ import {
   createWorkerUserDataExportRepository,
 } from '@/domains/user/sub-domains/user-data-export/user-data-export.repository.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * The last repository in the user domain without a database test. Its reads are all scoped by
@@ -83,7 +83,7 @@ describe('UserDataExportRepository (database)', () => {
     const created = await repository.create(exportRow(user.id));
 
     const found = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user.public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       async (databaseHandle) => {
         const workerRepository = createWorkerUserDataExportRepository(databaseHandle);
         return workerRepository.findByPublicIdAndUserId(created.public_id, user.id);

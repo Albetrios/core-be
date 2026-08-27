@@ -50,10 +50,7 @@ import type { MemberInvitationService } from './member-invitation/member-invitat
 import { invalidatePermissions } from '@/domains/tenancy/sub-domains/permission/permission-cache.service.js';
 import type { OrganizationApiKeyRepository } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.repository.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
-import {
-  resolveVerifiedOrganizationPrincipalScope,
-  resolveVerifiedUserPrincipalScope,
-} from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Cross-domain port for REQ-4 seat enforcement and Stripe seat reconciliation, satisfied by
@@ -725,7 +722,7 @@ export class MembershipService {
    */
   async countActiveMembers(options: { organizationPublicId: string }): Promise<number> {
     return withPrincipalDatabaseContext(
-      resolveVerifiedOrganizationPrincipalScope(options.organizationPublicId),
+      resolveVerifiedPrincipalScope({ organizationPublicId: options.organizationPublicId }),
       async () => {
         const organization = await this.organizationService.requireOrganizationByPublicId(
           options.organizationPublicId,
@@ -757,7 +754,7 @@ export class MembershipService {
     ceiling: number;
   }): Promise<number> {
     const suspendedUserIds = await withPrincipalDatabaseContext(
-      resolveVerifiedOrganizationPrincipalScope(options.organizationPublicId),
+      resolveVerifiedPrincipalScope({ organizationPublicId: options.organizationPublicId }),
       async () => {
         const organization = await this.organizationService.requireOrganizationRecordByPublicId(
           options.organizationPublicId,
@@ -793,7 +790,7 @@ export class MembershipService {
     limit: number;
   }) {
     return withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(options.userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
       (_databaseHandle) =>
         this.membershipRepository.listOrganizationsForUserDataExport(
           options.userInternalId,

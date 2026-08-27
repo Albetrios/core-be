@@ -63,7 +63,7 @@ describe('job-scope minting confinement', () => {
         'grep',
         [
           '-rlE',
-          'resolve(Organization|User)?JobP?r?i?n?c?i?p?a?l?S?c?o?p?e?\\b|resolveJobPrincipalScope|resolveOrganizationJobScope|resolveUserJobScope',
+          'resolve(Organization|User)?JobP?r?i?n?c?i?p?a?l?S?c?o?p?e?\\b|resolveJobPrincipalScope|resolveJobPrincipalScope|resolveJobPrincipalScope',
           'src',
           '--include=*.ts',
         ],

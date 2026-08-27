@@ -36,7 +36,7 @@ import {
 } from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
 import type { UserAuthRecord } from '@/domains/user/user.types.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const IP_FAILED_LOGIN_KEY_PREFIX = 'auth:failed_login:ip:';
 
@@ -383,7 +383,7 @@ export class AuthService {
     // nesting it here would hold this checkout open across it, making the request peak at two
     // concurrent connections instead of taking them one after another.
     const { user, resolved } = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(userPublicId),
+      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       async () => {
         const record = await this.userService.requireUserRecordByPublicId(userPublicId);
         if (record.status !== 'ACTIVE') throw new UnauthorizedError('errors:accountNotActive');

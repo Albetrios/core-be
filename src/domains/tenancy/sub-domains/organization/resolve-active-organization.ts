@@ -2,7 +2,7 @@ import { env } from '@/shared/config/env.config.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { provisionPersonalOrganization } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
 import { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
 /**
@@ -46,7 +46,10 @@ async function withUserContextForInternalId<T>(
 ): Promise<T | undefined> {
   const userPublicId = await organizationRepository.resolveUserPublicIdByInternalId(userInternalId);
   if (userPublicId === null) return undefined;
-  return withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(userPublicId), callback);
+  return withPrincipalDatabaseContext(
+    resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+    callback,
+  );
 }
 
 /**

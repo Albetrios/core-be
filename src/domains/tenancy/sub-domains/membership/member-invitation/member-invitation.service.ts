@@ -33,7 +33,7 @@ import {
   type MemberInvitationEmailPayload,
   type MemberInvitationAcceptedPayload,
 } from '@/domains/tenancy/sub-domains/membership/member-invitation/events/member-invitation.events.js';
-import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const MEMBER_INVITATION_RESOURCE = 'Member invitation';
 
@@ -229,7 +229,7 @@ export class MemberInvitationService {
     if (!lookup) throw new NotFoundError(MEMBER_INVITATION_RESOURCE);
     let acceptedMemberPublicId: string | null = null;
     const result = await withPrincipalDatabaseContext(
-      resolveVerifiedOrganizationPrincipalScope(lookup.organization_public_id),
+      resolveVerifiedPrincipalScope({ organizationPublicId: lookup.organization_public_id }),
       async () => {
         const row = await this.invitationRepository.findByPublicId(invitation_public_id);
         if (!row) throw new NotFoundError(MEMBER_INVITATION_RESOURCE);

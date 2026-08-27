@@ -6,6 +6,21 @@ import {
 } from '@/infrastructure/database/contexts/database-context.js';
 import { ConfigurationError } from '@/shared/errors/index.js';
 
+/** Org-bearing payload → org-narrowed scope (optionally carrying the user too). */
+export function resolveJobPrincipalScope(payload: {
+  organizationPublicId: string;
+  userPublicId?: string;
+}): OrganizationPrincipalDatabaseScope;
+/** User-only payload → user-narrowed scope. */
+export function resolveJobPrincipalScope(payload: {
+  userPublicId: string;
+  organizationPublicId?: undefined;
+}): UserPrincipalDatabaseScope;
+/** Discriminator-optional payload (generic runners) → unnarrowed scope. */
+export function resolveJobPrincipalScope(payload: {
+  organizationPublicId?: string | undefined;
+  userPublicId?: string | undefined;
+}): PrincipalDatabaseScope;
 /**
  * Mints the `job`-source {@link PrincipalDatabaseScope} for a BullMQ processor —
  * the worker-runtime counterpart of `resolvePrincipalDatabaseScope`.
@@ -35,16 +50,4 @@ export function resolveJobPrincipalScope(payload: {
     userPublicId: payload.userPublicId,
     source: 'job',
   });
-}
-
-/** {@link resolveJobPrincipalScope} narrowed to organization-scoped jobs. */
-export function resolveOrganizationJobScope(
-  organizationPublicId: string,
-): OrganizationPrincipalDatabaseScope {
-  return resolveJobPrincipalScope({ organizationPublicId }) as OrganizationPrincipalDatabaseScope;
-}
-
-/** {@link resolveJobPrincipalScope} narrowed to user-scoped jobs. */
-export function resolveUserJobScope(userPublicId: string): UserPrincipalDatabaseScope {
-  return resolveJobPrincipalScope({ userPublicId }) as UserPrincipalDatabaseScope;
 }

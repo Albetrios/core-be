@@ -6,7 +6,7 @@ import { createTestOrganization } from '@/tests/factories/organization.factory.j
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 describe('Security: worker RLS database context', () => {
   const originalRuntime = process.env.CORE_BE_RUNTIME;
@@ -33,7 +33,7 @@ describe('Security: worker RLS database context', () => {
     const organization = await createTestOrganization({ ownerUserId: owner.id });
 
     await withPrincipalDatabaseContext(
-      resolveVerifiedOrganizationPrincipalScope(organization.public_id),
+      resolveVerifiedPrincipalScope({ organizationPublicId: organization.public_id }),
       async (databaseHandle) => {
         const repository = createWorkerSubscriptionRepository(databaseHandle);
         const rows = await repository.listByOrganization(organization.id);

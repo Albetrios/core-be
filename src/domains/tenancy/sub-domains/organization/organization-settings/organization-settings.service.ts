@@ -17,7 +17,7 @@ import {
   invalidateCachedOrganizationDefaultLocale,
   setCachedOrganizationDefaultLocale,
 } from './i18n-locale.cache.js';
-import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Read/write service for the per-organization settings row plus two
@@ -111,7 +111,7 @@ export class OrganizationSettingsService {
       return cached as OrganizationDefaultLocale;
     }
     const locale = await withPrincipalDatabaseContext(
-      resolveVerifiedOrganizationPrincipalScope(organizationPublicId),
+      resolveVerifiedPrincipalScope({ organizationPublicId: organizationPublicId }),
       async () => {
         const found =
           await this.settingsRepository.findDefaultLocaleByOrganizationPublicId(

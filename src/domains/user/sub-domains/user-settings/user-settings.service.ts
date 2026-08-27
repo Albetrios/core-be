@@ -9,7 +9,7 @@ import {
   withPrincipalDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Read or merge the authenticated user's personalization toggles and locale preferences.
@@ -64,7 +64,7 @@ export class UserSettingsService {
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
     const settings = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user_public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user_public_id }),
       () => this.repository.getByUserId(user.id),
     );
     return serializeUserSettings(settings);
@@ -80,7 +80,7 @@ export class UserSettingsService {
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
     const result = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(user_public_id),
+      resolveVerifiedPrincipalScope({ userPublicId: user_public_id }),
       () => this.repository.upsert(user.id, omitUndefined(parsed)),
     );
     return serializeUserSettings(result);

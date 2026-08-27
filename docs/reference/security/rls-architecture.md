@@ -40,8 +40,8 @@ row. Elevated access exists only as the named fixture role `core_be_operator`
 
 | Old call | New call |
 | -------- | -------- |
-| `withOrganizationContext(orgId, cb)` / `withOrganizationDatabaseContext(orgId, cb)` | `withPrincipalDatabaseContext(scope, cb)` — scope minted by `resolvePrincipalDatabaseScope(request)` (HTTP), `resolveOrganizationJobScope(organizationPublicId)` (worker), or `resolveVerifiedOrganizationPrincipalScope(organizationPublicId)` (verified/port flows) |
-| `withUserDatabaseContext(userId, cb)` | `withPrincipalDatabaseContext(scope, cb)` — `requireUserPrincipalDatabaseScope(request)`, `resolveUserJobScope(userPublicId)`, or `resolveVerifiedUserPrincipalScope(userPublicId)` |
+| `withOrganizationContext(orgId, cb)` / `withOrganizationDatabaseContext(orgId, cb)` | `withPrincipalDatabaseContext(scope, cb)` — scope minted by `resolvePrincipalDatabaseScope(request)` (HTTP), `resolveJobPrincipalScope({ organizationPublicId })` (worker), or `resolveVerifiedPrincipalScope({ organizationPublicId })` (verified/port flows) |
+| `withUserDatabaseContext(userId, cb)` | `withPrincipalDatabaseContext(scope, cb)` — `requireUserPrincipalDatabaseScope(request)`, `resolveJobPrincipalScope({ userPublicId })`, or `resolveVerifiedPrincipalScope({ userPublicId })` |
 | `withGlobalRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, cb)` |
 | `withSessionRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.session_retention_cleanup, cb)` |
 | `withGlobalAdminDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, cb)` |
@@ -79,10 +79,10 @@ public→internal inside the arm where an FK column needs it).
 ┌────────────────────────────── TRUST BOUNDARIES (scopes are MINTED here) ─────────────────────────────┐
 │                                                                                                      │
 │  HTTP request (JWT verified)          Worker job (payload)             Verified/port flows           │
-│  ─ resolvePrincipalDatabaseScope      ─ resolveOrganizationJobScope    ─ resolveVerified*Principal-  │
+│  ─ resolvePrincipalDatabaseScope      ─ resolveJobPrincipalScope    ─ resolveVerified*Principal-  │
 │    (org REQUIRED, from `org` claim)     (organizationPublicId in         Scope (caller already       │
 │  ─ requireUserPrincipalDatabaseScope    the job payload)                 authenticated the id:       │
-│    (user REQUIRED, org optional —     ─ resolveUserJobScope              invite flow, Stripe event,  │
+│    (user REQUIRED, org optional —     ─ resolveJobPrincipalScope              invite flow, Stripe event,  │
 │    self-heal transitional state)        (userPublicId in payload)        provisioning, admin)        │
 │                                                                                                      │
 │  Pre-auth session artifact:           Static bypass authority:                                       │
@@ -212,8 +212,8 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 
 | Pattern | Scope type | Minted by (per-file confined) | Context call |
 | --- | --- | --- | --- |
-| Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `resolvePrincipalDatabaseScope(request)` · `resolveOrganizationJobScope(organizationPublicId)` · `resolveVerifiedOrganizationPrincipalScope(organizationPublicId)` | `withPrincipalDatabaseContext` |
-| Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `requireUserPrincipalDatabaseScope(request)` · `resolveUserJobScope(userPublicId)` · `resolveVerifiedUserPrincipalScope(userPublicId)` | `withPrincipalDatabaseContext` |
+| Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `resolvePrincipalDatabaseScope(request)` · `resolveJobPrincipalScope({ organizationPublicId })` · `resolveVerifiedPrincipalScope({ organizationPublicId })` | `withPrincipalDatabaseContext` |
+| Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `requireUserPrincipalDatabaseScope(request)` · `resolveJobPrincipalScope({ userPublicId })` · `resolveVerifiedPrincipalScope({ userPublicId })` | `withPrincipalDatabaseContext` |
 | Session | `SessionDatabaseScope` — kinds `public_id` \| `token_hash` | `createSessionDatabaseScope(kind, value)` (auth domain only; token values are pre-hashed) | `withSessionDatabaseContext` |
 | Maintenance | `MaintenanceDatabaseScope` — 7 frozen singletons: `global_retention_cleanup`, `session_retention_cleanup`, `global_admin`, `system_audit_insert`, `audit_outbox_drain`, `system_table_retention`, `system_table_worker` | nothing to mint — `MAINTENANCE_SCOPE.<kind>` | `withMaintenanceDatabaseContext` |
 

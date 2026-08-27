@@ -3,7 +3,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import { env } from '@/shared/config/env.config.js';
 import { sql } from '@/infrastructure/database/connection.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Production hardening item 2: when many concurrent requests use scoped
@@ -23,7 +23,7 @@ describe('Chaos resilience: database pool stays available under bursty scoped-co
 
     const scopedUnitsOfWork = Array.from({ length: burstSize }, (_, index) =>
       withPrincipalDatabaseContext(
-        resolveVerifiedOrganizationPrincipalScope(organizationPublicId),
+        resolveVerifiedPrincipalScope({ organizationPublicId: organizationPublicId }),
         async (databaseHandle) => {
           const rows = await databaseHandle.execute<{ value: number }>(
             drizzleSql`SELECT ${index}::int AS value`,
