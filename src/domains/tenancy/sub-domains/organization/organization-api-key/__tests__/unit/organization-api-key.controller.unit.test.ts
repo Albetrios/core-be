@@ -102,7 +102,7 @@ describe('createOrganizationApiKeyController', () => {
     );
 
     expect(service.update).toHaveBeenCalledWith(
-      organizationPublicId,
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
       apiKeyPublicId,
       {},
       undefined,

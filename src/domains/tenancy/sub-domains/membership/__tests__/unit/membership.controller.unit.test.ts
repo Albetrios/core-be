@@ -195,7 +195,10 @@ describe('createMembershipController', () => {
       }),
       mockReply(),
     );
-    expect(service.getPermissions).toHaveBeenCalledWith(organizationPublicId, membershipPublicId);
+    expect(service.getPermissions).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      membershipPublicId,
+    );
   });
 
   it('createMembership returns 200 with valid organization id', async () => {

@@ -50,8 +50,10 @@ export async function runTenantScopedWorkerJob<TJob, TResult>(
   processor: (databaseHandle: WorkerDatabaseHandle, job: TJob) => Promise<TResult>,
 ): Promise<TResult> {
   const { organizationPublicId, ...jobPayload } = job;
-  return withPrincipalDatabaseContext(resolveOrganizationJobScope(organizationPublicId), (databaseHandle) =>
-    processor(brandWorkerContextDatabaseHandle(databaseHandle), jobPayload as TJob),
+  return withPrincipalDatabaseContext(
+    resolveOrganizationJobScope(organizationPublicId),
+    (databaseHandle) =>
+      processor(brandWorkerContextDatabaseHandle(databaseHandle), jobPayload as TJob),
   );
 }
 

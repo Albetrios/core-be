@@ -62,7 +62,10 @@ describe('createMemberRoleController', () => {
       mockRequest({ params: { organization_id: organizationPublicId } }),
       mockReply(),
     );
-    expect(service.list).toHaveBeenCalledWith(organizationPublicId, { limit: 25 });
+    expect(service.list).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      { limit: 25 },
+    );
     expect(response).toMatchObject({
       data: [role],
       meta: { pagination: expect.objectContaining({ has_more: true, next: 'role_cursor_2' }) },
@@ -74,7 +77,10 @@ describe('createMemberRoleController', () => {
       mockRequest({ params: { organization_id: organizationPublicId, role_id: rolePublicId } }),
       mockReply(),
     );
-    expect(service.getByPublicId).toHaveBeenCalledWith(organizationPublicId, rolePublicId);
+    expect(service.getByPublicId).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      rolePublicId,
+    );
   });
 
   it('createRole returns 200', async () => {
@@ -109,7 +115,10 @@ describe('createMemberRoleController', () => {
       mockRequest({ params: { organization_id: organizationPublicId, role_id: rolePublicId } }),
       reply,
     );
-    expect(service.delete).toHaveBeenCalledWith(organizationPublicId, rolePublicId);
+    expect(service.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      rolePublicId,
+    );
     expect(reply.code).toHaveBeenCalledWith(204);
   });
 
@@ -171,7 +180,10 @@ describe('createMemberRoleController', () => {
       mockRequest({ params: { organization_id: organizationPublicId, role_id: rolePublicId } }),
       mockReply(),
     );
-    expect(service.getByPublicId).toHaveBeenCalledWith(organizationPublicId, rolePublicId);
+    expect(service.getByPublicId).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      rolePublicId,
+    );
   });
 
   // sec-new-T3: getRole, updateRole, deleteRole now validate both id and roleId.

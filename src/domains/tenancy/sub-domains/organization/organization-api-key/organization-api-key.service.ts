@@ -3,6 +3,10 @@ import { env } from '@/shared/config/env.config.js';
 import { ConflictError, NotFoundError } from '@/shared/errors/index.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  withPrincipalDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { OrganizationApiKeyRepository } from './organization-api-key.repository.js';
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
@@ -66,9 +70,10 @@ export class OrganizationApiKeyService {
     private readonly permissionRepository: PermissionRepository,
   ) {}
 
-  async list(organization_public_id: string, query: unknown) {
+  async list(scope: OrganizationPrincipalDatabaseScope, query: unknown) {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateListOrganizationApiKeysQuery(query);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const result = await this.apiKeyRepository.findByOrganizationId(
@@ -89,10 +94,11 @@ export class OrganizationApiKeyService {
   }
 
   async getByPublicId(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     api_key_public_id: string,
   ): Promise<OrganizationApiKeyOutput> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.apiKeyRepository.findByPublicId(api_key_public_id, organization.id);
@@ -102,11 +108,12 @@ export class OrganizationApiKeyService {
   }
 
   async create(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     created_by_user_public_id: string,
     options?: { expiresAtOverride?: Date | null },
   ): Promise<CreateOrganizationApiKeyResult> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateCreateOrganizationApiKey(body);
     await assertCallerCanGrantPermissionCodes({
       authorizationService: this.authorizationService,
@@ -115,7 +122,7 @@ export class OrganizationApiKeyService {
       organizationPublicId: organization_public_id,
       requestedPermissionCodes: parsed.scopes,
     });
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       // sec-r5-followup-ratelimit-dos-1 + audit-#8: serialize the per-org count + insert with a
@@ -160,13 +167,14 @@ export class OrganizationApiKeyService {
   }
 
   async update(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     api_key_public_id: string,
     body: unknown,
     updated_by_user_public_id: string | undefined,
   ): Promise<OrganizationApiKeyOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateOrganizationApiKey(body);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.apiKeyRepository.findByPublicId(api_key_public_id, organization.id);
@@ -184,8 +192,12 @@ export class OrganizationApiKeyService {
     });
   }
 
-  async delete(organization_public_id: string, api_key_public_id: string): Promise<void> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async delete(
+    scope: OrganizationPrincipalDatabaseScope,
+    api_key_public_id: string,
+  ): Promise<void> {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const deleted = await this.apiKeyRepository.softDelete(api_key_public_id, organization.id);
@@ -219,11 +231,12 @@ export class OrganizationApiKeyService {
   }
 
   async rotate(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     api_key_public_id: string,
     created_by_user_public_id: string,
   ): Promise<CreateOrganizationApiKeyResult> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const existing = await this.apiKeyRepository.findByPublicId(
@@ -240,7 +253,7 @@ export class OrganizationApiKeyService {
         throw new ConflictError('errors:apiKeyRotationConflict');
       }
       return this.create(
-        organization_public_id,
+        scope,
         { name: existing.name, scopes: existing.scopes },
         created_by_user_public_id,
         // Carry the replaced key's expiry forward so rotation preserves the original time-box.

@@ -52,7 +52,9 @@ describe('createOrganizationNotificationPolicyController', () => {
       mockRequest({ params: { organization_id: organizationPublicId } }),
       mockReply(),
     );
-    expect(service.list).toHaveBeenCalledWith(organizationPublicId);
+    expect(service.list).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+    );
     expect(response).toMatchObject({ data: [policyRow] });
   });
 
@@ -77,7 +79,7 @@ describe('createOrganizationNotificationPolicyController', () => {
       mockReply(),
     );
     expect(service.getByPublicId).toHaveBeenCalledWith(
-      organizationPublicId,
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
       'pol_a1b2c3d4e5f6g7h8i9j0k',
     );
     expect(response).toMatchObject({ data: policyRow });
@@ -120,7 +122,11 @@ describe('createOrganizationNotificationPolicyController', () => {
     // The controller no longer sets an explicit status: the uniform method-status policy
     // (POST -> 200) owns the code, so the handler must leave reply.code untouched.
     expect(reply.code).not.toHaveBeenCalled();
-    expect(service.create).toHaveBeenCalledWith(organizationPublicId, body, userId);
+    expect(service.create).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      body,
+      userId,
+    );
     expect(response).toMatchObject({ data: policyRow });
   });
 
@@ -151,7 +157,7 @@ describe('createOrganizationNotificationPolicyController', () => {
       mockReply(),
     );
     expect(service.update).toHaveBeenCalledWith(
-      organizationPublicId,
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
       'pol_a1b2c3d4e5f6g7h8i9j0k',
       body,
       userId,
@@ -203,7 +209,10 @@ describe('createOrganizationNotificationPolicyController', () => {
       }),
       reply,
     );
-    expect(service.delete).toHaveBeenCalledWith(organizationPublicId, 'pol_a1b2c3d4e5f6g7h8i9j0k');
+    expect(service.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      'pol_a1b2c3d4e5f6g7h8i9j0k',
+    );
     expect(reply.code).toHaveBeenCalledWith(204);
     expect(reply.send).toHaveBeenCalled();
   });

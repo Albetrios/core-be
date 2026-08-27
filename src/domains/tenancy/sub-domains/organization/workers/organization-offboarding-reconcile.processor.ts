@@ -1,4 +1,6 @@
 import { and, isNotNull, isNull, lt, ne } from 'drizzle-orm';
+import type { OrganizationPrincipalDatabaseScope } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveOrganizationJobScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
@@ -19,7 +21,7 @@ import {
  * on the one idempotent method it calls, keeping the processor unit-testable with a stub.
  */
 export interface OrganizationOffboardingReconcileService {
-  resumeOffboarding(public_id: string): Promise<void>;
+  resumeOffboarding(scope: OrganizationPrincipalDatabaseScope): Promise<void>;
 }
 
 /**
@@ -82,7 +84,7 @@ export async function runOrganizationOffboardingReconcileJob(
   let failed = 0;
   for (const { public_id } of stuck) {
     try {
-      await service.resumeOffboarding(public_id);
+      await service.resumeOffboarding(resolveOrganizationJobScope(public_id));
       resumed += 1;
     } catch (error) {
       failed += 1;

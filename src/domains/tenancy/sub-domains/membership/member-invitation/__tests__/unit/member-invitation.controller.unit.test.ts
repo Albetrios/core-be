@@ -78,7 +78,10 @@ describe('createMemberInvitationController — invitationId path-param validatio
       mockUserRequest({ organization_id: organizationPublicId, invitation_id: invitationPublicId }),
       mockReply(),
     );
-    expect(service.revoke).toHaveBeenCalledWith(organizationPublicId, invitationPublicId);
+    expect(service.revoke).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      invitationPublicId,
+    );
   });
 
   it('resendInvitation rejects a malformed invitationId (sec-new-T2)', async () => {
@@ -97,7 +100,7 @@ describe('createMemberInvitationController — invitationId path-param validatio
       mockReply(),
     );
     expect(service.resend).toHaveBeenCalledWith(
-      organizationPublicId,
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
       invitationPublicId,
       expect.anything(),
       expect.objectContaining({ requestId: expect.any(String) }),

@@ -1,6 +1,9 @@
 import { env } from '@/shared/config/env.config.js';
 import { ConflictError, NotFoundError } from '@/shared/errors/index.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  withPrincipalDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { OrganizationNotificationPolicyRepository } from './organization-notification-policy.repository.js';
 import type { OrganizationNotificationPolicyOutput } from './organization-notification-policy.types.js';
@@ -37,8 +40,11 @@ export class OrganizationNotificationPolicyService {
     private readonly policyRepository: OrganizationNotificationPolicyRepository,
   ) {}
 
-  async list(organization_public_id: string): Promise<OrganizationNotificationPolicyOutput[]> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async list(
+    scope: OrganizationPrincipalDatabaseScope,
+  ): Promise<OrganizationNotificationPolicyOutput[]> {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const rows = await this.policyRepository.findByOrganizationId(organization.id);
@@ -49,10 +55,11 @@ export class OrganizationNotificationPolicyService {
   }
 
   async getByPublicId(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     policy_public_id: string,
   ): Promise<OrganizationNotificationPolicyOutput> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.policyRepository.findByPublicId(policy_public_id, organization.id);
@@ -62,12 +69,13 @@ export class OrganizationNotificationPolicyService {
   }
 
   async create(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     created_by_user_public_id: string | undefined,
   ): Promise<OrganizationNotificationPolicyOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateCreateOrganizationNotificationPolicy(body);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       // sec-r5-followup-ratelimit-dos-3 + audit-#8: serialize the per-org count + insert with a
@@ -97,13 +105,14 @@ export class OrganizationNotificationPolicyService {
   }
 
   async update(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     policy_public_id: string,
     body: unknown,
     updated_by_user_public_id: string | undefined,
   ): Promise<OrganizationNotificationPolicyOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateOrganizationNotificationPolicy(body);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const userId =
@@ -129,8 +138,9 @@ export class OrganizationNotificationPolicyService {
     });
   }
 
-  async delete(organization_public_id: string, policy_public_id: string): Promise<void> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async delete(scope: OrganizationPrincipalDatabaseScope, policy_public_id: string): Promise<void> {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const deleted = await this.policyRepository.softDelete(policy_public_id, organization.id);

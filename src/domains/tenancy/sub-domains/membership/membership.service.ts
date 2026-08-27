@@ -10,6 +10,10 @@ import { isDisposableEmailBlocked } from '@/shared/utils/text/email.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import {
+  withPrincipalDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
+import {
   acquireResourceQuotaLock,
   RESOURCE_QUOTA_LOCK_NAMESPACE,
 } from '@/infrastructure/database/resource-quota-lock.util.js';
@@ -318,9 +322,10 @@ export class MembershipService {
     return output!;
   }
 
-  async list(organization_public_id: string, query: unknown) {
+  async list(scope: OrganizationPrincipalDatabaseScope, query: unknown) {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateListMembershipsQuery(query);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const result = await this.membershipRepository.findByOrganizationId(
@@ -342,10 +347,11 @@ export class MembershipService {
   }
 
   async getByPublicId(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     membership_public_id: string,
   ): Promise<MembershipOutput> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -358,11 +364,12 @@ export class MembershipService {
   }
 
   async create(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     invited_by_user_public_id: string | undefined,
     options?: { requestId?: string },
   ): Promise<MembershipOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateCreateMembership(body);
     const userService = this.userService;
     const memberInvitationService = this.memberInvitationService;
@@ -384,7 +391,7 @@ export class MembershipService {
     const inviteeUser = await userService.findOrCreateInvitedByEmail({
       email: parsed.email,
     });
-    const result = await withOrganizationDatabaseContext(organization_public_id, async () => {
+    const result = await withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       // Capability matrix: a PERSONAL organization is single-member by definition. Collaboration
@@ -462,14 +469,15 @@ export class MembershipService {
   }
 
   async update(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     membership_public_id: string,
     body: unknown,
     updated_by_user_public_id: string | undefined,
   ): Promise<MembershipOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateMembership(body);
     let affectedUserInternalId: number | undefined;
-    const result = await withOrganizationDatabaseContext(organization_public_id, async () => {
+    const result = await withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -545,9 +553,13 @@ export class MembershipService {
     return result;
   }
 
-  async delete(organization_public_id: string, membership_public_id: string): Promise<void> {
+  async delete(
+    scope: OrganizationPrincipalDatabaseScope,
+    membership_public_id: string,
+  ): Promise<void> {
+    const organization_public_id = scope.organizationPublicId;
     let affectedUserInternalId: number | undefined;
-    await withOrganizationDatabaseContext(organization_public_id, async () => {
+    await withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -590,10 +602,11 @@ export class MembershipService {
   }
 
   async getPermissions(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     membership_public_id: string,
   ): Promise<MembershipPermissionsOutput> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -608,8 +621,12 @@ export class MembershipService {
     });
   }
 
-  async leaveOrganization(organization_public_id: string, user_public_id: string): Promise<void> {
-    await withOrganizationDatabaseContext(organization_public_id, async () => {
+  async leaveOrganization(
+    scope: OrganizationPrincipalDatabaseScope,
+    user_public_id: string,
+  ): Promise<void> {
+    const organization_public_id = scope.organizationPublicId;
+    await withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const userId = await this.organizationService.resolveUserInternalIdByPublicId(user_public_id);
@@ -649,12 +666,13 @@ export class MembershipService {
   }
 
   async transferOwnership(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     current_user_public_id: string,
   ): Promise<MembershipOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateTransferOwnership(body);
-    const result = await withOrganizationDatabaseContext(organization_public_id, async () => {
+    const result = await withPrincipalDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       // A PERSONAL organization belongs solely to its owner and cannot be handed off.

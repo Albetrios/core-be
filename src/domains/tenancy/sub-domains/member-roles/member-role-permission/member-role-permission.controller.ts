@@ -4,7 +4,7 @@ import {
   getActingUserPublicId,
   getRequestIdentifier,
   requirePrincipal,
-  resolveActiveOrganizationId,
+  resolvePrincipalDatabaseScope,
 } from '@/shared/utils/http/request.util.js';
 import type { MemberRolePermissionService } from './member-role-permission.service.js';
 import { serializeMemberRolePermission } from './member-role-permission.serializer.js';
@@ -19,9 +19,10 @@ import { serializeMemberRolePermission } from './member-role-permission.serializ
 export function createMemberRolePermissionController(service: MemberRolePermissionService) {
   return {
     listRolePermissions: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = resolvePrincipalDatabaseScope(request);
+      const _organizationId = scope.organizationPublicId;
       const { role_id: roleId } = request.params as { role_id: string };
-      const rows = await service.list(organizationId, roleId);
+      const rows = await service.list(scope, roleId);
       const data = rows.map((row) => serializeMemberRolePermission(row, roleId));
       return paginatedResponse(data, getRequestIdentifier(request), {
         per_page: data.length,
@@ -32,14 +33,10 @@ export function createMemberRolePermissionController(service: MemberRolePermissi
     },
     putRolePermissions: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = resolvePrincipalDatabaseScope(request);
+      const _organizationId = scope.organizationPublicId;
       const { role_id: roleId } = request.params as { role_id: string };
-      const rows = await service.put(
-        organizationId,
-        roleId,
-        request.body,
-        getActingUserPublicId(auth),
-      );
+      const rows = await service.put(scope, roleId, request.body, getActingUserPublicId(auth));
       const data = rows.map((row) => serializeMemberRolePermission(row, roleId));
       return successResponse(data, getRequestIdentifier(request));
     },

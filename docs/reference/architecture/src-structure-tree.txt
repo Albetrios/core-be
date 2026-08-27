@@ -1318,6 +1318,7 @@ src/
     │   │   │   │   ├── worker-connection-budget.unit.test.ts
     │   │   │   │   ├── worker-queue-family.util.unit.test.ts
     │   │   │   │   └── worker-registration.registry.unit.test.ts
+    │   │   ├── job-principal-scope.util.ts
     │   │   ├── scheduler-registry-audit.ts
     │   │   ├── shutdown-timing.util.ts
     │   │   ├── worker-close.util.ts

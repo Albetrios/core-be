@@ -6,10 +6,27 @@ vi.mock('@/infrastructure/database/contexts/organization-database.context.js', (
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 import { NotFoundError } from '@/shared/errors/index.js';
 import { OrganizationNotificationPolicyService } from '@/domains/tenancy/sub-domains/organization/organization-notification-policy/organization-notification-policy.service.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { OrganizationNotificationPolicyRepository } from '@/domains/tenancy/sub-domains/organization/organization-notification-policy/organization-notification-policy.repository.js';
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 
 const now = new Date('2026-01-01T00:00:00.000Z');
 const organization = { id: 1, public_id: 'org_public_abc', name: 'Test Org' };
@@ -25,6 +42,12 @@ const policyRow = {
   created_at: now,
   updated_at: now,
 };
+
+const asScope = (organizationPublicId: string) =>
+  createPrincipalDatabaseScope({
+    organizationPublicId,
+    source: 'token',
+  }) as OrganizationPrincipalDatabaseScope;
 
 describe('OrganizationNotificationPolicyService', () => {
   const organizationRepository = {
@@ -64,7 +87,7 @@ describe('OrganizationNotificationPolicyService', () => {
 
   describe('list', () => {
     it('returns serialized policies for an organization', async () => {
-      const result = await service.list('org_public_abc');
+      const result = await service.list(asScope('org_public_abc'));
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
         organization_id: 'org_public_abc',
@@ -75,34 +98,34 @@ describe('OrganizationNotificationPolicyService', () => {
 
     it('throws NotFoundError when organization is missing', async () => {
       vi.mocked(organizationRepository.findByPublicId).mockResolvedValue(null);
-      await expect(service.list('org_public_abc')).rejects.toBeInstanceOf(NotFoundError);
+      await expect(service.list(asScope('org_public_abc'))).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('returns empty array when no policies exist', async () => {
       vi.mocked(policyRepository.findByOrganizationId).mockResolvedValue([]);
-      const result = await service.list('org_public_abc');
+      const result = await service.list(asScope('org_public_abc'));
       expect(result).toHaveLength(0);
     });
   });
 
   describe('getById', () => {
     it('returns serialized policy when found', async () => {
-      const result = await service.getByPublicId('org_public_abc', 'pol_public_1');
+      const result = await service.getByPublicId(asScope('org_public_abc'), 'pol_public_1');
       expect(result).toMatchObject({ id: policyRow.public_id, organization_id: 'org_public_abc' });
     });
 
     it('throws NotFoundError when organization is missing', async () => {
       vi.mocked(organizationRepository.findByPublicId).mockResolvedValue(null);
-      await expect(service.getByPublicId('org_public_abc', 'pol_public_1')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.getByPublicId(asScope('org_public_abc'), 'pol_public_1'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('throws NotFoundError when policy is missing', async () => {
       vi.mocked(policyRepository.findByPublicId).mockResolvedValue(null);
-      await expect(service.getByPublicId('org_public_abc', 'pol_public_1')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.getByPublicId(asScope('org_public_abc'), 'pol_public_1'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 
@@ -115,7 +138,7 @@ describe('OrganizationNotificationPolicyService', () => {
     };
 
     it('creates and returns serialized policy', async () => {
-      const result = await service.create('org_public_abc', body, 'user_public');
+      const result = await service.create(asScope('org_public_abc'), body, 'user_public');
       expect(policyRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           organization_id: organization.id,
@@ -128,14 +151,14 @@ describe('OrganizationNotificationPolicyService', () => {
 
     it('throws NotFoundError when organization is missing', async () => {
       vi.mocked(organizationRepository.findByPublicId).mockResolvedValue(null);
-      await expect(service.create('org_public_abc', body, 'user_public')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.create(asScope('org_public_abc'), body, 'user_public'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('propagates repository create errors', async () => {
       vi.mocked(policyRepository.create).mockRejectedValue(new Error('Unique constraint'));
-      await expect(service.create('org_public_abc', body, 'user_public')).rejects.toThrow(
+      await expect(service.create(asScope('org_public_abc'), body, 'user_public')).rejects.toThrow(
         'Unique constraint',
       );
     });
@@ -144,7 +167,7 @@ describe('OrganizationNotificationPolicyService', () => {
   describe('update', () => {
     it('updates and returns serialized policy', async () => {
       const result = await service.update(
-        'org_public_abc',
+        asScope('org_public_abc'),
         'pol_public_1',
         { default_enabled: false },
         'user_public',
@@ -156,36 +179,46 @@ describe('OrganizationNotificationPolicyService', () => {
     it('throws NotFoundError when organization is missing', async () => {
       vi.mocked(organizationRepository.findByPublicId).mockResolvedValue(null);
       await expect(
-        service.update('org_public_abc', 'pol_public_1', { default_enabled: false }, 'user_public'),
+        service.update(
+          asScope('org_public_abc'),
+          'pol_public_1',
+          { default_enabled: false },
+          'user_public',
+        ),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('throws NotFoundError when policy update returns null', async () => {
       vi.mocked(policyRepository.update).mockResolvedValue(null);
       await expect(
-        service.update('org_public_abc', 'pol_public_1', { default_enabled: false }, 'user_public'),
+        service.update(
+          asScope('org_public_abc'),
+          'pol_public_1',
+          { default_enabled: false },
+          'user_public',
+        ),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 
   describe('delete', () => {
     it('soft-deletes the policy when found', async () => {
-      await service.delete('org_public_abc', 'pol_public_1');
+      await service.delete(asScope('org_public_abc'), 'pol_public_1');
       expect(policyRepository.softDelete).toHaveBeenCalledWith('pol_public_1', organization.id);
     });
 
     it('throws NotFoundError when organization is missing', async () => {
       vi.mocked(organizationRepository.findByPublicId).mockResolvedValue(null);
-      await expect(service.delete('org_public_abc', 'pol_public_1')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.delete(asScope('org_public_abc'), 'pol_public_1'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('throws NotFoundError when policy is not found for deletion', async () => {
       vi.mocked(policyRepository.softDelete).mockResolvedValue(null);
-      await expect(service.delete('org_public_abc', 'pol_public_1')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.delete(asScope('org_public_abc'), 'pol_public_1'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 });

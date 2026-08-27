@@ -6,6 +6,10 @@ import {
 } from '@/shared/errors/index.js';
 import { env } from '@/shared/config/env.config.js';
 import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  withPrincipalDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { MembershipRepository } from '@/domains/tenancy/sub-domains/membership/membership.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
@@ -308,8 +312,12 @@ export class MemberInvitationService {
     return { ...result, organization_id: lookup.organization_public_id };
   }
 
-  async revoke(organization_public_id: string, invitation_public_id: string): Promise<void> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async revoke(
+    scope: OrganizationPrincipalDatabaseScope,
+    invitation_public_id: string,
+  ): Promise<void> {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.invitationRepository.findByPublicId(invitation_public_id);
@@ -328,13 +336,14 @@ export class MemberInvitationService {
   }
 
   async resend(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     invitation_public_id: string,
     body: unknown,
     options?: MemberInvitationCommandOptions,
   ): Promise<MemberInvitationOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateResendMemberInvitation(body);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.invitationRepository.findByPublicId(invitation_public_id);

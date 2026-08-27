@@ -179,37 +179,40 @@ async function claimWebhookDeliveryAttempt(options: {
 }): Promise<WebhookDeliveryClaim> {
   const { deliveryAttemptId, organizationPublicId, attemptNumber, deliveryAttemptRepository } =
     options;
-  return withPrincipalDatabaseContext(resolveOrganizationJobScope(organizationPublicId), async (databaseHandle) => {
-    const attemptRepository =
-      deliveryAttemptRepository ?? createWorkerWebhookDeliveryAttemptRepository(databaseHandle);
-    const webhookDeliveryQueries = createWorkerWebhookDeliveryQueries(databaseHandle);
-    const deliveryContext = await webhookDeliveryQueries.findWebhookDeliveryAttemptWithWebhook(
-      deliveryAttemptId,
-      organizationPublicId,
-    );
-    if (!deliveryContext) {
-      throw new Error(`webhook.delivery.attempt_not_found:${String(deliveryAttemptId)}`);
-    }
-    // sec-N1: the fan-out filter on is_enabled / deleted_at does NOT apply to
-    // BullMQ retries — without this re-check, attempts continue firing the
-    // signed payload to a URL operators have just disabled or soft-deleted.
-    // Record FAILED (terminal, no retry) and return no_op so BullMQ does not
-    // re-attempt. tryMarkSending is intentionally skipped — there's no point
-    // claiming a row we're about to terminate.
-    if (!deliveryContext.webhookIsEnabled || deliveryContext.webhookDeletedAt !== null) {
-      await attemptRepository.recordOutcome(deliveryAttemptId, {
-        status: 'FAILED',
-        response_body: 'webhook_disabled',
-        next_retry_at: null,
-      });
-      return { status: 'no_op', reason: 'webhook_disabled' };
-    }
-    const sendingClaim = await attemptRepository.tryMarkSending(deliveryAttemptId, attemptNumber);
-    if (sendingClaim === 'already_sent' || sendingClaim === 'in_flight') {
-      return { status: 'no_op', reason: sendingClaim };
-    }
-    return { status: 'claimed', deliveryContext };
-  });
+  return withPrincipalDatabaseContext(
+    resolveOrganizationJobScope(organizationPublicId),
+    async (databaseHandle) => {
+      const attemptRepository =
+        deliveryAttemptRepository ?? createWorkerWebhookDeliveryAttemptRepository(databaseHandle);
+      const webhookDeliveryQueries = createWorkerWebhookDeliveryQueries(databaseHandle);
+      const deliveryContext = await webhookDeliveryQueries.findWebhookDeliveryAttemptWithWebhook(
+        deliveryAttemptId,
+        organizationPublicId,
+      );
+      if (!deliveryContext) {
+        throw new Error(`webhook.delivery.attempt_not_found:${String(deliveryAttemptId)}`);
+      }
+      // sec-N1: the fan-out filter on is_enabled / deleted_at does NOT apply to
+      // BullMQ retries — without this re-check, attempts continue firing the
+      // signed payload to a URL operators have just disabled or soft-deleted.
+      // Record FAILED (terminal, no retry) and return no_op so BullMQ does not
+      // re-attempt. tryMarkSending is intentionally skipped — there's no point
+      // claiming a row we're about to terminate.
+      if (!deliveryContext.webhookIsEnabled || deliveryContext.webhookDeletedAt !== null) {
+        await attemptRepository.recordOutcome(deliveryAttemptId, {
+          status: 'FAILED',
+          response_body: 'webhook_disabled',
+          next_retry_at: null,
+        });
+        return { status: 'no_op', reason: 'webhook_disabled' };
+      }
+      const sendingClaim = await attemptRepository.tryMarkSending(deliveryAttemptId, attemptNumber);
+      if (sendingClaim === 'already_sent' || sendingClaim === 'in_flight') {
+        return { status: 'no_op', reason: sendingClaim };
+      }
+      return { status: 'claimed', deliveryContext };
+    },
+  );
 }
 
 /**
@@ -228,11 +231,14 @@ async function recordWebhookDeliveryOutcome(options: {
   deliveryAttemptRepository?: WebhookDeliveryAttemptRepository | undefined;
 }): Promise<void> {
   const { deliveryAttemptId, organizationPublicId, outcome, deliveryAttemptRepository } = options;
-  await withPrincipalDatabaseContext(resolveOrganizationJobScope(organizationPublicId), async (databaseHandle) => {
-    const attemptRepository =
-      deliveryAttemptRepository ?? createWorkerWebhookDeliveryAttemptRepository(databaseHandle);
-    await attemptRepository.recordOutcome(deliveryAttemptId, outcome);
-  });
+  await withPrincipalDatabaseContext(
+    resolveOrganizationJobScope(organizationPublicId),
+    async (databaseHandle) => {
+      const attemptRepository =
+        deliveryAttemptRepository ?? createWorkerWebhookDeliveryAttemptRepository(databaseHandle);
+      await attemptRepository.recordOutcome(deliveryAttemptId, outcome);
+    },
+  );
 }
 
 /**

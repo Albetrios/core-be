@@ -4,7 +4,7 @@ import {
   getActingUserPublicId,
   getRequestIdentifier,
   requirePrincipal,
-  resolveActiveOrganizationId,
+  resolvePrincipalDatabaseScope,
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
 import type { OrganizationNotificationPolicyService } from './organization-notification-policy.service.js';
@@ -31,25 +31,28 @@ export function createOrganizationNotificationPolicyController(
 ) {
   return {
     listPolicies: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const organizationId = resolveActiveOrganizationId(request);
-      const data = await service.list(organizationId);
+      const scope = resolvePrincipalDatabaseScope(request);
+      const _organizationId = scope.organizationPublicId;
+      const data = await service.list(scope);
       return successResponse(data, getRequestIdentifier(request));
     },
     getPolicy: async (request: FastifyRequest, _reply: FastifyReply) => {
       const { notification_policy_id: policyId } = (request.params as {
         notification_policy_id: string;
       }) ?? { notification_policy_id: '' };
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = resolvePrincipalDatabaseScope(request);
+      const _organizationId = scope.organizationPublicId;
       const data = await service.getByPublicId(
-        organizationId,
+        scope,
         validatePublicIdParam(policyId, 'notification_policy_id'),
       );
       return successResponse(data, getRequestIdentifier(request));
     },
     createPolicy: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const organizationId = resolveActiveOrganizationId(request);
-      const data = await service.create(organizationId, request.body, getActingUserPublicId(auth));
+      const scope = resolvePrincipalDatabaseScope(request);
+      const _organizationId = scope.organizationPublicId;
+      const data = await service.create(scope, request.body, getActingUserPublicId(auth));
       return successResponse(data, getRequestIdentifier(request));
     },
     updatePolicy: async (request: FastifyRequest, _reply: FastifyReply) => {
@@ -57,9 +60,10 @@ export function createOrganizationNotificationPolicyController(
       const { notification_policy_id: policyId } = (request.params as {
         notification_policy_id: string;
       }) ?? { notification_policy_id: '' };
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = resolvePrincipalDatabaseScope(request);
+      const _organizationId = scope.organizationPublicId;
       const data = await service.update(
-        organizationId,
+        scope,
         validatePublicIdParam(policyId, 'notification_policy_id'),
         request.body,
         getActingUserPublicId(auth),
@@ -71,11 +75,9 @@ export function createOrganizationNotificationPolicyController(
       const { notification_policy_id: policyId } = (request.params as {
         notification_policy_id: string;
       }) ?? { notification_policy_id: '' };
-      const organizationId = resolveActiveOrganizationId(request);
-      await service.delete(
-        organizationId,
-        validatePublicIdParam(policyId, 'notification_policy_id'),
-      );
+      const scope = resolvePrincipalDatabaseScope(request);
+      const _organizationId = scope.organizationPublicId;
+      await service.delete(scope, validatePublicIdParam(policyId, 'notification_policy_id'));
       return reply.code(204).send();
     },
   };

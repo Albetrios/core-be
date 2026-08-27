@@ -189,7 +189,10 @@ export async function processNotificationDispatchJob(
       }
       return withUserDatabaseContext(userPublicId, loadNotification);
     }
-    return withPrincipalDatabaseContext(resolveOrganizationJobScope(organizationPublicId), loadNotification);
+    return withPrincipalDatabaseContext(
+      resolveOrganizationJobScope(organizationPublicId),
+      loadNotification,
+    );
   };
   const notificationRow =
     notificationRepository !== undefined

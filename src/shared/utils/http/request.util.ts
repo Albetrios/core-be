@@ -134,7 +134,9 @@ export function resolvePrincipalDatabaseScope(
   }
   const params = request.params as Record<string, string> | undefined;
   const organizationId = params?.organization_id ?? auth.organizationPublicId;
-  if (organizationId === undefined) {
+  // Parity with resolveActiveOrganizationId: an empty-string path value is "no
+  // organization in scope" (403), not a malformed id (400).
+  if (!organizationId) {
     throw new ForbiddenError('errors:organizationContextRequired');
   }
   return createPrincipalDatabaseScope({

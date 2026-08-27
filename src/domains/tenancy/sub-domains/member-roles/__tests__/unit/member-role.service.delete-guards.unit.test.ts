@@ -11,6 +11,19 @@ vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', 
   invalidateOrganizationPermissions: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 import { MemberRoleService } from '@/domains/tenancy/sub-domains/member-roles/member-role.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { MemberRoleRepository } from '@/domains/tenancy/sub-domains/member-roles/member-role.repository.js';
@@ -18,6 +31,10 @@ import type { MemberRolePermissionRepository } from '@/domains/tenancy/sub-domai
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permission/permission.repository.js';
 import { invalidateOrganizationPermissions } from '@/domains/tenancy/sub-domains/permission/permission-cache.service.js';
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 
 // These delete/update-guard tests never supply permission_codes, so the permission-side
 // dependencies (added for atomic create-with-permissions) are never exercised — stub them.
@@ -41,6 +58,12 @@ const stubPermissionRepository = {} as unknown as PermissionRepository;
  * member-assignment can't slip between a separate count and the delete. A zero-row result means
  * active members remain → `ConflictError`.
  */
+const asScope = (organizationPublicId: string) =>
+  createPrincipalDatabaseScope({
+    organizationPublicId,
+    source: 'token',
+  }) as OrganizationPrincipalDatabaseScope;
+
 describe('MemberRoleService.delete — sec-T3 guards (route-audit C2 atomic)', () => {
   const organization = { id: 1, public_id: 'org_public', owner_user_id: 99 };
 
@@ -102,9 +125,9 @@ describe('MemberRoleService.delete — sec-T3 guards (route-audit C2 atomic)', (
   it('refuses to delete a system role with ForbiddenError (is_system guard fires first)', async () => {
     vi.mocked(memberRoleRepository.findByPublicId).mockResolvedValue(systemRole as never);
 
-    await expect(service.delete('org_public', systemRole.public_id)).rejects.toBeInstanceOf(
-      ForbiddenError,
-    );
+    await expect(
+      service.delete(asScope('org_public'), systemRole.public_id),
+    ).rejects.toBeInstanceOf(ForbiddenError);
 
     expect(memberRoleRepository.softDeleteIfNoActiveMembers).not.toHaveBeenCalled();
     expect(invalidateOrganizationPermissions).not.toHaveBeenCalled();
@@ -115,9 +138,9 @@ describe('MemberRoleService.delete — sec-T3 guards (route-audit C2 atomic)', (
     // Atomic guard matches zero rows because active members remain.
     vi.mocked(memberRoleRepository.softDeleteIfNoActiveMembers).mockResolvedValue(null as never);
 
-    await expect(service.delete('org_public', customRoleAssigned.public_id)).rejects.toBeInstanceOf(
-      ConflictError,
-    );
+    await expect(
+      service.delete(asScope('org_public'), customRoleAssigned.public_id),
+    ).rejects.toBeInstanceOf(ConflictError);
 
     expect(invalidateOrganizationPermissions).not.toHaveBeenCalled();
   });
@@ -125,7 +148,9 @@ describe('MemberRoleService.delete — sec-T3 guards (route-audit C2 atomic)', (
   it('allows deletion of an unused non-system role (control case — happy path)', async () => {
     vi.mocked(memberRoleRepository.findByPublicId).mockResolvedValue(customRoleEmpty as never);
 
-    await expect(service.delete('org_public', customRoleEmpty.public_id)).resolves.toBeUndefined();
+    await expect(
+      service.delete(asScope('org_public'), customRoleEmpty.public_id),
+    ).resolves.toBeUndefined();
 
     expect(memberRoleRepository.softDeleteIfNoActiveMembers).toHaveBeenCalledWith(
       customRoleEmpty.public_id,
@@ -137,7 +162,7 @@ describe('MemberRoleService.delete — sec-T3 guards (route-audit C2 atomic)', (
   it('throws NotFoundError when the role does not exist (guarded delete is skipped)', async () => {
     vi.mocked(memberRoleRepository.findByPublicId).mockResolvedValue(null);
 
-    await expect(service.delete('org_public', 'role_missing')).rejects.toBeInstanceOf(
+    await expect(service.delete(asScope('org_public'), 'role_missing')).rejects.toBeInstanceOf(
       NotFoundError,
     );
 
@@ -209,7 +234,12 @@ describe('MemberRoleService.update — sec-T3 is_system guard', () => {
     vi.mocked(roleRepoForUpdate.findByPublicId).mockResolvedValue(systemRole as never);
 
     await expect(
-      updateService.update('org_public', systemRole.public_id, { name: 'Hacked' }, undefined),
+      updateService.update(
+        asScope('org_public'),
+        systemRole.public_id,
+        { name: 'Hacked' },
+        undefined,
+      ),
     ).rejects.toBeInstanceOf(ForbiddenError);
 
     expect(roleRepoForUpdate.update).not.toHaveBeenCalled();
@@ -221,7 +251,12 @@ describe('MemberRoleService.update — sec-T3 is_system guard', () => {
     vi.mocked(roleRepoForUpdate.update).mockResolvedValue(updatedRole as never);
 
     await expect(
-      updateService.update('org_public', customRole.public_id, { name: 'Renamed' }, undefined),
+      updateService.update(
+        asScope('org_public'),
+        customRole.public_id,
+        { name: 'Renamed' },
+        undefined,
+      ),
     ).resolves.toBeDefined();
 
     expect(roleRepoForUpdate.update).toHaveBeenCalled();

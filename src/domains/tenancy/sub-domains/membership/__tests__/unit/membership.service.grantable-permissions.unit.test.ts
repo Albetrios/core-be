@@ -15,6 +15,19 @@ vi.mock('@/domains/tenancy/sub-domains/permission/assert-grantable-permissions.u
   assertCallerCanGrantPermissionCodes: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 import { ForbiddenError } from '@/shared/errors/index.js';
 import { MembershipService } from '@/domains/tenancy/sub-domains/membership/membership.service.js';
 import { assertCallerCanGrantPermissionCodes } from '@/domains/tenancy/sub-domains/permission/assert-grantable-permissions.util.js';
@@ -26,6 +39,10 @@ import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permiss
 import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permission/permission.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { MemberInvitationService } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.service.js';
+import {
+  createPrincipalDatabaseScope,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 
 /**
  * Regression for the Critical org-takeover finding (T1).
@@ -36,6 +53,12 @@ import type { MemberInvitationService } from '@/domains/tenancy/sub-domains/memb
  * `assertCallerCanGrantPermissionCodes` against the resolved role's permission codes
  * BEFORE the membership row is persisted.
  */
+const asScope = (organizationPublicId: string) =>
+  createPrincipalDatabaseScope({
+    organizationPublicId,
+    source: 'token',
+  }) as OrganizationPrincipalDatabaseScope;
+
 describe('MembershipService.create — grantable-permissions guard (sec-T1)', () => {
   const organization = { id: 1, public_id: 'org_public', owner_user_id: 99 };
   const adminRole = { id: 2, public_id: 'role_public_admin', name: 'Admin' };
@@ -152,7 +175,7 @@ describe('MembershipService.create — grantable-permissions guard (sec-T1)', ()
     });
 
     await service.create(
-      'org_public',
+      asScope('org_public'),
       { email: 'invitee@example.com', role_id: 'role_public_admin' },
       'inviter_public',
     );
@@ -177,7 +200,7 @@ describe('MembershipService.create — grantable-permissions guard (sec-T1)', ()
 
     await expect(
       service.create(
-        'org_public',
+        asScope('org_public'),
         { email: 'invitee@example.com', role_id: 'role_public_admin' },
         'inviter_public',
       ),
@@ -193,7 +216,7 @@ describe('MembershipService.create — grantable-permissions guard (sec-T1)', ()
 
     await expect(
       service.create(
-        'org_public',
+        asScope('org_public'),
         { email: 'invitee@example.com', role_id: 'role_public_admin' },
         undefined,
       ),

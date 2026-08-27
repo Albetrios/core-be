@@ -1,5 +1,9 @@
 import { ForbiddenError, NotFoundError } from '@/shared/errors/index.js';
 import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  withPrincipalDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { MemberRoleRepository } from '@/domains/tenancy/sub-domains/member-roles/member-role.repository.js';
 import type { MembershipRepository } from '@/domains/tenancy/sub-domains/membership/membership.repository.js';
@@ -46,8 +50,9 @@ export class MemberRolePermissionService {
     return rows.map((row) => row.permission_code);
   }
 
-  async list(organization_public_id: string, role_public_id: string) {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async list(scope: OrganizationPrincipalDatabaseScope, role_public_id: string) {
+    const organization_public_id = scope.organizationPublicId;
+    return withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const role = await this.memberRoleRepository.findByPublicId(role_public_id, organization.id);
@@ -57,13 +62,14 @@ export class MemberRolePermissionService {
   }
 
   async put(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     role_public_id: string,
     body: unknown,
     created_by_user_public_id: string | undefined,
   ) {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validatePutMemberRolePermissions(body);
-    const result = await withOrganizationDatabaseContext(organization_public_id, async () => {
+    const result = await withPrincipalDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const role = await this.memberRoleRepository.findByPublicId(role_public_id, organization.id);

@@ -60,7 +60,12 @@ describe('job-scope minting confinement', () => {
     try {
       output = execFileSync(
         'grep',
-        ['-rlE', 'resolve(Organization|User)?JobP?r?i?n?c?i?p?a?l?S?c?o?p?e?\\b|resolveJobPrincipalScope|resolveOrganizationJobScope|resolveUserJobScope', 'src', '--include=*.ts'],
+        [
+          '-rlE',
+          'resolve(Organization|User)?JobP?r?i?n?c?i?p?a?l?S?c?o?p?e?\\b|resolveJobPrincipalScope|resolveOrganizationJobScope|resolveUserJobScope',
+          'src',
+          '--include=*.ts',
+        ],
         { encoding: 'utf8' },
       );
     } catch {

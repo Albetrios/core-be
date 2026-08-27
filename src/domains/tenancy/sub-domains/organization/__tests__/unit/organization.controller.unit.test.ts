@@ -131,7 +131,9 @@ describe('createOrganizationController', () => {
       mockRequest({ params: { organization_id: organizationPublicId } }),
       reply,
     );
-    expect(service.delete).toHaveBeenCalledWith(organizationPublicId);
+    expect(service.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+    );
     expect(reply.code).toHaveBeenCalledWith(204);
   });
 

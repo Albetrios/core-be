@@ -4,7 +4,7 @@ import { ForbiddenError } from '@/shared/errors/index.js';
 import {
   getRequestIdentifier,
   requirePrincipal,
-  resolveActiveOrganizationId,
+  resolvePrincipalDatabaseScope,
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
 import type { MemberInvitationService } from './member-invitation.service.js';
@@ -35,20 +35,22 @@ export function createMemberInvitationController(service: MemberInvitationServic
     },
     revokeMemberInvitation: async (request: FastifyRequest, reply: FastifyReply) => {
       requirePrincipal(request);
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = resolvePrincipalDatabaseScope(request);
+      const _organizationId = scope.organizationPublicId;
       // sec-new-T2: reject malformed path params before reaching the service layer.
       const { invitation_id: rawRevokeId } = request.params as { invitation_id: string };
       const invitationId = validatePublicIdParam(rawRevokeId ?? '', 'invitation_id');
-      await service.revoke(organizationId, invitationId);
+      await service.revoke(scope, invitationId);
       return reply.code(204).send();
     },
     resendInvitation: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = resolvePrincipalDatabaseScope(request);
+      const _organizationId = scope.organizationPublicId;
       // sec-new-T2: reject malformed path params before reaching the service layer.
       const { invitation_id: rawResendId } = request.params as { invitation_id: string };
       const invitationId = validatePublicIdParam(rawResendId ?? '', 'invitation_id');
       // R1 / TEN-34: regenerated token is delivered only via email, never returned.
-      const invitation = await service.resend(organizationId, invitationId, request.body, {
+      const invitation = await service.resend(scope, invitationId, request.body, {
         requestId: getRequestIdentifier(request),
       });
       return successResponse({ invitation }, getRequestIdentifier(request));

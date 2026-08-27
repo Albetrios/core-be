@@ -33,7 +33,9 @@ describe('runOrganizationOffboardingReconcileJob (TEN-06)', () => {
     const result = await runOrganizationOffboardingReconcileJob(service);
 
     expect(service.resumeOffboarding).toHaveBeenCalledTimes(2);
-    expect(service.resumeOffboarding).toHaveBeenCalledWith('org_a');
+    expect(service.resumeOffboarding).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: 'org_a' }),
+    );
     expect(result).toEqual({ scanned: 2, resumed: 2, failed: 0 });
   });
 
