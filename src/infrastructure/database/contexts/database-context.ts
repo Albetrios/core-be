@@ -291,8 +291,8 @@ function buildIdentityGucStatement(identity: {
  *   real minting call site (or drop the arm in a migration).
  */
 export const SESSION_CONTEXTS = {
-  public_id: { guc: 'app.current_session_public_id' },
-  token_hash: { guc: 'app.current_session_token_hash' },
+  session_public_id: { guc: 'app.current_session_public_id' },
+  session_token_hash: { guc: 'app.current_session_token_hash' },
 } as const satisfies Record<string, { readonly guc: string }>;
 
 /** Derived — the closed set of session-context kinds. */

@@ -181,7 +181,7 @@ export class AuthSessionService {
     const tokenHash = hashAccessToken(token);
     await invalidateCachedSessionToken(tokenHash);
     const revoked = await withSessionDatabaseContext(
-      createSessionDatabaseScope('token_hash', tokenHash),
+      createSessionDatabaseScope('session_token_hash', tokenHash),
       (_databaseHandle) => this.sessionRepository.revokeByTokenHash(tokenHash),
     );
     if (!revoked) {
@@ -225,7 +225,7 @@ export class AuthSessionService {
     // runReadWithTransientRetry); an invalid/expired session still returns null on the first attempt.
     const session = await runReadWithTransientRetry(() =>
       withSessionDatabaseContext(
-        createSessionDatabaseScope('token_hash', tokenHash),
+        createSessionDatabaseScope('session_token_hash', tokenHash),
         (_databaseHandle) => this.sessionRepository.findActiveByTokenHash(tokenHash),
       ),
     );
@@ -254,7 +254,7 @@ export class AuthSessionService {
 
   async findActiveSessionByPublicId(sessionPublicId: string) {
     return withSessionDatabaseContext(
-      createSessionDatabaseScope('public_id', sessionPublicId),
+      createSessionDatabaseScope('session_public_id', sessionPublicId),
       (_databaseHandle) => this.sessionRepository.findByPublicId(sessionPublicId),
     );
   }
@@ -269,14 +269,14 @@ export class AuthSessionService {
    */
   async findSessionByPublicIdIncludingRevoked(sessionPublicId: string) {
     return withSessionDatabaseContext(
-      createSessionDatabaseScope('public_id', sessionPublicId),
+      createSessionDatabaseScope('session_public_id', sessionPublicId),
       (_databaseHandle) => this.sessionRepository.findByPublicIdIncludingRevoked(sessionPublicId),
     );
   }
 
   async rotateSessionTokenHash(sessionPublicId: string, tokenHash: string): Promise<void> {
     await withSessionDatabaseContext(
-      createSessionDatabaseScope('public_id', sessionPublicId),
+      createSessionDatabaseScope('session_public_id', sessionPublicId),
       async (_databaseHandle) => {
         const existing = await this.sessionRepository.findByPublicId(sessionPublicId);
         if (existing?.token_hash) {
@@ -302,7 +302,7 @@ export class AuthSessionService {
     const nextTokenHash = hashAccessToken(nextAccessToken);
 
     const rotated = await withSessionDatabaseContext(
-      createSessionDatabaseScope('public_id', sessionPublicId),
+      createSessionDatabaseScope('session_public_id', sessionPublicId),
       async (_databaseHandle) => {
         const existing = await this.sessionRepository.findByPublicId(sessionPublicId);
         if (!existing?.refresh_token_hash) {
@@ -335,7 +335,7 @@ export class AuthSessionService {
       // to use its refresh secret." We capture every refresh-secret mismatch to Sentry
       // for breach detection, separate from whether we re-revoke.
       const reuseDetection = await withSessionDatabaseContext(
-        createSessionDatabaseScope('public_id', sessionPublicId),
+        createSessionDatabaseScope('session_public_id', sessionPublicId),
         async (_databaseHandle) => {
           const existing =
             await this.sessionRepository.findByPublicIdIncludingRevoked(sessionPublicId);
@@ -389,7 +389,7 @@ export class AuthSessionService {
   }): Promise<void> {
     const nextTokenHash = hashAccessToken(nextAccessToken);
     await withSessionDatabaseContext(
-      createSessionDatabaseScope('public_id', sessionPublicId),
+      createSessionDatabaseScope('session_public_id', sessionPublicId),
       async (_databaseHandle) => {
         const existing = await this.sessionRepository.findByPublicId(sessionPublicId);
         if (!existing) {

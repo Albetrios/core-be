@@ -44,10 +44,10 @@ describe('AuthSessionRepository refresh concurrency grace (database — audit-#2
     const publicId = await seedSession(user.id, presentedHash);
 
     const [a, b] = await Promise.all([
-      withSessionDatabaseContext(createSessionDatabaseScope('public_id', publicId), () =>
+      withSessionDatabaseContext(createSessionDatabaseScope('session_public_id', publicId), () =>
         repository.rotateSessionCredentials(publicId, presentedHash, 'tok-a', 'refresh-a'),
       ),
-      withSessionDatabaseContext(createSessionDatabaseScope('public_id', publicId), () =>
+      withSessionDatabaseContext(createSessionDatabaseScope('session_public_id', publicId), () =>
         repository.rotateSessionCredentials(publicId, presentedHash, 'tok-b', 'refresh-b'),
       ),
     ]);
@@ -77,7 +77,7 @@ describe('AuthSessionRepository refresh concurrency grace (database — audit-#2
 
     // First rotation: original → A (original now in the previous slot, rotated = now).
     const first = await withSessionDatabaseContext(
-      createSessionDatabaseScope('public_id', publicId),
+      createSessionDatabaseScope('session_public_id', publicId),
       () => repository.rotateSessionCredentials(publicId, presentedHash, 'tok-a', 'refresh-a'),
     );
     expect(first).not.toBeNull();
@@ -89,7 +89,7 @@ describe('AuthSessionRepository refresh concurrency grace (database — audit-#2
       .where(eq(sessions.public_id, publicId));
 
     const replay = await withSessionDatabaseContext(
-      createSessionDatabaseScope('public_id', publicId),
+      createSessionDatabaseScope('session_public_id', publicId),
       () => repository.rotateSessionCredentials(publicId, presentedHash, 'tok-x', 'refresh-x'),
     );
     // Neither current (refresh-a) nor previous-within-grace matches → null → the service revokes.

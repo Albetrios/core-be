@@ -145,8 +145,8 @@ switches** whose authority is the frozen scope singleton + per-file allowlist.
 | --- | ---------------- | ----- | -------- |
 | `app.current_organization_public_id` | Principal | org **public id** (dynamic, from the JWT `org` claim / job payload / verified id) | scope carries `organizationPublicId` |
 | `app.current_user_public_id` | Principal | user **public id** (dynamic) | scope carries `userPublicId` |
-| `app.current_session_public_id` | Session (`kind: public_id`) | session public id (dynamic) | pre-auth session lookup by public id |
-| `app.current_session_token_hash` | Session (`kind: token_hash`) | token hash (dynamic) | pre-auth session lookup by token hash |
+| `app.current_session_public_id` | Session (`kind: session_public_id`) | session public id (dynamic) | pre-auth session lookup by public id |
+| `app.current_session_token_hash` | Session (`kind: session_token_hash`) | token hash (dynamic) | pre-auth session lookup by token hash |
 | `app.global_retention_cleanup` | Maintenance | `'true'` | retention/tombstone workers, offboarding reconcilers, the org tombstoning step |
 | `app.session_retention_cleanup` | Maintenance | `'true'` | session-cleanup worker |
 | `app.global_admin` | Maintenance | `'true'` | admin user reads/suspend/soft-delete, admin audit listing, drain user resolution, DLQ-replay actor lookup |
@@ -214,7 +214,7 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 | --- | --- | --- | --- |
 | Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `resolvePrincipalDatabaseScope(request)` · `resolveJobPrincipalScope({ organizationPublicId })` · `resolveVerifiedPrincipalScope({ organizationPublicId })` | `withPrincipalDatabaseContext` |
 | Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `requireUserPrincipalDatabaseScope(request)` · `resolveJobPrincipalScope({ userPublicId })` · `resolveVerifiedPrincipalScope({ userPublicId })` | `withPrincipalDatabaseContext` |
-| Session | `SessionDatabaseScope` — kinds `public_id` \| `token_hash` | `createSessionDatabaseScope(kind, value)` (auth domain only; token values are pre-hashed) | `withSessionDatabaseContext` |
+| Session | `SessionDatabaseScope` — kinds `session_public_id` \| `session_token_hash` | `createSessionDatabaseScope(kind, value)` (auth domain only; token values are pre-hashed) | `withSessionDatabaseContext` |
 | Maintenance | `MaintenanceDatabaseScope` — 7 frozen singletons: `global_retention_cleanup`, `session_retention_cleanup`, `global_admin`, `system_audit_insert`, `audit_outbox_drain`, `system_table_retention`, `system_table_worker` | nothing to mint — `MAINTENANCE_SCOPE.<kind>` | `withMaintenanceDatabaseContext` |
 
 Provenance (`scope.source`): `token` = authenticated HTTP request · `job` = validated
