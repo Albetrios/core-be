@@ -1883,6 +1883,7 @@ src/
     │   │   │   ├── billing.js
     │   │   │   ├── comprehensive-journey.js
     │   │   │   ├── daily-ops.js
+    │   │   │   ├── fe-full-journey.js
     │   │   │   ├── fe-user-journey.js
     │   │   │   ├── health-breakpoint.js
     │   │   │   ├── health-stress.js
