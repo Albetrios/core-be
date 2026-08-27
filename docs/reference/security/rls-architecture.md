@@ -220,7 +220,7 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 
 | Role | Connects via | RLS posture | Purpose |
 | ---- | ------------ | ----------- | ------- |
-| `core` (local) / provider superuser | operator/psql/migrations | exempt | migrations, test harness fixtures — never the app |
+| **owner / migration role** — local: `core` (compose superuser, a convenience); hosted: the provider's database **owner** (managed Postgres has no true superusers) | `DATABASE_MIGRATION_URL` / operator psql | local `core`: exempt (superuser). Hosted owner: **subject** on data (FORCE RLS binds the owner too) — what it uniquely holds is **DDL power** (create/alter tables and policies) | migrations, test-harness fixtures — never the running app. Optional future formalization: a NOLOGIN `core_be_owner` that owns all objects, with the migration login granted membership (same three-tier naming everywhere; owner stays non-superuser) |
 | `core_be_app` | `DATABASE_URL` | subject | ALL request/worker traffic |
 | `core_be_maintenance` | `DATABASE_MAINTENANCE_URL` (optional) | subject | maintenance (bypass) contexts on a dedicated pool; NOLOGIN until provisioned per the [runbook](../../deployment/runbooks/maintenance-database-role.md) |
 
