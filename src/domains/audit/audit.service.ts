@@ -98,7 +98,7 @@ export class AuditService {
       return;
     }
 
-    const insert = (): Promise<number> =>
+    const insert = (): Promise<void> =>
       insertAuditOutboxRow({
         actorUserPublicId: input.actorUserPublicId,
         actorApiKeyPublicId: input.actorApiKeyPublicId,

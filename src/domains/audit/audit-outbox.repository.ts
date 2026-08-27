@@ -31,9 +31,13 @@ export interface AuditOutboxInsertInput {
  * org-scoped rows, the system-audit-insert context for tenantless rows.
  *
  * @remarks
- * - **Algorithm:** single `INSERT ... RETURNING id` against the request-scoped
- *   handle resolved from ALS. Never opens its own transaction — the wrapping
- *   context (org / system-audit-insert) owns the transaction boundary.
+ * - **Algorithm:** single `INSERT` (no `RETURNING` — Postgres applies SELECT-policy
+ *   visibility to `RETURNING` rows, and `audit.outbox` SELECT is deliberately
+ *   drain-exclusive, so a `RETURNING` here is rejected under the RLS-subject
+ *   application roles) against the request-scoped handle resolved from ALS. The
+ *   affected-row count is the loud-failure guard instead of the returned id.
+ *   Never opens its own transaction — the wrapping context (org /
+ *   system-audit-insert) owns the transaction boundary.
  * - **Failure modes:** RLS rejects the INSERT when `app.current_organization_id`
  *   does not match the supplied `organizationPublicId` (or, for tenantless
  *   audits, when `app.system_audit_insert` is not `'true'`). The thrown error
@@ -46,30 +50,26 @@ export interface AuditOutboxInsertInput {
  * - **Notes:** never reachable from worker runtime — callers must already hold
  *   a request DB context (`AuditService.record` establishes it).
  */
-export async function insertAuditOutboxRow(input: AuditOutboxInsertInput): Promise<number> {
+export async function insertAuditOutboxRow(input: AuditOutboxInsertInput): Promise<void> {
   const database = getRequestDatabase();
-  const rows = await database
-    .insert(audit_outbox)
-    .values({
-      status: 'PENDING',
-      actor_user_public_id: input.actorUserPublicId ?? null,
-      actor_api_key_public_id: input.actorApiKeyPublicId ?? null,
-      target_user_public_id: input.targetUserPublicId ?? null,
-      organization_public_id: input.organizationPublicId ?? null,
-      action: input.action,
-      resource_type: input.resourceType,
-      resource_id: input.resourceId ?? null,
-      ip_address: input.ipAddress ?? null,
-      user_agent: input.userAgent ?? null,
-      severity: input.severity ?? 'INFO',
-      metadata: input.metadata ?? {},
-    })
-    .returning({ id: audit_outbox.id });
-  const id = rows[0]?.id;
-  if (id === undefined) {
-    throw new Error('audit.outbox INSERT returned no id');
+  const result = await database.insert(audit_outbox).values({
+    status: 'PENDING',
+    actor_user_public_id: input.actorUserPublicId ?? null,
+    actor_api_key_public_id: input.actorApiKeyPublicId ?? null,
+    target_user_public_id: input.targetUserPublicId ?? null,
+    organization_public_id: input.organizationPublicId ?? null,
+    action: input.action,
+    resource_type: input.resourceType,
+    resource_id: input.resourceId ?? null,
+    ip_address: input.ipAddress ?? null,
+    user_agent: input.userAgent ?? null,
+    severity: input.severity ?? 'INFO',
+    metadata: input.metadata ?? {},
+  });
+  const affectedRows = (result as unknown as { count?: number }).count ?? 0;
+  if (affectedRows !== 1) {
+    throw new Error('audit.outbox INSERT staged no row');
   }
-  return id;
 }
 
 /**
@@ -96,18 +96,25 @@ export function createDrainAuditOutboxRepository(databaseHandle: RequestScopedPo
       await assertWorkerRlsGucSet(databaseHandle, 'audit_outbox_drain');
       // Drizzle has no first-class FOR UPDATE SKIP LOCKED on `select()`, so use a
       // raw SQL UPDATE..FROM..RETURNING which is both atomic and skip-locked.
+      // The locking SELECT lives in a MATERIALIZED CTE deliberately: as a plain
+      // FROM-subquery the planner may pick a nested loop that RESCANS it per
+      // target row, and each rescan locks `limit` MORE rows (SKIP LOCKED skips
+      // the ones it just locked) — the claim escalates past its limit. Observed
+      // under RLS-subject roles (plans differ from the RLS-exempt superuser);
+      // MATERIALIZED pins one execution of the locking scan.
       const result = await databaseHandle.execute<AuditOutboxRow>(drizzleSql`
+        WITH claimable AS MATERIALIZED (
+          SELECT id
+            FROM audit.outbox
+           WHERE status = 'PENDING'
+           ORDER BY created_at ASC
+           LIMIT ${limit}
+             FOR UPDATE SKIP LOCKED
+        )
         UPDATE audit.outbox
            SET attempt_count = audit.outbox.attempt_count + 1,
                updated_at = NOW()
-          FROM (
-            SELECT id
-              FROM audit.outbox
-             WHERE status = 'PENDING'
-             ORDER BY created_at ASC
-             LIMIT ${limit}
-             FOR UPDATE SKIP LOCKED
-          ) AS claimable
+          FROM claimable
          WHERE audit.outbox.id = claimable.id
         RETURNING audit.outbox.*
       `);

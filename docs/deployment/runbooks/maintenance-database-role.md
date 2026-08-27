@@ -9,7 +9,16 @@ authority becomes a connection-level property instead of a GUC-only one.
 ## Current state (groundwork shipped, gating not yet enforced)
 
 - Migration `20260827010000_core_be_maintenance_role.sql` creates `core_be_maintenance`
-  **NOLOGIN** with data-plane grants mirroring `core_be_app`. Nothing connects as it yet.
+  **NOLOGIN** with data-plane grants mirroring `core_be_app`.
+- Migration `20260827020000_maintenance_role_policy_access.sql` extends the six
+  role-scoped `*_app_access` system-table policies to both application roles (without it a
+  maintenance-pool connection hits `deny_all` on the mail outbox / Stripe ledger / DLQ
+  ledger) and grants `core_be_app` membership so `SET LOCAL ROLE core_be_app` tooling
+  keeps working on maintenance connections.
+- **Local development is provisioned**: the compose Postgres role has LOGIN and the
+  gitignored local env file carries `DATABASE_MAINTENANCE_URL` — local runs and the DB
+  test suites exercise maintenance contexts as `core_be_maintenance` (production-like RLS
+  instead of the superuser-exempt pool). Hosted environments are NOT yet provisioned.
 - `DATABASE_MAINTENANCE_URL` (optional env var) selects the pool: unset → maintenance
   contexts use the shared `DATABASE_URL` pool exactly as before; set → they use a lazy
   second pool built from the same tuned options

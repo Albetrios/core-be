@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, desc } from 'drizzle-orm';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
@@ -35,9 +35,13 @@ function outboxRowId(row: { id: number }): number {
   return Number(row.id);
 }
 
-/** Stages a tenantless PENDING row through the real write path (RLS context included). */
+/**
+ * Stages a tenantless PENDING row through the real write path (RLS context included)
+ * and resolves its id via a superuser read-back — `insertAuditOutboxRow` no longer
+ * RETURNINGs the id (SELECT on audit.outbox is drain-exclusive under RLS).
+ */
 async function stagePendingRow(action: string): Promise<number> {
-  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_audit_insert, () =>
+  await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_audit_insert, () =>
     insertAuditOutboxRow({
       actorUserPublicId: ACTOR_PUBLIC_ID,
       action,
@@ -45,6 +49,14 @@ async function stagePendingRow(action: string): Promise<number> {
       metadata: { source: 'audit-outbox.repository.db.unit' },
     }),
   );
+  const [row] = await database
+    .select({ id: audit_outbox.id })
+    .from(audit_outbox)
+    .where(eq(audit_outbox.action, action))
+    .orderBy(desc(audit_outbox.id))
+    .limit(1);
+  if (!row) throw new Error(`staged row for ${action} not found`);
+  return Number(row.id);
 }
 
 describe('audit-outbox.repository (database)', () => {
@@ -53,9 +65,11 @@ describe('audit-outbox.repository (database)', () => {
   });
 
   /**
-   * The returned id is not cosmetic — `insertAuditOutboxRow` throws when `RETURNING` comes back
-   * empty, which is the guard that turns a silently-dropped audit row into a loud failure. Prove
-   * the id is real by reading the row back with it.
+   * The affected-row guard is not cosmetic — `insertAuditOutboxRow` throws when the INSERT
+   * stages no row, which turns a silently-dropped audit row into a loud failure. (It no longer
+   * RETURNINGs the id: Postgres applies SELECT-policy visibility to RETURNING rows, and outbox
+   * SELECT is drain-exclusive — a RETURNING would be rejected under the RLS-subject app roles.)
+   * Prove the row is real by reading it back as the superuser test pool.
    */
   it('insertAuditOutboxRow returns the new id and stages a PENDING row with the payload', async () => {
     const insertedId = await stagePendingRow('user.login');
