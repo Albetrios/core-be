@@ -58,7 +58,7 @@ export class AuthMeContextService {
     // They serialize on that one connection, so this trades a little latency at low load for a
     // 3x cut in connections held per request — the resource that actually runs out first.
     // `resolveUserOrganizationPermissions` stays outside: it drives a DIFFERENT guc
-    // (`app.current_organization_id`), so it must keep its own transaction and can still
+    // (`app.current_organization_public_id`), so it must keep its own transaction and can still
     // overlap with the block below.
     const [userScoped, myPermissions] = await Promise.all([
       withPrincipalDatabaseContext(scope, async () => ({

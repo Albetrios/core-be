@@ -209,7 +209,7 @@ export class UploadService {
    * @remarks
    * - **sec-r7/M4:** the RLS context MUST match the row being inserted. An org-scoped
    *   upload (`organization_id` set) only satisfies the `uploads_tenant_isolation`
-   *   `WITH CHECK` under `withOrganizationDatabaseContext` (`app.current_organization_id`);
+   *   `WITH CHECK` under `withOrganizationDatabaseContext` (`app.current_organization_public_id`);
    *   under `withUserDatabaseContext` the INSERT is rejected by RLS as the production
    *   `core_be_app` role (FORCE RLS) — every org-logo / org-file upload would 500.
    *   User-scoped uploads (`organization_id` NULL, e.g. avatars) run under
@@ -324,7 +324,7 @@ export class UploadService {
       /**
        * `requireOrganizationByPublicId` reads `tenancy.organizations` which is FORCE RLS.
        * Under `DATABASE_RLS_SCOPED_CONTEXTS=true` the call needs either an active
-       * organization context or `app.current_user_id` + the `organizations_user_discovery`
+       * organization context or `app.current_user_public_id` + the `organizations_user_discovery`
        * policy. The latter is appropriate here because we have just authorized the user.
        */
       const organization = await withPrincipalDatabaseContext(

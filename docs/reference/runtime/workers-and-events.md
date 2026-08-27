@@ -121,13 +121,13 @@ Regression tests: `src/tests/integration/worker-race/*.integration.test.ts` (`pn
 
 ## Worker Postgres context (RLS)
 
-HTTP requests set `app.current_organization_id` via tenant middleware and an org-scoped transaction. **Workers do not** — each job must use an explicit context wrapper before querying FORCE RLS tables.
+HTTP requests set `app.current_organization_public_id` via tenant middleware and an org-scoped transaction. **Workers do not** — each job must use an explicit context wrapper before querying FORCE RLS tables.
 
 | Context wrapper                                                             | GUC / purpose                                                            |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `withPrincipalDatabaseContext` (org job scope) / `runTenantScopedWorkerJob` | `app.current_organization_id` — tenant mutations and reads               |
+| `withPrincipalDatabaseContext` (org job scope) / `runTenantScopedWorkerJob` | `app.current_organization_public_id` — tenant mutations and reads               |
 | `MAINTENANCE_SCOPE.global_retention_cleanup` / `runGlobalRetentionWorkerJob` | `app.global_retention_cleanup` — cross-tenant tombstone retention       |
-| `withPrincipalDatabaseContext` (user job scope) / `runUserScopedWorkerJob`  | `app.current_user_id` — GDPR export                                      |
+| `withPrincipalDatabaseContext` (user job scope) / `runUserScopedWorkerJob`  | `app.current_user_public_id` — GDPR export                                      |
 | `MAINTENANCE_SCOPE.session_retention_cleanup`                               | `app.session_retention_cleanup` — session cleanup worker                 |
 | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker)`     | No tenant RLS — `auth.mail_outbox`, `billing.stripe_webhook_events` only |
 

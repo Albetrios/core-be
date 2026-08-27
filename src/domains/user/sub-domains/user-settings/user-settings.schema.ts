@@ -7,7 +7,7 @@ import { users } from '@/domains/user/user.schema.js';
  * `auth.user_settings` — a singleton row per user (PK = `user_id`) holding personalization toggles
  * and locale preferences. Cascades on user delete so offboarding sweeps the row automatically;
  * absence of a row is interpreted as the platform default in the serializer. RLS-gated by
- * `app.current_user_id` (set via `withUserDatabaseContext`) so users can only read/write their own row.
+ * `app.current_user_public_id` (set via `withUserDatabaseContext`) so users can only read/write their own row.
  */
 export const user_settings = authSchema
   .table(
@@ -31,12 +31,12 @@ export const user_settings = authSchema
         to: 'public',
         using: sql`${table.user_id} = (
           SELECT id FROM auth.users
-          WHERE public_id = current_setting('app.current_user_id', true)
+          WHERE public_id = current_setting('app.current_user_public_id', true)
             AND deleted_at IS NULL
         )`,
         withCheck: sql`${table.user_id} = (
           SELECT id FROM auth.users
-          WHERE public_id = current_setting('app.current_user_id', true)
+          WHERE public_id = current_setting('app.current_user_public_id', true)
             AND deleted_at IS NULL
         )`,
       }),

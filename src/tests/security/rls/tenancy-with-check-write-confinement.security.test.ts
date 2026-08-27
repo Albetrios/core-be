@@ -19,7 +19,7 @@ import {
  *
  * These tenancy policies declare USING with a null WITH CHECK, so Postgres reuses the USING
  * predicate as the WITH CHECK for writes. This closes the gap: under org B's tenant context (the
- * least-privilege `core_be_app` role with `app.current_organization_id` set, no user GUC),
+ * least-privilege `core_be_app` role with `app.current_organization_public_id` set, no user GUC),
  * reassigning a visible org-B row to org A must be rejected by the policy — the DB backstop that
  * catches an application bug writing the wrong `organization_id`. A same-org reassignment is the
  * positive control, proving the rejection is the org predicate and not a blanket permission denial.

@@ -50,7 +50,7 @@ it. Either way the final, approved document looks like the form below.
 - Relations / indexes: <FKs, composite/unique indexes | none>
   # e.g. index (organization_id, issued_at desc); unique (organization_id, number)
 - Tenancy / soft-delete / audit: <org-scoped? RLS? soft-delete? audit?>
-  # e.g. org-scoped, RLS on (USING + WITH CHECK app.current_organization_id) | soft-delete: no (immutable ledger) | audit: created_at only
+  # e.g. org-scoped, RLS on (USING + WITH CHECK app.current_organization_public_id) | soft-delete: no (immutable ledger) | audit: created_at only
 
 ## 3. Public API
 - Endpoints: <METHOD /api/v1/<path> — purpose>  (snake_case semantic params like {invoice_id})

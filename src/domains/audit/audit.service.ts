@@ -55,7 +55,7 @@ function collectReferencedInternalIds(
  *  - the read path ({@link AuditService.list}) is unchanged.
  *
  * Failure modes for `record`:
- *  - RLS rejects the outbox INSERT when the caller's `app.current_organization_id`
+ *  - RLS rejects the outbox INSERT when the caller's `app.current_organization_public_id`
  *    does not match the supplied `organization_public_id`. The thrown error
  *    bubbles to the audit-record wrapper, which catches + logs (the business
  *    write itself is never failed by an audit problem).
@@ -114,7 +114,7 @@ export class AuditService {
       });
 
     // sec-R10: the `audit.outbox` INSERT is gated by RLS (audit_outbox_tenant_isolation_insert:
-    // org rows need `app.current_organization_id`, tenantless rows need `app.system_audit_insert`).
+    // org rows need `app.current_organization_public_id`, tenantless rows need `app.system_audit_insert`).
     // Post-sec-M4 the per-request org RLS transaction is a no-op and controllers emit audit AFTER
     // the service's withOrganizationDatabaseContext block has closed — so without establishing the
     // matching context here the bare-pool INSERT is rejected under the production core_be_app role

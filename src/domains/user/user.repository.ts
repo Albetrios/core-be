@@ -67,7 +67,7 @@ export class UserRepository {
   /**
    * Resolves a user by email for the pre-session authentication phase (login, forgot-password,
    * webauthn auth-options, OAuth find-or-create). Goes through the `auth.resolve_user_*` SECURITY
-   * DEFINER resolver because `auth.users` is FORCE RLS and no `app.current_user_id` is set yet — a
+   * DEFINER resolver because `auth.users` is FORCE RLS and no `app.current_user_public_id` is set yet — a
    * plain SELECT would resolve the owner policy to NULL and return zero rows, rejecting every login.
    */
   async findByEmail(email: string): Promise<UserRow | null> {
@@ -195,7 +195,7 @@ export class UserRepository {
    * Inserts a user from an OAuth profile (no password) with a caller-supplied `public_id`.
    *
    * Public-id generation, unique-collision retry, and the `withUserDatabaseContext` wrapper that
-   * satisfies the FORCE RLS owner WITH CHECK (`public_id = app.current_user_id`) live in
+   * satisfies the FORCE RLS owner WITH CHECK (`public_id = app.current_user_public_id`) live in
    * {@link UserService.createFromOAuth}: the context must be set to the exact `public_id` used for
    * the insert, so the service owns the generate → enter-context → insert sequence per attempt.
    */

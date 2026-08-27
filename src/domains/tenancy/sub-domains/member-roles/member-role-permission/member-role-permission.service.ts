@@ -19,7 +19,7 @@ import { assertCallerCanGrantPermissionCodes } from '@/domains/tenancy/sub-domai
  *
  * @remarks
  * - **Algorithm:** every public method runs under `withPrincipalDatabaseContext`
- *   so Postgres RLS sees `app.current_organization_id`; the org and role are
+ *   so Postgres RLS sees `app.current_organization_public_id`; the org and role are
  *   resolved by public id, then the repository is invoked.
  * - **Failure modes:** `NotFoundError` when the organization or role does not
  *   exist (or has been soft-deleted); Zod `ValidationError` from

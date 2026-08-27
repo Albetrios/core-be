@@ -18,7 +18,7 @@ import { OrganizationRepository } from '@/domains/tenancy/sub-domains/organizati
  * Regression guard for `OrganizationRepository`'s two user-id resolvers.
  *
  * Both directions are called from ORG-only contexts (`withOrganizationDatabaseContext` sets ONLY
- * `app.current_organization_id`) and from post-commit paths with no GUC at all. `auth.users` is
+ * `app.current_organization_public_id`) and from post-commit paths with no GUC at all. `auth.users` is
  * FORCE RLS with a single self-or-admin policy, so the plain `auth.users` SELECT these methods
  * used matched ZERO rows under the non-superuser `core_be_app` role — silently nulling
  * `created_by_user_id` / `updated_by_user_id` attribution, and silently SKIPPING the

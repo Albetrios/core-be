@@ -360,7 +360,7 @@ export class WebauthnService {
       throw new UnauthorizedError('errors:webauthnInvalidChallenge');
     }
     // The challenge binds this assertion to a user; auth.webauthn_credentials is FORCE RLS keyed on
-    // app.current_user_id, so look the credential up inside that user's context.
+    // app.current_user_public_id, so look the credential up inside that user's context.
     const storedCredential = await withPrincipalDatabaseContext(
       resolveVerifiedUserPrincipalScope(challenge.user_public_id),
       () => this.credentialRepository.findActiveByCredentialId(response.id),

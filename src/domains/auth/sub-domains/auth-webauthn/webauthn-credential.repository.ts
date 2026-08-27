@@ -17,7 +17,7 @@ export type WebauthnCredentialRow = typeof webauthn_credentials.$inferSelect;
  * Drizzle repository for {@link webauthn_credentials}; tracks signature counter monotonicity via
  * {@link updateCounter} and revokes via `revoked_at` (partial unique index keeps `credential_id`
  * reusable after revocation). `auth.webauthn_credentials` is FORCE RLS keyed on
- * `app.current_user_id`, so every method reads/writes via the request-scoped handle and callers
+ * `app.current_user_public_id`, so every method reads/writes via the request-scoped handle and callers
  * must run inside `withUserDatabaseContext` (the owning user public id is always known at the call
  * site — authenticated request or WebAuthn challenge).
  */

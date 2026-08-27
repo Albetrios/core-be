@@ -18,7 +18,7 @@ import {
 /**
  * Regression for sec-U3 (High): `audit.logs` was RLS-isolated with a single
  * `FOR ALL` policy whose USING predicate doubled as the write predicate. Any
- * caller with the correct `app.current_organization_id` GUC could UPDATE or
+ * caller with the correct `app.current_organization_public_id` GUC could UPDATE or
  * DELETE audit rows for their own organization through the standard
  * `core_be_app` role. Append-only was convention, not invariant.
  *

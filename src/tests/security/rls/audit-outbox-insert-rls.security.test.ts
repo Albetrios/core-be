@@ -19,7 +19,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
  *
  * `audit.outbox` is the request-time staging table for the audit ledger. Its INSERT policy
  * (`audit_outbox_tenant_isolation_insert`) only passes when the row's `organization_public_id`
- * matches `app.current_organization_id` (org-scoped rows) OR `organization_public_id IS NULL` AND
+ * matches `app.current_organization_public_id` (org-scoped rows) OR `organization_public_id IS NULL` AND
  * `app.system_audit_insert = 'true'` (tenantless rows). There is NO user arm.
  *
  * Post-sec-M4 the per-request org RLS transaction is a no-op, and HTTP controllers emit audit AFTER

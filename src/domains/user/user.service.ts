@@ -224,7 +224,7 @@ export class UserService {
       }
     }
     // Persist offboarding DB effects before external cleanup. Each step uses its own per-user RLS
-    // transaction (FORCE RLS keys writes on app.current_user_id), so a single wrapping transaction
+    // transaction (FORCE RLS keys writes on app.current_user_public_id), so a single wrapping transaction
     // is not feasible — but ordering matters for correctness:
     //
     //   (1) revoke sessions → kills any in-flight bearer immediately, so no concurrent request
@@ -288,7 +288,7 @@ export class UserService {
     avatar_url?: string;
     is_email_verified: boolean;
   }): Promise<UserAuthRecord> {
-    // FORCE RLS owner WITH CHECK requires public_id = app.current_user_id. Generate the id first,
+    // FORCE RLS owner WITH CHECK requires public_id = app.current_user_public_id. Generate the id first,
     // enter that user's context, then insert with the exact id so the policy passes. The retry
     // regenerates id + re-enters context on the (rare) public_id unique collision.
     return runInsertWithPublicIdentifierRetry(async () => {

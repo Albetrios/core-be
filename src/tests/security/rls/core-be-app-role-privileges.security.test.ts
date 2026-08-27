@@ -71,7 +71,7 @@ describe('Security: core_be_app application role is least-privilege (RLS-bound)'
     );
     expect(superuserCount).toBe(1);
 
-    // Proof — under `core_be_app` with no `app.current_user_id`, FORCE RLS on the self-scoped
+    // Proof — under `core_be_app` with no `app.current_user_public_id`, FORCE RLS on the self-scoped
     // `auth.users` hides the row. If the role ever gained BYPASSRLS/SUPERUSER this returns 1 and
     // fails, which is the whole point: it pins the role's RLS-subjection behaviorally, not just by
     // catalog attribute.

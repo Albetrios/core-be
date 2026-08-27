@@ -293,10 +293,10 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
     });
   });
 
-  describe('permission resolution under ORG-only FORCE RLS (no app.current_user_id)', () => {
+  describe('permission resolution under ORG-only FORCE RLS (no app.current_user_public_id)', () => {
     // Regression guard: requireOrganizationPermission resolves permissions inside
-    // withOrganizationContext, which sets app.current_organization_id but NOT
-    // app.current_user_id. Under the non-superuser core_be_app role with FORCE RLS,
+    // withOrganizationContext, which sets app.current_organization_public_id but NOT
+    // app.current_user_public_id. Under the non-superuser core_be_app role with FORCE RLS,
     // a direct auth.users join returned zero rows → empty permission set → 403 on all
     // org PERM-gated routes in production (CI runs as a superuser and never saw it).
     // The repository now resolves the user via a SECURITY DEFINER function, so this
@@ -383,7 +383,7 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
         })
         .returning();
 
-      // The GDPR export worker reads audit.logs under app.current_user_id with NO org context.
+      // The GDPR export worker reads audit.logs under app.current_user_public_id with NO org context.
       // The audit_logs_user_export_select policy must expose only the actor's own rows.
       await executeAsCoreBeAppUser(userA.public_id, async (transaction) => {
         const ownRows = await transaction.execute(
@@ -457,7 +457,7 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
     it('plain SELECT on tenancy.api_keys returns 0 rows with no org context (demonstrates the bug)', async () => {
       const fixture = await seedRlsMatrixFixtures();
       void fixture;
-      // No app.current_organization_id → tenant-isolation policy resolves to NULL → 0 rows. This is
+      // No app.current_organization_public_id → tenant-isolation policy resolves to NULL → 0 rows. This is
       // why the auth phase (which has no org context yet) cannot look a key up directly.
       const count = await countRowsAsTenant('tenancy', 'api_keys', null);
       expect(count).toBe(0);

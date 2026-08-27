@@ -34,7 +34,7 @@ async function hasSoftDeletedFilterInPolicy(): Promise<boolean> {
  * tenant requests.
  *
  * Before this migration, the `USING` clause was:
- *   public_id = app.current_organization_id
+ *   public_id = app.current_organization_public_id
  *   OR app.global_retention_cleanup = 'true'
  *
  * A request with `X-Organization-Id` set to a deleted org's `public_id` could
@@ -73,11 +73,11 @@ describe('Security: organizations RLS — soft-deleted orgs excluded (sec-new-D3
       .set({ deleted_at: new Date() })
       .where(eq(organizations.id, organization.id));
 
-    // Open a tenant-scoped transaction (core_be_app role + app.current_organization_id).
+    // Open a tenant-scoped transaction (core_be_app role + app.current_organization_public_id).
     await database.transaction(async (transaction) => {
       await transaction.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
       await transaction.execute(
-        drizzleSql`SELECT set_config('app.current_organization_id', ${organization.public_id}, true)`,
+        drizzleSql`SELECT set_config('app.current_organization_public_id', ${organization.public_id}, true)`,
       );
 
       // The soft-deleted org must NOT appear when queried by its own public_id.
@@ -102,7 +102,7 @@ describe('Security: organizations RLS — soft-deleted orgs excluded (sec-new-D3
     await database.transaction(async (transaction) => {
       await transaction.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
       await transaction.execute(
-        drizzleSql`SELECT set_config('app.current_organization_id', ${organization.public_id}, true)`,
+        drizzleSql`SELECT set_config('app.current_organization_public_id', ${organization.public_id}, true)`,
       );
 
       const rows = await transaction

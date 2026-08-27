@@ -12,11 +12,11 @@ import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts
  *
  * @remarks
  * - **RLS:** every tenancy lookup runs under {@link withUserDatabaseContext} via
- *   {@link withUserContextForInternalId}, which sets `app.current_user_id` so the
+ *   {@link withUserContextForInternalId}, which sets `app.current_user_public_id` so the
  *   `organizations_user_discovery` / `memberships_user_self_discovery` policies (migration
  *   `20260520000004`) match the caller's own rows. These reads must NOT run under the
  *   global-admin context: `tenancy.organizations` and `tenancy.memberships` are
- *   FORCE RLS and their policies honor only `app.current_organization_id` and `app.current_user_id`
+ *   FORCE RLS and their policies honor only `app.current_organization_public_id` and `app.current_user_public_id`
  *   — never `app.global_admin` (only the `auth.*` and `audit.logs` policies carry that arm). Under
  *   the admin context every policy evaluates false and the memberships → organizations join returns
  *   zero rows, stranding users on the onboarding wizard once the login role lost BYPASSRLS.
@@ -29,7 +29,7 @@ const organizationRepository = new OrganizationRepository();
 /**
  * Resolves `userInternalId` → `auth.users.public_id` through the `auth.resolve_user_by_internal_id`
  * SECURITY DEFINER resolver, then runs `callback` under {@link withUserDatabaseContext} so the
- * tenancy policies see `app.current_user_id`.
+ * tenancy policies see `app.current_user_public_id`.
  *
  * Returns `undefined` when the internal id resolves to no live user, so callers degrade to
  * "no organization" exactly as they did when the underlying query returned no rows.

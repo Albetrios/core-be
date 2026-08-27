@@ -84,7 +84,7 @@ export type OrganizationOffboardingDependencies = {
  *
  * @remarks
  * - **Algorithm:** every mutation runs inside `withOrganizationDatabaseContext`
- *   (sets `app.current_organization_id` for RLS) and reads use
+ *   (sets `app.current_organization_public_id` for RLS) and reads use
  *   `withUserDatabaseContext` to satisfy the `organizations_user_discovery`
  *   policy. Slug uniqueness is enforced explicitly; access checks short-
  *   circuit for global admins and otherwise require ownership or an active
@@ -216,7 +216,7 @@ export class OrganizationService {
    * - **Notes:** this does **NOT** assert that the caller is a member of the organization — it only
    *   resolves the row (the old name falsely implied a membership check). Authorization is enforced
    *   upstream by the route's `requireOrganizationPermission` preHandler and Postgres RLS scoped to
-   *   `app.current_organization_id`. Do not add a route that relies on this method as its sole
+   *   `app.current_organization_public_id`. Do not add a route that relies on this method as its sole
    *   authorization gate; always pair it with a permission preHandler.
    */
   async requireOrganizationRecordByPublicId(
@@ -343,7 +343,7 @@ export class OrganizationService {
   /**
    * Cross-organization read for the current user. Wraps in `withUserDatabaseContext`
    * so the `organizations_user_discovery` and `memberships_user_self_discovery`
-   * RLS policies see `app.current_user_id` (introduced by migration
+   * RLS policies see `app.current_user_public_id` (introduced by migration
    * `20260520000004_organization_discovery_and_invitation_lookup_rls.sql`). Without
    * this wrap the call returns empty when `DATABASE_RLS_SCOPED_CONTEXTS=true`.
    */
@@ -414,7 +414,7 @@ export class OrganizationService {
     const parsed = validateCreateOrganization(body);
     /**
      * INSERT must pass `organizations_user_discovery` WITH CHECK
-     * (`owner_user_id` resolves to the current `app.current_user_id`). The slug
+     * (`owner_user_id` resolves to the current `app.current_user_public_id`). The slug
      * existence check runs in the same wrap so the SELECT also sees the user GUC.
      */
     return withPrincipalDatabaseContext(

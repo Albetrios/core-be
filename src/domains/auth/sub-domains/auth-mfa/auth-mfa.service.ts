@@ -165,7 +165,7 @@ export class MfaService {
       );
       verified = true;
     } else if (parsed.recovery_code) {
-      // auth.mfa_recovery_codes is FORCE RLS keyed on app.current_user_id; the MFA session already
+      // auth.mfa_recovery_codes is FORCE RLS keyed on app.current_user_public_id; the MFA session already
       // identifies the user, so consume the single-use code inside that user's context.
       const recoveryCode = parsed.recovery_code;
       const consumed = await withPrincipalDatabaseContext(

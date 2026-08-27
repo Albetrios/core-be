@@ -32,70 +32,79 @@ const RLS_TABLE_SCOPE_MAP: Record<string, readonly string[]> = {
   'tenancy.permissions': [],
 
   'audit.logs': [
-    'app.current_organization_id',
-    'app.current_user_id',
+    'app.current_organization_public_id',
+    'app.current_user_public_id',
     'app.global_admin',
     'app.global_retention_cleanup',
     'app.system_audit_insert',
   ],
   'audit.outbox': [
     'app.audit_outbox_drain',
-    'app.current_organization_id',
+    'app.current_organization_public_id',
     'app.system_audit_insert',
   ],
-  'auth.auth_methods': ['app.current_user_id', 'app.global_admin'],
-  'auth.mfa_methods': ['app.current_user_id'],
-  'auth.mfa_recovery_codes': ['app.current_user_id'],
+  'auth.auth_methods': ['app.current_user_public_id', 'app.global_admin'],
+  'auth.mfa_methods': ['app.current_user_public_id'],
+  'auth.mfa_recovery_codes': ['app.current_user_public_id'],
   'auth.sessions': [
     'app.current_session_public_id',
     'app.current_session_token_hash',
-    'app.current_user_id',
+    'app.current_user_public_id',
     'app.session_retention_cleanup',
   ],
-  'auth.user_data_exports': ['app.current_user_id', 'app.global_retention_cleanup'],
-  'auth.user_notification_preferences': ['app.current_user_id'],
-  'auth.user_settings': ['app.current_user_id'],
-  'auth.users': ['app.current_user_id', 'app.global_admin', 'app.global_retention_cleanup'],
-  'auth.webauthn_credentials': ['app.current_user_id'],
-  'billing.subscriptions': ['app.current_organization_id', 'app.global_retention_cleanup'],
+  'auth.user_data_exports': ['app.current_user_public_id', 'app.global_retention_cleanup'],
+  'auth.user_notification_preferences': ['app.current_user_public_id'],
+  'auth.user_settings': ['app.current_user_public_id'],
+  'auth.users': ['app.current_user_public_id', 'app.global_admin', 'app.global_retention_cleanup'],
+  'auth.webauthn_credentials': ['app.current_user_public_id'],
+  'billing.subscriptions': ['app.current_organization_public_id', 'app.global_retention_cleanup'],
   'notify.notifications': [
-    'app.current_organization_id',
-    'app.current_user_id',
+    'app.current_organization_public_id',
+    'app.current_user_public_id',
     'app.global_retention_cleanup',
   ],
   'notify.webhook_delivery_attempts': [
-    'app.current_organization_id',
+    'app.current_organization_public_id',
     'app.global_retention_cleanup',
   ],
-  'notify.webhooks': ['app.current_organization_id', 'app.global_retention_cleanup'],
-  'tenancy.api_keys': ['app.current_organization_id', 'app.global_retention_cleanup'],
-  'tenancy.member_invitations': ['app.current_organization_id', 'app.global_retention_cleanup'],
+  'notify.webhooks': ['app.current_organization_public_id', 'app.global_retention_cleanup'],
+  'tenancy.api_keys': ['app.current_organization_public_id', 'app.global_retention_cleanup'],
+  'tenancy.member_invitations': [
+    'app.current_organization_public_id',
+    'app.global_retention_cleanup',
+  ],
   'tenancy.memberships': [
-    'app.current_organization_id',
-    'app.current_user_id',
+    'app.current_organization_public_id',
+    'app.current_user_public_id',
     'app.global_retention_cleanup',
   ],
   'tenancy.organization_notification_policies': [
-    'app.current_organization_id',
+    'app.current_organization_public_id',
     'app.global_retention_cleanup',
   ],
-  'tenancy.organization_settings': ['app.current_organization_id', 'app.global_retention_cleanup'],
+  'tenancy.organization_settings': [
+    'app.current_organization_public_id',
+    'app.global_retention_cleanup',
+  ],
   'tenancy.organizations': [
-    'app.current_organization_id',
-    'app.current_user_id',
+    'app.current_organization_public_id',
+    'app.current_user_public_id',
     'app.global_retention_cleanup',
   ],
-  'tenancy.role_permissions': ['app.current_organization_id', 'app.global_retention_cleanup'],
-  'tenancy.roles': ['app.current_organization_id', 'app.global_retention_cleanup'],
+  'tenancy.role_permissions': [
+    'app.current_organization_public_id',
+    'app.global_retention_cleanup',
+  ],
+  'tenancy.roles': ['app.current_organization_public_id', 'app.global_retention_cleanup'],
   'upload.uploads': [
-    'app.current_organization_id',
-    'app.current_user_id',
+    'app.current_organization_public_id',
+    'app.current_user_public_id',
     'app.global_retention_cleanup',
   ],
 };
 
 /** Identity GUCs set by the principal pattern (`buildIdentityGucStatement`). */
-const PRINCIPAL_GUCS = ['app.current_organization_id', 'app.current_user_id'];
+const PRINCIPAL_GUCS = ['app.current_organization_public_id', 'app.current_user_public_id'];
 
 /**
  * GUCs a policy arm references but NO code path sets — every entry here is a

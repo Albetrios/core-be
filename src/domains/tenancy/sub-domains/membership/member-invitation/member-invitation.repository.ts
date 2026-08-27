@@ -153,7 +153,7 @@ export class MemberInvitationRepository {
    * Bypasses tenant RLS via the SECURITY DEFINER function
    * `tenancy.resolve_member_invitation_lookup_by_public_id` so the public accept
    * route and the user-driven decline route can resolve the organization without
-   * having `app.current_organization_id` set up front.
+   * having `app.current_organization_public_id` set up front.
    */
   async lookupOrganizationByInvitationPublicId(
     invitation_public_id: string,

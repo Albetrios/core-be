@@ -75,7 +75,7 @@ export const member_invitations = tenancySchema
             SELECT id FROM tenancy.memberships
             WHERE organization_id = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
@@ -83,7 +83,7 @@ export const member_invitations = tenancySchema
             SELECT id FROM tenancy.memberships
             WHERE organization_id = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )`,
       }),

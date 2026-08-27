@@ -48,8 +48,8 @@ describe('withPrincipalDatabaseContext', () => {
 
     expect(mockExecute).toHaveBeenCalledTimes(1);
     const [sqlText] = executedSqlTexts();
-    expect(sqlText).toContain('app.current_user_id');
-    expect(sqlText).toContain('app.current_organization_id');
+    expect(sqlText).toContain('app.current_user_public_id');
+    expect(sqlText).toContain('app.current_organization_public_id');
   });
 
   it('sets only the organization GUC for an org-only (API-key) scope', async () => {
@@ -58,8 +58,8 @@ describe('withPrincipalDatabaseContext', () => {
     await withPrincipalDatabaseContext(scope, async () => undefined);
 
     const [sqlText] = executedSqlTexts();
-    expect(sqlText).toContain('app.current_organization_id');
-    expect(sqlText).not.toContain('app.current_user_id');
+    expect(sqlText).toContain('app.current_organization_public_id');
+    expect(sqlText).not.toContain('app.current_user_public_id');
   });
 
   it('sets only the user GUC for a user-only scope', async () => {
@@ -68,8 +68,8 @@ describe('withPrincipalDatabaseContext', () => {
     await withPrincipalDatabaseContext(scope, async () => undefined);
 
     const [sqlText] = executedSqlTexts();
-    expect(sqlText).toContain('app.current_user_id');
-    expect(sqlText).not.toContain('app.current_organization_id');
+    expect(sqlText).toContain('app.current_user_public_id');
+    expect(sqlText).not.toContain('app.current_organization_public_id');
   });
 
   it('never emits any GUC key beyond the two identity keys (bypass ceiling)', async () => {
@@ -144,10 +144,10 @@ describe('withPrincipalDatabaseContext', () => {
         expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
       });
 
-      // exactly one extra statement: layering app.current_user_id onto the outer handle
+      // exactly one extra statement: layering app.current_user_public_id onto the outer handle
       const sqlTexts = executedSqlTexts();
       expect(sqlTexts).toHaveLength(1);
-      expect(sqlTexts[0]).toContain('app.current_user_id');
+      expect(sqlTexts[0]).toContain('app.current_user_public_id');
     });
   });
 
@@ -169,9 +169,9 @@ describe('withPrincipalDatabaseContext', () => {
       });
       const sqlTexts = executedSqlTexts();
       expect(sqlTexts).toHaveLength(1);
-      expect(sqlTexts[0]).toContain('app.current_user_id');
+      expect(sqlTexts[0]).toContain('app.current_user_public_id');
       // The pinned session's org GUC is never rewritten by a user-only scope.
-      expect(sqlTexts[0]).not.toContain('app.current_organization_id');
+      expect(sqlTexts[0]).not.toContain('app.current_organization_public_id');
     });
   });
 

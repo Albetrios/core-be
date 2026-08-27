@@ -17,8 +17,8 @@ import {
  * (`tenancy.search_organization_membership_ids`, migration 20260702000000).
  *
  * Server-side member search matches on the member's user email / name, which live in `auth.users` —
- * a FORCE ROW LEVEL SECURITY table behind a self-owner policy keyed on `app.current_user_id`. The
- * members list runs under ORG-only context (`app.current_organization_id` set, `app.current_user_id`
+ * a FORCE ROW LEVEL SECURITY table behind a self-owner policy keyed on `app.current_user_public_id`. The
+ * members list runs under ORG-only context (`app.current_organization_public_id` set, `app.current_user_public_id`
  * NOT set), so under the non-superuser `core_be_app` role a plain join from `tenancy.memberships`
  * to `auth.users` resolves the auth.users policy to NULL and returns ZERO rows — search would
  * silently match nothing in production while passing under the RLS-exempt CI superuser. The resolver

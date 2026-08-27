@@ -19,8 +19,8 @@ import { organizations } from '@/domains/tenancy/sub-domains/organization/organi
  * Drizzle definition for `upload.uploads`. Stores upload metadata + lifecycle
  * status (`PENDING` → `UPLOADED` or `FAILED`) referenced by S3 object keys.
  * Two permissive RLS policies are layered: tenant-isolation by
- * `app.current_organization_id` for org-scoped rows, and an owner-access
- * policy via `app.current_user_id` for user-scoped (NULL-org) uploads such
+ * `app.current_organization_public_id` for org-scoped rows, and an owner-access
+ * policy via `app.current_user_public_id` for user-scoped (NULL-org) uploads such
  * as avatars.
  */
 export const uploads = uploadSchema
@@ -70,7 +70,7 @@ export const uploads = uploadSchema
             ${table.organization_id} IS NOT NULL
             AND ${table.organization_id} = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
@@ -83,7 +83,7 @@ export const uploads = uploadSchema
             ${table.organization_id} IS NOT NULL
             AND ${table.organization_id} = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
@@ -98,7 +98,7 @@ export const uploads = uploadSchema
         using: sql`${table.organization_id} IS NULL
           AND ${table.user_id} = (
             SELECT id FROM auth.users
-            WHERE public_id = current_setting('app.current_user_id', true)
+            WHERE public_id = current_setting('app.current_user_public_id', true)
               AND deleted_at IS NULL
           )`,
       }),

@@ -41,8 +41,8 @@ export type RlsTenantFixture = {
 };
 
 /**
- * User-scoped FORCE-RLS tables (audit #7) — isolated by `app.current_user_id` rather than
- * `app.current_organization_id`. Asserted for cross-user denial in the RLS matrix.
+ * User-scoped FORCE-RLS tables (audit #7) — isolated by `app.current_user_public_id` rather than
+ * `app.current_organization_public_id`. Asserted for cross-user denial in the RLS matrix.
  */
 export const USER_SCOPED_FORCE_RLS_TABLES: ForceRlsTableRef[] = [
   { schemaName: 'auth', tableName: 'users' },
@@ -137,7 +137,7 @@ export async function executeAsCoreBeAppTenant<T>(
     await transaction.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
     const tenantValue = organizationPublicId ?? '';
     await transaction.execute(
-      drizzleSql`SELECT set_config('app.current_organization_id', ${tenantValue}, true)`,
+      drizzleSql`SELECT set_config('app.current_organization_public_id', ${tenantValue}, true)`,
     );
     return callback(transaction as unknown as typeof database);
   });
@@ -169,7 +169,7 @@ export async function countRowsAsTenant(
 }
 
 /**
- * Runs `callback` as the least-privilege `core_be_app` role with `app.current_user_id` set, so
+ * Runs `callback` as the least-privilege `core_be_app` role with `app.current_user_public_id` set, so
  * user-scoped FORCE-RLS policies (audit #7) are exercised exactly as they are in production under a
  * non-superuser connection.
  */
@@ -180,13 +180,13 @@ export async function executeAsCoreBeAppUser<T>(
   return database.transaction(async (transaction) => {
     await transaction.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
     await transaction.execute(
-      drizzleSql`SELECT set_config('app.current_user_id', ${userPublicId ?? ''}, true)`,
+      drizzleSql`SELECT set_config('app.current_user_public_id', ${userPublicId ?? ''}, true)`,
     );
     return callback(transaction as unknown as typeof database);
   });
 }
 
-/** Counts rows in a user-scoped table under the supplied `app.current_user_id` context. */
+/** Counts rows in a user-scoped table under the supplied `app.current_user_public_id` context. */
 export async function countRowsAsUser(
   schemaName: string,
   tableName: string,
@@ -481,7 +481,7 @@ export async function seedRlsMatrixFixtures(): Promise<RlsTenantFixture> {
 
 /**
  * Seeds two users each owning one row in every user-scoped FORCE-RLS table (audit #7) so the matrix
- * can assert that user A — under `app.current_user_id = A` — sees its own row but zero of user B's.
+ * can assert that user A — under `app.current_user_public_id = A` — sees its own row but zero of user B's.
  *
  * @remarks
  * - **Algorithm:** insert via the superuser `database` handle (RLS-exempt) so seeding is independent

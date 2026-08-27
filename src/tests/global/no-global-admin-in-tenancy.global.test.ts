@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
  * global-admin escape hatch.**
  *
  * `tenancy.organizations` and `tenancy.memberships` are FORCE RLS, and their policies honor only
- * `app.current_organization_id` (`organizations_tenant_isolation`) and `app.current_user_id`
+ * `app.current_organization_public_id` (`organizations_tenant_isolation`) and `app.current_user_public_id`
  * (`organizations_user_discovery` / `memberships_user_self_discovery`). Unlike the `auth.*` and
  * `audit.logs` policies, **none of them carries an `app.global_admin` arm** — so
  * `withMaintenanceDatabaseContext` grants exactly nothing on tenancy tables while looking like it
@@ -69,8 +69,8 @@ describe('Global: tenancy code never uses the global-admin RLS escape hatch', ()
     expect(
       violations,
       'Tenancy RLS policies do not honor app.global_admin — the hatch reads/writes ZERO rows there.\n' +
-        'Use withUserDatabaseContext (app.current_user_id), withOrganizationDatabaseContext\n' +
-        '(app.current_organization_id), or an auth.* SECURITY DEFINER resolver instead.\n' +
+        'Use withUserDatabaseContext (app.current_user_public_id), withOrganizationDatabaseContext\n' +
+        '(app.current_organization_public_id), or an auth.* SECURITY DEFINER resolver instead.\n' +
         `Offending file(s):\n  ${violations.join('\n  ')}`,
     ).toEqual([]);
   });

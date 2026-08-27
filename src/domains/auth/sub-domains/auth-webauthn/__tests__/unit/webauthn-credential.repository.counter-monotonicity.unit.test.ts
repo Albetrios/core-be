@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * authenticators (Apple Passkeys / Windows Hello) the no-op `0 → 0` write.
  *
  * The repository uses `getRequestDatabase()` and the WebAuthn schema is FORCE
- * RLS keyed on `app.current_user_id`, so a real-DB exercise of `updateCounter`
+ * RLS keyed on `app.current_user_public_id`, so a real-DB exercise of `updateCounter`
  * would need the full user-context plumbing. This suite instead spies on the
  * Drizzle operators imported by the repository and asserts the monotonicity
  * operator (`lt` vs `eq`) is chosen based on the new counter value.

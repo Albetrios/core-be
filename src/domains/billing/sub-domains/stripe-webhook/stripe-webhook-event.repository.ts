@@ -326,7 +326,7 @@ export class StripeWebhookEventRepository {
    * Resolves the owning organization's public id for a Stripe subscription via
    * the `billing.resolve_organization_public_id_for_stripe_subscription`
    * SECURITY DEFINER resolver. Used by the Stripe webhook handler to pin
-   * `app.current_organization_id` before mutating tenant-scoped billing rows.
+   * `app.current_organization_public_id` before mutating tenant-scoped billing rows.
    *
    * @remarks
    * Architecturally this belongs on the repository rather than as ad-hoc

@@ -373,7 +373,7 @@ export class AuthService {
     sessionPublicId: string;
     organizationPublicId: string;
   }): Promise<{ access_token: string; organization_public_id: string }> {
-    // Both reads below run under `app.current_user_id` set to the SAME value, so they share one
+    // Both reads below run under `app.current_user_public_id` set to the SAME value, so they share one
     // context instead of opening a transaction each. `findUserActiveOrganizationByPublicId` takes
     // an INTERNAL id and resolves it back to the public id we already hold — inside the shared
     // context that resolve is a plain query on an open checkout rather than a second BEGIN.

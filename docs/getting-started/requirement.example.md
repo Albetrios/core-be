@@ -28,7 +28,7 @@ added" list up top, so you can change them before the document is finalized like
   - issued_at: timestamptz, notNull
 - Public-id prefix: inv
 - Relations / indexes: index (organization_id, issued_at desc); unique (organization_id, number)
-- Tenancy / soft-delete / audit: org-scoped, RLS on (USING + WITH CHECK app.current_organization_id) | soft-delete: no (immutable ledger) | audit: created_at, updated_at
+- Tenancy / soft-delete / audit: org-scoped, RLS on (USING + WITH CHECK app.current_organization_public_id) | soft-delete: no (immutable ledger) | audit: created_at, updated_at
 
 ## 3. Public API
 - Endpoints:

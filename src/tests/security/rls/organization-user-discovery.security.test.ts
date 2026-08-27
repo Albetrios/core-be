@@ -22,12 +22,12 @@ import { grantCoreBeAppRoleForTests } from '@/tests/helpers/rls-matrix.helper.js
  *
  * The fix-under-test is twofold:
  *   1. `organizations_user_discovery` + `memberships_user_self_discovery` PERMISSIVE
- *      policies grant access ONLY when `app.current_user_id` matches the row owner
+ *      policies grant access ONLY when `app.current_user_public_id` matches the row owner
  *      or an active membership. Existing `*_tenant_isolation` policies are unchanged.
  *   2. `tenancy.resolve_member_invitation_lookup_by_public_id` and
  *      `tenancy.list_pending_member_invitations_for_email` SECURITY DEFINER helpers
  *      let the invitation accept route resolve the owning organization
- *      without an active `app.current_organization_id` GUC, then wrap the actual write
+ *      without an active `app.current_organization_public_id` GUC, then wrap the actual write
  *      in `withOrganizationDatabaseContext`.
  *
  * All assertions run under `core_be_app` so RLS is enforced (the test runner role
@@ -41,7 +41,9 @@ async function executeAsCoreBeAppUser<T>(
   return database.transaction(async (transaction) => {
     await transaction.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
     const value = userPublicId ?? '';
-    await transaction.execute(drizzleSql`SELECT set_config('app.current_user_id', ${value}, true)`);
+    await transaction.execute(
+      drizzleSql`SELECT set_config('app.current_user_public_id', ${value}, true)`,
+    );
     return callback(transaction as unknown as typeof database);
   });
 }
@@ -55,7 +57,7 @@ describe('Security: organization user-discovery RLS + invitation SECURITY DEFINE
     await cleanupDatabase();
   });
 
-  it('owner sees their own organization under app.current_user_id (organizations_user_discovery)', async () => {
+  it('owner sees their own organization under app.current_user_public_id (organizations_user_discovery)', async () => {
     const owner = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: owner.id });
 
@@ -68,7 +70,7 @@ describe('Security: organization user-discovery RLS + invitation SECURITY DEFINE
     expect(rows).toHaveLength(1);
   });
 
-  it('active member sees member organization under app.current_user_id', async () => {
+  it('active member sees member organization under app.current_user_public_id', async () => {
     const owner = await createTestUser();
     const member = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: owner.id });
@@ -118,7 +120,7 @@ describe('Security: organization user-discovery RLS + invitation SECURITY DEFINE
     expect(rows).toHaveLength(0);
   });
 
-  it('user sees own memberships under app.current_user_id (memberships_user_self_discovery)', async () => {
+  it('user sees own memberships under app.current_user_public_id (memberships_user_self_discovery)', async () => {
     const owner = await createTestUser();
     const member = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: owner.id });

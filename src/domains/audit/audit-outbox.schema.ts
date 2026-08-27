@@ -31,7 +31,7 @@ import { auditSchema } from '@/infrastructure/database/pg-schemas.js';
  * `PENDING → FAILED` after `MAX_ATTEMPTS` drain retries (then operator triage).
  *
  * RLS — mirrors the {@link logs} INSERT/SELECT pattern. INSERT is permitted only
- * under the tenant context (`app.current_organization_id`) or the tenantless
+ * under the tenant context (`app.current_organization_public_id`) or the tenantless
  * system-audit arm (`app.system_audit_insert = 'true'` AND
  * `organization_public_id IS NULL`). SELECT/UPDATE/DELETE require the drain
  * context (`app.audit_outbox_drain = 'true'`) which is set only by the drain
@@ -112,7 +112,7 @@ export const audit_outbox = auditSchema
         as: 'permissive',
         for: 'insert',
         to: 'public',
-        withCheck: sql`${table.organization_public_id} = current_setting('app.current_organization_id', true)
+        withCheck: sql`${table.organization_public_id} = current_setting('app.current_organization_public_id', true)
           OR (
             ${table.organization_public_id} IS NULL
             AND current_setting('app.system_audit_insert', true) = 'true'

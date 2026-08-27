@@ -1,6 +1,6 @@
 ---
 name: rls-tenant-isolation-guard
-description: Enforces Postgres Row-Level Security and tenant-isolation correctness in core-be — every tenant-owned table ENABLE + FORCE RLS with an org-scoped policy carrying both USING and WITH CHECK, the app.current_organization_id GUC set on every query path, workers using context wrappers (never calling getRequestDatabase), and tenant jobs carrying organizationPublicId. Use when adding or changing a *.schema.ts table, a migration touching RLS, a database context wrapper, tenant middleware, or any worker/processor that reads tenant data.
+description: Enforces Postgres Row-Level Security and tenant-isolation correctness in core-be — every tenant-owned table ENABLE + FORCE RLS with an org-scoped policy carrying both USING and WITH CHECK, the app.current_organization_public_id GUC set on every query path, workers using context wrappers (never calling getRequestDatabase), and tenant jobs carrying organizationPublicId. Use when adding or changing a *.schema.ts table, a migration touching RLS, a database context wrapper, tenant middleware, or any worker/processor that reads tenant data.
 trigger: src/infrastructure/database/contexts/**, src/domains/**/*.worker.ts
 triggerNote: DB context wrappers, workers, and RLS migrations — tenant isolation
 indexNote: Postgres RLS + tenant isolation (FORCE RLS, org GUC, worker context wrappers)
@@ -12,11 +12,11 @@ The single most failure-prone, security-critical surface in core-be: a missed `F
 
 ## Mechanism (how isolation actually works)
 
-- Postgres RLS policies read transaction-scoped GUCs via `current_setting('app.<key>', true)`. The org GUC is **`app.current_organization_id`** and holds the organization **`public_id`** (not the bigint PK). Tenant policies resolve it as `organization_id = (SELECT id FROM tenancy.organizations WHERE public_id = current_setting('app.current_organization_id', true))`.
+- Postgres RLS policies read transaction-scoped GUCs via `current_setting('app.<key>', true)`. The org GUC is **`app.current_organization_public_id`** and holds the organization **`public_id`** (not the bigint PK). Tenant policies resolve it as `organization_id = (SELECT id FROM tenancy.organizations WHERE public_id = current_setting('app.current_organization_public_id', true))`.
 - Because connections are pooled, the GUC is **always** set with `SET LOCAL` / `set_config(key, value, true)` inside a transaction, so it dies at COMMIT/ROLLBACK and never leaks across checkouts.
 - **HTTP path:** the tenant middleware (`src/shared/middlewares/tenant/tenant.middleware.ts`) only maps `X-Organization-Id → request.organizationId`; it is **not** the RLS authority. The active org is the signed `org` JWT claim. The GUC is set per service unit-of-work by `withPrincipalDatabaseContext(scope, cb)` (`src/infrastructure/database/contexts/database-context.ts`) — the scope is minted at the controller (`resolvePrincipalDatabaseScope`) or, for job/verified paths, by the confined job/verified minters.
 - **Worker path:** `src/worker.ts` sets `CORE_BE_RUNTIME=worker`. Context wrappers open a txn, set their GUC, pin the handle in AsyncLocalStorage, and pass a branded `WorkerContextDatabaseHandle`:
-  - `withPrincipalDatabaseContext` (job-minted org/user scope) → `app.current_organization_id` / `app.current_user_id`
+  - `withPrincipalDatabaseContext` (job-minted org/user scope) → `app.current_organization_public_id` / `app.current_user_public_id`
   - `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup)` → `app.global_retention_cleanup = 'true'`
   - `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.session_retention_cleanup)` → `app.session_retention_cleanup = 'true'`
   - Every bypass kind lives in the `MAINTENANCE_CONTEXTS` registry (`database-context.ts`); usage is per-path allowlisted by `maintenance-context-confinement.policy.unit.test.ts`.
@@ -33,8 +33,8 @@ When you add a **new table in a tenant-owned schema** (`tenancy`, `billing`, `no
 
 - [ ] `ALTER TABLE … ENABLE ROW LEVEL SECURITY`
 - [ ] `ALTER TABLE … FORCE ROW LEVEL SECURITY` — **without FORCE, the table-owning `core_be_app` role bypasses RLS → cross-org leak.**
-- [ ] `CREATE POLICY … FOR ALL` with predicate `organization_id = (SELECT id FROM tenancy.organizations WHERE public_id = current_setting('app.current_organization_id', true)) OR current_setting('app.global_retention_cleanup', true) = 'true'`.
-- [ ] **Writable tables define both `USING` and an explicit `WITH CHECK`.** A `USING`-only policy makes Postgres reuse `USING` for the write check — and since `USING` carries the `app.global_retention_cleanup` (and any `app.global_admin`) bypass, that bypass then leaks to INSERT/UPDATE, letting a retention/admin context plant a row in **any** tenant (audit #41 / H1). The explicit `WITH CHECK` MUST pin to the active-org GUC **without** the retention/admin bypass arm: `WITH CHECK (organization_id = (SELECT id FROM tenancy.organizations WHERE public_id = current_setting('app.current_organization_id', true)))`. Add it with `ALTER POLICY … WITH CHECK (…)` (no policy-gap) and mirror it in the schema `pgPolicy({ … withCheck })`.
+- [ ] `CREATE POLICY … FOR ALL` with predicate `organization_id = (SELECT id FROM tenancy.organizations WHERE public_id = current_setting('app.current_organization_public_id', true)) OR current_setting('app.global_retention_cleanup', true) = 'true'`.
+- [ ] **Writable tables define both `USING` and an explicit `WITH CHECK`.** A `USING`-only policy makes Postgres reuse `USING` for the write check — and since `USING` carries the `app.global_retention_cleanup` (and any `app.global_admin`) bypass, that bypass then leaks to INSERT/UPDATE, letting a retention/admin context plant a row in **any** tenant (audit #41 / H1). The explicit `WITH CHECK` MUST pin to the active-org GUC **without** the retention/admin bypass arm: `WITH CHECK (organization_id = (SELECT id FROM tenancy.organizations WHERE public_id = current_setting('app.current_organization_public_id', true)))`. Add it with `ALTER POLICY … WITH CHECK (…)` (no policy-gap) and mirror it in the schema `pgPolicy({ … withCheck })`.
 - [ ] Keep the `app.global_retention_cleanup` escape clause **in `USING` only**, so the retention/tombstone worker can still SELECT/DELETE cross-tenant but can never write cross-tenant.
 - [ ] Add the table to `EXPECTED_FORCE_RLS_TABLES` (`force-rls-tables.constants.ts`, alphabetical) — `diffForceRlsTables` asserts the live DB FORCE-RLS set matches exactly.
 
@@ -49,7 +49,7 @@ For **`SECURITY DEFINER`** functions — the RLS-bypass resolvers across `auth` 
 
 ### Reading / searching a FORCE-RLS column that lives on a *joined* table
 
-A very common trap: the members list runs under **org-only** context (`app.current_organization_id` set, `app.current_user_id` NOT set), but member email / name live in `auth.users`, which is FORCE RLS behind a self-owner policy keyed on `app.current_user_id`. Under the non-superuser `core_be_app` role a plain `memberships JOIN auth.users` therefore resolves the auth.users policy to NULL and returns **ZERO rows** — the query silently matches nothing in production while passing under the RLS-exempt local/CI superuser (the exact trap behind 20260530000010 / 20260603120000 and the org-mandated-MFA bypass).
+A very common trap: the members list runs under **org-only** context (`app.current_organization_public_id` set, `app.current_user_public_id` NOT set), but member email / name live in `auth.users`, which is FORCE RLS behind a self-owner policy keyed on `app.current_user_public_id`. Under the non-superuser `core_be_app` role a plain `memberships JOIN auth.users` therefore resolves the auth.users policy to NULL and returns **ZERO rows** — the query silently matches nothing in production while passing under the RLS-exempt local/CI superuser (the exact trap behind 20260530000010 / 20260603120000 and the org-mandated-MFA bypass).
 
 **Rule:** whenever a read/search/sort needs a column from a FORCE-RLS table that the current context can't satisfy (e.g. a user column under org context, or an org column before any tenant GUC exists), route it through a narrow SECURITY DEFINER resolver instead of a plain join. Prefer returning **only ids / the minimal columns** and let the caller's normal RLS-scoped, typed query apply the keyset + serialize — keeps typing, pagination, and the auth.users column exposure minimal.
 
@@ -62,15 +62,15 @@ A `with*DatabaseContext` wrapper sets **one** GUC and grants access only on tabl
 
 | Context | GUC | Grants on |
 | --- | --- | --- |
-| `withPrincipalDatabaseContext` (org scope) | `app.current_organization_id` | tenant-scoped tables (`*_tenant_isolation`) |
-| `withPrincipalDatabaseContext` (user scope) | `app.current_user_id` | user-owned rows (`auth.*`, uploads, notifications) **and** the tenancy discovery policies (`organizations_user_discovery`, `memberships_user_self_discovery`) |
+| `withPrincipalDatabaseContext` (org scope) | `app.current_organization_public_id` | tenant-scoped tables (`*_tenant_isolation`) |
+| `withPrincipalDatabaseContext` (user scope) | `app.current_user_public_id` | user-owned rows (`auth.*`, uploads, notifications) **and** the tenancy discovery policies (`organizations_user_discovery`, `memberships_user_self_discovery`) |
 | `withGlobalAdminDatabaseContext` | `app.global_admin` | **`auth.*` and `audit.logs` ONLY** |
 | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup)` | `app.global_retention_cleanup` | retention-sweep tables |
 
 **`app.global_admin` is NOT a tenancy bypass.** No `tenancy.*` policy carries that arm, so the admin context reads zero rows from `tenancy.organizations` / `tenancy.memberships` and fails their `WITH CHECK` on write. (The `WITH CHECK` checklist item above warns about a `global_admin` arm leaking from `USING` — that concerns tables where such an arm exists, e.g. `audit.logs`; on tenancy tables there is none to leak.) This shipped to production three times — organization provisioning (42501), active-org resolution at login (zero rows → no `org` claim, empty permissions), and the `OrganizationRepository` user-id resolvers (`null` → permission-cache purge skipped, attribution nulled).
 
 - **Never import `withGlobalAdminDatabaseContext` under `src/domains/tenancy/**`** — enforced by `no-global-admin-in-tenancy.global.test.ts`. The policy fact itself is pinned by `tenancy-global-admin-invisibility.security.test.ts`.
-- For an auth-flow read that has no org GUC yet (login, MFA, org switch, refresh), use `withPrincipalDatabaseContext` with a user scope (verified minter on auth flows) — the tenancy discovery policies are keyed on `app.current_user_id`, so the caller sees exactly their own orgs and memberships.
+- For an auth-flow read that has no org GUC yet (login, MFA, org switch, refresh), use `withPrincipalDatabaseContext` with a user scope (verified minter on auth flows) — the tenancy discovery policies are keyed on `app.current_user_public_id`, so the caller sees exactly their own orgs and memberships.
 - The joined-table rule above applies to **any** context that cannot satisfy the target policy — org-only context *and* post-commit paths running with no GUC at all (a frequent miss: `sec-R11`-style "invalidate AFTER commit, outside the org block" code).
 
 ### Savepoints do NOT restore session settings
@@ -79,12 +79,12 @@ A `with*DatabaseContext` wrapper sets **one** GUC and grants access only on tabl
 
 ```sql
 BEGIN;
-SELECT set_config('app.current_organization_id','A',true);
-SAVEPOINT s; SELECT set_config('app.current_organization_id','B',true); RELEASE SAVEPOINT s;
-SELECT current_setting('app.current_organization_id');   -- 'B', not 'A'
+SELECT set_config('app.current_organization_public_id','A',true);
+SAVEPOINT s; SELECT set_config('app.current_organization_public_id','B',true); RELEASE SAVEPOINT s;
+SELECT current_setting('app.current_organization_public_id');   -- 'B', not 'A'
 ```
 
-**Rule:** inside a nested transaction, set **every** GUC the RLS identity depends on, on **every** iteration — never only the one that row happens to need. A branch that sets just its own GUC inherits the other branch's value from the previous row, silently widening the policy for the remainder of the batch. Reference: the per-row savepoint in `audit-outbox-drain.processor.ts` writes both `app.current_organization_id` and `app.system_audit_insert` unconditionally for exactly this reason.
+**Rule:** inside a nested transaction, set **every** GUC the RLS identity depends on, on **every** iteration — never only the one that row happens to need. A branch that sets just its own GUC inherits the other branch's value from the previous row, silently widening the policy for the remainder of the batch. Reference: the per-row savepoint in `audit-outbox-drain.processor.ts` writes both `app.current_organization_public_id` and `app.system_audit_insert` unconditionally for exactly this reason.
 
 Do **not** try to enforce this with a blanket "no `set_config` inside a nested transaction" test — legitimate per-row RLS scoping needs it. Enforce *totality* (all identity GUCs written every iteration) instead.
 

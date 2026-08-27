@@ -16,7 +16,7 @@ import { PUBLIC_ID_REGEX } from '@/shared/utils/identity/public-id.util.js';
  * pre-auth format-validated decoration and is never the authority for permission
  * checks or the RLS GUC. Do not introduce new consumers that trust it pre-auth.
  *
- * Row-Level Security for Postgres uses `SET LOCAL app.current_organization_id`
+ * Row-Level Security for Postgres uses `SET LOCAL app.current_organization_public_id`
  * inside the short-lived `withPrincipalDatabaseContext` transaction opened at
  * each org-scoped call site, keyed by the claim-resolved organization id.
  *

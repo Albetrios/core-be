@@ -241,7 +241,7 @@ export class OrganizationApiKeyRepository extends BaseRepository {
    * Resolves active API-key candidates by prefix for the pre-session authentication phase.
    * Delegates to the `tenancy.resolve_api_key_for_authentication` SECURITY DEFINER resolver because
    * `tenancy.api_keys` (and `tenancy.organizations`) are FORCE RLS and the auth phase has no
-   * `app.current_organization_id` context — a plain SELECT would resolve the policy to NULL and
+   * `app.current_organization_public_id` context — a plain SELECT would resolve the policy to NULL and
    * return zero rows, rejecting every valid key in production.
    */
   async findActiveByKeyPrefix(

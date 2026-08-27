@@ -48,7 +48,7 @@ async function isPrivilegeBypassMigrationApplied(): Promise<boolean> {
  *
  * After migration 20260608040000 the INSERT policy accepts only a
  * tenant-scoped insert where `organization_id` matches
- * `current_setting('app.current_organization_id', true)`. Both the
+ * `current_setting('app.current_organization_public_id', true)`. Both the
  * `global_admin` and `global_retention_cleanup` paths must now be rejected.
  */
 describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec-r4-D1)', () => {
@@ -75,7 +75,7 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
     let caught: unknown;
     try {
       await executeAsCoreBeAppGlobalAdmin(async (transaction) => {
-        // No app.current_organization_id set — only global_admin is active.
+        // No app.current_organization_public_id set — only global_admin is active.
         // Before the fix this would succeed (global_admin bypassed WITH CHECK).
         // After the fix RLS rejects it.
         await transaction.execute(
@@ -103,7 +103,7 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
       await withMaintenanceDatabaseContext(
         MAINTENANCE_SCOPE.global_retention_cleanup,
         async (databaseHandle) => {
-          // No app.current_organization_id set — only global_retention_cleanup
+          // No app.current_organization_public_id set — only global_retention_cleanup
           // is active. Before the fix this would succeed. After the fix, RLS
           // rejects it.
           await databaseHandle.execute(
@@ -142,7 +142,7 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
       await database.transaction(async (transaction) => {
         await transaction.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
         await transaction.execute(
-          drizzleSql`SELECT set_config('app.current_organization_id', ${organization.public_id}, true)`,
+          drizzleSql`SELECT set_config('app.current_organization_public_id', ${organization.public_id}, true)`,
         );
         await transaction.execute(
           drizzleSql`INSERT INTO audit.logs (organization_id, action, resource_type, ip_address, user_agent, metadata)

@@ -38,7 +38,7 @@ export interface AuditOutboxInsertInput {
  *   affected-row count is the loud-failure guard instead of the returned id.
  *   Never opens its own transaction — the wrapping context (org /
  *   system-audit-insert) owns the transaction boundary.
- * - **Failure modes:** RLS rejects the INSERT when `app.current_organization_id`
+ * - **Failure modes:** RLS rejects the INSERT when `app.current_organization_public_id`
  *   does not match the supplied `organizationPublicId` (or, for tenantless
  *   audits, when `app.system_audit_insert` is not `'true'`). The thrown error
  *   bubbles back to the caller's audit-record wrapper, which catches and logs

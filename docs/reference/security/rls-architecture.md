@@ -127,8 +127,8 @@ switches** whose authority is the frozen scope singleton + per-file allowlist.
 
 | GUC | Pattern / setter | Value | Set when |
 | --- | ---------------- | ----- | -------- |
-| `app.current_organization_id` | Principal | org **public id** (dynamic, from the JWT `org` claim / job payload / verified id) | scope carries `organizationPublicId` |
-| `app.current_user_id` | Principal | user **public id** (dynamic) | scope carries `userPublicId` |
+| `app.current_organization_public_id` | Principal | org **public id** (dynamic, from the JWT `org` claim / job payload / verified id) | scope carries `organizationPublicId` |
+| `app.current_user_public_id` | Principal | user **public id** (dynamic) | scope carries `userPublicId` |
 | `app.current_session_public_id` | Session (`kind: public_id`) | session public id (dynamic) | pre-auth session lookup by public id |
 | `app.current_session_token_hash` | Session (`kind: token_hash`) | token hash (dynamic) | pre-auth session lookup by token hash |
 | `app.global_retention_cleanup` | Maintenance | `'true'` | retention/tombstone workers, offboarding reconcilers, the org tombstoning step |
@@ -151,13 +151,13 @@ job → worker-runtime mints scope ─┘        │
                                            ▼
                      one SELECT set_config(...), set_config(...)   ← ONE round trip,
                      exactly the GUCs the scope carries:              never more
-                       org-only scope  → app.current_organization_id
-                       user-only scope → app.current_user_id
+                       org-only scope  → app.current_organization_public_id
+                       user-only scope → app.current_user_public_id
                        both            → both
                                            │
                      reuse branches (no second checkout):
                        same-org nested call        → reuse pinned handle as-is
-                       user-only inside pinned tx  → layer ONLY app.current_user_id
+                       user-only inside pinned tx  → layer ONLY app.current_user_public_id
                                                      onto the outer handle (FK atomicity
                                                      for OAuth find-or-create)
 ```
@@ -179,10 +179,10 @@ Authoritative, live-verified map: `rls-table-scope-map.db.unit.test.ts` (asserts
 
 | Table group | GUC arms on its policies |
 | ----------- | ------------------------ |
-| Tenant-scoped (`tenancy.*` children, `billing.subscriptions`, `notify.*`, org-scoped `upload.uploads`, org-scoped `audit.logs`/`outbox` arms) | `app.current_organization_id` + `app.global_retention_cleanup` |
-| User-owned (`auth.users`†, `auth.auth_methods`†, MFA/WebAuthn/settings/preferences/exports, personal uploads, user notifications) | `app.current_user_id` (+ `app.global_admin`†, + `app.global_retention_cleanup` where retention prunes) |
-| `auth.sessions` | `app.current_user_id`, `app.current_session_public_id`, `app.current_session_token_hash`, `app.session_retention_cleanup` |
-| `audit.logs` | org arm, `app.current_user_id` (own-actions export), `app.global_admin`, `app.global_retention_cleanup`, `app.system_audit_insert` |
+| Tenant-scoped (`tenancy.*` children, `billing.subscriptions`, `notify.*`, org-scoped `upload.uploads`, org-scoped `audit.logs`/`outbox` arms) | `app.current_organization_public_id` + `app.global_retention_cleanup` |
+| User-owned (`auth.users`†, `auth.auth_methods`†, MFA/WebAuthn/settings/preferences/exports, personal uploads, user notifications) | `app.current_user_public_id` (+ `app.global_admin`†, + `app.global_retention_cleanup` where retention prunes) |
+| `auth.sessions` | `app.current_user_public_id`, `app.current_session_public_id`, `app.current_session_token_hash`, `app.session_retention_cleanup` |
+| `audit.logs` | org arm, `app.current_user_public_id` (own-actions export), `app.global_admin`, `app.global_retention_cleanup`, `app.system_audit_insert` |
 | `audit.outbox` | org arm + `app.system_audit_insert` (INSERT); `app.audit_outbox_drain` (SELECT/UPDATE/DELETE — drain-exclusive) |
 | System tables (`auth.mail_outbox`, `billing.stripe_webhook_events`, `billing.plans`, tombstones, `audit.dead_letter_jobs`, `tenancy.permissions`, `auth.verification_tokens`) | no GUC — role-scoped `*_app_access` policies (`core_be_app`, `core_be_maintenance`) or `USING (true)` |
 

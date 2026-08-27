@@ -365,7 +365,7 @@ All 19 phases from the Consolidated Master Plan (Domain API Upgrade + CI/CD + en
 - [x] `DATABASE_MIGRATION_URL` in env config; `migrate.ts` uses it with fallback
 - [x] `db:push` script added to `package.json`
 - [x] RLS migration (consolidated into the baseline `migrations/00000000000000_init.sql`) for all multi-tenant tables
-- [x] Tenant middleware sets `app.current_organization_id` Postgres session variable for RLS
+- [x] Tenant middleware sets `app.current_organization_public_id` Postgres session variable for RLS
 
 ### Phase 3 — Security hardening
 

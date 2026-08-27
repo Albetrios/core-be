@@ -39,7 +39,7 @@ describe('Security: Organization RLS session', () => {
     await seedPermissions([TENANCY_PERMISSIONS.ORGANIZATION_READ]);
   });
 
-  it('should hide other tenants when app.current_organization_id is set in a transaction', async () => {
+  it('should hide other tenants when app.current_organization_public_id is set in a transaction', async () => {
     const forceRlsRows = await sql<{ relforcerowsecurity: boolean }[]>`
       SELECT c.relforcerowsecurity
       FROM pg_class c
@@ -58,7 +58,7 @@ describe('Security: Organization RLS session', () => {
     await database.transaction(async (transaction) => {
       await transaction.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
       await transaction.execute(
-        drizzleSql`SELECT set_config('app.current_organization_id', ${organizationA.public_id}, true)`,
+        drizzleSql`SELECT set_config('app.current_organization_public_id', ${organizationA.public_id}, true)`,
       );
       const rows = await transaction
         .select({ public_id: organizations.public_id })
@@ -81,7 +81,7 @@ describe('Security: Organization RLS session', () => {
       roleId: role.id,
     });
     // Flat organization route resolves the active org from the JWT `org` claim,
-    // which drives the RLS GUC (`app.current_organization_id`) for the request.
+    // which drives the RLS GUC (`app.current_organization_public_id`) for the request.
     const token = await generateTestToken({
       userId: user.public_id,
       organizationPublicId: organization.public_id,

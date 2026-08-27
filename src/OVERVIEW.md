@@ -88,7 +88,7 @@ These patterns are implemented identically across the codebase. See [src/PATTERN
 - **`audit-emission`** — security- and governance-relevant writes stage a row in `audit.outbox` (drained into `audit.logs`); failures never fail the originating request.
 - **`idempotency`** — mutating endpoints accept (and some require) an `X-Idempotency-Key` header backed by a 24 h Redis cache.
 - **`soft-delete`** — most user/org-owned tables tombstone with `deleted_at`; immutable ledgers (audit, billing) hard-delete only after retention windows.
-- **`rls-context`** — workers and request handlers wrap DB I/O in context helpers that `SET LOCAL app.current_organization_id`. Workers must not import request-scoped DB context.
+- **`rls-context`** — workers and request handlers wrap DB I/O in context helpers that `SET LOCAL app.current_organization_public_id`. Workers must not import request-scoped DB context.
 - **`transactional-outbox`** — outbound side effects (mail, webhook delivery) are written to an outbox table inside the originating transaction and dispatched by a separate worker with at-least-once semantics.
 - **`import-paths`** — `@/` alias for all cross-folder imports inside `src/` (`@tooling/` in tooling); same-folder `./` only, never `../` traversal.
 

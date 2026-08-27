@@ -18,7 +18,7 @@ import { api_keys } from '@/domains/tenancy/sub-domains/organization/organizatio
 /**
  * Drizzle definition for `audit.logs` — the append-only ledger of actor/resource
  * actions. RLS tenant-isolation policies scope access by operation type:
- * - **INSERT** (WITH CHECK): only normal tenant context (`app.current_organization_id`)
+ * - **INSERT** (WITH CHECK): only normal tenant context (`app.current_organization_public_id`)
  *   may write rows. Neither `app.global_admin` nor `app.global_retention_cleanup`
  *   is permitted on INSERT — they are read/delete contexts only (sec-r4-D1).
  * - **SELECT** (USING): tenant context, `app.global_retention_cleanup`, and the
@@ -92,7 +92,7 @@ export const logs = auditSchema
         sql`${table.severity} IN ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')`,
       ),
       // sec-U3: audit.logs is append-only at the DB layer. The old `FOR ALL`
-      // policy let any caller with `app.current_organization_id` UPDATE or
+      // policy let any caller with `app.current_organization_public_id` UPDATE or
       // DELETE audit rows for their own organization. We split into FOR
       // SELECT + FOR INSERT + FOR DELETE so:
       //   - SELECT / INSERT predicates are byte-identical to the old USING
@@ -109,7 +109,7 @@ export const logs = auditSchema
         to: 'public',
         using: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations
-            WHERE public_id = current_setting('app.current_organization_id', true)
+            WHERE public_id = current_setting('app.current_organization_public_id', true)
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'
           OR current_setting('app.global_admin', true) = 'true'`,
@@ -130,7 +130,7 @@ export const logs = auditSchema
         // replay and other system-level emitters that have no tenant.
         withCheck: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations
-            WHERE public_id = current_setting('app.current_organization_id', true)
+            WHERE public_id = current_setting('app.current_organization_public_id', true)
           )
           OR (
             ${table.organization_id} IS NULL
@@ -149,7 +149,7 @@ export const logs = auditSchema
         to: 'public',
         using: sql`${table.actor_user_id} = (
             SELECT id FROM auth.users
-            WHERE public_id = current_setting('app.current_user_id', true)
+            WHERE public_id = current_setting('app.current_user_public_id', true)
               AND deleted_at IS NULL
           )`,
       }),

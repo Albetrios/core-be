@@ -34,7 +34,7 @@ export class UserSettingsService {
     const user_public_id = scope.userPublicId;
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    // auth.user_settings is FORCE RLS keyed on app.current_user_id — read inside the user context.
+    // auth.user_settings is FORCE RLS keyed on app.current_user_public_id — read inside the user context.
     const settings = await withPrincipalDatabaseContext(scope, () =>
       this.repository.getByUserId(user.id),
     );
@@ -46,7 +46,7 @@ export class UserSettingsService {
     const parsed = validateUpdateUserSettings(body);
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    // auth.user_settings is FORCE RLS keyed on app.current_user_id — upsert inside the user context.
+    // auth.user_settings is FORCE RLS keyed on app.current_user_public_id — upsert inside the user context.
     const result = await withPrincipalDatabaseContext(scope, () =>
       this.repository.upsert(user.id, omitUndefined(parsed)),
     );

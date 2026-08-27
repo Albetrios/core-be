@@ -146,8 +146,8 @@ export function createPrincipalDatabaseScope(input: {
 
 /**
  * The common unit-of-work wrapper for principal-scoped database access: opens one
- * transaction, sets the identity GUCs the scope carries (`app.current_user_id`
- * and/or `app.current_organization_id`) in a single `set_config` statement, pins the
+ * transaction, sets the identity GUCs the scope carries (`app.current_user_public_id`
+ * and/or `app.current_organization_public_id`) in a single `set_config` statement, pins the
  * handle in ALS, and releases everything at COMMIT/ROLLBACK.
  *
  * @remarks
@@ -187,7 +187,7 @@ export async function withPrincipalDatabaseContext<T>(
       if (userPublicId !== undefined) {
         await setLocalDatabaseConfig(
           activeSession.databaseHandle,
-          'app.current_user_id',
+          'app.current_user_public_id',
           userPublicId,
         );
       }
@@ -210,7 +210,7 @@ export async function withPrincipalDatabaseContext<T>(
     return runWithWorkerDatabaseContext(workerContext, async () => {
       await setLocalDatabaseConfig(
         activeSession.databaseHandle,
-        'app.current_user_id',
+        'app.current_user_public_id',
         userPublicId,
       );
       return callback(brandWorkerContextDatabaseHandle(activeSession.databaseHandle));
@@ -268,12 +268,12 @@ function buildIdentityGucStatement(identity: {
 }) {
   const { userPublicId, organizationPublicId } = identity;
   if (userPublicId !== undefined && organizationPublicId !== undefined) {
-    return drizzleSql`SELECT set_config('app.current_user_id', ${userPublicId}, true), set_config('app.current_organization_id', ${organizationPublicId}, true)`;
+    return drizzleSql`SELECT set_config('app.current_user_public_id', ${userPublicId}, true), set_config('app.current_organization_public_id', ${organizationPublicId}, true)`;
   }
   if (organizationPublicId !== undefined) {
-    return drizzleSql`SELECT set_config('app.current_organization_id', ${organizationPublicId}, true)`;
+    return drizzleSql`SELECT set_config('app.current_organization_public_id', ${organizationPublicId}, true)`;
   }
-  return drizzleSql`SELECT set_config('app.current_user_id', ${userPublicId as string}, true)`;
+  return drizzleSql`SELECT set_config('app.current_user_public_id', ${userPublicId as string}, true)`;
 }
 
 /**

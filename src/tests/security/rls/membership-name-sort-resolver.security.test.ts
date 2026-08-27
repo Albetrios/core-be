@@ -17,8 +17,8 @@ import {
  * (`tenancy.list_organization_membership_ids_by_name`, migration 20260702010000).
  *
  * Sorting the members list by name orders on the member's `auth.users` display name — a FORCE ROW
- * LEVEL SECURITY table behind a self-owner policy keyed on `app.current_user_id`. The members list
- * runs under ORG-only context (`app.current_organization_id` set, `app.current_user_id` NOT set), so
+ * LEVEL SECURITY table behind a self-owner policy keyed on `app.current_user_public_id`. The members list
+ * runs under ORG-only context (`app.current_organization_public_id` set, `app.current_user_public_id` NOT set), so
  * under the non-superuser `core_be_app` role a plain join from `tenancy.memberships` to `auth.users`
  * resolves to ZERO rows — sort-by-name would silently return an empty page in production while
  * passing under the RLS-exempt CI superuser. The resolver bypasses RLS by explicit organization

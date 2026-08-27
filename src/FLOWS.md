@@ -180,7 +180,7 @@ sequenceDiagram
   Admin->>Mem: POST /organization/memberships {email, role_id}
   Mem->>Usr: findOrCreateInvitedByEmail(email)
   Usr->>DB: resolve by email (SECURITY DEFINER) — else INSERT auth.users (ACTIVE, is_email_verified=false, no auth method)
-  Mem->>DB: BEGIN; SET LOCAL app.current_organization_id
+  Mem->>DB: BEGIN; SET LOCAL app.current_organization_public_id
   Mem->>DB: privilege-escalation guard; INSERT memberships (status=INVITED)
   Mem->>Inv: createForMembership(...)
   Inv->>DB: INSERT member_invitations (token_hash, expires_at)
@@ -192,7 +192,7 @@ sequenceDiagram
   Note over Invitee,Auth: invitee onboards (claims the pre-created user) via email verification-code login or OAuth — find-by-email reuses the row and email-code/OAuth set is_email_verified
   Invitee->>Inv: POST /tenancy/invitations/:invitation_id/accept {token} (authenticated)
   Inv->>Usr: requireUserRecordByPublicId(actingUser) — 403 if email unverified, 403 if email ≠ invitee
-  Inv->>DB: BEGIN; SET LOCAL app.current_organization_id
+  Inv->>DB: BEGIN; SET LOCAL app.current_organization_public_id
   Inv->>DB: UPDATE member_invitations SET accepted_at=NOW() WHERE token_hash=$1 (atomic, single-use)
   Inv->>DB: UPDATE memberships SET status=ACTIVE, joined_at=NOW() (activateForInvitationAccept)
   Inv->>DB: COMMIT
@@ -252,7 +252,7 @@ sequenceDiagram
   Queue->>Worker: deliver job (async, separate process)
   Worker->>SWS: handleEvent → dispatchEvent
   SWS->>Sub: syncFromStripeProviderSubscription(provider_id, data, event.created_at)
-  Sub->>DB: BEGIN; SET LOCAL app.current_organization_id
+  Sub->>DB: BEGIN; SET LOCAL app.current_organization_public_id
   Sub->>DB: UPDATE subscriptions SET ... WHERE provider_subscription_id=$1
   Sub->>DB: COMMIT
   Worker->>DB: UPDATE stripe_webhook_events SET status=processed

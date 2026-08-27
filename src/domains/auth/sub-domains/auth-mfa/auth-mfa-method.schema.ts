@@ -15,7 +15,7 @@ import { users } from '@/domains/user/user.schema.js';
 /**
  * Dedicated MFA methods table — conceptually separate from login auth_methods.
  * Stores TOTP secrets, backup codes, and other MFA factor data. RLS-gated by
- * `app.current_user_id` (set via `withUserDatabaseContext`) so MFA secrets are isolated per user.
+ * `app.current_user_public_id` (set via `withUserDatabaseContext`) so MFA secrets are isolated per user.
  */
 export const mfa_methods = authSchema
   .table(
@@ -51,12 +51,12 @@ export const mfa_methods = authSchema
         to: 'public',
         using: sql`${table.user_id} = (
             SELECT id FROM auth.users
-            WHERE public_id = current_setting('app.current_user_id', true)
+            WHERE public_id = current_setting('app.current_user_public_id', true)
               AND deleted_at IS NULL
           )`,
         withCheck: sql`${table.user_id} = (
             SELECT id FROM auth.users
-            WHERE public_id = current_setting('app.current_user_id', true)
+            WHERE public_id = current_setting('app.current_user_public_id', true)
               AND deleted_at IS NULL
           )`,
       }),

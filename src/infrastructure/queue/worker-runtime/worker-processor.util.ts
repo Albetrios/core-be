@@ -19,7 +19,7 @@ export type WorkerDatabaseHandle = WorkerContextDatabaseHandle;
 /**
  * Decorates a per-queue job payload `TJob` with the `organizationPublicId` discriminator
  * required by {@link runTenantScopedWorkerJob} so the processor can re-enter Postgres
- * inside the job-scope principal context (sets `app.current_organization_id` for RLS).
+ * inside the job-scope principal context (sets `app.current_organization_public_id` for RLS).
  */
 export type TenantScopedWorkerJob<TJob> = TJob & {
   organizationPublicId: string;
@@ -36,7 +36,7 @@ export type TenantScopedJobData = {
 /**
  * Decorates a per-queue job payload `TJob` with the `userPublicId` discriminator required
  * by {@link runUserScopedWorkerJob} so the processor can re-enter Postgres inside
- * the job-scope principal context (sets `app.current_user_id` for GDPR-scoped reads).
+ * the job-scope principal context (sets `app.current_user_public_id` for GDPR-scoped reads).
  */
 export type UserScopedWorkerJob<TJob> = TJob & {
   userPublicId: string;
@@ -70,7 +70,7 @@ export async function runGlobalRetentionWorkerJob<TResult>(
 }
 
 /**
- * Runs a user-scoped worker job with `app.current_user_id` set (GDPR export, etc.).
+ * Runs a user-scoped worker job with `app.current_user_public_id` set (GDPR export, etc.).
  */
 export async function runUserScopedWorkerJob<TJob, TResult>(
   job: UserScopedWorkerJob<TJob>,

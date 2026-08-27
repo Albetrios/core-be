@@ -15,7 +15,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
  * `auth`/`audit` do) — so the `tenancy.organizations` INSERT's WITH CHECK was rejected under the
  * non-superuser `core_be_app` role in deployed environments, while passing locally where the DB
  * connects as a BYPASSRLS superuser. The fix runs the bootstrap under the NEW org's own context
- * (`app.current_organization_id` = the pre-generated `public_id`), which satisfies the
+ * (`app.current_organization_public_id` = the pre-generated `public_id`), which satisfies the
  * tenant-isolation WITH CHECK for the org row and every org-scoped child row.
  *
  * These assertions run as `core_be_app` so FORCE RLS is actually enforced — the default test
@@ -100,8 +100,8 @@ describe('Security: personal-organization provisioning under RLS (core_be_app)',
 
   it('rejects the org INSERT with an RLS violation when NO org context is set (the former global-admin path)', async () => {
     // The old provisioning set app.global_admin (which the org policy ignores) and no
-    // app.current_organization_id — reproduced here as an empty tenant context. The WITH CHECK
-    // `public_id = app.current_organization_id` cannot match, so the write is rejected.
+    // app.current_organization_public_id — reproduced here as an empty tenant context. The WITH CHECK
+    // `public_id = app.current_organization_public_id` cannot match, so the write is rejected.
     const organizationPublicId = generatePublicId('organization');
 
     let caught: unknown;

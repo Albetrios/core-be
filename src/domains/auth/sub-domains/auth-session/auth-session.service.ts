@@ -414,7 +414,7 @@ export class AuthSessionService {
    * @remarks
    * - **Algorithm:** resolves the owner's public id from the internal `userId`
    *   via {@link UserService.findById} (RLS-safe SECURITY DEFINER resolver),
-   *   then revokes all of that user's sessions under their own `app.current_user_id`
+   *   then revokes all of that user's sessions under their own `app.current_user_public_id`
    *   context so the `sessions_user_access` policy authorizes the family-wide update.
    * - **Failure modes:** if the owner can no longer be resolved (already
    *   hard-deleted) the revoke is skipped — the replay is rejected regardless by

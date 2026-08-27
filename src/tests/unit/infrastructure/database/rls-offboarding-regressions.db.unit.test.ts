@@ -46,7 +46,7 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
       // Seed BEFORE SET ROLE is not possible inside this tx (role already set) —
       // the user arm's WITH CHECK admits the self insert, so seed under the user GUC.
       await tx.execute(
-        drizzleSql`SELECT set_config('app.current_user_id', 'usr_rlsregression000001', true)`,
+        drizzleSql`SELECT set_config('app.current_user_public_id', 'usr_rlsregression000001', true)`,
       );
       await seedUser(tx, 'usr_rlsregression000001');
 
@@ -84,11 +84,11 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
   it('organization soft-delete is rejected under the plain org scope and succeeds under retention (sec-new-D3 kept)', async () => {
     const outcome = await runRolledBack(async (tx) => {
       await tx.execute(
-        drizzleSql`SELECT set_config('app.current_user_id', 'usr_rlsregression000002', true)`,
+        drizzleSql`SELECT set_config('app.current_user_public_id', 'usr_rlsregression000002', true)`,
       );
       await seedUser(tx, 'usr_rlsregression000002');
       await tx.execute(
-        drizzleSql`SELECT set_config('app.current_organization_id', 'org_rlsregression00001', true)`,
+        drizzleSql`SELECT set_config('app.current_organization_public_id', 'org_rlsregression00001', true)`,
       );
       await tx.execute(
         drizzleSql`INSERT INTO tenancy.organizations (public_id, name, owner_user_id)
@@ -110,7 +110,9 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
       }
 
       // Retention context (what organization.service now uses for the tombstone step).
-      await tx.execute(drizzleSql`SELECT set_config('app.current_organization_id', '', true)`);
+      await tx.execute(
+        drizzleSql`SELECT set_config('app.current_organization_public_id', '', true)`,
+      );
       await tx.execute(drizzleSql`SELECT set_config('app.global_retention_cleanup', 'true', true)`);
       const updated = await tx.execute(
         drizzleSql`UPDATE tenancy.organizations SET deleted_at = now()
@@ -129,10 +131,10 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
   it('retention context can see users rows (tombstone purge + offboarding reconciler scans)', async () => {
     const visible = await runRolledBack(async (tx) => {
       await tx.execute(
-        drizzleSql`SELECT set_config('app.current_user_id', 'usr_rlsregression000003', true)`,
+        drizzleSql`SELECT set_config('app.current_user_public_id', 'usr_rlsregression000003', true)`,
       );
       await seedUser(tx, 'usr_rlsregression000003');
-      await tx.execute(drizzleSql`SELECT set_config('app.current_user_id', '', true)`);
+      await tx.execute(drizzleSql`SELECT set_config('app.current_user_public_id', '', true)`);
       await tx.execute(drizzleSql`SELECT set_config('app.global_retention_cleanup', 'true', true)`);
       const rows = await tx.execute(
         drizzleSql`SELECT public_id FROM auth.users WHERE public_id = 'usr_rlsregression000003'`,
@@ -146,11 +148,11 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
   it('the audit drain resolvers return org and api-key ids under global_admin only', async () => {
     const outcome = await runRolledBack(async (tx) => {
       await tx.execute(
-        drizzleSql`SELECT set_config('app.current_user_id', 'usr_rlsregression000004', true)`,
+        drizzleSql`SELECT set_config('app.current_user_public_id', 'usr_rlsregression000004', true)`,
       );
       await seedUser(tx, 'usr_rlsregression000004');
       await tx.execute(
-        drizzleSql`SELECT set_config('app.current_organization_id', 'org_rlsregression00002', true)`,
+        drizzleSql`SELECT set_config('app.current_organization_public_id', 'org_rlsregression00002', true)`,
       );
       await tx.execute(
         drizzleSql`INSERT INTO tenancy.organizations (public_id, name, owner_user_id)
@@ -158,8 +160,10 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
                            (SELECT id FROM auth.users WHERE public_id = 'usr_rlsregression000004'))`,
       );
       // Drop every GUC — the drain resolves under app.global_admin only.
-      await tx.execute(drizzleSql`SELECT set_config('app.current_user_id', '', true)`);
-      await tx.execute(drizzleSql`SELECT set_config('app.current_organization_id', '', true)`);
+      await tx.execute(drizzleSql`SELECT set_config('app.current_user_public_id', '', true)`);
+      await tx.execute(
+        drizzleSql`SELECT set_config('app.current_organization_public_id', '', true)`,
+      );
       await tx.execute(drizzleSql`SELECT set_config('app.global_admin', 'true', true)`);
 
       const direct = await tx.execute(

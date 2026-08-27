@@ -55,7 +55,7 @@ function resolveBillingCycleForStripePrice(
  *      to enforce at-least-once idempotency, 2) resolves tenancy scope via
  *      {@link runStripeWebhookHandlerWithOrganizationContext} (reads
  *      `organization_id` metadata or `billing.resolve_organization_public_id_for_stripe_subscription`)
- *      so RLS sees `app.current_organization_id`, 3) dispatches by event type
+ *      so RLS sees `app.current_organization_public_id`, 3) dispatches by event type
  *      and updates the local subscription row via a worker-scoped repository,
  *      and 4) marks the ledger row `processed`.
  * - **Failure modes:** Returns silently on `processed_duplicate`; throws

@@ -17,7 +17,7 @@ import { users } from '@/domains/user/user.schema.js';
  * Holds slug-based identity, ownership, lifecycle status, optional Stripe
  * customer linkage, and soft-delete via `deleted_at`. The `pgPolicy`
  * `organizations_tenant_isolation` enforces RLS by matching `public_id` to
- * `app.current_organization_id`, with a global retention-cleanup escape
+ * `app.current_organization_public_id`, with a global retention-cleanup escape
  * hatch for tombstone workers.
  */
 export const organizations = tenancySchema
@@ -95,11 +95,11 @@ export const organizations = tenancySchema
         for: 'all',
         to: 'public',
         using: sql`(
-            ${table.public_id} = current_setting('app.current_organization_id', true)
+            ${table.public_id} = current_setting('app.current_organization_public_id', true)
             AND ${table.deleted_at} IS NULL
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
-        withCheck: sql`${table.public_id} = current_setting('app.current_organization_id', true)
+        withCheck: sql`${table.public_id} = current_setting('app.current_organization_public_id', true)
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
       }),
     ],

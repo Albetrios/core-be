@@ -18,7 +18,7 @@ import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identi
  * job). `worker-tenant-isolation.security.test.ts` proves the repository layer scopes by
  * `organizationPublicId`; this proves the LAST line of defense: even a raw query run inside
  * `withPrincipalDatabaseContext(resolveVerifiedOrganizationPrincipalScope(orgB)` cannot read or mutate orgA's rows), because the wrapper sets
- * the `app.current_organization_id` GUC and RLS engages.
+ * the `app.current_organization_public_id` GUC and RLS engages.
  *
  * The production worker connects as the non-bypass `core_be_app` role; the test connection is
  * the RLS-exempt `core` superuser, so each callback issues `SET LOCAL ROLE core_be_app` to

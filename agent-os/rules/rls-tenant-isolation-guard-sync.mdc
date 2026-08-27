@@ -8,8 +8,8 @@ alwaysApply: false
 
 When you change any matched file, read `agent-os/skills/rls-tenant-isolation-guard/SKILL.md` and verify:
 
-- **New tenant-owned table** → `ENABLE` **and** `FORCE ROW LEVEL SECURITY`, plus a `FOR ALL` policy whose predicate is org-scoped on the `public_id` (`organization_id = (SELECT id FROM tenancy.organizations WHERE public_id = current_setting('app.current_organization_id', true)) OR current_setting('app.global_retention_cleanup', true) = 'true'`). Writable tables carry **both `USING` and `WITH CHECK`**. Add the table to `EXPECTED_FORCE_RLS_TABLES`.
-- The `app.current_organization_id` GUC is set on every query path via `withPrincipalDatabaseContext` with a minted org scope — never a raw pool query.
+- **New tenant-owned table** → `ENABLE` **and** `FORCE ROW LEVEL SECURITY`, plus a `FOR ALL` policy whose predicate is org-scoped on the `public_id` (`organization_id = (SELECT id FROM tenancy.organizations WHERE public_id = current_setting('app.current_organization_public_id', true)) OR current_setting('app.global_retention_cleanup', true) = 'true'`). Writable tables carry **both `USING` and `WITH CHECK`**. Add the table to `EXPECTED_FORCE_RLS_TABLES`.
+- The `app.current_organization_public_id` GUC is set on every query path via `withPrincipalDatabaseContext` with a minted org scope — never a raw pool query.
 - Workers/processors never call `getRequestDatabase()` (the GUC-less pool); importing DB-handle types / `setLocalDatabaseConfig` from `database-context-runtime` is allowed. Tenant-scoped jobs carry `organizationPublicId`, user-scoped jobs `userPublicId`; worker repos take an explicit `databaseHandle`.
 - No external I/O (fetch / Stripe / S3 / Resend) inside a `with*DatabaseContext` callback.
 - New `SECURITY DEFINER` functions pin `SET search_path`, `GRANT EXECUTE` to `core_be_app`, AND `REVOKE EXECUTE ... FROM PUBLIC` (Postgres grants EXECUTE to PUBLIC by default, so a GRANT alone is not "only"); the function body is the sole tenant boundary — scope every query by the passed id.

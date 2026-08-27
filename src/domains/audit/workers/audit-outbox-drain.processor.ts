@@ -241,7 +241,7 @@ async function drainOutboxRow(options: {
       // `RELEASE SAVEPOINT` KEEPS whatever the savepoint set — only `ROLLBACK TO SAVEPOINT`
       // restores it. So a value set for one row survives into the rest of the outer batch
       // transaction and is inherited by every later row. When these branches each set only their
-      // own GUC, a tenanted row left `app.current_organization_id` set for a following tenantless
+      // own GUC, a tenanted row left `app.current_organization_public_id` set for a following tenantless
       // row, and a tenantless row left `app.system_audit_insert='true'` set for every following
       // tenanted row — silently widening the `audit_logs_tenant_isolation_insert` policy for the
       // remainder of the batch. That is not exploitable today only because the policy selects its
@@ -250,7 +250,7 @@ async function drainOutboxRow(options: {
       // iteration makes each row's RLS identity total, so nothing is inherited.
       await setLocalDatabaseConfig(
         savepointHandle,
-        'app.current_organization_id',
+        'app.current_organization_public_id',
         row.organization_public_id ?? '',
       );
       // Tenantless audit (system events) need the system arm; `resolveRowInserts` guarantees such
@@ -294,7 +294,7 @@ async function drainOutboxRow(options: {
  *  1. Claims up to `batchSize` rows via FOR UPDATE SKIP LOCKED (concurrent drain instances
  *     never double-process — bumps `attempt_count` atomically on claim).
  *  2. Bulk-resolves every distinct public id with `app.global_admin = true`.
- *  3. Per row, switches `app.current_organization_id` (or `app.system_audit_insert` for
+ *  3. Per row, switches `app.current_organization_public_id` (or `app.system_audit_insert` for
  *     tenantless rows) so the `audit.logs` INSERT passes the tenant-isolation policy.
  *  4. Marks success rows PROCESSED, retryable failures' `last_error` updated (status
  *     stays PENDING), unresolvable / over-cap rows FAILED.

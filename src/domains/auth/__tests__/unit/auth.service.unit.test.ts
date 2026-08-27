@@ -457,7 +457,7 @@ describe('AuthService', () => {
 
   /**
    * `switchToOrganization`'s two user-scoped reads — the user record and the membership gate —
-   * both run under `app.current_user_id` set to the SAME value, so they must share ONE context
+   * both run under `app.current_user_public_id` set to the SAME value, so they must share ONE context
    * and therefore one pooled checkout. Splitting them back into a context each is invisible in
    * the response and only shows up as connection pressure under load, so it is pinned here.
    *

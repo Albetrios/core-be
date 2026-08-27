@@ -193,7 +193,7 @@ describe('runAuditOutboxDrainJob', () => {
     expect(setLocalDatabaseConfigMock).toHaveBeenNthCalledWith(
       2,
       databaseHandle,
-      'app.current_organization_id',
+      'app.current_organization_public_id',
       'org_a',
     );
     // …and the system arm is explicitly turned OFF for a tenanted row. Savepoints do NOT restore
@@ -231,7 +231,7 @@ describe('runAuditOutboxDrainJob', () => {
     // inherits the previous row's value and widens the insert policy for the rest of the batch.
     expect(setLocalDatabaseConfigMock).toHaveBeenCalledWith(
       databaseHandle,
-      'app.current_organization_id',
+      'app.current_organization_public_id',
       '',
     );
   });

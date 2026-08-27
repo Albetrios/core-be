@@ -57,7 +57,7 @@ function readStripeCustomerId(
 }
 
 /**
- * Resolves tenancy scope for Stripe webhook side effects (RLS requires app.current_organization_id).
+ * Resolves tenancy scope for Stripe webhook side effects (RLS requires app.current_organization_public_id).
  *
  * @remarks
  * The **database mapping is authoritative whenever it exists** (audit #2): the
@@ -123,7 +123,7 @@ export async function resolveOrganizationPublicIdForStripeEvent(
 }
 
 /**
- * Runs billing mutations under SET LOCAL app.current_organization_id for RLS policies.
+ * Runs billing mutations under SET LOCAL app.current_organization_public_id for RLS policies.
  */
 export async function runWithOrganizationPublicIdForStripeWebhook<T>(
   organizationPublicId: string,

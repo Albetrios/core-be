@@ -104,12 +104,12 @@ export const subscriptions = billingSchema
         to: 'public',
         using: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations
-            WHERE public_id = current_setting('app.current_organization_id', true)
+            WHERE public_id = current_setting('app.current_organization_public_id', true)
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
         withCheck: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations
-            WHERE public_id = current_setting('app.current_organization_id', true)
+            WHERE public_id = current_setting('app.current_organization_public_id', true)
           )`,
       }),
     ],

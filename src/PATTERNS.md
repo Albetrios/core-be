@@ -15,7 +15,7 @@ Prevent cross-tenant data leaks. Every read and write performed under an organiz
 ### Where it lives
 
 - HTTP layer: [src/shared/middlewares/tenant/tenant.middleware.ts](src/shared/middlewares/tenant/tenant.middleware.ts) — reads `X-Organization-Id`, validates its format, and decorates `request.organizationId`. The **authoritative** active organization is the signed `org` JWT claim; routes carry no `{organization_id}` path segment.
-- Database layer: [src/infrastructure/database/contexts/database-context.ts](src/infrastructure/database/contexts/database-context.ts) — `withPrincipalDatabaseContext(scope, …)` opens a Drizzle transaction and sets the identity GUCs (`app.current_organization_id` / `app.current_user_id`) from the token-minted principal scope in one `set_config` statement. RLS policies on org-scoped tables read those GUCs.
+- Database layer: [src/infrastructure/database/contexts/database-context.ts](src/infrastructure/database/contexts/database-context.ts) — `withPrincipalDatabaseContext(scope, …)` opens a Drizzle transaction and sets the identity GUCs (`app.current_organization_public_id` / `app.current_user_public_id`) from the token-minted principal scope in one `set_config` statement. RLS policies on org-scoped tables read those GUCs.
 - Worker layer: [src/infrastructure/queue/worker-runtime/worker-processor.util.ts](src/infrastructure/queue/worker-runtime/worker-processor.util.ts) — `runTenantScopedWorkerJob` requires `organizationPublicId` in the job payload and wraps the processor body in `withPrincipalDatabaseContext` (with a job-minted principal scope) so RLS sees the same GUC the HTTP layer would have set.
 
 ### Implementation
@@ -31,7 +31,7 @@ sequenceDiagram
   Mw->>Mw: validate X-Organization-Id format
   Mw->>Svc: request.organizationId
   Svc->>Ctx: withPrincipalDatabaseContext(scope, fn)
-  Ctx->>DB: BEGIN; SET LOCAL app.current_organization_id = orgId
+  Ctx->>DB: BEGIN; SET LOCAL app.current_organization_public_id = orgId
   Ctx->>Svc: pinned databaseHandle (transaction)
   Svc->>DB: SELECT/INSERT/UPDATE (RLS filters by org)
   Ctx->>DB: COMMIT
@@ -147,7 +147,7 @@ Postgres Row-Level Security is the **defense-in-depth** layer for tenant isolati
 
 ### Implementation
 
-- HTTP requests get RLS via `tenant.middleware` + `organization-rls-transaction.middleware` opening a request-scoped transaction with `SET LOCAL app.current_organization_id = $1`.
+- HTTP requests get RLS via `tenant.middleware` + `organization-rls-transaction.middleware` opening a request-scoped transaction with `SET LOCAL app.current_organization_public_id = $1`.
 - Workers get RLS via `runTenantScopedWorkerJob` which **requires** `organizationPublicId` in the job payload and opens its own `withPrincipalDatabaseContext` transaction (job-minted org scope). Workers are forbidden from importing `database-context-runtime.ts` (enforced by `worker-database-guard.unit.test.ts` and global tests).
 - Global-scope workers (cross-org sweeps) use `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, …)`, which sets a different GUC that RLS policies recognize as "global retention" — strictly limited to retention/cleanup operations.
 
@@ -157,8 +157,8 @@ A context sets **one** GUC. It grants access only on tables whose policies test 
 
 | Context | GUC it sets | Grants on |
 | --- | --- | --- |
-| `withPrincipalDatabaseContext` (org scope) | `app.current_organization_id` | tenant-scoped tables (`organizations_tenant_isolation` and the per-table `*_tenant_isolation` policies) |
-| `withPrincipalDatabaseContext` (user scope) | `app.current_user_id` | user-owned rows — `auth.users`, `auth.auth_methods`, uploads/notifications, **and the tenancy discovery policies** (`organizations_user_discovery`, `memberships_user_self_discovery`) |
+| `withPrincipalDatabaseContext` (org scope) | `app.current_organization_public_id` | tenant-scoped tables (`organizations_tenant_isolation` and the per-table `*_tenant_isolation` policies) |
+| `withPrincipalDatabaseContext` (user scope) | `app.current_user_public_id` | user-owned rows — `auth.users`, `auth.auth_methods`, uploads/notifications, **and the tenancy discovery policies** (`organizations_user_discovery`, `memberships_user_self_discovery`) |
 | `MAINTENANCE_SCOPE.global_admin` | `app.global_admin` | **`auth.*` and `audit.logs` ONLY** |
 | `MAINTENANCE_SCOPE.global_retention_cleanup` | `app.global_retention_cleanup` | retention-sweep tables only |
 

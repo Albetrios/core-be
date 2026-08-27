@@ -22,9 +22,9 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
  * The membership owner is resolved from `public_id` to internal id via the
  * `auth.resolve_user_id_by_public_id` SECURITY DEFINER function rather than a
  * direct `auth.users` join: permission resolution runs under ORG-only context
- * (`app.current_organization_id` is set, but `app.current_user_id` is not), and
+ * (`app.current_organization_public_id` is set, but `app.current_user_public_id` is not), and
  * `auth.users` is FORCE-RLS protected by an owner policy keyed on
- * `app.current_user_id`. A direct join would therefore return zero rows under
+ * `app.current_user_public_id`. A direct join would therefore return zero rows under
  * the non-superuser `core_be_app` role and silently strip every permission
  * (403 on all org PERM-gated routes). The resolver also filters
  * `deleted_at IS NULL`, so a soft-deleted user resolves to `null` → empty set.

@@ -16,7 +16,7 @@ import { users } from '@/domains/user/user.schema.js';
  * `auth.user_data_exports` — one row per GDPR export request. Tracks job status, the S3 artifact key,
  * and the artifact `expires_at` timestamp used by the retention worker to purge the bucket alongside
  * S3 lifecycle rules. Cascades on user delete so offboarding cannot leave orphan exports. RLS-gated
- * by `app.current_user_id` (set via `withUserDatabaseContext`) with a `app.global_retention_cleanup`
+ * by `app.current_user_public_id` (set via `withUserDatabaseContext`) with a `app.global_retention_cleanup`
  * escape for the retention worker that purges expired rows across all users.
  */
 export const user_data_exports = authSchema
@@ -56,13 +56,13 @@ export const user_data_exports = authSchema
         to: 'public',
         using: sql`${table.user_id} = (
           SELECT id FROM auth.users
-          WHERE public_id = current_setting('app.current_user_id', true)
+          WHERE public_id = current_setting('app.current_user_public_id', true)
             AND deleted_at IS NULL
         )
         OR current_setting('app.global_retention_cleanup', true) = 'true'`,
         withCheck: sql`${table.user_id} = (
           SELECT id FROM auth.users
-          WHERE public_id = current_setting('app.current_user_id', true)
+          WHERE public_id = current_setting('app.current_user_public_id', true)
             AND deleted_at IS NULL
         )
         OR current_setting('app.global_retention_cleanup', true) = 'true'`,

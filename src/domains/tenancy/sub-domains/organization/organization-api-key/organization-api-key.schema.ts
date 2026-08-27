@@ -19,7 +19,7 @@ import { users } from '@/domains/user/user.schema.js';
  * indexable `key_prefix` (first N chars used for lookup), JSONB `scopes`,
  * `ACTIVE`/`REVOKED` status, optional expiry, and soft-delete. Tenant
  * isolation is enforced by the `api_keys_tenant_isolation` RLS policy that
- * resolves `app.current_organization_id` to a tenancy.organizations.id, with
+ * resolves `app.current_organization_public_id` to a tenancy.organizations.id, with
  * an escape hatch for global retention cleanup.
  */
 export const api_keys = tenancySchema
@@ -74,12 +74,12 @@ export const api_keys = tenancySchema
         to: 'public',
         using: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations
-            WHERE public_id = current_setting('app.current_organization_id', true)
+            WHERE public_id = current_setting('app.current_organization_public_id', true)
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
         withCheck: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations
-            WHERE public_id = current_setting('app.current_organization_id', true)
+            WHERE public_id = current_setting('app.current_organization_public_id', true)
           )`,
       }),
     ],

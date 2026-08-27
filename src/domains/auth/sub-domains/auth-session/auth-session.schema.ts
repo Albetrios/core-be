@@ -68,7 +68,7 @@ export const sessions = authSchema
         using: sql`(
           ${table.user_id} = (
             SELECT id FROM auth.users
-            WHERE public_id = current_setting('app.current_user_id', true)
+            WHERE public_id = current_setting('app.current_user_public_id', true)
               AND deleted_at IS NULL
           )
           OR ${table.public_id} = current_setting('app.current_session_public_id', true)
@@ -78,7 +78,7 @@ export const sessions = authSchema
         withCheck: sql`(
           ${table.user_id} = (
             SELECT id FROM auth.users
-            WHERE public_id = current_setting('app.current_user_id', true)
+            WHERE public_id = current_setting('app.current_user_public_id', true)
               AND deleted_at IS NULL
           )
           OR ${table.public_id} = current_setting('app.current_session_public_id', true)

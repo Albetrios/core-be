@@ -48,7 +48,7 @@ export type WorkerDatabaseContextKind =
   /**
    * Audit-outbox drain worker. Pins `app.audit_outbox_drain = 'true'` so the worker
    * is the only context that can SELECT / UPDATE / DELETE rows in `audit.outbox`.
-   * Per-row, the worker temporarily layers `app.current_organization_id` (or
+   * Per-row, the worker temporarily layers `app.current_organization_public_id` (or
    * `app.system_audit_insert`) for the eventual `audit.logs` INSERT.
    */
   | 'audit_outbox_drain';
@@ -196,7 +196,7 @@ export type RequestScopedPostgresDatabase = PostgresDatabaseHandle;
 
 /**
  * Fastify HTTP requests that send `X-Organization-Id` run inside a single Drizzle
- * transaction with `SET LOCAL app.current_organization_id` so every query shares one
+ * transaction with `SET LOCAL app.current_organization_public_id` so every query shares one
  * checkout from the postgres.js pool and RLS policies see a stable GUC.
  *
  * Workers must use context wrappers that pin ALS via `runWithPinnedOrganizationDatabaseSession`
@@ -279,7 +279,7 @@ export function runWithPinnedDatabaseHandle<T>(
 /**
  * Sets a transaction-scoped Postgres GUC (`SET LOCAL` via `set_config(..., true)`)
  * on the supplied handle. Used to pin RLS-driving variables such as
- * `app.current_organization_id` and `app.global_retention_cleanup` for the
+ * `app.current_organization_public_id` and `app.global_retention_cleanup` for the
  * duration of the surrounding transaction.
  */
 export async function setLocalDatabaseConfig(
@@ -331,13 +331,13 @@ const GUC_BY_CONTEXT_KIND: Record<
   Exclude<WorkerDatabaseContextKind, 'system_table'>,
   { key: string; label: string }
 > = {
-  organization: { key: 'app.current_organization_id', label: 'organization' },
+  organization: { key: 'app.current_organization_public_id', label: 'organization' },
   global_retention_cleanup: {
     key: 'app.global_retention_cleanup',
     label: 'global retention cleanup',
   },
   global_admin: { key: 'app.global_admin', label: 'global admin' },
-  user: { key: 'app.current_user_id', label: 'user' },
+  user: { key: 'app.current_user_public_id', label: 'user' },
   session_retention_cleanup: {
     key: 'app.session_retention_cleanup',
     label: 'session retention cleanup',

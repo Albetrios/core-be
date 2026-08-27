@@ -228,7 +228,9 @@ export class SubscriptionRepository {
     const rows = await this.db()
       .select({ id: organizations.id })
       .from(organizations)
-      .where(sql`${organizations.public_id} = current_setting('app.current_organization_id', true)`)
+      .where(
+        sql`${organizations.public_id} = current_setting('app.current_organization_public_id', true)`,
+      )
       .limit(1);
     return rows[0]?.id ?? null;
   }

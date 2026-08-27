@@ -111,9 +111,9 @@ export interface ProvisionOrganizationResult {
  *
  * @remarks
  * - **Algorithm:** pre-generates the org `public_id` and runs every insert inside one
- *   `withPrincipalDatabaseContext(resolveVerifiedOrganizationPrincipalScope(publicId), …)` transaction, so `app.current_organization_id`
+ *   `withPrincipalDatabaseContext(resolveVerifiedOrganizationPrincipalScope(publicId), …)` transaction, so `app.current_organization_public_id`
  *   equals the org being created. The org row then satisfies its tenant-isolation WITH CHECK
- *   (`public_id = app.current_organization_id`) and the child rows (roles, role_permissions,
+ *   (`public_id = app.current_organization_public_id`) and the child rows (roles, role_permissions,
  *   memberships) satisfy theirs (`organization_id` → the just-inserted org) — all under the
  *   non-superuser `core_be_app` role with NO admin escape hatch (the tenancy policies do not honor
  *   `app.global_admin`; only `auth`/`audit` do, which is why the former global-admin path failed
@@ -162,8 +162,8 @@ async function provisionOrganization(
   input: ProvisionOrganizationInput,
 ): Promise<ProvisionOrganizationResult> {
   // Pre-generate the org public_id so the entire owner-bootstrap runs INSIDE the new org's own
-  // RLS context (`app.current_organization_id` = this id): every tenant-isolation WITH CHECK then
-  // passes naturally — the org row (`public_id = app.current_organization_id`) and its child rows
+  // RLS context (`app.current_organization_public_id` = this id): every tenant-isolation WITH CHECK then
+  // passes naturally — the org row (`public_id = app.current_organization_public_id`) and its child rows
   // (roles, role_permissions, memberships, all `organization_id`-scoped to the just-inserted org).
   // This replaces `withMaintenanceDatabaseContext`, which was both improper on a self-service
   // login/signup path AND ineffective: the tenancy policies never honor `app.global_admin` (only
