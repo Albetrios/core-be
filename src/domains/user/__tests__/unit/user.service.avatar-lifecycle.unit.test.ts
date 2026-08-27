@@ -35,11 +35,6 @@ vi.mock(
  * the caller's own prefix. None of those branches were covered: they were the single largest
  * cluster of surviving mutants in `user.service.ts`.
  */
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
 
 vi.mock('@/shared/utils/infrastructure/postgres-error.util.js', () => ({
   runInsertWithPublicIdentifierRetry: async (operation: () => Promise<unknown>) => operation(),

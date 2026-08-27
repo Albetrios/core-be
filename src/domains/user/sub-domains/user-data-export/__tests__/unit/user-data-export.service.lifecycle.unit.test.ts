@@ -36,11 +36,6 @@ vi.mock('@/domains/user/sub-domains/user-data-export/user-data-export.repository
   createWorkerUserDataExportRepository: () => workerExportRepository,
 }));
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: (_userPublicId: string, callback: (handle?: unknown) => unknown) =>
-    callback({ kind: 'user-context' }),
-}));
-
 vi.mock('@/shared/utils/infrastructure/logger.util.js', () => ({
   logger: { info: loggerInfoMock, warn: loggerWarnMock, error: vi.fn(), debug: vi.fn() },
 }));

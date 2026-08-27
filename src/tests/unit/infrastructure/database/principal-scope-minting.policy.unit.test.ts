@@ -13,7 +13,7 @@ const ALLOWED_IMPORTER_SUFFIXES = [
   'src/infrastructure/database/contexts/principal-database.context.ts',
   'src/shared/utils/http/request.util.ts',
   'src/infrastructure/queue/worker-runtime/job-principal-scope.util.ts',
-  'src/domains/auth/shared/verified-user-principal-scope.util.ts',
+  'src/shared/utils/identity/verified-principal-scope.util.ts',
 ];
 
 describe('principal-scope minting confinement', () => {

@@ -54,13 +54,6 @@ vi.mock(
   }),
 );
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: async (
-    _organizationPublicId: string,
-    callback: (databaseHandle: never) => unknown,
-  ) => callback({} as never),
-}));
-
 vi.mock('@/shared/utils/security/field-secret-encryption.util.js', () => ({
   decryptFieldSecret: vi.fn(() => 'signing-secret'),
 }));

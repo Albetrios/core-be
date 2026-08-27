@@ -7,6 +7,19 @@ import {
 } from '@/domains/notify/sub-domains/webhook/webhook-delivery/workers/webhook-delivery.worker.js';
 import { resetWebhookOutboundCircuitsForTesting } from '@/domains/notify/sub-domains/webhook/webhook-delivery/workers/webhook-outbound-circuit.js';
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 const { deliveryContextFixture } = vi.hoisted(() => ({
   deliveryContextFixture: {
     deliveryAttemptId: 42,
@@ -52,12 +65,6 @@ vi.mock('@/shared/utils/security/webhook-url.util.js', () => ({
  * `database.transaction()` setting `app.current_organization_id`). Run the callback
  * directly so the test exercises worker logic without needing a Postgres connection.
  */
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: vi.fn(
-    (_organizationPublicId: string, callback: (databaseHandle: unknown) => Promise<unknown>) =>
-      callback({}),
-  ),
-}));
 
 function createDeliveryAttemptRepositoryMock() {
   return {

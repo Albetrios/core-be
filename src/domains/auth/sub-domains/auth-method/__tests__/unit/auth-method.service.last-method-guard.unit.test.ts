@@ -6,12 +6,6 @@ import type { AuthMethodRepository } from '@/domains/auth/sub-domains/auth-metho
 import type { VerificationTokenRepository } from '@/domains/auth/sub-domains/auth-method/verification-token/verification-token.repository.js';
 import type { AuthSessionService } from '@/domains/auth/sub-domains/auth-session/auth-session.service.js';
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn(async (_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
 vi.mock(
   '@/infrastructure/database/contexts/principal-database.context.js',
   async (importOriginal) => {

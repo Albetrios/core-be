@@ -1,6 +1,5 @@
 import { NotFoundError } from '@/shared/errors/index.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { UserSettingsRepository } from './user-settings.repository.js';
 import { serializeUserSettings } from './user-settings.serializer.js';
@@ -10,6 +9,7 @@ import {
   withPrincipalDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Read or merge the authenticated user's personalization toggles and locale preferences.
@@ -63,8 +63,9 @@ export class UserSettingsService {
   async getForInvitedUser(user_public_id: string): Promise<UserSettingsOutput> {
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    const settings = await withUserDatabaseContext(user_public_id, () =>
-      this.repository.getByUserId(user.id),
+    const settings = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(user_public_id),
+      () => this.repository.getByUserId(user.id),
     );
     return serializeUserSettings(settings);
   }
@@ -78,8 +79,9 @@ export class UserSettingsService {
     const parsed = validateUpdateUserSettings(body);
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    const result = await withUserDatabaseContext(user_public_id, () =>
-      this.repository.upsert(user.id, omitUndefined(parsed)),
+    const result = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(user_public_id),
+      () => this.repository.upsert(user.id, omitUndefined(parsed)),
     );
     return serializeUserSettings(result);
   }

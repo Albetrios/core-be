@@ -8,12 +8,6 @@ import {
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/principal-database.context.js';
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
 vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
   getOrganizationRequestDatabaseSession: vi.fn().mockReturnValue(undefined),
 }));

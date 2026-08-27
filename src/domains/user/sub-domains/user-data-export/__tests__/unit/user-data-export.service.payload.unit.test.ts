@@ -30,10 +30,6 @@ vi.mock('@/domains/user/sub-domains/user-data-export/user-data-export.repository
   createWorkerUserDataExportRepository: () => workerExportRepository,
 }));
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: (_userPublicId: string, callback: () => unknown) => callback(),
-}));
-
 vi.mock(
   '@/infrastructure/database/contexts/principal-database.context.js',
   async (importOriginal) => {

@@ -12,7 +12,7 @@ What this suite **does** cover:
 
 - HTTP route behavior end-to-end (controllers + services + repositories + DB).
 - BullMQ worker / processor pipelines against real Redis.
-- RLS contracts (read/write through `withOrganizationDatabaseContext`, etc.).
+- RLS contracts (read/write through `withPrincipalDatabaseContext`, etc.).
 - Cross-domain interactions through the event bus.
 - Cursor pagination, idempotency, rate limit headers, audit emission.
 

@@ -13,7 +13,7 @@ The organization's active subscription record. One row per organization, bound t
 - **One subscription per organization**: enforced at the service layer; concurrent create attempts resolve to a single Stripe subscription via the forwarded idempotency key.
 - **State changes are Stripe-driven**: `subscriptions.status` only transitions in response to a webhook event whose `event.created_at` is newer than the row's last update.
 - **Stale-event rejection**: out-of-order webhooks are rejected so state cannot roll backward.
-- **Network I/O outside RLS contexts**: Stripe API calls run **outside** `withOrganizationDatabaseContext`. The service interleaves: `withOrganizationDatabaseContext(read)` → Stripe call → `withOrganizationDatabaseContext(write)`.
+- **Network I/O outside RLS contexts**: Stripe API calls run **outside** `withPrincipalDatabaseContext`. The service interleaves: `withPrincipalDatabaseContext(read)` → Stripe call → `withPrincipalDatabaseContext(write)`.
 - **Retained mutable state (not an immutable ledger)** (audit-#B2): subscription rows are updated in place as status transitions (Stripe syncs, cancel/resume, plan changes, seat counts) and are never soft- or hard-deleted — cancellation transitions to `canceled` and the row stays for forensic + invoice-history value. DB-level append-only enforcement (as on `audit.logs`) is intentionally NOT applied, because in-place status transitions are the table's purpose; immutability is scoped to the monotonic `last_stripe_event_created_at` watermark that blocks stale/out-of-order events, not to the row as a whole.
 
 ## Lifecycle

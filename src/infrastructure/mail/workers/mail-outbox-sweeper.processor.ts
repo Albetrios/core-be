@@ -1,4 +1,3 @@
-import { withSystemTableWorkerContext } from '@/infrastructure/database/contexts/worker-database.context.js';
 import {
   findStalePendingMailOutboxIds,
   reclaimStaleSendingMailOutboxIds,
@@ -8,6 +7,10 @@ import { MAIL_OUTBOX_RECLAIM_CIRCUIT_OPEN_MULTIPLIER } from '@/infrastructure/ma
 import { resendCircuit } from '@/infrastructure/resilience/circuit-breaker.js';
 import { env } from '@/shared/config/env.config.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 
 const DEFAULT_SWEEP_BATCH_SIZE = 100;
 
@@ -54,7 +57,9 @@ export type MailOutboxSweeperJobResult = {
  *   run concurrently with the mail worker because the claim transition is atomic.
  */
 export async function runMailOutboxSweeperJob(): Promise<MailOutboxSweeperJobResult> {
-  return withSystemTableWorkerContext(() => runMailOutboxSweeperJobInner());
+  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, () =>
+    runMailOutboxSweeperJobInner(),
+  );
 }
 
 async function runMailOutboxSweeperJobInner(): Promise<MailOutboxSweeperJobResult> {

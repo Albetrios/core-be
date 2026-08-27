@@ -1,8 +1,11 @@
-import { withSystemTableWorkerContext } from '@/infrastructure/database/contexts/worker-database.context.js';
 import { countPendingMailOutbox } from '@/infrastructure/mail/mail-outbox.repository.js';
 import { getTotalDeadLetterJobCount } from '@/infrastructure/observability/dlq-depth/dlq-depth.service.js';
 import { isMetricsEnabled } from '@/infrastructure/observability/metrics/metrics-registry.js';
 import { setBusinessMetricCounts } from '@/infrastructure/observability/metrics/prometheus-metrics.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 
 /**
  * Refreshes business backlog gauges (`mail_outbox_pending`, `dlq_depth`) from Postgres
@@ -20,7 +23,9 @@ export async function refreshBusinessMetricsGauges(): Promise<void> {
   }
 
   const [mailOutboxPending, dlqDepth] = await Promise.all([
-    withSystemTableWorkerContext(() => countPendingMailOutbox()),
+    withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, () =>
+      countPendingMailOutbox(),
+    ),
     getTotalDeadLetterJobCount(),
   ]);
   setBusinessMetricCounts({ mailOutboxPending, dlqDepth });

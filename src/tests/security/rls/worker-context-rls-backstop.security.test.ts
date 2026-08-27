@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
-import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
 import { notifications } from '@/domains/notify/sub-domains/notification/notification.schema.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { grantCoreBeAppRoleForTests } from '@/tests/helpers/rls-matrix.helper.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Worker context RLS backstop.
@@ -16,7 +17,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
  * context via {@link withOrganizationContext} (the real wrapper used by every tenant-scoped
  * job). `worker-tenant-isolation.security.test.ts` proves the repository layer scopes by
  * `organizationPublicId`; this proves the LAST line of defense: even a raw query run inside
- * `withOrganizationContext(orgB)` cannot read or mutate orgA's rows, because the wrapper sets
+ * `withPrincipalDatabaseContext(resolveVerifiedOrganizationPrincipalScope(orgB)` cannot read or mutate orgA's rows), because the wrapper sets
  * the `app.current_organization_id` GUC and RLS engages.
  *
  * The production worker connects as the non-bypass `core_be_app` role; the test connection is
@@ -51,47 +52,56 @@ describe('Security: worker context RLS backstop (wrong-org context cannot reach 
     return row!.id;
   }
 
-  it('a raw SELECT under withOrganizationContext(orgB) cannot see orgA rows', async () => {
+  it('a raw SELECT under withPrincipalDatabaseContext(resolveVerifiedOrganizationPrincipalScope(orgB) cannot see orgA rows', async () => {
     const user = await createTestUser();
     const organizationA = await createTestOrganization({ ownerUserId: user.id });
     const organizationB = await createTestOrganization({ ownerUserId: user.id });
     const notificationId = await seedOrganizationNotification(organizationA.id, user.id);
 
     // Wrong context: a worker scoped to org B raw-queries org A's row.
-    const visibleUnderB = await withOrganizationContext(organizationB.public_id, async (handle) => {
-      await handle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
-      return handle
-        .select({ id: notifications.id })
-        .from(notifications)
-        .where(eq(notifications.id, notificationId));
-    });
+    const visibleUnderB = await withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(organizationB.public_id),
+      async (handle) => {
+        await handle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
+        return handle
+          .select({ id: notifications.id })
+          .from(notifications)
+          .where(eq(notifications.id, notificationId));
+      },
+    );
     expect(visibleUnderB).toHaveLength(0);
 
     // Correct context: a worker scoped to org A sees its own row — proves the wrapper actually
     // set the org GUC (so the empty result above is RLS isolation, not a broken query).
-    const visibleUnderA = await withOrganizationContext(organizationA.public_id, async (handle) => {
-      await handle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
-      return handle
-        .select({ id: notifications.id })
-        .from(notifications)
-        .where(eq(notifications.id, notificationId));
-    });
+    const visibleUnderA = await withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(organizationA.public_id),
+      async (handle) => {
+        await handle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
+        return handle
+          .select({ id: notifications.id })
+          .from(notifications)
+          .where(eq(notifications.id, notificationId));
+      },
+    );
     expect(visibleUnderA).toHaveLength(1);
   });
 
-  it('a raw UPDATE under withOrganizationContext(orgB) cannot mutate orgA rows', async () => {
+  it('a raw UPDATE under withPrincipalDatabaseContext(resolveVerifiedOrganizationPrincipalScope(orgB) cannot mutate orgA rows', async () => {
     const user = await createTestUser();
     const organizationA = await createTestOrganization({ ownerUserId: user.id });
     const organizationB = await createTestOrganization({ ownerUserId: user.id });
     const notificationId = await seedOrganizationNotification(organizationA.id, user.id);
 
-    await withOrganizationContext(organizationB.public_id, async (handle) => {
-      await handle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
-      await handle
-        .update(notifications)
-        .set({ title: 'tampered by org B' })
-        .where(eq(notifications.id, notificationId));
-    });
+    await withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(organizationB.public_id),
+      async (handle) => {
+        await handle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
+        await handle
+          .update(notifications)
+          .set({ title: 'tampered by org B' })
+          .where(eq(notifications.id, notificationId));
+      },
+    );
 
     // Re-read as the RLS-exempt superuser: org A's row is untouched (RLS USING blocked the UPDATE).
     const [row] = await database

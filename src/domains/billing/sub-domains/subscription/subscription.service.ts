@@ -99,12 +99,12 @@ import {
   validateUpdateSubscription,
 } from './subscription.validator.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/principal-database.context.js';
 import { enqueueSubscriptionSeatSyncBestEffort } from './queues/subscription-seat-sync.queue.js';
+import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Namespaces a client-supplied `X-Idempotency-Key` by organization (and operation) before it is
@@ -334,8 +334,8 @@ export class SubscriptionService {
       );
       return;
     }
-    const { organization, subscription } = await withOrganizationDatabaseContext(
-      organization_public_id,
+    const { organization, subscription } = await withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(organization_public_id),
       async () => {
         const organization =
           await this.organizationService.requireOrganizationByPublicId(organization_public_id);
@@ -369,10 +369,12 @@ export class SubscriptionService {
       );
     }
 
-    await withOrganizationDatabaseContext(organization_public_id, async () =>
-      this.repository.update(subscription.public_id, organization.id, {
-        seats: quantity,
-      }),
+    await withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(organization_public_id),
+      async () =>
+        this.repository.update(subscription.public_id, organization.id, {
+          seats: quantity,
+        }),
     );
   }
 
@@ -972,8 +974,8 @@ export class SubscriptionService {
    *   path touched billing. Re-running after a partial failure finds no active sub → no-op.
    */
   async cancelActiveForOrganizationOffboarding(organization_public_id: string): Promise<void> {
-    const { organization, subscription } = await withOrganizationDatabaseContext(
-      organization_public_id,
+    const { organization, subscription } = await withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(organization_public_id),
       async () => {
         const organization =
           await this.organizationService.requireOrganizationByPublicId(organization_public_id);
@@ -998,12 +1000,14 @@ export class SubscriptionService {
         ),
       );
     }
-    await withOrganizationDatabaseContext(organization_public_id, async () =>
-      this.repository.update(subscription.public_id, organization.id, {
-        status: 'CANCELED',
-        canceled_at: new Date(),
-        last_stripe_event_created_at: new Date(),
-      }),
+    await withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(organization_public_id),
+      async () =>
+        this.repository.update(subscription.public_id, organization.id, {
+          status: 'CANCELED',
+          canceled_at: new Date(),
+          last_stripe_event_created_at: new Date(),
+        }),
     );
   }
 

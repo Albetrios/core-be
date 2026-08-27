@@ -8,7 +8,6 @@ import {
 import { isPostgresUniqueViolation } from '@/shared/utils/infrastructure/postgres-error.util.js';
 import { isDisposableEmailBlocked } from '@/shared/utils/text/email.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
@@ -17,7 +16,6 @@ import {
   acquireResourceQuotaLock,
   RESOURCE_QUOTA_LOCK_NAMESPACE,
 } from '@/infrastructure/database/resource-quota-lock.util.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { UserSettingsService } from '@/domains/user/sub-domains/user-settings/user-settings.service.js';
 import {
   isFactoryDefaultUserLocaleSettings,
@@ -52,6 +50,10 @@ import type { MemberInvitationService } from './member-invitation/member-invitat
 import { invalidatePermissions } from '@/domains/tenancy/sub-domains/permission/permission-cache.service.js';
 import type { OrganizationApiKeyRepository } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.repository.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
+import {
+  resolveVerifiedOrganizationPrincipalScope,
+  resolveVerifiedUserPrincipalScope,
+} from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Cross-domain port for REQ-4 seat enforcement and Stripe seat reconciliation, satisfied by
@@ -722,12 +724,15 @@ export class MembershipService {
    *   directly (cross-domain reads go service→service).
    */
   async countActiveMembers(options: { organizationPublicId: string }): Promise<number> {
-    return withOrganizationDatabaseContext(options.organizationPublicId, async () => {
-      const organization = await this.organizationService.requireOrganizationByPublicId(
-        options.organizationPublicId,
-      );
-      return this.membershipRepository.countActiveByOrganization(organization.id);
-    });
+    return withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(options.organizationPublicId),
+      async () => {
+        const organization = await this.organizationService.requireOrganizationByPublicId(
+          options.organizationPublicId,
+        );
+        return this.membershipRepository.countActiveByOrganization(organization.id);
+      },
+    );
   }
 
   /**
@@ -751,8 +756,8 @@ export class MembershipService {
     organizationPublicId: string;
     ceiling: number;
   }): Promise<number> {
-    const suspendedUserIds = await withOrganizationDatabaseContext(
-      options.organizationPublicId,
+    const suspendedUserIds = await withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(options.organizationPublicId),
       async () => {
         const organization = await this.organizationService.requireOrganizationRecordByPublicId(
           options.organizationPublicId,
@@ -787,11 +792,13 @@ export class MembershipService {
     userInternalId: number;
     limit: number;
   }) {
-    return withUserDatabaseContext(options.userPublicId, (_databaseHandle) =>
-      this.membershipRepository.listOrganizationsForUserDataExport(
-        options.userInternalId,
-        options.limit,
-      ),
+    return withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(options.userPublicId),
+      (_databaseHandle) =>
+        this.membershipRepository.listOrganizationsForUserDataExport(
+          options.userInternalId,
+          options.limit,
+        ),
     );
   }
 }

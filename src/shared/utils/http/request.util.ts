@@ -81,7 +81,7 @@ export function requirePrincipal(request: FastifyRequest): AuthContext {
  * path param when the route carries one, otherwise the signed `org` token claim
  * (`auth.organizationPublicId`). Matching that precedence is a security invariant — the
  * organization the permission preHandler authorized MUST equal the organization the controller
- * then scopes data to (and binds the RLS GUC to via `withOrganizationDatabaseContext`). If the
+ * then scopes data to (and binds the RLS GUC to via `withPrincipalDatabaseContext`). If the
  * two could diverge (e.g. one read the path while the other read the claim) a caller could be
  * permission-checked against organization A while reading/writing organization B. The claim is
  * scope, not authority: membership is still verified by `requireOrganizationPermission` and RLS

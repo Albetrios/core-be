@@ -41,11 +41,6 @@ vi.mock(
  * exercises service logic without touching Postgres. Matches the pattern in
  * `src/domains/auth/__tests__/unit/auth.service.unit.test.ts`.
  */
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
 
 vi.mock('@/shared/utils/infrastructure/postgres-error.util.js', () => ({
   runInsertWithPublicIdentifierRetry: async (operation: () => Promise<unknown>) => operation(),

@@ -45,7 +45,7 @@ stateDiagram-v2
 
 - **S3 write failure** → BullMQ retries the worker job; final failure → DLQ + Sentry; user does not receive the email.
 - **One table exceeds 1 000 rows** → bundle includes the first 1 000 rows + a metadata note; logged at info; user receives the export.
-- **User soft-deleted while export is in flight** → export still completes (read path is `withUserDatabaseContext` on the user public id; soft-delete does not revoke history reads).
+- **User soft-deleted while export is in flight** → export still completes (read path is a user principal scope on the user public id; soft-delete does not revoke history reads).
 - **Mail enqueue failure** → does not fail the export; the bundle exists in S3 and the status route can re-mint a fresh 15-minute presigned URL on demand (every mint is audited), but the user won't receive the original email link.
 
 ## Policy constants

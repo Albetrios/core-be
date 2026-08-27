@@ -17,7 +17,7 @@ import { PUBLIC_ID_REGEX } from '@/shared/utils/identity/public-id.util.js';
  * checks or the RLS GUC. Do not introduce new consumers that trust it pre-auth.
  *
  * Row-Level Security for Postgres uses `SET LOCAL app.current_organization_id`
- * inside the short-lived `withOrganizationDatabaseContext` transaction opened at
+ * inside the short-lived `withPrincipalDatabaseContext` transaction opened at
  * each org-scoped call site, keyed by the claim-resolved organization id.
  *
  * **sec-M7 foot-gun**: `request.organizationId` is set on the **`onRequest`**

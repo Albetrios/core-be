@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: (_organizationPublicId: string, callback: () => unknown) =>
-    callback(),
-}));
-
 const invalidatePermissionsMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', () => ({
   invalidatePermissions: invalidatePermissionsMock,

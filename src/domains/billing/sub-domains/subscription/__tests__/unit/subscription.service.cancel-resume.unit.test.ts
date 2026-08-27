@@ -8,12 +8,6 @@ vi.mock(
   }),
 );
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    async (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
-
 vi.mock(
   '@/infrastructure/database/contexts/principal-database.context.js',
   async (importOriginal) => {

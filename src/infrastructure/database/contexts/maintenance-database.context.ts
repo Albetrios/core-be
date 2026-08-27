@@ -6,6 +6,7 @@ import {
   type RequestScopedPostgresDatabase,
 } from '@/infrastructure/database/contexts/request-database.context.js';
 import {
+  isWorkerRuntime,
   runWithWorkerDatabaseContext,
   type WorkerDatabaseContextKind,
 } from '@/infrastructure/database/contexts/worker-database.context.js';
@@ -17,8 +18,10 @@ import { applyWorkerStatementTimeout } from '@/infrastructure/database/contexts/
 
 /** One row of the maintenance-context registry — the GUC it arms and how its transaction is tuned. */
 interface MaintenanceContextDefinition {
-  /** The `app.*` GUC this kind sets to `'true'` for the transaction. */
-  readonly guc: string;
+  /** The `app.*` GUC this kind sets to `'true'` — `null` for system-table kinds (non-RLS tables, no GUC). */
+  readonly guc: string | null;
+  /** Open a Postgres transaction (default behavior). `false` = pin the shared pool handle without a transaction — for callbacks that perform external I/O and must not hold a checkout across network calls. */
+  readonly opensTransaction: boolean;
   /** ALS context kind pinned for worker-runtime assertions. */
   readonly workerContextKind: WorkerDatabaseContextKind;
   /** Lift the HTTP statement/lock timeouts to the worker budget (bulk background work). */
@@ -44,33 +47,53 @@ interface MaintenanceContextDefinition {
 export const MAINTENANCE_CONTEXTS = {
   global_retention_cleanup: {
     guc: 'app.global_retention_cleanup',
+    opensTransaction: true,
     workerContextKind: 'global_retention_cleanup',
     appliesWorkerStatementTimeout: true,
     grants: 'cross-tenant read/delete via the USING bypass arms on tenant policies',
   },
   session_retention_cleanup: {
     guc: 'app.session_retention_cleanup',
+    opensTransaction: true,
     workerContextKind: 'session_retention_cleanup',
     appliesWorkerStatementTimeout: true,
     grants: 'cross-user delete on auth.sessions',
   },
   global_admin: {
     guc: 'app.global_admin',
+    opensTransaction: true,
     workerContextKind: 'global_admin',
     appliesWorkerStatementTimeout: false,
     grants: 'cross-user/cross-tenant reads on auth.users, auth.auth_methods, audit.logs',
   },
   system_audit_insert: {
     guc: 'app.system_audit_insert',
+    opensTransaction: true,
     workerContextKind: 'system_table',
     appliesWorkerStatementTimeout: false,
     grants: 'tenantless INSERT into audit.logs (organization_id IS NULL only)',
   },
   audit_outbox_drain: {
     guc: 'app.audit_outbox_drain',
+    opensTransaction: true,
     workerContextKind: 'audit_outbox_drain',
     appliesWorkerStatementTimeout: true,
     grants: 'exclusive SELECT/UPDATE/DELETE on audit.outbox',
+  },
+  system_table_retention: {
+    guc: null,
+    opensTransaction: true,
+    workerContextKind: 'system_table',
+    appliesWorkerStatementTimeout: true,
+    grants: 'pure-DB bulk retention on non-RLS tables (e.g. billing.stripe_webhook_events)',
+  },
+  system_table_worker: {
+    guc: null,
+    opensTransaction: false,
+    workerContextKind: 'system_table',
+    appliesWorkerStatementTimeout: false,
+    grants:
+      'non-RLS table access from workers doing external I/O (mail outbox, ledgers) — no transaction held across network calls',
   },
 } as const satisfies Record<string, MaintenanceContextDefinition>;
 
@@ -142,6 +165,26 @@ export async function withMaintenanceDatabaseContext<T>(
   options?: MaintenanceDatabaseContextOptions,
 ): Promise<T> {
   const definition = MAINTENANCE_CONTEXTS[scope.kind];
+  if (!definition.opensTransaction) {
+    // Non-transactional kinds pin the shared pool handle so getRequestDatabase()
+    // resolves in worker runtime WITHOUT holding a checkout across the callback's
+    // external I/O (mail sends, BullMQ re-enqueues). Outside worker runtime the
+    // handle is passed straight through with no ALS pinning — an HTTP caller
+    // (stripe-webhook service, commit-dispatch executor) must not have its
+    // request-pinned transaction handle shadowed by the bare pool.
+    if (!isWorkerRuntime()) {
+      return callback(
+        brandWorkerContextDatabaseHandle(database as unknown as RequestScopedPostgresDatabase),
+      );
+    }
+    return runWithWorkerDatabaseContext({ kind: definition.workerContextKind }, () =>
+      runWithPinnedDatabaseHandle(database as unknown as RequestScopedPostgresDatabase, () =>
+        callback(
+          brandWorkerContextDatabaseHandle(database as unknown as RequestScopedPostgresDatabase),
+        ),
+      ),
+    );
+  }
   return runWithWorkerDatabaseContext({ kind: definition.workerContextKind }, () =>
     database.transaction(async (transaction) => {
       const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
@@ -151,7 +194,9 @@ export async function withMaintenanceDatabaseContext<T>(
       if (definition.appliesWorkerStatementTimeout) {
         await applyWorkerStatementTimeout(databaseHandle);
       }
-      await setLocalDatabaseConfig(databaseHandle, definition.guc, 'true');
+      if (definition.guc !== null) {
+        await setLocalDatabaseConfig(databaseHandle, definition.guc, 'true');
+      }
       return runWithPinnedDatabaseHandle(databaseHandle, () =>
         callback(brandWorkerContextDatabaseHandle(databaseHandle)),
       );

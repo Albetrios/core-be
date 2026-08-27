@@ -3,12 +3,6 @@ import { WebauthnService } from '@/domains/auth/sub-domains/auth-webauthn/webaut
 import type { UserService } from '@/domains/user/user.service.js';
 import type { WebauthnCredentialRepository } from '@/domains/auth/sub-domains/auth-webauthn/webauthn-credential.repository.js';
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
 vi.mock('@/domains/auth/sub-domains/auth-webauthn/webauthn-challenge.js', () => ({
   createWebauthnChallenge: vi.fn().mockResolvedValue('challenge-token'),
 }));

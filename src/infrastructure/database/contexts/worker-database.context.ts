@@ -1,16 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { database } from '@/infrastructure/database/connection.js';
-import {
-  brandWorkerContextDatabaseHandle,
-  type PostgresDatabaseHandle,
-  type WorkerContextDatabaseHandle,
-} from '@/infrastructure/database/utils/database-handle.types.js';
 import {
   isForceRlsTable,
   type ForceRlsTableRef,
 } from '@/infrastructure/database/utils/force-rls-tables.constants.js';
-import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
-import { runWithPinnedDatabaseHandle } from '@/infrastructure/database/contexts/request-database.context.js';
 import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/worker-database.context.error.js';
 
 /**
@@ -84,7 +76,7 @@ export function getWorkerDatabaseContext(): WorkerDatabaseContext | undefined {
 
 /**
  * Runs `callback` with the given {@link WorkerDatabaseContext} pinned in ALS. Worker
- * context wrappers (`withOrganizationContext`, `withSystemTableWorkerContext`, etc.)
+ * context wrappers (`withPrincipalDatabaseContext`, `withMaintenanceDatabaseContext`, etc.)
  * build on top of this primitive — application code should call the wrappers
  * directly rather than this raw helper.
  */
@@ -109,7 +101,7 @@ export function assertWorkerDatabaseContext(
   const context = getWorkerDatabaseContext();
   if (context === undefined) {
     throw new WorkerDatabaseContextError(
-      'Worker process must not use unpinned database access. Wrap the job in a context helper (withOrganizationContext, runTenantScopedWorkerJob, withPrincipalDatabaseContext, withUserDatabaseContext, withMaintenanceDatabaseContext, withSessionDatabaseContext, withSystemTableWorkerContext, or withSystemTableRetentionContext) and pass databaseHandle into createWorker*Repository() factories.',
+      'Worker process must not use unpinned database access. Wrap the job in a context helper (withPrincipalDatabaseContext, runTenantScopedWorkerJob, withMaintenanceDatabaseContext, or withSessionDatabaseContext) and pass databaseHandle into createWorker*Repository() factories.',
     );
   }
 
@@ -145,34 +137,6 @@ export function assertWorkerForceRlsTableAccess(tableRef: ForceRlsTableRef): voi
       `Worker context kind "${context.kind}" cannot access FORCE RLS table ${tableRef.schemaName}.${tableRef.tableName}. Use organization, global_retention_cleanup, global_admin, user, or session_retention_cleanup context.`,
     );
   }
-}
-
-/**
- * Explicit bypass for tables without tenant RLS (mail outbox, Stripe webhook ledger).
- * Pins ALS so getRequestDatabase() resolves in worker runtime without opening a transaction.
- *
- * @remarks
- * - **Notes:** Does NOT open a Postgres transaction, so `SET LOCAL statement_timeout`
- *   is not applied. This is intentional — callers like the mail processor and
- *   BullMQ re-enqueue workers perform external I/O (Resend, Redis) inside the
- *   context and must not hold a connection across network calls.
- *   For pure-DB retention workers (no external I/O) use
- *   `withSystemTableRetentionContext` from
- *   `@/infrastructure/database/contexts/retention-database.context.js`
- *   instead so the worker statement-timeout is applied (sec-new-Q4).
- */
-export async function withSystemTableWorkerContext<T>(
-  callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
-): Promise<T> {
-  if (!isWorkerRuntime()) {
-    return callback(brandWorkerContextDatabaseHandle(database as PostgresDatabaseHandle));
-  }
-
-  return runWithWorkerDatabaseContext({ kind: 'system_table' }, () =>
-    runWithPinnedDatabaseHandle(database as RequestScopedPostgresDatabase, () =>
-      callback(brandWorkerContextDatabaseHandle(database as PostgresDatabaseHandle)),
-    ),
-  );
 }
 
 /**

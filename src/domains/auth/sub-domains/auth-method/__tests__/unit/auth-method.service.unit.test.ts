@@ -39,12 +39,6 @@ vi.mock('@/shared/utils/security/anti-enumeration.util.js', () => ({
   enforceMinimumDuration: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
 // resetPassword now runs inside withTransaction + runWithPinnedDatabaseHandle; invoke the
 // callbacks directly so the unit test exercises the flow without a real database/transaction.
 vi.mock('@/infrastructure/database/transaction.js', () => ({

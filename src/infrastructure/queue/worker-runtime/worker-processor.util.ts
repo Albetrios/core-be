@@ -84,7 +84,7 @@ export async function runUserScopedWorkerJob<TJob, TResult>(
 
 /**
  * BullMQ worker factory for jobs that include `organizationPublicId` in the payload.
- * Runs each job inside `withOrganizationContext` and passes a pinned `databaseHandle` to the handler.
+ * Runs each job inside `withPrincipalDatabaseContext` and passes a pinned `databaseHandle` to the handler.
  */
 export function createTenantScopedBullMQWorker<TJobData extends TenantScopedJobData>(
   queueName: string,

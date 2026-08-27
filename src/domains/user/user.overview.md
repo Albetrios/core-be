@@ -38,7 +38,7 @@ The root `user.service.ts` is also a public service (`UserService`) consumed by 
 This domain implements the contracts documented in [src/PATTERNS.md](src/PATTERNS.md):
 
 - `tenant-isolation` does **not** apply to the user record itself (users are global identities). It does apply when reading user-scoped data inside an organization context (handled by other domains).
-- `rls-context` — `user-data-export` runs inside `withUserDatabaseContext` so RLS attributes the export to the right user.
+- `rls-context` — `user-data-export` runs inside `withPrincipalDatabaseContext` (user scope) so RLS attributes the export to the right user.
 - `soft-delete` — users tombstone with `deleted_at`; retention purges after the window.
 - `audit-emission` — profile changes, settings changes, and export requests record audit rows.
 - `transactional-outbox` — export-ready notifications flow through the mail outbox.
@@ -76,7 +76,7 @@ stateDiagram-v2
 
 - **Export with > GDPR_EXPORT_MAX_ROWS_PER_TABLE rows in one table** → truncated with a metadata note in the bundle; logged at `info`.
 - **S3 write failure during export** → BullMQ retries the worker job; final failure → DLQ.
-- **User soft-delete while an export is in flight** → export still completes (the read path is `withUserDatabaseContext` on the user public id; soft-delete does not revoke history reads).
+- **User soft-delete while an export is in flight** → export still completes (the read path is a user principal scope on the user public id; soft-delete does not revoke history reads).
 - **Settings row missing** → API returns the platform default; no error.
 
 ## Policy constants

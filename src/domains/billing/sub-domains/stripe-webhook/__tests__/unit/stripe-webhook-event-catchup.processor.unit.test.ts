@@ -6,9 +6,18 @@ const isStripeConfiguredMock = vi.fn();
 const listRecentStripeEventsMock = vi.fn();
 const enqueueStripeWebhookByEventIdForReclaimMock = vi.fn();
 
-vi.mock('@/infrastructure/database/contexts/worker-database.context.js', () => ({
-  withSystemTableWorkerContext: (callback: () => Promise<unknown>) => callback(),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/maintenance-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withMaintenanceDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
 
 vi.mock('@/infrastructure/payment/stripe.client.js', () => ({
   isStripeConfigured: (...arguments_: unknown[]) => isStripeConfiguredMock(...arguments_),

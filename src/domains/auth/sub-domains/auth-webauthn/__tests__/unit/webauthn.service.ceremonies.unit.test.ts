@@ -13,12 +13,6 @@ import type { WebauthnCredentialRepository } from '@/domains/auth/sub-domains/au
  * the verifier, the counter update, and the refusal arms.
  */
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
 const { consumeChallengeMock, createChallengeMock } = vi.hoisted(() => ({
   consumeChallengeMock: vi.fn(),
   createChallengeMock: vi.fn().mockResolvedValue('challenge-token'),

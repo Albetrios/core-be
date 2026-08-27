@@ -11,9 +11,7 @@ const DOMAINS_ROOT = join(ROOT, 'src/domains');
  */
 const DATABASE_CONTEXT_WRAPPERS = [
   'withPrincipalDatabaseContext',
-  'withOrganizationDatabaseContext',
-  'withOrganizationContext',
-  'withUserDatabaseContext',
+  'withSessionDatabaseContext',
   'withMaintenanceDatabaseContext',
   'withTransaction',
 ] as const;

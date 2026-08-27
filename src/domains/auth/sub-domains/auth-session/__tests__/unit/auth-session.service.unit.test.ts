@@ -13,12 +13,6 @@ vi.mock('@/domains/auth/sub-domains/auth-session/session-token-cache.service.js'
   invalidateCachedSessionToken: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
 vi.mock(
   '@/infrastructure/database/contexts/principal-database.context.js',
   async (importOriginal) => {

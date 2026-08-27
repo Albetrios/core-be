@@ -7,12 +7,10 @@ import {
 import { assertTeamOrganization } from './organization-capability.js';
 import { env } from '@/shared/config/env.config.js';
 import { GLOBAL_ROLES, type GlobalRole } from '@/shared/constants/roles.constants.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/principal-database.context.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { OrganizationRepository } from './organization.repository.js';
 import type {
   OrganizationBillingContext,
@@ -35,6 +33,10 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { isPostgresUniqueViolation } from '@/shared/utils/infrastructure/postgres-error.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import type { UploadService } from '@/domains/upload/upload.service.js';
+import {
+  resolveVerifiedOrganizationPrincipalScope,
+  resolveVerifiedUserPrincipalScope,
+} from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Structural port for the billing side of organization offboarding (route-audit-#2).
@@ -195,7 +197,7 @@ export class OrganizationService {
     userPublicId: string,
     userInternalId: number,
   ): Promise<number> {
-    return withUserDatabaseContext(userPublicId, () =>
+    return withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(userPublicId), () =>
       this.repository.countActiveOwnedByUser(userInternalId),
     );
   }
@@ -305,11 +307,14 @@ export class OrganizationService {
   ): Promise<void> {
     // tenancy.organizations is FORCE RLS — persist the Stripe customer id under the org GUC
     // so the update is not silently dropped when called from the payment provider outside HTTP.
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
-      const organization = await this.repository.findByPublicId(organization_public_id);
-      if (!organization) throw new NotFoundError('Organization');
-      await this.repository.updateStripeCustomerId(organization.id, stripe_customer_id);
-    });
+    return withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(organization_public_id),
+      async () => {
+        const organization = await this.repository.findByPublicId(organization_public_id);
+        if (!organization) throw new NotFoundError('Organization');
+        await this.repository.updateStripeCustomerId(organization.id, stripe_customer_id);
+      },
+    );
   }
 
   private isGlobalAdmin(global_role?: GlobalRole): boolean {
@@ -346,15 +351,18 @@ export class OrganizationService {
       after: parsed.after,
       limit: parsed.limit,
     });
-    return withUserDatabaseContext(user_public_id, async () => {
-      const result = this.isGlobalAdmin(global_role)
-        ? await this.repository.findAll(pagination)
-        : await this.repository.findAllForUser(user_public_id, pagination);
-      return {
-        ...result,
-        items: await Promise.all(result.items.map((row) => this.toOrganizationOutput(row))),
-      };
-    });
+    return withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(user_public_id),
+      async () => {
+        const result = this.isGlobalAdmin(global_role)
+          ? await this.repository.findAll(pagination)
+          : await this.repository.findAllForUser(user_public_id, pagination);
+        return {
+          ...result,
+          items: await Promise.all(result.items.map((row) => this.toOrganizationOutput(row))),
+        };
+      },
+    );
   }
 
   async getByPublicId(
@@ -362,12 +370,15 @@ export class OrganizationService {
     user_public_id: string,
     global_role?: GlobalRole,
   ): Promise<OrganizationOutput> {
-    return withUserDatabaseContext(user_public_id, async () => {
-      await this.assertUserCanAccessOrganization(user_public_id, public_id, global_role);
-      const organization = await this.repository.findByPublicId(public_id);
-      if (!organization) throw new NotFoundError('Organization');
-      return this.toOrganizationOutput(organization);
-    });
+    return withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(user_public_id),
+      async () => {
+        await this.assertUserCanAccessOrganization(user_public_id, public_id, global_role);
+        const organization = await this.repository.findByPublicId(public_id);
+        if (!organization) throw new NotFoundError('Organization');
+        return this.toOrganizationOutput(organization);
+      },
+    );
   }
 
   async getBySlug(
@@ -375,16 +386,19 @@ export class OrganizationService {
     user_public_id: string,
     global_role?: GlobalRole,
   ): Promise<OrganizationOutput> {
-    return withUserDatabaseContext(user_public_id, async () => {
-      const organization = await this.repository.findBySlug(slug);
-      if (!organization) throw new NotFoundError('Organization');
-      await this.assertUserCanAccessOrganization(
-        user_public_id,
-        organization.public_id,
-        global_role,
-      );
-      return this.toOrganizationOutput(organization);
-    });
+    return withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(user_public_id),
+      async () => {
+        const organization = await this.repository.findBySlug(slug);
+        if (!organization) throw new NotFoundError('Organization');
+        await this.assertUserCanAccessOrganization(
+          user_public_id,
+          organization.public_id,
+          global_role,
+        );
+        return this.toOrganizationOutput(organization);
+      },
+    );
   }
 
   async create(body: unknown, owner_user_public_id: string): Promise<OrganizationOutput> {
@@ -401,57 +415,60 @@ export class OrganizationService {
      * (`owner_user_id` resolves to the current `app.current_user_id`). The slug
      * existence check runs in the same wrap so the SELECT also sees the user GUC.
      */
-    return withUserDatabaseContext(owner_user_public_id, async () => {
-      const ownerId = await this.repository.resolveUserIdByPublicId(owner_user_public_id);
-      if (ownerId === null) throw new NotFoundError('User');
-      // Anti-abuse: cap the number of TEAM organizations a single account may own (personal is
-      // exempt — countActiveOwnedByUser already counts only type='TEAM').
-      // TEN-02 / audit-#8 / audit-R12: serialize the count + insert with ONE per-owner
-      // transaction-scoped advisory lock (the canonical resource-quota lock; releases at COMMIT) so
-      // concurrent creates by the same owner cannot both pass the same count and overshoot the cap.
-      // Previously this path ALSO took a second, redundant lock from the parallel resource-cap-lock
-      // module (now removed) — either lock alone fully serializes, so the second was dead weight.
-      await this.repository.acquireOwnedOrganizationQuotaLock(ownerId);
-      const ownedTeamCount = await this.repository.countActiveOwnedByUser(ownerId);
-      if (ownedTeamCount >= env.MAX_TEAM_ORGANIZATIONS_PER_OWNER) {
-        throw new ConflictError(
-          'errors:maxTeamOrganizationsReached',
-          { max: env.MAX_TEAM_ORGANIZATIONS_PER_OWNER },
-          `Maximum number of team organizations (${env.MAX_TEAM_ORGANIZATIONS_PER_OWNER}) reached for this account`,
-        );
-      }
-      const existing = await this.repository.findBySlug(parsed.slug);
-      if (existing)
-        throw new ConflictError(
-          'errors:organizationSlugExists',
-          { slug: parsed.slug },
-          `Organization with slug "${parsed.slug}" already exists`,
-        ).withReason('organization_slug_exists');
-      try {
-        // Atomically create the organization AND bootstrap the owner's role + full
-        // permissions + membership — without this the creator resolves zero permissions
-        // on their own organization (the permission path is a strict role→membership join).
-        const { organization } = await provisionOrganizationWithOwner({
-          name: parsed.name,
-          slug: parsed.slug,
-          type: 'TEAM',
-          ownerUserId: ownerId,
-        });
-        return this.toOrganizationOutput(organization);
-      } catch (error) {
-        // Two concurrent creates can both pass the findBySlug pre-check; the
-        // loser hits the `idx_organizations_slug` unique index. Map the
-        // Postgres unique_violation to a 409 instead of a 500.
-        if (isPostgresUniqueViolation(error)) {
+    return withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(owner_user_public_id),
+      async () => {
+        const ownerId = await this.repository.resolveUserIdByPublicId(owner_user_public_id);
+        if (ownerId === null) throw new NotFoundError('User');
+        // Anti-abuse: cap the number of TEAM organizations a single account may own (personal is
+        // exempt — countActiveOwnedByUser already counts only type='TEAM').
+        // TEN-02 / audit-#8 / audit-R12: serialize the count + insert with ONE per-owner
+        // transaction-scoped advisory lock (the canonical resource-quota lock; releases at COMMIT) so
+        // concurrent creates by the same owner cannot both pass the same count and overshoot the cap.
+        // Previously this path ALSO took a second, redundant lock from the parallel resource-cap-lock
+        // module (now removed) — either lock alone fully serializes, so the second was dead weight.
+        await this.repository.acquireOwnedOrganizationQuotaLock(ownerId);
+        const ownedTeamCount = await this.repository.countActiveOwnedByUser(ownerId);
+        if (ownedTeamCount >= env.MAX_TEAM_ORGANIZATIONS_PER_OWNER) {
+          throw new ConflictError(
+            'errors:maxTeamOrganizationsReached',
+            { max: env.MAX_TEAM_ORGANIZATIONS_PER_OWNER },
+            `Maximum number of team organizations (${env.MAX_TEAM_ORGANIZATIONS_PER_OWNER}) reached for this account`,
+          );
+        }
+        const existing = await this.repository.findBySlug(parsed.slug);
+        if (existing)
           throw new ConflictError(
             'errors:organizationSlugExists',
             { slug: parsed.slug },
             `Organization with slug "${parsed.slug}" already exists`,
           ).withReason('organization_slug_exists');
+        try {
+          // Atomically create the organization AND bootstrap the owner's role + full
+          // permissions + membership — without this the creator resolves zero permissions
+          // on their own organization (the permission path is a strict role→membership join).
+          const { organization } = await provisionOrganizationWithOwner({
+            name: parsed.name,
+            slug: parsed.slug,
+            type: 'TEAM',
+            ownerUserId: ownerId,
+          });
+          return this.toOrganizationOutput(organization);
+        } catch (error) {
+          // Two concurrent creates can both pass the findBySlug pre-check; the
+          // loser hits the `idx_organizations_slug` unique index. Map the
+          // Postgres unique_violation to a 409 instead of a 500.
+          if (isPostgresUniqueViolation(error)) {
+            throw new ConflictError(
+              'errors:organizationSlugExists',
+              { slug: parsed.slug },
+              `Organization with slug "${parsed.slug}" already exists`,
+            ).withReason('organization_slug_exists');
+          }
+          throw error;
         }
-        throw error;
-      }
-    });
+      },
+    );
   }
 
   async update(

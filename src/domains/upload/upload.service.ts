@@ -9,8 +9,6 @@ import {
   NotFoundError,
   ValidationError,
 } from '@/shared/errors/index.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { UserService } from '@/domains/user/user.service.js';
@@ -38,6 +36,11 @@ import type { CreateUploadInput, UploadCreateOutput, UploadDetailOutput } from '
 import type { UploadRepository, UploadRow } from './upload.repository.js';
 import { serializeUploadCreate, serializeUploadDetail } from './upload.serializer.js';
 import { validateUploadPublicIdParam } from './upload.validator.js';
+import {
+  resolveVerifiedOrganizationPrincipalScope,
+  resolveVerifiedUserPrincipalScope,
+} from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
 
 /** Inputs for {@link UploadService}'s private atomic PENDING-slot reservation. */
 interface ReservePendingUploadSlotParams {
@@ -295,9 +298,15 @@ export class UploadService {
     };
 
     if (organizationInternalId !== null && organizationPublicId !== null) {
-      return withOrganizationDatabaseContext(organizationPublicId, runReservation);
+      return withPrincipalDatabaseContext(
+        resolveVerifiedOrganizationPrincipalScope(organizationPublicId),
+        runReservation,
+      );
     }
-    return withUserDatabaseContext(userPublicId, runReservation);
+    return withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      runReservation,
+    );
   }
 
   private async resolveUploadOrganizationInternalId(
@@ -318,8 +327,9 @@ export class UploadService {
        * organization context or `app.current_user_id` + the `organizations_user_discovery`
        * policy. The latter is appropriate here because we have just authorized the user.
        */
-      const organization = await withUserDatabaseContext(userPublicId, () =>
-        this.organizationService.requireOrganizationByPublicId(input.organization_id!),
+      const organization = await withPrincipalDatabaseContext(
+        resolveVerifiedUserPrincipalScope(userPublicId),
+        () => this.organizationService.requireOrganizationByPublicId(input.organization_id!),
       );
       return organization.id;
     }
@@ -391,8 +401,9 @@ export class UploadService {
       return;
     }
 
-    const organization = await withUserDatabaseContext(userPublicId, () =>
-      this.organizationService.findOrganizationByInternalId(row.organization_id!),
+    const organization = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      () => this.organizationService.findOrganizationByInternalId(row.organization_id!),
     );
     if (!organization) {
       throw new NotFoundError('Upload');
@@ -413,8 +424,9 @@ export class UploadService {
     userInternalId: number;
   }): Promise<UploadRow> {
     const { public_id, userPublicId, userInternalId } = input;
-    const row = await withUserDatabaseContext(userPublicId, () =>
-      this.repository.findByPublicId(public_id),
+    const row = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      () => this.repository.findByPublicId(public_id),
     );
     if (!row) throw new NotFoundError('Upload');
 
@@ -531,8 +543,9 @@ export class UploadService {
     // legacy rows are at end-of-life; refuse and require re-upload via
     // a fresh pending key.
     if (!pendingKeyed) {
-      const failedRow = await withUserDatabaseContext(userPublicId, () =>
-        this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
+      const failedRow = await withPrincipalDatabaseContext(
+        resolveVerifiedUserPrincipalScope(userPublicId),
+        () => this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
       );
       if (!failedRow) throw new NotFoundError('Upload');
       logger.warn(
@@ -553,8 +566,9 @@ export class UploadService {
     });
 
     if (!verified) {
-      const failedRow = await withUserDatabaseContext(userPublicId, () =>
-        this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
+      const failedRow = await withPrincipalDatabaseContext(
+        resolveVerifiedUserPrincipalScope(userPublicId),
+        () => this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
       );
       if (!failedRow) throw new NotFoundError('Upload');
       throw new ValidationError('errors:uploadVerificationFailed', undefined, {
@@ -564,8 +578,9 @@ export class UploadService {
 
     // Repoint the row at the immutable final key in the same update that marks it UPLOADED, so a
     // servable row never references the overwritable pending key.
-    const updated = await withUserDatabaseContext(userPublicId, () =>
-      this.repository.markConfirmedByPublicId(validatedPublicId, finalKey),
+    const updated = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      () => this.repository.markConfirmedByPublicId(validatedPublicId, finalKey),
     );
     if (!updated) throw new NotFoundError('Upload');
 
@@ -662,8 +677,9 @@ export class UploadService {
        */
       const organization =
         userPublicId !== undefined && userPublicId.length > 0
-          ? await withUserDatabaseContext(userPublicId, () =>
-              this.organizationService.findOrganizationByInternalId(row.organization_id!),
+          ? await withPrincipalDatabaseContext(
+              resolveVerifiedUserPrincipalScope(userPublicId),
+              () => this.organizationService.findOrganizationByInternalId(row.organization_id!),
             )
           : await this.organizationService.findOrganizationByInternalId(row.organization_id);
       organizationPublicId = organization?.public_id ?? null;
@@ -689,8 +705,9 @@ export class UploadService {
       );
     }
 
-    const deleted = await withUserDatabaseContext(userPublicId, () =>
-      this.repository.softDeleteByPublicId(validatedPublicId),
+    const deleted = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      () => this.repository.softDeleteByPublicId(validatedPublicId),
     );
     if (!deleted) throw new NotFoundError('Upload');
   }

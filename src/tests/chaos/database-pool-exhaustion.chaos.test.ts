@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { env } from '@/shared/config/env.config.js';
 import { sql } from '@/infrastructure/database/connection.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Production hardening item 2: when many concurrent requests use scoped
@@ -21,15 +22,18 @@ describe('Chaos resilience: database pool stays available under bursty scoped-co
     const burstSize = Math.max(poolMax * 2, 20);
 
     const scopedUnitsOfWork = Array.from({ length: burstSize }, (_, index) =>
-      withOrganizationDatabaseContext(organizationPublicId, async (databaseHandle) => {
-        const rows = await databaseHandle.execute<{ value: number }>(
-          drizzleSql`SELECT ${index}::int AS value`,
-        );
-        const result = Array.isArray(rows)
-          ? rows
-          : ((rows as { rows?: { value: number }[] }).rows ?? []);
-        return result[0]?.value ?? -1;
-      }),
+      withPrincipalDatabaseContext(
+        resolveVerifiedOrganizationPrincipalScope(organizationPublicId),
+        async (databaseHandle) => {
+          const rows = await databaseHandle.execute<{ value: number }>(
+            drizzleSql`SELECT ${index}::int AS value`,
+          );
+          const result = Array.isArray(rows)
+            ? rows
+            : ((rows as { rows?: { value: number }[] }).rows ?? []);
+          return result[0]?.value ?? -1;
+        },
+      ),
     );
 
     const autocommitProbes = Array.from(

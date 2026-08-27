@@ -1,5 +1,4 @@
 import { UnauthorizedError } from '@/shared/errors/index.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import {
   withPrincipalDatabaseContext,
   type UserPrincipalDatabaseScope,
@@ -9,6 +8,7 @@ import { PAGINATION } from '@/shared/constants/pagination.constants.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import type { NotificationRepository } from './notification.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
+import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Options forwarded from controllers/event handlers into {@link NotificationService.listForUser}.
@@ -79,8 +79,9 @@ export class NotificationService {
   /** Lists notification metadata for a GDPR data-export bundle (capped by caller). */
   async listForUserDataExport(options: { userPublicId: string; limit: number }) {
     const userId = await this.resolveUserId(options.userPublicId);
-    return withUserDatabaseContext(options.userPublicId, () =>
-      this.repository.listForUserDataExport(userId, options.limit),
+    return withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(options.userPublicId),
+      () => this.repository.listForUserDataExport(userId, options.limit),
     );
   }
 

@@ -6,14 +6,20 @@ vi.mock(
   '@/infrastructure/database/contexts/maintenance-database.context.js',
   async (importOriginal) => {
     const actual = await importOriginal<Record<string, unknown>>();
-    const inner = ((...parameters: unknown[]) =>
-      withGlobalAdminDatabaseContextMock(...parameters)) as unknown as (
-      ...parameters: unknown[]
-    ) => unknown;
     return {
       ...actual,
-      withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
-        inner(...parameters),
+      // Per-kind dispatch: only global_admin routes to its spy; system_table_worker
+      // (the queue-drain shell) is a plain passthrough so it never pollutes the
+      // global-admin call-count assertions.
+      withMaintenanceDatabaseContext: vi.fn(
+        (scope: { kind: string }, callback: (handle: unknown) => Promise<unknown>) =>
+          scope.kind === 'global_admin'
+            ? (
+                withGlobalAdminDatabaseContextMock as unknown as (
+                  ...parameters: unknown[]
+                ) => unknown
+              )(callback)
+            : callback({}),
       ),
     };
   },
@@ -45,14 +51,6 @@ vi.mock(
   }),
 );
 
-vi.mock('@/infrastructure/database/contexts/worker-database.context.js', () => ({
-  withSystemTableWorkerContext: (callback: () => Promise<unknown>) => callback(),
-}));
-
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: (...parameters: unknown[]) => withUserDatabaseContextMock(...parameters),
-}));
-
 vi.mock(
   '@/infrastructure/database/contexts/principal-database.context.js',
   async (importOriginal) => {
@@ -63,9 +61,12 @@ vi.mock(
       // signature so the existing implementations and assertions stay valid.
       withPrincipalDatabaseContext: vi.fn(
         (
-          scope: { organizationPublicId?: string },
+          scope: { organizationPublicId?: string; userPublicId?: string },
           callback: (handle: unknown) => Promise<unknown>,
-        ) => withOrganizationContextMock(scope.organizationPublicId, callback),
+        ) =>
+          scope.organizationPublicId !== undefined
+            ? withOrganizationContextMock(scope.organizationPublicId, callback)
+            : withUserDatabaseContextMock(scope.userPublicId, callback),
       ),
     };
   },

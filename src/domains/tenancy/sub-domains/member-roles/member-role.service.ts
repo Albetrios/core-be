@@ -1,7 +1,6 @@
 import { env } from '@/shared/config/env.config.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/shared/errors/index.js';
 import { isPostgresUniqueViolation } from '@/shared/utils/infrastructure/postgres-error.util.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
@@ -30,7 +29,7 @@ import type { ListMemberRolesQueryInput } from './member-role.dto.js';
  *
  * @remarks
  * - **Algorithm:** every public method runs inside
- *   {@link withOrganizationDatabaseContext} and resolves the caller's
+ *   `withPrincipalDatabaseContext` and resolves the caller's
  *   organization through {@link OrganizationService.requireOrganizationRecordByPublicId}
  *   before touching the role repository, so RLS and membership checks happen
  *   before any data access.
@@ -191,7 +190,7 @@ export class MemberRoleService {
 
       // When an initial permission set is requested, verify the caller may grant every code
       // BEFORE creating the role. An escalation attempt (a code the caller does not hold) or an
-      // unknown code throws here, and the whole `withOrganizationDatabaseContext` transaction
+      // unknown code throws here, and the whole `withPrincipalDatabaseContext` transaction
       // rolls back — no half-made role. A brand-new role has no current permissions and is never
       // the owner role, so the owner-protection / removed-codes checks the PUT path runs do not apply.
       const permissionCodes = parsed.permission_codes ?? [];

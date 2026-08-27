@@ -9,12 +9,6 @@ vi.mock('@/infrastructure/cache/redis.client.js', () => ({
   },
 }));
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: vi.fn(
-    async (_organizationId: string, callback: () => Promise<string[]>) => callback(),
-  ),
-}));
-
 import { redisConnection } from '@/infrastructure/cache/redis.client.js';
 import { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permission/permission.repository.js';

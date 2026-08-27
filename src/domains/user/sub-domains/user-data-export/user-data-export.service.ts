@@ -1,7 +1,6 @@
 import { ConfigurationError, NotFoundError } from '@/shared/errors/index.js';
 import { isPostgresUniqueViolation } from '@/shared/utils/infrastructure/postgres-error.util.js';
 import type { WorkerDatabaseHandle } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { createWorkerUserDataExportRepository } from '@/domains/user/sub-domains/user-data-export/user-data-export.repository.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { GDPR_EXPORT_MAX_ROWS_PER_TABLE } from '@/shared/constants/query-limits.constants.js';
@@ -33,6 +32,7 @@ import {
   withPrincipalDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 function buildExportS3Key(userPublicId: string, exportPublicId: string): string {
   return `${USER_DATA_EXPORT_S3_PREFIX}/${userPublicId}/${exportPublicId}.json.gz`;
@@ -284,8 +284,8 @@ export class UserDataExportService {
     userPublicId: string;
     body: Buffer;
   }): Promise<void> {
-    const s3Key = await withUserDatabaseContext(
-      options.userPublicId,
+    const s3Key = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(options.userPublicId),
       async (scopedDatabaseHandle) =>
         this.resolveExportArtifactS3Key(
           {
@@ -308,16 +308,19 @@ export class UserDataExportService {
     });
 
     try {
-      await withUserDatabaseContext(options.userPublicId, async (scopedDatabaseHandle) => {
-        await this.finalizeExportAfterUpload(
-          {
-            exportPublicId: options.exportPublicId,
-            userInternalId: options.userInternalId,
-            userPublicId: options.userPublicId,
-          },
-          scopedDatabaseHandle,
-        );
-      });
+      await withPrincipalDatabaseContext(
+        resolveVerifiedUserPrincipalScope(options.userPublicId),
+        async (scopedDatabaseHandle) => {
+          await this.finalizeExportAfterUpload(
+            {
+              exportPublicId: options.exportPublicId,
+              userInternalId: options.userInternalId,
+              userPublicId: options.userPublicId,
+            },
+            scopedDatabaseHandle,
+          );
+        },
+      );
     } catch (error) {
       await this.bestEffortDeleteUploadedExportArtifact(s3Key, {
         exportPublicId: options.exportPublicId,
@@ -429,12 +432,14 @@ export class UserDataExportService {
     // domain's `tombstoneAllByUserId` offboarding pattern.
     let afterId = 0;
     for (;;) {
-      const rows = await withUserDatabaseContext(userPublicId, () =>
-        this.exportRepository.findS3KeysByUserIdAfter(
-          userInternalId,
-          afterId,
-          USER_DATA_EXPORT_OFFBOARDING_DELETE_BATCH_SIZE,
-        ),
+      const rows = await withPrincipalDatabaseContext(
+        resolveVerifiedUserPrincipalScope(userPublicId),
+        () =>
+          this.exportRepository.findS3KeysByUserIdAfter(
+            userInternalId,
+            afterId,
+            USER_DATA_EXPORT_OFFBOARDING_DELETE_BATCH_SIZE,
+          ),
       );
       if (rows.length === 0) {
         break;
@@ -448,8 +453,9 @@ export class UserDataExportService {
         break;
       }
     }
-    const deletedCount = await withUserDatabaseContext(userPublicId, () =>
-      this.exportRepository.deleteAllByUserId(userInternalId),
+    const deletedCount = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      () => this.exportRepository.deleteAllByUserId(userInternalId),
     );
     if (deletedCount > 0) {
       logger.info({ userInternalId, deletedCount }, 'user-data-export.offboarding.deleted');

@@ -1,8 +1,9 @@
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { env } from '@/shared/config/env.config.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { provisionPersonalOrganization } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
 import { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
+import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
 
 /**
  * Orchestrates the login/active-organization lookups under the caller's own user RLS context. The
@@ -45,7 +46,7 @@ async function withUserContextForInternalId<T>(
 ): Promise<T | undefined> {
   const userPublicId = await organizationRepository.resolveUserPublicIdByInternalId(userInternalId);
   if (userPublicId === null) return undefined;
-  return withUserDatabaseContext(userPublicId, callback);
+  return withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(userPublicId), callback);
 }
 
 /**

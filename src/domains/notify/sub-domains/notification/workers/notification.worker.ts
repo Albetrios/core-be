@@ -15,7 +15,6 @@ import {
 } from '@/domains/notify/sub-domains/notification/queues/notification.queue.js';
 import { createWorkerNotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
 import { dispatchOutboxEmail, recordOutboxEmail } from '@/infrastructure/mail/queues/mail.queue.js';
-import { withSystemTableWorkerContext } from '@/infrastructure/database/contexts/worker-database.context.js';
 import { isMailConfigured } from '@/infrastructure/mail/mail.service.js';
 import { buildNotificationEmailHtml } from './notification-email-content.js';
 import {
@@ -32,8 +31,8 @@ import {
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
 import { resolveOrganizationJobScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
+import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 type NotificationDispatchData = {
   channels?: ('email' | 'in_app')[];
@@ -94,7 +93,7 @@ async function dispatchNotificationEmail(options: {
   // back the existing id), closing the duplicate-email window the Redis marker alone left
   // open. The Redis marker below is now just a fast-path to skip the DB insert on retry.
   let mailOutboxId: number | undefined;
-  await withSystemTableWorkerContext(async () => {
+  await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, async () => {
     mailOutboxId = await recordOutboxEmail({
       to: email,
       subject,
@@ -187,7 +186,10 @@ export async function processNotificationDispatchJob(
       if (!userPublicId) {
         throw new Error(`notification.user_unknown:${String(notificationId)}`);
       }
-      return withUserDatabaseContext(userPublicId, loadNotification);
+      return withPrincipalDatabaseContext(
+        resolveVerifiedUserPrincipalScope(userPublicId),
+        loadNotification,
+      );
     }
     return withPrincipalDatabaseContext(
       resolveOrganizationJobScope(organizationPublicId),

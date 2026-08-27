@@ -10,6 +10,21 @@ import type { OrganizationService } from '@/domains/tenancy/sub-domains/organiza
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 
+// UploadService now wraps repository work in the real principal wrapper, which
+// opens a `database.transaction()` — passthrough so this stays a pure unit test.
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 vi.mock('@/shared/config/env.config.js', () => ({
   getEnv: vi.fn(() => ({
     S3_BUCKET: 'test-bucket',
@@ -25,20 +40,6 @@ vi.mock('@/shared/config/env.config.js', () => ({
     UPLOAD_MAX_PENDING_PER_USER: 100,
     UPLOAD_MAX_PENDING_PER_ORGANIZATION: 2_000,
   },
-}));
-
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  // sec-r7/M4: org-scoped uploads now reserve their PENDING slot under organization RLS
-  // context. The unit test just runs the callback (RLS is exercised in the security suite).
-  withOrganizationDatabaseContext: vi.fn(
-    (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
 }));
 
 const userPublicId = generatePublicId('user');

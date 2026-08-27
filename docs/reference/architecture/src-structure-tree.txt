@@ -1127,19 +1127,15 @@ src/
     │   │   │   ├── assert-connection-budget.unit.test.ts
     │   │   │   ├── assert-database-rls-safety.unit.test.ts
     │   │   │   ├── assert-database-tls-safety.unit.test.ts
+    │   │   │   ├── principal-checkout-accounting.test.ts
     │   │   │   ├── principal-database.context.test.ts
-    │   │   │   ├── tenant-database.context.test.ts
     │   │   │   ├── worker-context-database-handle.unit.test.ts
     │   │   │   └── worker-database.context.test.ts
     │   ├── contexts/
     │   │   ├── maintenance-database.context.ts
-    │   │   ├── organization-database.context.ts
     │   │   ├── principal-database.context.ts
     │   │   ├── request-database.context.ts
-    │   │   ├── retention-database.context.ts
     │   │   ├── session-database.context.ts
-    │   │   ├── tenant-database.context.ts
-    │   │   ├── user-database.context.ts
     │   │   ├── worker-database-guard.util.ts
     │   │   ├── worker-database.context.error.ts
     │   │   ├── worker-database.context.ts
@@ -1585,7 +1581,8 @@ src/
     │   ├── identity/
     │   │   ├── public-id-param.util.ts
     │   │   ├── public-id.util.ts
-    │   │   └── uuid.util.ts
+    │   │   ├── uuid.util.ts
+    │   │   └── verified-principal-scope.util.ts
     │   ├── infrastructure/
     │   │   ├── application-lifecycle.util.ts
     │   │   ├── audit-record.util.ts
@@ -2112,6 +2109,7 @@ src/
     │   │   │   ├── retention-database.context.unit.test.ts
     │   │   │   ├── session-context-confinement.policy.unit.test.ts
     │   │   │   ├── transaction.util.db.unit.test.ts
+    │   │   │   ├── verified-scope-usage.policy.unit.test.ts
     │   │   │   └── worker-database-guard.unit.test.ts
     │   │   ├── mail/
     │   │   │   ├── __snapshots__/

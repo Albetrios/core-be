@@ -1,4 +1,3 @@
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { BILLING_PERMISSIONS } from '@/domains/billing/billing.permissions.js';
 import { TENANCY_PERMISSIONS } from '@/domains/tenancy/tenancy.permissions.js';
@@ -7,6 +6,8 @@ import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/mem
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import type { Organization } from '@/domains/tenancy/sub-domains/organization/organization.types.js';
+import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
 
 /** Name of the auto-provisioned, undeletable owner role created with every organization. */
 export const OWNER_ROLE_NAME = 'Owner';
@@ -110,7 +111,7 @@ export interface ProvisionOrganizationResult {
  *
  * @remarks
  * - **Algorithm:** pre-generates the org `public_id` and runs every insert inside one
- *   `withOrganizationDatabaseContext(publicId, …)` transaction, so `app.current_organization_id`
+ *   `withPrincipalDatabaseContext(resolveVerifiedOrganizationPrincipalScope(publicId), …)` transaction, so `app.current_organization_id`
  *   equals the org being created. The org row then satisfies its tenant-isolation WITH CHECK
  *   (`public_id = app.current_organization_id`) and the child rows (roles, role_permissions,
  *   memberships) satisfy theirs (`organization_id` → the just-inserted org) — all under the
@@ -169,82 +170,85 @@ async function provisionOrganization(
   // auth/audit do), so the org INSERT failed its WITH CHECK with SQLSTATE 42501 under the
   // non-superuser `core_be_app` role in deployed environments.
   const organizationPublicId = generatePublicId('organization');
-  return withOrganizationDatabaseContext(organizationPublicId, async (databaseHandle) => {
-    const [organization] = await databaseHandle
-      .insert(organizations)
-      .values({
-        public_id: organizationPublicId,
-        name: input.name,
-        slug: input.slug,
-        type: input.type,
-        owner_user_id: input.ownerUserId,
-        created_by_user_id: input.ownerUserId,
-        updated_by_user_id: input.ownerUserId,
-      })
-      .returning();
+  return withPrincipalDatabaseContext(
+    resolveVerifiedOrganizationPrincipalScope(organizationPublicId),
+    async (databaseHandle) => {
+      const [organization] = await databaseHandle
+        .insert(organizations)
+        .values({
+          public_id: organizationPublicId,
+          name: input.name,
+          slug: input.slug,
+          type: input.type,
+          owner_user_id: input.ownerUserId,
+          created_by_user_id: input.ownerUserId,
+          updated_by_user_id: input.ownerUserId,
+        })
+        .returning();
 
-    const [role] = await databaseHandle
-      .insert(roles)
-      .values({
-        public_id: generatePublicId('memberRole'),
-        organization_id: organization!.id,
-        name: OWNER_ROLE_NAME,
-        is_system: true,
-        created_by_user_id: input.ownerUserId,
-      })
-      .returning();
+      const [role] = await databaseHandle
+        .insert(roles)
+        .values({
+          public_id: generatePublicId('memberRole'),
+          organization_id: organization!.id,
+          name: OWNER_ROLE_NAME,
+          is_system: true,
+          created_by_user_id: input.ownerUserId,
+        })
+        .returning();
 
-    await databaseHandle.insert(role_permissions).values(
-      ownerPermissionCodesForOrganizationType(input.type).map((permission_code) => ({
-        role_id: role!.id,
-        permission_code,
-        created_by_user_id: input.ownerUserId,
-      })),
-    );
+      await databaseHandle.insert(role_permissions).values(
+        ownerPermissionCodesForOrganizationType(input.type).map((permission_code) => ({
+          role_id: role!.id,
+          permission_code,
+          created_by_user_id: input.ownerUserId,
+        })),
+      );
 
-    const [membership] = await databaseHandle
-      .insert(memberships)
-      .values({
-        public_id: generatePublicId('membership'),
-        user_id: input.ownerUserId,
-        organization_id: organization!.id,
-        role_id: role!.id,
-        status: 'ACTIVE',
-        joined_at: new Date(),
-      })
-      .returning();
+      const [membership] = await databaseHandle
+        .insert(memberships)
+        .values({
+          public_id: generatePublicId('membership'),
+          user_id: input.ownerUserId,
+          organization_id: organization!.id,
+          role_id: role!.id,
+          status: 'ACTIVE',
+          joined_at: new Date(),
+        })
+        .returning();
 
-    // TEAM organizations also receive the default non-owner system roles (Admin/Member/Viewer)
-    // so the team can assign a role and invite members immediately. PERSONAL organizations are
-    // single-member and reject custom roles, so they get Owner only.
-    if (input.type === 'TEAM') {
-      for (const defaultRole of DEFAULT_TEAM_ROLES) {
-        const [defaultRoleRow] = await databaseHandle
-          .insert(roles)
-          .values({
-            public_id: generatePublicId('memberRole'),
-            organization_id: organization!.id,
-            name: defaultRole.name,
-            description: defaultRole.description,
-            is_system: true,
-            created_by_user_id: input.ownerUserId,
-          })
-          .returning();
+      // TEAM organizations also receive the default non-owner system roles (Admin/Member/Viewer)
+      // so the team can assign a role and invite members immediately. PERSONAL organizations are
+      // single-member and reject custom roles, so they get Owner only.
+      if (input.type === 'TEAM') {
+        for (const defaultRole of DEFAULT_TEAM_ROLES) {
+          const [defaultRoleRow] = await databaseHandle
+            .insert(roles)
+            .values({
+              public_id: generatePublicId('memberRole'),
+              organization_id: organization!.id,
+              name: defaultRole.name,
+              description: defaultRole.description,
+              is_system: true,
+              created_by_user_id: input.ownerUserId,
+            })
+            .returning();
 
-        await databaseHandle.insert(role_permissions).values(
-          defaultRole.permissionCodes.map((permission_code) => ({
-            role_id: defaultRoleRow!.id,
-            permission_code,
-            created_by_user_id: input.ownerUserId,
-          })),
-        );
+          await databaseHandle.insert(role_permissions).values(
+            defaultRole.permissionCodes.map((permission_code) => ({
+              role_id: defaultRoleRow!.id,
+              permission_code,
+              created_by_user_id: input.ownerUserId,
+            })),
+          );
+        }
       }
-    }
 
-    return {
-      organization: organization! as Organization,
-      roleId: role!.id,
-      membershipPublicId: membership!.public_id,
-    };
-  });
+      return {
+        organization: organization! as Organization,
+        roleId: role!.id,
+        membershipPublicId: membership!.public_id,
+      };
+    },
+  );
 }

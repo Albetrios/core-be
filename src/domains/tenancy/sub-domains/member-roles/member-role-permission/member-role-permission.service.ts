@@ -1,5 +1,4 @@
 import { ForbiddenError, NotFoundError } from '@/shared/errors/index.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
@@ -19,7 +18,7 @@ import { assertCallerCanGrantPermissionCodes } from '@/domains/tenancy/sub-domai
  * organization.
  *
  * @remarks
- * - **Algorithm:** every public method runs under {@link withOrganizationDatabaseContext}
+ * - **Algorithm:** every public method runs under `withPrincipalDatabaseContext`
  *   so Postgres RLS sees `app.current_organization_id`; the org and role are
  *   resolved by public id, then the repository is invoked.
  * - **Failure modes:** `NotFoundError` when the organization or role does not

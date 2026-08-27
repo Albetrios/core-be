@@ -2,7 +2,6 @@ import { createHash, randomBytes } from 'node:crypto';
 import { env } from '@/shared/config/env.config.js';
 import { ConflictError, NotFoundError } from '@/shared/errors/index.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import {
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
@@ -27,6 +26,7 @@ import {
   ORGANIZATION_API_KEY_PREFIX_DISPLAY_LENGTH,
   ORGANIZATION_API_KEY_RAW_SECRET_BYTE_LENGTH,
 } from '@/shared/constants/limits.constants.js';
+import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 function generateApiKey(): string {
   return `ak_${randomBytes(ORGANIZATION_API_KEY_RAW_SECRET_BYTE_LENGTH).toString('hex')}`;
@@ -218,8 +218,9 @@ export class OrganizationApiKeyService {
       // The resolver already returned the owning organization public id (FORCE RLS on
       // tenancy.organizations means we cannot read it here without an org context). Establish that
       // context so the last_used_at touch passes the api_keys tenant-isolation policy.
-      await withOrganizationDatabaseContext(candidate.organization_public_id, () =>
-        this.apiKeyRepository.touchLastUsedAt(candidate.public_id),
+      await withPrincipalDatabaseContext(
+        resolveVerifiedOrganizationPrincipalScope(candidate.organization_public_id),
+        () => this.apiKeyRepository.touchLastUsedAt(candidate.public_id),
       );
       return {
         public_id: candidate.public_id,

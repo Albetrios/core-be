@@ -3,7 +3,8 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { WebhookRepository } from '@/domains/notify/sub-domains/webhook/webhook.repository.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
@@ -28,22 +29,25 @@ describe('WebhookRepository creation-quota concurrency (database — audit-#8)',
     const organization = await createTestOrganization({ ownerUserId: user.id });
 
     const attempt = (index: number) =>
-      withOrganizationDatabaseContext(organization.public_id, async () => {
-        // Mirror the service: lock → count → conditional insert, all in this one transaction.
-        await repository.acquireCreationQuotaLock(organization.id);
-        const activeCount = await repository.countActiveByOrganization(organization.id);
-        if (activeCount >= CAP) {
-          throw new Error('cap_reached');
-        }
-        return repository.create({
-          organization_id: organization.id,
-          url: `https://example.com/hook-${index}`,
-          encrypted_secret: 'secret',
-          events: ['webhook.test'],
-          is_enabled: true,
-          created_by_user_id: user.id,
-        });
-      });
+      withPrincipalDatabaseContext(
+        resolveVerifiedOrganizationPrincipalScope(organization.public_id),
+        async () => {
+          // Mirror the service: lock → count → conditional insert, all in this one transaction.
+          await repository.acquireCreationQuotaLock(organization.id);
+          const activeCount = await repository.countActiveByOrganization(organization.id);
+          if (activeCount >= CAP) {
+            throw new Error('cap_reached');
+          }
+          return repository.create({
+            organization_id: organization.id,
+            url: `https://example.com/hook-${index}`,
+            encrypted_secret: 'secret',
+            events: ['webhook.test'],
+            is_enabled: true,
+            created_by_user_id: user.id,
+          });
+        },
+      );
 
     const results = await Promise.allSettled(
       Array.from({ length: CONCURRENT }, (_value, index) => attempt(index)),
@@ -52,8 +56,9 @@ describe('WebhookRepository creation-quota concurrency (database — audit-#8)',
     const fulfilled = results.filter((result) => result.status === 'fulfilled');
     expect(fulfilled).toHaveLength(CAP);
 
-    const finalCount = await withOrganizationDatabaseContext(organization.public_id, () =>
-      repository.countActiveByOrganization(organization.id),
+    const finalCount = await withPrincipalDatabaseContext(
+      resolveVerifiedOrganizationPrincipalScope(organization.public_id),
+      () => repository.countActiveByOrganization(organization.id),
     );
     expect(finalCount).toBe(CAP);
   });

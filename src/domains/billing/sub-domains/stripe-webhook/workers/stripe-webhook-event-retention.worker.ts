@@ -8,8 +8,11 @@ import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
 import { STRIPE_WEBHOOK_EVENT_RETENTION_QUEUE_NAME } from '@/domains/billing/sub-domains/stripe-webhook/workers/stripe-webhook-event-retention.constants.js';
 import { runStripeWebhookEventRetentionJob } from '@/domains/billing/sub-domains/stripe-webhook/workers/stripe-webhook-event-retention.processor.js';
-import { withSystemTableRetentionContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 
 /**
  * Purges terminal Stripe webhook ledger rows older than
@@ -35,7 +38,7 @@ export function createStripeWebhookEventRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     STRIPE_WEBHOOK_EVENT_RETENTION_QUEUE_NAME,
     async () =>
-      withSystemTableRetentionContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_retention, (databaseHandle) =>
         runStripeWebhookEventRetentionJob(databaseHandle),
       ),
     {

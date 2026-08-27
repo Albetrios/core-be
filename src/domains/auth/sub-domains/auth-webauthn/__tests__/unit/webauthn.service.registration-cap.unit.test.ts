@@ -7,11 +7,6 @@ import type { UserService } from '@/domains/user/user.service.js';
 import type { WebauthnCredentialRepository } from '@/domains/auth/sub-domains/auth-webauthn/webauthn-credential.repository.js';
 
 // Run the registration verify without a real DB transaction.
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
 
 // Stub the challenge consume so the test never touches Redis.
 vi.mock('@/domains/auth/sub-domains/auth-webauthn/webauthn-challenge.js', () => ({

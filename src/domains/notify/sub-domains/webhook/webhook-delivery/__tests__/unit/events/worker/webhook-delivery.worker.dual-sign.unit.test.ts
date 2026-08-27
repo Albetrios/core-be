@@ -46,13 +46,6 @@ vi.mock('@/shared/utils/security/webhook-url.util.js', () => ({
   validateWebhookUrl: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: vi.fn(
-    (_organizationPublicId: string, callback: (databaseHandle: unknown) => Promise<unknown>) =>
-      callback({}),
-  ),
-}));
-
 function createDeliveryAttemptRepositoryMock() {
   return {
     tryMarkSending: vi.fn().mockResolvedValue('claimed'),

@@ -14,7 +14,10 @@ import type {
 } from './stripe-webhook-event.repository.js';
 import { enqueueStripeWebhook } from './queues/stripe-webhook.queue.js';
 import { runStripeWebhookHandlerWithOrganizationContext } from './stripe-webhook-organization.util.js';
-import { withSystemTableWorkerContext } from '@/infrastructure/database/contexts/worker-database.context.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/maintenance-database.context.js';
 
 /** Result row type from PlanRepository.findByStripePriceId; threaded through the sec-B9 fallback. */
 type MatchedPlanForCreate = Awaited<ReturnType<PlanRepository['findByStripePriceId']>>;
@@ -104,15 +107,17 @@ export class StripeWebhookService {
     event: Stripe.Event,
     context?: { requestId?: string },
   ): Promise<StripeWebhookEventClaimResult> {
-    const claimResult = await withSystemTableWorkerContext(() =>
-      this.stripeWebhookEventRepository.tryClaimEvent(
-        omitUndefined({
-          stripe_event_id: event.id,
-          event_type: event.type,
-          stripe_created_at: new Date(event.created * 1000),
-          request_id: context?.requestId,
-        }),
-      ),
+    const claimResult = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.system_table_worker,
+      () =>
+        this.stripeWebhookEventRepository.tryClaimEvent(
+          omitUndefined({
+            stripe_event_id: event.id,
+            event_type: event.type,
+            stripe_created_at: new Date(event.created * 1000),
+            request_id: context?.requestId,
+          }),
+        ),
     );
 
     if (claimResult === 'claimed' || claimResult === 'reclaimed') {
@@ -133,7 +138,7 @@ export class StripeWebhookService {
   async handleEvent(event: Stripe.Event, context?: { requestId?: string }): Promise<void> {
     const stripeEventCreatedAt = new Date(event.created * 1000);
 
-    await withSystemTableWorkerContext(async () => {
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, async () => {
       const claimResult = await this.stripeWebhookEventRepository.tryClaimEvent(
         omitUndefined({
           stripe_event_id: event.id,

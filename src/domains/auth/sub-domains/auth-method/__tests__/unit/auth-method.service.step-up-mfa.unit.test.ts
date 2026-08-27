@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn(async (_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
 vi.mock('@/shared/utils/security/password.util.js', () => ({
   hashPassword: vi.fn().mockResolvedValue('hashed'),
   verifyPassword: vi.fn().mockResolvedValue({ valid: true, needsRehash: false }),

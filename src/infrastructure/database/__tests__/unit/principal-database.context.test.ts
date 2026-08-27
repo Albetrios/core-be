@@ -4,7 +4,6 @@ import {
   createPrincipalDatabaseScope,
   withPrincipalDatabaseContext,
 } from '@/infrastructure/database/contexts/principal-database.context.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import {
   getActiveOrganizationRlsCheckoutCount,
   resetOrganizationRlsCheckoutCountForTests,
@@ -131,7 +130,11 @@ describe('withPrincipalDatabaseContext', () => {
       source: 'token',
     });
 
-    await withOrganizationDatabaseContext('org_x', async (outerHandle) => {
+    const outerScope = createPrincipalDatabaseScope({
+      organizationPublicId: 'org_x',
+      source: 'token',
+    });
+    await withPrincipalDatabaseContext(outerScope, async (outerHandle) => {
       mockExecute.mockClear();
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
 

@@ -26,28 +26,17 @@ const PLUMBING_FILES = [
   'worker-statement-timeout.util.ts',
 ] as const;
 
-/**
- * Legacy identity-family wrappers being absorbed into the principal pattern —
- * every file here is scheduled for DELETION (phases 5–7.5: tenancy/user/audit/
- * upload migration + job/provisioning/preauth-header minters + system-table
- * registry rows). This list may only SHRINK; a removed entry must never return.
+/*
+ * The legacy identity-family wrappers (organization/tenant/user/retention
+ * context files) were fully absorbed into the principal + maintenance
+ * registries in Phase 7.5 and DELETED. None of those filenames may return.
  */
-const LEGACY_FILES_PENDING_REMOVAL = [
-  'organization-database.context.ts',
-  'tenant-database.context.ts',
-  'user-database.context.ts',
-  'retention-database.context.ts', // only withSystemTableRetentionContext remains → maintenance registry row
-] as const;
 
 describe('context directory standard — three scope patterns only', () => {
   const contextsDirectory = join(process.cwd(), 'src', 'infrastructure', 'database', 'contexts');
 
-  it('contains only the three scope patterns, plumbing, and shrinking legacy files', () => {
-    const allowed = new Set<string>([
-      ...SCOPE_PATTERN_FILES,
-      ...PLUMBING_FILES,
-      ...LEGACY_FILES_PENDING_REMOVAL,
-    ]);
+  it('contains only the three scope patterns and plumbing', () => {
+    const allowed = new Set<string>([...SCOPE_PATTERN_FILES, ...PLUMBING_FILES]);
     const actual = readdirSync(contextsDirectory).filter((name) => name.endsWith('.ts'));
 
     const unexpected = actual.filter((name) => !allowed.has(name));

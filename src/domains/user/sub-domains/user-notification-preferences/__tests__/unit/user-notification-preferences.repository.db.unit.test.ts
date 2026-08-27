@@ -3,9 +3,10 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { user_notification_preferences } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.schema.js';
 import { UserNotificationPreferencesRepository } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.repository.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 describe('UserNotificationPreferencesRepository (database)', () => {
   const repository = new UserNotificationPreferencesRepository();
@@ -142,7 +143,7 @@ describe('UserNotificationPreferencesRepository (database)', () => {
     const CONCURRENT_REPLACES = 8;
     const settled = await Promise.allSettled(
       Array.from({ length: CONCURRENT_REPLACES }, (_, index) =>
-        withUserDatabaseContext(user.public_id, () =>
+        withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(user.public_id), () =>
           repository.replaceAll(user.id, payload(index % 2 === 0), user.id),
         ),
       ),

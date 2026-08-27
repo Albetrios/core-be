@@ -31,6 +31,18 @@ const ALLOWED_PATH_FRAGMENTS: Record<MaintenanceContextKind, readonly string[]> 
     'queue/dlq/', // DLQ replay audit entries
   ],
   audit_outbox_drain: ['audit/audit-outbox.repository.ts', 'audit/workers/'],
+  system_table_retention: [
+    'stripe-webhook/workers/', // stripe_webhook_events ledger retention (non-RLS table)
+  ],
+  system_table_worker: [
+    'notification/workers/notification.worker.ts', // web-push subscription reads outside a request
+    'stripe-webhook/stripe-webhook.service.ts', // webhook-event ledger claim/settle
+    'stripe-webhook/workers/', // catchup / reclaim processors over the ledger
+    'infrastructure/mail/workers/', // mail outbox reads/settles around external sends
+    'metrics/business-metrics.ts', // Prometheus gauges over system tables
+    'queue/commit-dispatch/commit-dispatch.executor.ts', // commit-dispatch store access
+    'queue/dlq/dlq-auto-retry.processor.ts', // DLQ replay bookkeeping
+  ],
 };
 
 describe('maintenance-context confinement', () => {

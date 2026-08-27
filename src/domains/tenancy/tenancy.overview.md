@@ -36,7 +36,7 @@ What it does not own: identity proof (lives in [auth](src/domains/auth/)), user 
 
 This domain is the **owner** of `tenant-isolation` and `rls-context`; every other domain uses it. See [src/PATTERNS.md](src/PATTERNS.md):
 
-- `tenant-isolation` — the defining domain. Every read/write either runs through HTTP `tenant.middleware` or worker `withOrganizationContext`.
+- `tenant-isolation` — the defining domain. Every read/write either runs through HTTP `tenant.middleware` or worker `withPrincipalDatabaseContext` (job-minted org scope).
 - `rls-context` — same; this domain emits the GUC that RLS policies on every other table consume.
 - `audit-emission` — every membership change, role change, and invitation event records an audit row.
 - `idempotency` — invitation create + organization API key issuance accept `X-Idempotency-Key`.
