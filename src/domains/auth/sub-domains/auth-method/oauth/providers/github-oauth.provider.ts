@@ -12,10 +12,12 @@ const GITHUB_USER_URL = 'https://api.github.com/user';
 const GITHUB_EMAILS_URL = 'https://api.github.com/user/emails';
 
 function getGitHubRedirectUri(): string {
-  // The redirect URI is the SPA's provider-agnostic /callback page: the browser lands
-  // there with `code`+`state`, and the SPA forwards them to this API's
+  // The redirect URI is the SPA's provider-specific /callback/github page: the browser
+  // lands there with `code`+`state`, and the SPA forwards them to this API's
   // GET /api/v1/auth/oauth/github/callback for the token exchange.
-  return env.OAUTH_GITHUB_REDIRECT_URI ?? `${env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL}/callback`;
+  return (
+    env.OAUTH_GITHUB_REDIRECT_URI ?? `${env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL}/callback/github`
+  );
 }
 
 /** Builds the GitHub authorize URL (`https://github.com/login/oauth/authorize?...`) with the configured client id, callback URI, scopes (`read:user user:email`), CSRF `state`, and the PKCE S256 `code_challenge`. Throws `NotImplementedError` when `OAUTH_GITHUB_CLIENT_ID` is unset. */

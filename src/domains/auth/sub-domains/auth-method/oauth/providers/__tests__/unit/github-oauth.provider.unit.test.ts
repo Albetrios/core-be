@@ -15,7 +15,7 @@ vi.mock('@/shared/config/env.config.js', async () => {
       ...actual.env,
       OAUTH_GITHUB_CLIENT_ID: 'github-client-id',
       OAUTH_GITHUB_CLIENT_SECRET: 'github-client-secret',
-      OAUTH_GITHUB_REDIRECT_URI: 'https://app.example/callback',
+      OAUTH_GITHUB_REDIRECT_URI: 'https://app.example/callback/github',
     },
   };
 });

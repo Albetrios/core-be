@@ -32,7 +32,7 @@ const googleUserinfoHostnameOutbound = 'https://www.googleapis.com';
  */
 describe('Google OAuth outbound contract (`google-oauth.provider`)', () => {
   const expectedGoogleRedirectUriOutbound =
-    env.OAUTH_GOOGLE_REDIRECT_URI ?? `${env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL}/callback`;
+    env.OAUTH_GOOGLE_REDIRECT_URI ?? `${env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL}/callback/google`;
 
   test('token exchange sends the documented form fields and userinfo carries the Bearer token', async () => {
     GoogleTokenSuccessResponseContractSchema.parse(googleTokenSuccessFixture);
