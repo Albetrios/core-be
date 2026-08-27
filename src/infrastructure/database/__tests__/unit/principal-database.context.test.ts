@@ -92,13 +92,27 @@ describe('withPrincipalDatabaseContext', () => {
     }
   });
 
-  it('does not lift statement/lock timeouts (HTTP caps stay)', async () => {
+  it('does not lift statement/lock timeouts outside worker runtime (HTTP caps stay)', async () => {
+    delete process.env.CORE_BE_RUNTIME;
     const scope = createPrincipalDatabaseScope({ organizationPublicId: 'org_x', source: 'token' });
 
     await withPrincipalDatabaseContext(scope, async () => undefined);
 
     for (const sqlText of executedSqlTexts()) {
       expect(sqlText).not.toMatch(/statement_timeout|lock_timeout/);
+    }
+  });
+
+  it('lifts statement/lock timeouts to the worker budget in worker runtime (job scopes)', async () => {
+    process.env.CORE_BE_RUNTIME = 'worker';
+    try {
+      const scope = createPrincipalDatabaseScope({ organizationPublicId: 'org_x', source: 'job' });
+      await withPrincipalDatabaseContext(scope, async () => undefined);
+      const combined = executedSqlTexts().join(' ');
+      expect(combined).toMatch(/statement_timeout/);
+      expect(combined).toMatch(/lock_timeout/);
+    } finally {
+      delete process.env.CORE_BE_RUNTIME;
     }
   });
 

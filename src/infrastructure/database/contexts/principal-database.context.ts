@@ -8,10 +8,12 @@ import {
   type RequestScopedPostgresDatabase,
 } from '@/infrastructure/database/contexts/request-database.context.js';
 import {
+  isWorkerRuntime,
   runWithWorkerDatabaseContext,
   workerDatabaseContextForOrganization,
   workerDatabaseContextForUser,
 } from '@/infrastructure/database/contexts/worker-database.context.js';
+import { applyWorkerStatementTimeout } from '@/infrastructure/database/contexts/worker-statement-timeout.util.js';
 import {
   decrementOrganizationRlsCheckoutCount,
   incrementOrganizationRlsCheckoutCount,
@@ -120,8 +122,8 @@ export function createPrincipalDatabaseScope(input: {
  * - **Side effects:** organization-bearing scopes take one pooled checkout, counted
  *   for the pool-exhaustion alerter and the `database_rls_checkout_hold_seconds`
  *   histogram.
- * - **Notes:** this wrapper NEVER lifts the HTTP statement/lock timeouts (worker
- *   budgets belong to the worker wrappers) and can only ever set the two identity
+ * - **Notes:** this wrapper lifts the HTTP statement/lock timeouts only in worker
+ *   runtime (job-scope units of work); HTTP paths keep the connection-level caps and can only ever set the two identity
  *   GUCs — bypass GUCs (`app.global_*`, retention, audit-drain) have no path through
  *   it, pinned by its unit tests. External I/O (Stripe, S3, Resend) must not run
  *   inside the callback.
@@ -163,6 +165,12 @@ export async function withPrincipalDatabaseContext<T>(
     return await runWithWorkerDatabaseContext(workerContext, () =>
       database.transaction(async (transaction) => {
         const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+        // Worker runtime only: lift the HTTP statement/lock caps to the worker
+        // budget for job-scope units of work (sec-re-16 semantics). HTTP paths
+        // keep the connection-level caps — see PR #1122's rationale.
+        if (isWorkerRuntime()) {
+          await applyWorkerStatementTimeout(databaseHandle);
+        }
         await databaseHandle.execute(
           buildIdentityGucStatement({ userPublicId, organizationPublicId }),
         );

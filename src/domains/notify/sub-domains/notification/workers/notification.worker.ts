@@ -30,7 +30,8 @@ import {
   type WorkerDatabaseHandle,
 } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveOrganizationJobScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
 
@@ -188,7 +189,7 @@ export async function processNotificationDispatchJob(
       }
       return withUserDatabaseContext(userPublicId, loadNotification);
     }
-    return withOrganizationContext(organizationPublicId, loadNotification);
+    return withPrincipalDatabaseContext(resolveOrganizationJobScope(organizationPublicId), loadNotification);
   };
   const notificationRow =
     notificationRepository !== undefined
@@ -263,7 +264,7 @@ async function processTenantScopedNotificationJob(
  *
  * @remarks
  * - **Algorithm:** for each job, branch on `organizationPublicId`: tenant-scoped jobs run inside
- *   `runTenantScopedWorkerJob` (`withOrganizationContext`) so RLS pins reads to the org;
+ *   `runTenantScopedWorkerJob` (`withPrincipalDatabaseContext`) so RLS pins reads to the org;
  *   tenant-less notifications delegate directly to {@link processNotificationDispatchJob}
  *   which then enters its own `loadNotificationForScope` flow — resolving the recipient
  *   public id under `withMaintenanceDatabaseContext` and pinning `withUserDatabaseContext`

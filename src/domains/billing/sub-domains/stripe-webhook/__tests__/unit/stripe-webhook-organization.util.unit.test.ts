@@ -1,12 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type Stripe from 'stripe';
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: vi.fn(
-    async (_organizationPublicId: string, callback: (handle: unknown) => Promise<unknown>) =>
-      callback({ tag: 'pinned-handle' }),
-  ),
-}));
+vi.mock('@/infrastructure/database/contexts/principal-database.context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withPrincipalDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: (handle: unknown) => Promise<unknown>) =>
+        callback({ tag: 'pinned-handle' }),
+    ),
+  };
+});
 
 import * as stripeWebhookOrganizationUtil from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook-organization.util.js';
 import type { StripeWebhookEventRepository } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook-event.repository.js';

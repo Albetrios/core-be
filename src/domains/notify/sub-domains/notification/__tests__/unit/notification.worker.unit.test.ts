@@ -53,9 +53,18 @@ vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
   withUserDatabaseContext: (...parameters: unknown[]) => withUserDatabaseContextMock(...parameters),
 }));
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: (...parameters: unknown[]) => withOrganizationContextMock(...parameters),
-}));
+vi.mock('@/infrastructure/database/contexts/principal-database.context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Arg-shift adapter: the org-branch spy keeps its (organizationPublicId, callback)
+    // signature so the existing implementations and assertions stay valid.
+    withPrincipalDatabaseContext: vi.fn(
+      (scope: { organizationPublicId?: string }, callback: (handle: unknown) => Promise<unknown>) =>
+        withOrganizationContextMock(scope.organizationPublicId, callback),
+    ),
+  };
+});
 
 vi.mock('@/domains/notify/sub-domains/notification/notification.repository.js', () => ({
   createWorkerNotificationRepository: (...parameters: unknown[]) =>

@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 const ALLOWED_IMPORTER_SUFFIXES = [
   'src/infrastructure/database/contexts/principal-database.context.ts',
   'src/shared/utils/http/request.util.ts',
+  'src/infrastructure/queue/worker-runtime/job-principal-scope.util.ts',
 ];
 
 describe('principal-scope minting confinement', () => {
@@ -39,6 +40,40 @@ describe('principal-scope minting confinement', () => {
       offenders,
       `createPrincipalDatabaseScope referenced outside the confined minters: ${offenders.join(', ')}. ` +
         'Scopes must be minted at a legitimate top (request minters, worker-payload minter, provisioning) — add a new minter and extend the allowlist deliberately.',
+    ).toEqual([]);
+  });
+});
+
+/**
+ * Job-source minters may only be used from worker paths — an HTTP handler
+ * reaching for a job scope would bypass the token minter's claim precedence.
+ */
+const JOB_MINTER_ALLOWED_FRAGMENTS = [
+  'queue/worker-runtime/',
+  '/workers/',
+  'stripe-webhook/stripe-webhook-organization.util.ts', // worker-side org resolution for Stripe events
+];
+
+describe('job-scope minting confinement', () => {
+  it('resolve*JobScope is referenced only from worker paths (and tests)', () => {
+    let output = '';
+    try {
+      output = execFileSync(
+        'grep',
+        ['-rlE', 'resolve(Organization|User)?JobP?r?i?n?c?i?p?a?l?S?c?o?p?e?\\b|resolveJobPrincipalScope|resolveOrganizationJobScope|resolveUserJobScope', 'src', '--include=*.ts'],
+        { encoding: 'utf8' },
+      );
+    } catch {
+      // no matches
+    }
+    const offenders = output
+      .split('\n')
+      .filter(Boolean)
+      .filter((filePath) => !/\.test\.ts$/.test(filePath))
+      .filter((filePath) => !JOB_MINTER_ALLOWED_FRAGMENTS.some((f) => filePath.includes(f)));
+    expect(
+      offenders,
+      `job-scope minters referenced outside worker paths: ${offenders.join(', ')}.`,
     ).toEqual([]);
   });
 });
