@@ -46,9 +46,9 @@ const productionRequiredBase = {
 describe('env-schema', () => {
   describe('OAuth redirect URIs', () => {
     it('requires OAUTH_GOOGLE_REDIRECT_URI once the Google client is configured', () => {
-      // The code fallback builds `${FRONTEND_URL}/auth/oauth/google/callback`, which core-fe does
-      // not serve, and this API has no self-origin variable to build its own from. Fail loudly at
-      // boot rather than ship a silently wrong redirect that only surfaces provider-side.
+      // The code fallback builds `${FRONTEND_URL}/callback` (the SPA's OAuth landing page), but
+      // the registered value must match the provider console exactly. Fail loudly at boot rather
+      // than ship a silently wrong redirect that only surfaces provider-side.
       expect(() =>
         envSchema.parse({ ...commonRequiredBase, OAUTH_GOOGLE_CLIENT_ID: 'google-client-id' }),
       ).toThrow();
@@ -58,9 +58,9 @@ describe('env-schema', () => {
       const parsed = envSchema.parse({
         ...commonRequiredBase,
         OAUTH_GOOGLE_CLIENT_ID: 'google-client-id',
-        OAUTH_GOOGLE_REDIRECT_URI: 'https://api.example.com/api/v1/auth/oauth/google/callback',
+        OAUTH_GOOGLE_REDIRECT_URI: 'https://app.example.com/callback',
       });
-      expect(parsed.OAUTH_GOOGLE_REDIRECT_URI).toContain('/api/v1/auth/oauth/google/callback');
+      expect(parsed.OAUTH_GOOGLE_REDIRECT_URI).toBe('https://app.example.com/callback');
     });
 
     it('requires OAUTH_GITHUB_REDIRECT_URI once the GitHub client is configured', () => {

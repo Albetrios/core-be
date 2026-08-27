@@ -119,8 +119,8 @@ process.env.OAUTH_GITHUB_CLIENT_SECRET ??= 'test-github-client-secret';
 // The schema requires a redirect URI wherever a client ID is set — a client ID alone is an
 // invalid configuration that fails closed at boot rather than misdirecting the provider. The
 // fixture must therefore model a COMPLETE provider, not a half-configured one.
-process.env.OAUTH_GOOGLE_REDIRECT_URI ??= 'http://localhost:3000/api/v1/auth/oauth/google/callback';
-process.env.OAUTH_GITHUB_REDIRECT_URI ??= 'http://localhost:3000/api/v1/auth/oauth/github/callback';
+process.env.OAUTH_GOOGLE_REDIRECT_URI ??= 'http://localhost:5173/callback';
+process.env.OAUTH_GITHUB_REDIRECT_URI ??= 'http://localhost:5173/callback';
 // Isolate the test Redis keyspace from a running `pnpm dev` (both are NODE_ENV=development); a hard
 // set (not the developer's `.env.local` value) keeps the test prefix deterministic and isolated.
 process.env.REDIS_KEY_PREFIX = `${REDIS_KEY_PREFIX_STEM}:test:`;

@@ -15,7 +15,7 @@ vi.mock('@/shared/config/env.config.js', async () => {
       ...actual.env,
       OAUTH_GOOGLE_CLIENT_ID: 'google-client-id',
       OAUTH_GOOGLE_CLIENT_SECRET: 'google-client-secret',
-      OAUTH_GOOGLE_REDIRECT_URI: 'https://app.example/auth/oauth/google/callback',
+      OAUTH_GOOGLE_REDIRECT_URI: 'https://app.example/callback',
     },
   };
 });
