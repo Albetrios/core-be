@@ -48,7 +48,6 @@ const RLS_TABLE_SCOPE_MAP: Record<string, readonly string[]> = {
   'auth.mfa_recovery_codes': ['app.current_user_id'],
   'auth.sessions': [
     'app.current_session_public_id',
-    'app.current_session_refresh_token_hash',
     'app.current_session_token_hash',
     'app.current_user_id',
     'app.session_retention_cleanup',
@@ -100,13 +99,11 @@ const PRINCIPAL_GUCS = ['app.current_organization_id', 'app.current_user_id'];
 
 /**
  * GUCs a policy arm references but NO code path sets — every entry here is a
- * dead arm scheduled for removal by a migration. Shrink-only.
+ * dead arm scheduled for removal by a migration. Shrink-only; currently empty
+ * (the app.current_session_refresh_token_hash arm was dropped by the
+ * rls_policy_initplan_hygiene migration).
  */
-const KNOWN_DEAD_POLICY_GUCS = new Set([
-  // auth.sessions has a refresh-token-hash arm but no session-context kind
-  // (or any other code path) ever sets this GUC — B-track drops the arm.
-  'app.current_session_refresh_token_hash',
-]);
+const KNOWN_DEAD_POLICY_GUCS = new Set<string>([]);
 
 describe('RLS table → required-scope map (Phase 8)', () => {
   it('live pg_policies GUC references match the map exactly, table by table', async () => {
