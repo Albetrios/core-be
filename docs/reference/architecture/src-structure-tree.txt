@@ -1126,11 +1126,11 @@ src/
     │   │   │   ├── assert-connection-budget.unit.test.ts
     │   │   │   ├── assert-database-rls-safety.unit.test.ts
     │   │   │   ├── assert-database-tls-safety.unit.test.ts
+    │   │   │   ├── database-context-runtime.test.ts
     │   │   │   ├── maintenance-pool-selection.test.ts
     │   │   │   ├── principal-checkout-accounting.test.ts
-    │   │   │   ├── principal-database.context.test.ts
-    │   │   │   ├── worker-context-database-handle.unit.test.ts
-    │   │   │   └── worker-database.context.test.ts
+    │   │   │   ├── principal-database-context.test.ts
+    │   │   │   └── worker-context-database-handle.unit.test.ts
     │   ├── contexts/
     │   │   ├── database-context-runtime.ts
     │   │   └── database-context.ts
