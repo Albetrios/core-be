@@ -29,6 +29,10 @@ import type { AuthSessionService } from '@/domains/auth/sub-domains/auth-session
 import type { MembershipService } from '@/domains/tenancy/sub-domains/membership/membership.service.js';
 import type { NotificationService } from '@/domains/notify/sub-domains/notification/notification.service.js';
 import type { AuditService } from '@/domains/audit/audit.service.js';
+import {
+  withPrincipalDatabaseContext,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 
 function buildExportS3Key(userPublicId: string, exportPublicId: string): string {
   return `${USER_DATA_EXPORT_S3_PREFIX}/${userPublicId}/${exportPublicId}.json.gz`;
@@ -126,13 +130,14 @@ export class UserDataExportService {
   }
 
   async requestExport(
-    userPublicId: string,
+    scope: UserPrincipalDatabaseScope,
     options?: { requestId?: string },
   ): Promise<UserDataExportOutput> {
+    const userPublicId = scope.userPublicId;
     const user = await this.userService.findUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
 
-    const existingPending = await withUserDatabaseContext(userPublicId, () =>
+    const existingPending = await withPrincipalDatabaseContext(scope, () =>
       this.exportRepository.findPendingOrProcessingByUserId(user.id),
     );
     if (existingPending) {
@@ -151,7 +156,7 @@ export class UserDataExportService {
     // context so the row passes the owner-access policy in default scoped-RLS mode.
     let row: Awaited<ReturnType<UserDataExportRepository['create']>>;
     try {
-      row = await withUserDatabaseContext(userPublicId, () =>
+      row = await withPrincipalDatabaseContext(scope, () =>
         this.exportRepository.create({
           public_id: exportPublicId,
           user_id: user.id,
@@ -164,7 +169,7 @@ export class UserDataExportService {
       if (!isPostgresUniqueViolation(error)) {
         throw error;
       }
-      const existingAfterRace = await withUserDatabaseContext(userPublicId, () =>
+      const existingAfterRace = await withPrincipalDatabaseContext(scope, () =>
         this.exportRepository.findPendingOrProcessingByUserId(user.id),
       );
       if (existingAfterRace) {
@@ -193,13 +198,14 @@ export class UserDataExportService {
   }
 
   async getExportStatus(
-    userPublicId: string,
+    scope: UserPrincipalDatabaseScope,
     exportPublicId: string,
   ): Promise<UserDataExportOutput> {
+    const userPublicId = scope.userPublicId;
     const user = await this.userService.findUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
 
-    const row = await withUserDatabaseContext(userPublicId, () =>
+    const row = await withPrincipalDatabaseContext(scope, () =>
       this.exportRepository.findByPublicIdAndUserId(exportPublicId, user.id),
     );
     if (!row) throw new NotFoundError('User data export');

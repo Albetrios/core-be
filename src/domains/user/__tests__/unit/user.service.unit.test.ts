@@ -12,6 +12,10 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import { env } from '@/shared/config/env.config.js';
 import { ensurePersonalOrganizationPublicId } from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
+import {
+  createPrincipalDatabaseScope,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 
 vi.mock(
   '@/infrastructure/database/contexts/maintenance-database.context.js',
@@ -64,6 +68,19 @@ vi.mock('@/shared/utils/auth/global-admin-role.util.js', () => ({
   resolveGlobalRoleForEmail: (...args: unknown[]) => resolveGlobalRoleForEmailMock(...args),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 const userRow = {
   id: 1,
   public_id: generatePublicId('user'),
@@ -81,6 +98,13 @@ const userRow = {
   created_at: new Date(),
   updated_at: new Date(),
 };
+
+const asUserScope = (userPublicId: string) =>
+  createPrincipalDatabaseScope({
+    userPublicId,
+    organizationPublicId: 'org_scope_test',
+    source: 'token',
+  }) as UserPrincipalDatabaseScope;
 
 describe('UserService', () => {
   const repository = {
@@ -202,9 +226,9 @@ describe('UserService', () => {
   });
 
   it('getMe and updateMe return serialized user', async () => {
-    const me = await service.getMe(userRow.public_id);
+    const me = await service.getMe(asUserScope(userRow.public_id));
     expect(me.id).toBe(userRow.public_id);
-    await service.updateMe(userRow.public_id, { first_name: 'Updated' });
+    await service.updateMe(asUserScope(userRow.public_id), { first_name: 'Updated' });
     expect(repository.update).toHaveBeenCalled();
   });
 
@@ -214,7 +238,7 @@ describe('UserService', () => {
     const original = env.PERSONAL_ORGANIZATION_ENABLED;
     env.PERSONAL_ORGANIZATION_ENABLED = false;
     try {
-      const me = await service.getMe(userRow.public_id);
+      const me = await service.getMe(asUserScope(userRow.public_id));
       expect(me.personal_organization_id).toBeNull();
       expect(ensurePersonalOrganizationPublicId).not.toHaveBeenCalled();
     } finally {
@@ -227,7 +251,7 @@ describe('UserService', () => {
     env.PERSONAL_ORGANIZATION_ENABLED = true;
     try {
       vi.mocked(ensurePersonalOrganizationPublicId).mockResolvedValueOnce('org_personalxxxxxxxxxx');
-      const me = await service.getMe(userRow.public_id);
+      const me = await service.getMe(asUserScope(userRow.public_id));
       expect(me.personal_organization_id).toBe('org_personalxxxxxxxxxx');
       expect(ensurePersonalOrganizationPublicId).toHaveBeenCalledWith(userRow.id);
     } finally {
@@ -236,7 +260,7 @@ describe('UserService', () => {
   });
 
   it('completeOnboarding stamps the flag and returns the fresh self profile', async () => {
-    const me = await service.completeOnboarding(userRow.public_id);
+    const me = await service.completeOnboarding(asUserScope(userRow.public_id));
     expect(repository.markOnboardingComplete).toHaveBeenCalledWith(userRow.public_id);
     expect(me.id).toBe(userRow.public_id);
   });
@@ -474,7 +498,7 @@ describe('UserService', () => {
       ...userRow,
       avatar_url: avatarKey,
     } as never);
-    const result = await service.updateMe(userRow.public_id, {
+    const result = await service.updateMe(asUserScope(userRow.public_id), {
       avatar_key: avatarKey,
       first_name: 'New',
     });
@@ -484,7 +508,7 @@ describe('UserService', () => {
   it('updateMe throws when repository update returns null', async () => {
     vi.mocked(repository.update).mockResolvedValue(null);
     await expect(
-      service.updateMe(userRow.public_id, { first_name: 'Missing' }),
+      service.updateMe(asUserScope(userRow.public_id), { first_name: 'Missing' }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -514,7 +538,9 @@ describe('UserService', () => {
       ...userRow,
       deleted_at: new Date(),
     } as never);
-    await expect(service.getMe(userRow.public_id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.getMe(asUserScope(userRow.public_id))).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 
   it('adminUpdateUser and suspendUser throw when repository returns null', async () => {
@@ -636,7 +662,7 @@ describe('UserService', () => {
 
   it('updateMe rejects avatar keys outside the user prefix', async () => {
     await expect(
-      service.updateMe(userRow.public_id, { avatar_key: 'wrong/prefix.png' }),
+      service.updateMe(asUserScope(userRow.public_id), { avatar_key: 'wrong/prefix.png' }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 

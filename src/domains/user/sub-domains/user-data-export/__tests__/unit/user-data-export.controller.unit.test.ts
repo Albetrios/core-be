@@ -16,7 +16,12 @@ import type { UserDataExportService } from '@/domains/user/sub-domains/user-data
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): never {
   return {
-    auth: { userId: generatePublicId('user'), role: 'user' },
+    auth: {
+      kind: 'user' as const,
+      userId: generatePublicId('user'),
+      role: 'user',
+      organizationPublicId: generatePublicId('organization'),
+    },
     params: {},
     body: {},
     headers: {},
@@ -52,11 +57,20 @@ describe('createUserDataExportController', () => {
     const reply = mockReply();
 
     await controller.requestExport(
-      mockRequest({ auth: { kind: 'user' as const, userId: userPublicId, role: 'user' } }),
+      mockRequest({
+        auth: {
+          kind: 'user' as const,
+          userId: userPublicId,
+          role: 'user',
+          organizationPublicId: generatePublicId('organization'),
+        },
+      }),
       reply,
     );
 
-    expect(service.requestExport).toHaveBeenCalledWith(userPublicId, { requestId: 'request-id' });
+    expect(service.requestExport).toHaveBeenCalledWith(expect.objectContaining({ userPublicId }), {
+      requestId: 'request-id',
+    });
     expect(reply.status).toHaveBeenCalledWith(202);
   });
 
@@ -73,13 +87,21 @@ describe('createUserDataExportController', () => {
 
     const response = await controller.getExportStatus(
       mockRequest({
-        auth: { kind: 'user' as const, userId: userPublicId, role: 'user' },
+        auth: {
+          kind: 'user' as const,
+          userId: userPublicId,
+          role: 'user',
+          organizationPublicId: generatePublicId('organization'),
+        },
         params: { data_export_id: exportId },
       }),
       mockReply(),
     );
 
-    expect(service.getExportStatus).toHaveBeenCalledWith(userPublicId, exportId);
+    expect(service.getExportStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ userPublicId }),
+      exportId,
+    );
     expect(response).toMatchObject({
       data: { export_id: exportId, status: USER_DATA_EXPORT_STATUSES.COMPLETED },
     });
@@ -105,7 +127,12 @@ describe('createUserDataExportController', () => {
 
     await controller.getExportStatus(
       mockRequest({
-        auth: { kind: 'user' as const, userId: userPublicId, role: 'user' },
+        auth: {
+          kind: 'user' as const,
+          userId: userPublicId,
+          role: 'user',
+          organizationPublicId: generatePublicId('organization'),
+        },
         params: { data_export_id: exportId },
       }),
       mockReply(),
@@ -137,7 +164,12 @@ describe('createUserDataExportController', () => {
 
     await controller.getExportStatus(
       mockRequest({
-        auth: { kind: 'user' as const, userId: userPublicId, role: 'user' },
+        auth: {
+          kind: 'user' as const,
+          userId: userPublicId,
+          role: 'user',
+          organizationPublicId: generatePublicId('organization'),
+        },
         params: { data_export_id: exportId },
       }),
       mockReply(),

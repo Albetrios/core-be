@@ -10,7 +10,30 @@ vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
     callback(),
   ),
 }));
+
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
 import { AuthMeContextService } from '@/domains/auth/auth-me-context.service.js';
+import {
+  createPrincipalDatabaseScope,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
+
+const meScope = createPrincipalDatabaseScope({
+  userPublicId: 'usr_1',
+  organizationPublicId: 'org_active',
+  source: 'token',
+}) as UserPrincipalDatabaseScope;
 
 describe('AuthMeContextService.getContext', () => {
   it('aggregates the user, active organization, resolved permissions, and org list', async () => {
@@ -32,12 +55,13 @@ describe('AuthMeContextService.getContext', () => {
     );
 
     const data = await service.getContext({
-      userPublicId: 'usr_1',
-      activeOrganizationPublicId: 'org_active',
+      scope: meScope,
       globalRole: undefined,
     });
 
-    expect(userService.getMe).toHaveBeenCalledWith('usr_1');
+    expect(userService.getMe).toHaveBeenCalledWith(
+      expect.objectContaining({ userPublicId: 'usr_1' }),
+    );
     expect(organizationService.getByPublicId).toHaveBeenCalledWith(
       'org_active',
       'usr_1',
@@ -101,8 +125,7 @@ describe('AuthMeContextService.getContext', () => {
     );
 
     const data = await service.getContext({
-      userPublicId: 'usr_1',
-      activeOrganizationPublicId: 'org_active',
+      scope: meScope,
       globalRole: undefined,
     });
 
@@ -125,17 +148,16 @@ describe('AuthMeContextService.getContext', () => {
       authorizationService as never,
     );
 
+    // Personal/team-organization invariant: a scope ALWAYS carries an active
+    // organization, so the active-org slice is always resolved.
     const data = await service.getContext({
-      userPublicId: 'usr_1',
-      activeOrganizationPublicId: undefined,
+      scope: meScope,
       globalRole: undefined,
     });
 
-    expect(data.activeOrganization).toBeNull();
-    expect(data.activeOrganizationPublicId).toBeNull();
-    expect(data.myPermissions).toEqual([]);
-    expect(organizationService.getByPublicId).not.toHaveBeenCalled();
-    expect(authorizationService.resolveUserOrganizationPermissions).not.toHaveBeenCalled();
+    expect(data.activeOrganizationPublicId).toBe('org_active');
+    expect(organizationService.getByPublicId).toHaveBeenCalled();
+    expect(authorizationService.resolveUserOrganizationPermissions).toHaveBeenCalled();
   });
 });
 

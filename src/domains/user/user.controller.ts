@@ -1,6 +1,10 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { successResponse, paginatedResponse } from '@/shared/utils/http/response.util.js';
-import { getRequestIdentifier, requireAuth } from '@/shared/utils/http/request.util.js';
+import {
+  getRequestIdentifier,
+  requireAuth,
+  requireUserPrincipalDatabaseScope,
+} from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
 import { recordScopedAuditEvent } from '@/shared/utils/infrastructure/audit-request-context.util.js';
 import type { UserContainer } from './user.container.js';
@@ -48,20 +52,23 @@ export function createUserController({
     // ── Self-service ──────────────────────────────────────────
 
     getMe: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const auth = requireAuth(request);
-      const data = await userService.getMe(auth.userId);
+      const _auth = requireAuth(request);
+      const data = await userService.getMe(requireUserPrincipalDatabaseScope(request));
       return successResponse(data, getRequestIdentifier(request));
     },
 
     patchMe: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const auth = requireAuth(request);
-      const data = await userService.updateMe(auth.userId, request.body);
+      const _auth = requireAuth(request);
+      const data = await userService.updateMe(
+        requireUserPrincipalDatabaseScope(request),
+        request.body,
+      );
       return successResponse(data, getRequestIdentifier(request));
     },
 
     completeOnboardingMe: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const auth = requireAuth(request);
-      const data = await userService.completeOnboarding(auth.userId);
+      const _auth = requireAuth(request);
+      const data = await userService.completeOnboarding(requireUserPrincipalDatabaseScope(request));
       return successResponse(data, getRequestIdentifier(request));
     },
 
@@ -80,14 +87,17 @@ export function createUserController({
     },
 
     getSettings: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const auth = requireAuth(request);
-      const data = await userSettingsService.get(auth.userId);
+      const _auth = requireAuth(request);
+      const data = await userSettingsService.get(requireUserPrincipalDatabaseScope(request));
       return successResponse(data, getRequestIdentifier(request));
     },
 
     patchSettings: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requireAuth(request);
-      const data = await userSettingsService.update(auth.userId, request.body);
+      const data = await userSettingsService.update(
+        requireUserPrincipalDatabaseScope(request),
+        request.body,
+      );
       await recordScopedAuditEvent(request, {
         actorUserPublicId: auth.userId,
         action: 'user.settings.update',
@@ -97,14 +107,19 @@ export function createUserController({
     },
 
     getNotificationPreferences: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const auth = requireAuth(request);
-      const data = await userNotificationPreferencesService.get(auth.userId);
+      const _auth = requireAuth(request);
+      const data = await userNotificationPreferencesService.get(
+        requireUserPrincipalDatabaseScope(request),
+      );
       return successResponse(data, getRequestIdentifier(request));
     },
 
     putNotificationPreferences: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const auth = requireAuth(request);
-      const data = await userNotificationPreferencesService.put(auth.userId, request.body);
+      const _auth = requireAuth(request);
+      const data = await userNotificationPreferencesService.put(
+        requireUserPrincipalDatabaseScope(request),
+        request.body,
+      );
       return successResponse(data, getRequestIdentifier(request));
     },
 

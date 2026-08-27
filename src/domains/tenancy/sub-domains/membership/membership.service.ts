@@ -248,13 +248,13 @@ export class MembershipService {
     organizationPublicId: string,
   ): Promise<void> {
     if (!(this.organizationSettingsService && this.userSettingsService)) return;
-    const currentSettings = await this.userSettingsService.get(userPublicId);
+    const currentSettings = await this.userSettingsService.getForInvitedUser(userPublicId);
     if (!isFactoryDefaultUserLocaleSettings(currentSettings)) return;
     const defaultLocale =
       await this.organizationSettingsService.resolveDefaultLocaleForOrganization(
         organizationPublicId,
       );
-    await this.userSettingsService.update(userPublicId, {
+    await this.userSettingsService.updateForInvitedUser(userPublicId, {
       language: defaultLocale,
       preferred_locales: preferredLocalesForOrganizationDefaultLocale(defaultLocale),
     });

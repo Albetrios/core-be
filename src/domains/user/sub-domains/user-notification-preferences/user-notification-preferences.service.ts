@@ -1,10 +1,13 @@
 import { NotFoundError, ValidationError } from '@/shared/errors/index.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { UserNotificationPreferencesRepository } from './user-notification-preferences.repository.js';
 import { serializeUserNotificationPreferenceList } from './user-notification-preferences.serializer.js';
 import type { NotificationPreferenceOutput } from './user-notification-preferences.types.js';
 import { validatePutUserNotificationPreferences } from './user-notification-preferences.validator.js';
+import {
+  withPrincipalDatabaseContext,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 
 /**
  * Read and replace the authenticated user's notification opt-ins per `(type, channel, organization?)`.
@@ -28,16 +31,21 @@ export class UserNotificationPreferencesService {
     private readonly repository: UserNotificationPreferencesRepository,
   ) {}
 
-  async get(user_public_id: string): Promise<NotificationPreferenceOutput[]> {
+  async get(scope: UserPrincipalDatabaseScope): Promise<NotificationPreferenceOutput[]> {
+    const user_public_id = scope.userPublicId;
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    const rows = await withUserDatabaseContext(user_public_id, () =>
+    const rows = await withPrincipalDatabaseContext(scope, () =>
       this.repository.listByUserId(user.id),
     );
     return serializeUserNotificationPreferenceList(rows);
   }
 
-  async put(user_public_id: string, body: unknown): Promise<NotificationPreferenceOutput[]> {
+  async put(
+    scope: UserPrincipalDatabaseScope,
+    body: unknown,
+  ): Promise<NotificationPreferenceOutput[]> {
+    const user_public_id = scope.userPublicId;
     const parsed = validatePutUserNotificationPreferences(body);
     // This is the user-scoped endpoint (/users/me/*) with no tenant context, so a non-null
     // organization_id can never satisfy the org branch of the RLS WITH CHECK policy and would
@@ -52,7 +60,7 @@ export class UserNotificationPreferencesService {
     }
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    const rows = await withUserDatabaseContext(user_public_id, () =>
+    const rows = await withPrincipalDatabaseContext(scope, () =>
       this.repository.replaceAll(
         user.id,
         parsed.preferences.map((preference) => ({

@@ -33,6 +33,10 @@ import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js'
 import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { runInsertWithPublicIdentifierRetry } from '@/shared/utils/infrastructure/postgres-error.util.js';
+import {
+  withPrincipalDatabaseContext,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 
 const ALLOWED_AVATAR_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 
@@ -451,8 +455,9 @@ export class UserService {
 
   // ── Self-service ────────────────────────────────────────────
 
-  async getMe(publicId: string): Promise<UserOutput> {
-    const user = await withUserDatabaseContext(publicId, () =>
+  async getMe(scope: UserPrincipalDatabaseScope): Promise<UserOutput> {
+    const publicId = scope.userPublicId;
+    const user = await withPrincipalDatabaseContext(scope, () =>
       this.repository.findByPublicId(publicId),
     );
     if (!user || user.deleted_at) throw new NotFoundError('User');
@@ -468,7 +473,8 @@ export class UserService {
     };
   }
 
-  async updateMe(publicId: string, body: unknown): Promise<UserOutput> {
+  async updateMe(scope: UserPrincipalDatabaseScope, body: unknown): Promise<UserOutput> {
+    const publicId = scope.userPublicId;
     const parsed = validateUpdateMe(body);
 
     const { avatar_key: avatarKey, ...profileFields } = parsed;
@@ -477,12 +483,12 @@ export class UserService {
     if (avatarKey) {
       await this.assertAvatarObjectInStorage(avatarKey, publicId);
       avatarUrl = avatarKey;
-      const previous = await withUserDatabaseContext(publicId, () =>
+      const previous = await withPrincipalDatabaseContext(scope, () =>
         this.repository.findByPublicId(publicId),
       );
       previousAvatarUrl = previous?.avatar_url ?? null;
     }
-    const user = await withUserDatabaseContext(publicId, () =>
+    const user = await withPrincipalDatabaseContext(scope, () =>
       this.repository.update(
         publicId,
         omitUndefined({
@@ -504,9 +510,12 @@ export class UserService {
    * self context. The frontend calls this when the user finishes the wizard so the
    * next post-login resolution routes them to the dashboard instead of re-onboarding.
    */
-  async completeOnboarding(publicId: string): Promise<UserOutput> {
-    await withUserDatabaseContext(publicId, () => this.repository.markOnboardingComplete(publicId));
-    return this.getMe(publicId);
+  async completeOnboarding(scope: UserPrincipalDatabaseScope): Promise<UserOutput> {
+    const publicId = scope.userPublicId;
+    await withPrincipalDatabaseContext(scope, () =>
+      this.repository.markOnboardingComplete(publicId),
+    );
+    return this.getMe(scope);
   }
 
   async deleteMe(publicId: string): Promise<void> {

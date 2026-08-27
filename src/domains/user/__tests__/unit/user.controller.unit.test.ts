@@ -5,7 +5,12 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
   return {
-    auth: { kind: 'user' as const, userId: generatePublicId('user'), role: 'USER' },
+    auth: {
+      kind: 'user' as const,
+      userId: generatePublicId('user'),
+      role: 'USER',
+      organizationPublicId: generatePublicId('organization'),
+    },
     params: {},
     body: {},
     query: {},

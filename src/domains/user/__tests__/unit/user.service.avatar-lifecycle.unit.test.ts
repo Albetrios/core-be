@@ -5,6 +5,10 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import { buildUserAvatarKeyPrefix } from '@/domains/upload/upload.constants.js';
 import { ValidationError, NotFoundError } from '@/shared/errors/index.js';
+import {
+  createPrincipalDatabaseScope,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/principal-database.context.js';
 
 vi.mock(
   '@/infrastructure/database/contexts/maintenance-database.context.js',
@@ -57,6 +61,19 @@ vi.mock('@/shared/utils/infrastructure/logger.util.js', () => ({
   logger: { info: vi.fn(), warn: loggerWarnMock, error: vi.fn(), debug: vi.fn() },
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 const USER_PUBLIC_ID = generatePublicId('user');
 const AVATAR_PREFIX = buildUserAvatarKeyPrefix(USER_PUBLIC_ID);
 const NEW_AVATAR_KEY = `${AVATAR_PREFIX}new.png`;
@@ -82,6 +99,13 @@ function userRow(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+const asUserScope = (userPublicId: string) =>
+  createPrincipalDatabaseScope({
+    userPublicId,
+    organizationPublicId: 'org_scope_test',
+    source: 'token',
+  }) as UserPrincipalDatabaseScope;
 
 describe('UserService — avatar lifecycle', () => {
   const repository = {
@@ -169,7 +193,7 @@ describe('UserService — avatar lifecycle', () => {
       userRow({ avatar_url: OLD_AVATAR_KEY }) as never,
     );
 
-    await service.updateMe(USER_PUBLIC_ID, {
+    await service.updateMe(asUserScope(USER_PUBLIC_ID), {
       first_name: 'Renamed',
       avatar_key: NEW_AVATAR_KEY,
     });
@@ -186,7 +210,7 @@ describe('UserService — avatar lifecycle', () => {
       userRow({ avatar_url: OLD_AVATAR_KEY }) as never,
     );
 
-    await service.updateMe(USER_PUBLIC_ID, { first_name: 'Renamed' });
+    await service.updateMe(asUserScope(USER_PUBLIC_ID), { first_name: 'Renamed' });
 
     expect(objectStorage.deleteObject).not.toHaveBeenCalled();
     // avatar_url must not be written at all — omitting the key means "leave it as it is".
@@ -201,7 +225,7 @@ describe('UserService — avatar lifecycle', () => {
       userRow({ avatar_url: NEW_AVATAR_KEY }) as never,
     );
 
-    await service.updateMe(USER_PUBLIC_ID, { avatar_key: NEW_AVATAR_KEY });
+    await service.updateMe(asUserScope(USER_PUBLIC_ID), { avatar_key: NEW_AVATAR_KEY });
 
     expect(objectStorage.deleteObject).not.toHaveBeenCalled();
   });
