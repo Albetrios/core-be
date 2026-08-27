@@ -48,7 +48,7 @@ import {
   validateWebauthnRegisterVerify,
 } from './webauthn.validator.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/domains/auth/shared/verified-user-principal-scope.util.js';
+import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Result envelope returned by {@link WebauthnService.generateRegistrationOptions}.

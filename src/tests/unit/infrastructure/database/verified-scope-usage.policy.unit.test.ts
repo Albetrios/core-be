@@ -10,12 +10,16 @@ import { describe, expect, it } from 'vitest';
  * added to this ledger deliberately, with the verification path understood.
  */
 const VERIFIED_MINTER_MODULE = 'shared/utils/identity/verified-principal-scope.util';
-const AUTH_REEXPORT_MODULE = 'auth/shared/verified-user-principal-scope.util';
 
 /** Importers of the shared verified-minter module (ledger — additions are deliberate). */
 const ALLOWED_IMPORTERS = [
-  // The auth-domain re-export shim (its own importers are ledgered below).
-  'src/domains/auth/shared/verified-user-principal-scope.util.ts',
+  // Auth pre-token flows: login/MFA/WebAuthn/session rebinds verify the user id
+  // themselves before any token exists.
+  'src/domains/auth/auth.service.ts',
+  'src/domains/auth/sub-domains/auth-method/auth-method.service.ts',
+  'src/domains/auth/sub-domains/auth-mfa/auth-mfa.service.ts',
+  'src/domains/auth/sub-domains/auth-session/auth-session.service.ts',
+  'src/domains/auth/sub-domains/auth-webauthn/webauthn.service.ts',
   // Admin/system flows resolving actors outside a token scope.
   'src/domains/audit/audit.service.ts',
   // Stripe-webhook–driven billing mutations (org resolved from the Stripe event).
@@ -44,15 +48,6 @@ const ALLOWED_IMPORTERS = [
   'src/infrastructure/queue/commit-dispatch/commit-dispatch.executor.ts',
 ] as const;
 
-/** Importers of the auth-domain re-export (login/MFA/WebAuthn pre-token flows). */
-const ALLOWED_AUTH_REEXPORT_IMPORTERS = [
-  'src/domains/auth/auth.service.ts',
-  'src/domains/auth/sub-domains/auth-method/auth-method.service.ts',
-  'src/domains/auth/sub-domains/auth-mfa/auth-mfa.service.ts',
-  'src/domains/auth/sub-domains/auth-session/auth-session.service.ts',
-  'src/domains/auth/sub-domains/auth-webauthn/webauthn.service.ts',
-] as const;
-
 function productionImportersOf(moduleFragment: string): string[] {
   let output = '';
   try {
@@ -73,12 +68,5 @@ describe('verified-principal-scope usage ledger', () => {
   it('the shared verified minters are imported only by ledgered files', () => {
     const actual = productionImportersOf(VERIFIED_MINTER_MODULE);
     expect(actual).toEqual([...ALLOWED_IMPORTERS].sort());
-  });
-
-  it('the auth re-export is imported only by ledgered auth services', () => {
-    const actual = productionImportersOf(AUTH_REEXPORT_MODULE).filter(
-      (filePath) => !filePath.endsWith('auth/shared/verified-user-principal-scope.util.ts'),
-    );
-    expect(actual).toEqual([...ALLOWED_AUTH_REEXPORT_IMPORTERS].sort());
   });
 });

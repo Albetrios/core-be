@@ -55,7 +55,6 @@
   "ignoreBinaries": [
     // Shell tools invoked from scripts / CI, not npm dependencies.
     "gitleaks",
-    "gh",
     "semgrep",
     // Load-test runner invoked by load:* scripts.
     "k6"

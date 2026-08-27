@@ -39,7 +39,7 @@ import {
   validateChangePassword,
 } from '@/domains/auth/auth.validator.js';
 import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedUserPrincipalScope } from '@/domains/auth/shared/verified-user-principal-scope.util.js';
+import { resolveVerifiedUserPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const PASSWORD_RESET_EXPIRES_IN_MINUTES = 60;
 
