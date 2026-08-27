@@ -4,16 +4,17 @@ import { createWebhookEventController } from '@/domains/notify/sub-domains/webho
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { UnauthorizedError } from '@/shared/errors/index.js';
 import type { WebhookEventService } from '@/domains/notify/sub-domains/webhook/webhook-event/webhook-event.service.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScopeGetters({
     auth: { kind: 'user', userId: generatePublicId('user'), role: 'user' },
     params: { organization_id: generatePublicId('organization') },
     body: {},
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {

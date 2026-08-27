@@ -1,11 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { successResponse } from '@/shared/utils/http/response.util.js';
 import { ForbiddenError } from '@/shared/errors/index.js';
-import {
-  getRequestIdentifier,
-  requirePrincipal,
-  resolvePrincipalDatabaseScope,
-} from '@/shared/utils/http/request.util.js';
+import { getRequestIdentifier, requirePrincipal } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
 import type { MemberInvitationService } from './member-invitation.service.js';
 
@@ -35,7 +31,7 @@ export function createMemberInvitationController(service: MemberInvitationServic
     },
     revokeMemberInvitation: async (request: FastifyRequest, reply: FastifyReply) => {
       requirePrincipal(request);
-      const scope = resolvePrincipalDatabaseScope(request);
+      const scope = request.principalScope;
       const _organizationId = scope.organizationPublicId;
       // sec-new-T2: reject malformed path params before reaching the service layer.
       const { invitation_id: rawRevokeId } = request.params as { invitation_id: string };
@@ -44,7 +40,7 @@ export function createMemberInvitationController(service: MemberInvitationServic
       return reply.code(204).send();
     },
     resendInvitation: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const scope = resolvePrincipalDatabaseScope(request);
+      const scope = request.principalScope;
       const _organizationId = scope.organizationPublicId;
       // sec-new-T2: reject malformed path params before reaching the service layer.
       const { invitation_id: rawResendId } = request.params as { invitation_id: string };

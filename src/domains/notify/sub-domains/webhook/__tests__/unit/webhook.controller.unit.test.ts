@@ -4,9 +4,10 @@ import { ValidationError } from '@/shared/errors/index.js';
 import { createWebhookController } from '@/domains/notify/sub-domains/webhook/webhook.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { WebhookService } from '@/domains/notify/sub-domains/webhook/webhook.service.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScopeGetters({
     auth: { userId: generatePublicId('user'), role: 'user' },
     params: {},
     body: {},
@@ -14,7 +15,7 @@ function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {

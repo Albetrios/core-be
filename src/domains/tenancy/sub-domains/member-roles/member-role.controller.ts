@@ -4,7 +4,6 @@ import {
   getActingUserPublicId,
   getRequestIdentifier,
   requirePrincipal,
-  resolvePrincipalDatabaseScope,
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
 import { validateListMemberRolesQuery } from './member-role.validator.js';
@@ -23,7 +22,7 @@ import type { MemberRoleService } from './member-role.service.js';
 export function createMemberRoleController(service: MemberRoleService) {
   return {
     listRoles: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const scope = resolvePrincipalDatabaseScope(request);
+      const scope = request.principalScope;
       const _organizationId = scope.organizationPublicId;
       const pagination = validateListMemberRolesQuery(request.query);
       const result = await service.list(scope, pagination);
@@ -39,7 +38,7 @@ export function createMemberRoleController(service: MemberRoleService) {
         role_id: string;
       }) ?? { role_id: '' };
       // sec-new-T3: reject malformed path params before reaching the service layer.
-      const scope = resolvePrincipalDatabaseScope(request);
+      const scope = request.principalScope;
       const _organizationId = scope.organizationPublicId;
       const roleId = validatePublicIdParam(rawRoleId ?? '', 'role_id');
       const data = await service.getByPublicId(scope, roleId);
@@ -47,7 +46,7 @@ export function createMemberRoleController(service: MemberRoleService) {
     },
     createRole: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const scope = resolvePrincipalDatabaseScope(request);
+      const scope = request.principalScope;
       const organizationId = scope.organizationPublicId;
       const data = await service.create(scope, request.body, getActingUserPublicId(auth));
       await recordScopedAuditEvent(request, {
@@ -65,7 +64,7 @@ export function createMemberRoleController(service: MemberRoleService) {
         role_id: string;
       }) ?? { role_id: '' };
       // sec-new-T3: reject malformed path params before reaching the service layer.
-      const scope = resolvePrincipalDatabaseScope(request);
+      const scope = request.principalScope;
       const organizationId = scope.organizationPublicId;
       const roleId = validatePublicIdParam(rawUpdateRoleId ?? '', 'role_id');
       const data = await service.update(scope, roleId, request.body, getActingUserPublicId(auth));
@@ -84,7 +83,7 @@ export function createMemberRoleController(service: MemberRoleService) {
         role_id: string;
       }) ?? { role_id: '' };
       // sec-new-T3: reject malformed path params before reaching the service layer.
-      const scope = resolvePrincipalDatabaseScope(request);
+      const scope = request.principalScope;
       const organizationId = scope.organizationPublicId;
       const roleId = validatePublicIdParam(rawDeleteRoleId ?? '', 'role_id');
       await service.delete(scope, roleId);

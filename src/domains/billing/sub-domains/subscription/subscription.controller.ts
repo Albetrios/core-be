@@ -4,7 +4,6 @@ import {
   getActingUserPublicId,
   getRequestIdentifier,
   requirePrincipal,
-  resolvePrincipalDatabaseScope,
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
 import type { SubscriptionService } from './subscription.service.js';
@@ -37,7 +36,7 @@ export function createSubscriptionController(service: SubscriptionService) {
   return {
     listSubscriptions: async (request: FastifyRequest, _reply: FastifyReply) => {
       requirePrincipal(request);
-      const data = await service.list(resolvePrincipalDatabaseScope(request));
+      const data = await service.list(request.principalScope);
       return successResponse(SubscriptionSerializer.many(data), getRequestIdentifier(request));
     },
     getSubscription: async (
@@ -46,7 +45,7 @@ export function createSubscriptionController(service: SubscriptionService) {
     ) => {
       requirePrincipal(request);
       const data = await service.get(
-        resolvePrincipalDatabaseScope(request),
+        request.principalScope,
         validatePublicIdParam(request.params.subscription_id, 'subscription_id'),
       );
       return successResponse(SubscriptionSerializer.one(data), getRequestIdentifier(request));
@@ -55,7 +54,7 @@ export function createSubscriptionController(service: SubscriptionService) {
       const auth = requirePrincipal(request);
       const idempotencyKey = readIdempotencyKey(request);
       const data = await service.create(
-        resolvePrincipalDatabaseScope(request),
+        request.principalScope,
         request.body,
         getActingUserPublicId(auth),
         idempotencyKey,
@@ -68,7 +67,7 @@ export function createSubscriptionController(service: SubscriptionService) {
     ) => {
       requirePrincipal(request);
       const data = await service.update(
-        resolvePrincipalDatabaseScope(request),
+        request.principalScope,
         validatePublicIdParam(request.params.subscription_id, 'subscription_id'),
         request.body,
       );
@@ -80,7 +79,7 @@ export function createSubscriptionController(service: SubscriptionService) {
     ) => {
       requirePrincipal(request);
       const data = await service.changePlan(
-        resolvePrincipalDatabaseScope(request),
+        request.principalScope,
         validatePublicIdParam(request.params.subscription_id, 'subscription_id'),
         request.body,
         readIdempotencyKey(request),
@@ -93,7 +92,7 @@ export function createSubscriptionController(service: SubscriptionService) {
     ) => {
       requirePrincipal(request);
       const data = await service.cancel(
-        resolvePrincipalDatabaseScope(request),
+        request.principalScope,
         validatePublicIdParam(request.params.subscription_id, 'subscription_id'),
         readIdempotencyKey(request),
       );
@@ -105,7 +104,7 @@ export function createSubscriptionController(service: SubscriptionService) {
     ) => {
       requirePrincipal(request);
       const data = await service.resume(
-        resolvePrincipalDatabaseScope(request),
+        request.principalScope,
         validatePublicIdParam(request.params.subscription_id, 'subscription_id'),
         readIdempotencyKey(request),
       );
@@ -117,17 +116,14 @@ export function createSubscriptionController(service: SubscriptionService) {
     ) => {
       requirePrincipal(request);
       const data = await service.getPaymentSetup(
-        resolvePrincipalDatabaseScope(request),
+        request.principalScope,
         validatePublicIdParam(request.params.subscription_id, 'subscription_id'),
       );
       return successResponse(data, getRequestIdentifier(request));
     },
     listInvoices: async (request: FastifyRequest, _reply: FastifyReply) => {
       requirePrincipal(request);
-      const result = await service.listInvoices(
-        resolvePrincipalDatabaseScope(request),
-        request.query,
-      );
+      const result = await service.listInvoices(request.principalScope, request.query);
       return paginatedResponse(result.items, getRequestIdentifier(request), {
         per_page: result.limit,
         next: result.next_cursor,
@@ -137,13 +133,13 @@ export function createSubscriptionController(service: SubscriptionService) {
     },
     listPaymentMethods: async (request: FastifyRequest, _reply: FastifyReply) => {
       requirePrincipal(request);
-      const data = await service.listPaymentMethods(resolvePrincipalDatabaseScope(request));
+      const data = await service.listPaymentMethods(request.principalScope);
       return successResponse(data, getRequestIdentifier(request));
     },
     createPaymentMethodSetup: async (request: FastifyRequest, _reply: FastifyReply) => {
       requirePrincipal(request);
       const data = await service.createPaymentMethodSetup(
-        resolvePrincipalDatabaseScope(request),
+        request.principalScope,
         readIdempotencyKey(request),
       );
       return successResponse(data, getRequestIdentifier(request));

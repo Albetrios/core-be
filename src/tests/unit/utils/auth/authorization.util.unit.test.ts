@@ -12,15 +12,16 @@ import {
   requireOrganizationPermission,
   requireRole,
 } from '@/shared/utils/auth/authorization.util.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 const mockedResolvePermissions = vi.mocked(resolveUserOrganizationPermissions);
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScopeGetters({
     auth: { kind: 'user' as const, userId: 'user-1', role: GLOBAL_ROLES.USER },
     params: { organization_id: 'org-public' },
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 const mockReply = {} as FastifyReply;

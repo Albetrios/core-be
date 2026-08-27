@@ -1791,6 +1791,7 @@ src/
     │   ├── database-context-mock.helper.ts
     │   ├── fast-check-property.util.ts
     │   ├── object-storage-mock.helper.ts
+    │   ├── principal-scope-getters.helper.ts
     │   ├── redis-mock.helper.ts
     │   ├── registered-route.util.ts
     │   ├── rls-matrix.helper.ts

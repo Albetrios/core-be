@@ -4,16 +4,17 @@ import { createOrganizationSettingsController } from '@/domains/tenancy/sub-doma
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { NotFoundError, UnauthorizedError } from '@/shared/errors/index.js';
 import type { OrganizationSettingsService } from '@/domains/tenancy/sub-domains/organization/organization-settings/organization-settings.service.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScopeGetters({
     auth: { kind: 'user', userId: generatePublicId('user'), role: 'user' },
     params: {},
     body: {},
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {

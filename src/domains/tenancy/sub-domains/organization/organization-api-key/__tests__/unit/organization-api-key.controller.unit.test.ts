@@ -4,6 +4,7 @@ import { createOrganizationApiKeyController } from '@/domains/tenancy/sub-domain
 import type { OrganizationApiKeyService } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.service.js';
 import { UnauthorizedError } from '@/shared/errors/index.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 // The controller records best-effort lifecycle audit events; stub the audit util so the unit test
 // (a minimal request without `server.auditDomain`) exercises authorization + service delegation only.
@@ -43,7 +44,7 @@ describe('createOrganizationApiKeyController', () => {
   }
 
   function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-    return {
+    return attachPrincipalScopeGetters({
       auth: { userId: userPublicId },
       params: { organization_id: organizationPublicId, api_key_id: apiKeyPublicId },
       body: {},
@@ -51,7 +52,7 @@ describe('createOrganizationApiKeyController', () => {
       headers: {},
       id: 'request-id',
       ...overrides,
-    } as FastifyRequest;
+    }) as FastifyRequest;
   }
 
   it('rejects API-key principals when creating a new API key', async () => {

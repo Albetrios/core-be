@@ -70,6 +70,13 @@ compose superuser is needed ONLY for a fresh clone's very first `pnpm db:migrate
 (before the roles exist) and is otherwise used by nothing. `DATABASE_OPERATOR_URL` is
 NEVER set in hosted environments.
 
+## Nightly CI parity canary
+
+`.github/workflows/scheduled-rls-parity.yml` re-runs the DB suites every night with this
+exact role posture provisioned in CI (operator fixtures, RLS-subject maintenance pool,
+`SET LOCAL ROLE core_be_app` suites) — a policy/plan regression that only bites
+RLS-subject roles opens a `ci-failure` issue by morning instead of surfacing at deploy.
+
 ## Related
 
 - Bypass-kind registry + per-path usage allowlists:

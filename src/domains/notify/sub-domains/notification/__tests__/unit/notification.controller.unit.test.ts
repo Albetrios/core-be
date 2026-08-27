@@ -3,9 +3,10 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { NotFoundError } from '@/shared/errors/index.js';
 import { createNotificationController } from '@/domains/notify/sub-domains/notification/notification.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): never {
-  return {
+  return attachPrincipalScopeGetters({
     auth: {
       kind: 'user' as const,
       userId: generatePublicId('user'),
@@ -17,7 +18,7 @@ function mockRequest(overrides: Partial<FastifyRequest> = {}): never {
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as never;
+  }) as never;
 }
 
 describe('createNotificationController', () => {

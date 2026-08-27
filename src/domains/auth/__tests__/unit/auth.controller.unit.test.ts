@@ -11,6 +11,7 @@ import { createAuthMfaHandlers } from '@/domains/auth/handlers/auth-mfa.handlers
 import { createAuthWebauthnHandlers } from '@/domains/auth/handlers/auth-webauthn.handlers.js';
 import { createAuthMeContextHandlers } from '@/domains/auth/handlers/auth-me-context.handlers.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 vi.mock('@/shared/middlewares/session/cookie-session-origin.pre-handler.js', () => ({
   requireAllowedSourceOriginForCookieSessionRoute: vi.fn(),
@@ -45,7 +46,7 @@ vi.mock('@/shared/config/env.config.js', () => {
 });
 
 function mockRequest(overrides: Record<string, unknown> = {}): never {
-  return {
+  return attachPrincipalScopeGetters({
     auth: {
       kind: 'user' as const,
       userId: generatePublicId('user'),
@@ -67,7 +68,7 @@ function mockRequest(overrides: Record<string, unknown> = {}): never {
     },
     log: { warn: vi.fn(), error: vi.fn() },
     ...overrides,
-  } as never;
+  }) as never;
 }
 
 function mockReply(): FastifyReply {

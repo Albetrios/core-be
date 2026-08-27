@@ -13,9 +13,10 @@ vi.mock('@/shared/utils/infrastructure/audit-request-context.util.js', () => ({
 
 import { createUserDataExportController } from '@/domains/user/sub-domains/user-data-export/user-data-export.controller.js';
 import type { UserDataExportService } from '@/domains/user/sub-domains/user-data-export/user-data-export.service.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): never {
-  return {
+  return attachPrincipalScopeGetters({
     auth: {
       kind: 'user' as const,
       userId: generatePublicId('user'),
@@ -27,7 +28,7 @@ function mockRequest(overrides: Partial<FastifyRequest> = {}): never {
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as never;
+  }) as never;
 }
 
 function mockReply(): FastifyReply {

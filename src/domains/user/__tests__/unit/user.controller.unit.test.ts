@@ -2,9 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { createUserController } from '@/domains/user/user.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScopeGetters({
     auth: {
       kind: 'user' as const,
       userId: generatePublicId('user'),
@@ -24,7 +25,7 @@ function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
       },
     },
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 describe('createUserController', () => {

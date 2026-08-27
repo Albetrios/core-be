@@ -4,20 +4,21 @@ import { createSubscriptionController } from '@/domains/billing/sub-domains/subs
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 import { UnauthorizedError, ValidationError } from '@/shared/errors/index.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 const organizationPublicId = generatePublicId('organization');
 const subscriptionPublicId = generatePublicId('subscription');
 const planPublicId = generatePublicId('plan');
 
 function buildRequest(overrides: Record<string, unknown> = {}): never {
-  return {
+  return attachPrincipalScopeGetters({
     auth: { userId: generatePublicId('user'), role: 'user' },
     params: { organization_id: organizationPublicId, subscription_id: subscriptionPublicId },
     body: {},
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as never;
+  }) as never;
 }
 
 function buildReply(): FastifyReply {

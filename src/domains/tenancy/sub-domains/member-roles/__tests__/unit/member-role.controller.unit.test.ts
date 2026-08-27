@@ -4,9 +4,10 @@ import { ForbiddenError, ValidationError } from '@/shared/errors/index.js';
 import { createMemberRoleController } from '@/domains/tenancy/sub-domains/member-roles/member-role.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { MemberRoleService } from '@/domains/tenancy/sub-domains/member-roles/member-role.service.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScopeGetters({
     auth: { kind: 'user' as const, userId: generatePublicId('user'), role: 'USER' },
     params: {},
     body: {},
@@ -17,7 +18,7 @@ function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
       auditDomain: { auditService: { record: vi.fn().mockResolvedValue(undefined) } },
     },
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {

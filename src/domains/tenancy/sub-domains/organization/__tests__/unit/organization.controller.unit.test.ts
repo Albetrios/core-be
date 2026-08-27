@@ -5,13 +5,14 @@ import { createOrganizationController } from '@/domains/tenancy/sub-domains/orga
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { AuditService } from '@/domains/audit/audit.service.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 describe('createOrganizationController', () => {
   const organizationPublicId = generatePublicId('organization');
   const userPublicId = generatePublicId('user');
 
   function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-    return {
+    return attachPrincipalScopeGetters({
       auth: { kind: 'user' as const, userId: userPublicId, role: 'USER' },
       params: {},
       body: {},
@@ -19,7 +20,7 @@ describe('createOrganizationController', () => {
       headers: {},
       id: 'request-id',
       ...overrides,
-    } as FastifyRequest;
+    }) as FastifyRequest;
   }
 
   function mockReply(): FastifyReply {

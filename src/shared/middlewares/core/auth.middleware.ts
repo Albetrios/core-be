@@ -7,6 +7,10 @@ import type { AuthContext } from '@/shared/types/index.js';
 import { GLOBAL_ROLES, type GlobalRole } from '@/shared/constants/roles.constants.js';
 import { resolveGlobalRoleForEmail } from '@/shared/utils/auth/global-admin-role.util.js';
 import { applyApiKeyAuthentication } from '@/shared/middlewares/security/api-key-auth.middleware.js';
+import {
+  requireUserPrincipalDatabaseScope,
+  resolvePrincipalDatabaseScope,
+} from '@/shared/utils/http/request.util.js';
 
 function getBearerToken(request: FastifyRequest): string {
   const authorizationHeader = request.headers.authorization;
@@ -126,6 +130,21 @@ async function authenticate(request: FastifyRequest, _reply: FastifyReply): Prom
 
 const authMiddleware: FastifyPluginAsync = async (app) => {
   app.decorateRequest('auth', null);
+  // Ergonomic access to the token-minted principal scopes: `request.principalScope`
+  // (org REQUIRED — 403 without one) and `request.userPrincipalScope` (user REQUIRED,
+  // org optional — the /users/me self-heal family). Lazy getters over the confined
+  // request minters, so controllers relay a scope without repeating the minting call;
+  // authority semantics are identical to calling the minters directly.
+  app.decorateRequest('principalScope', {
+    getter(this: FastifyRequest) {
+      return resolvePrincipalDatabaseScope(this);
+    },
+  });
+  app.decorateRequest('userPrincipalScope', {
+    getter(this: FastifyRequest) {
+      return requireUserPrincipalDatabaseScope(this);
+    },
+  });
   app.decorate('authenticate', authenticate);
 };
 

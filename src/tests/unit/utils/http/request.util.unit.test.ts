@@ -14,6 +14,7 @@ import {
 } from '@/shared/utils/http/request.util.js';
 import type { ApiKeyAuthContext, UserAuthContext } from '@/shared/types/index.js';
 import type { FastifyRequest } from 'fastify';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 const userPrincipal: UserAuthContext = { kind: 'user', userId: 'user-1', role: 'user' };
 const apiKeyPrincipal: ApiKeyAuthContext = {
@@ -24,11 +25,11 @@ const apiKeyPrincipal: ApiKeyAuthContext = {
 };
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScopeGetters({
     id: 'req-123',
     auth: undefined,
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 describe('request.util', () => {

@@ -3,9 +3,10 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ForbiddenError, ValidationError } from '@/shared/errors/index.js';
 import { createMembershipController } from '@/domains/tenancy/sub-domains/membership/membership.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
+import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScopeGetters({
     auth: { kind: 'user' as const, userId: generatePublicId('user'), role: 'USER' },
     params: {},
     body: {},
@@ -13,7 +14,7 @@ function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {

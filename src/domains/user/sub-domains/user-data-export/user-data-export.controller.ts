@@ -1,9 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import {
-  getRequestIdentifier,
-  requireAuth,
-  requireUserPrincipalDatabaseScope,
-} from '@/shared/utils/http/request.util.js';
+import { getRequestIdentifier, requireAuth } from '@/shared/utils/http/request.util.js';
 import { successResponse } from '@/shared/utils/http/response.util.js';
 import { recordScopedAuditEvent } from '@/shared/utils/infrastructure/audit-request-context.util.js';
 import type { UserDataExportService } from './user-data-export.service.js';
@@ -23,10 +19,9 @@ export function createUserDataExportController(userDataExportService: UserDataEx
     async requestExport(request: FastifyRequest, reply: FastifyReply) {
       const requestId = getRequestIdentifier(request);
       const _auth = requireAuth(request);
-      const data = await userDataExportService.requestExport(
-        requireUserPrincipalDatabaseScope(request),
-        { requestId },
-      );
+      const data = await userDataExportService.requestExport(request.userPrincipalScope, {
+        requestId,
+      });
       return reply.status(202).send(successResponse(data, requestId));
     },
 
@@ -47,7 +42,7 @@ export function createUserDataExportController(userDataExportService: UserDataEx
       const auth = requireAuth(request);
       const { data_export_id: exportId } = validateDataExportIdParam(request.params);
       const data = await userDataExportService.getExportStatus(
-        requireUserPrincipalDatabaseScope(request),
+        request.userPrincipalScope,
         exportId,
       );
       if (
