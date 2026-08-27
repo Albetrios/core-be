@@ -66,11 +66,18 @@ export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
 };
 
 /**
- * The common token scope narrowed to a real end user: `userPublicId` guaranteed
- * alongside the always-present organization — produced by
- * `requireUserPrincipalDatabaseScope` for user-owned resources (API keys rejected).
+ * The common token scope narrowed to a real end user: `userPublicId` guaranteed,
+ * organization OPTIONAL — produced by `requireUserPrincipalDatabaseScope` for
+ * user-owned resources (API keys rejected).
+ *
+ * @remarks
+ * The organization stays optional here because user-scoped routes are the
+ * self-heal surface of the personal/team-organization invariant: `GET /users/me`
+ * provisions a missing personal organization on demand, so an org-less token is
+ * a legitimate TRANSITIONAL state on this family (and only this family — the
+ * org-scoped minter still rejects it).
  */
-export type UserPrincipalDatabaseScope = OrganizationPrincipalDatabaseScope & {
+export type UserPrincipalDatabaseScope = PrincipalDatabaseScope & {
   readonly userPublicId: string;
 };
 

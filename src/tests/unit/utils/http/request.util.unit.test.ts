@@ -198,6 +198,13 @@ describe('principal database scope minters', () => {
       expect(scope.organizationPublicId).toBe(claimOrg);
     });
 
+    it('mints a user-only scope for an org-less token (the /users/me self-heal state)', () => {
+      const request = mockRequest({ auth: userPrincipal });
+      const scope = requireUserPrincipalDatabaseScope(request);
+      expect(scope.userPublicId).toBe(userPrincipal.userId);
+      expect(scope.organizationPublicId).toBeUndefined();
+    });
+
     it('rejects an API-key principal (user-owned resources need a real end user)', () => {
       const request = mockRequest({
         auth: { ...apiKeyPrincipal, organizationPublicId: claimOrg },

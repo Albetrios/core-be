@@ -150,11 +150,22 @@ export function resolvePrincipalDatabaseScope(
  * Mints a {@link UserPrincipalDatabaseScope} — the common scope narrowed to routes
  * that require a real end user: rejects API-key principals with
  * {@link UnauthorizedError} (matching {@link requireAuth} semantics), so
- * `userPublicId` is guaranteed alongside the always-present organization.
+ * `userPublicId` is guaranteed; the organization is included when present (org-less tokens are the /users/me self-heal transitional state).
  */
 export function requireUserPrincipalDatabaseScope(
   request: FastifyRequest,
 ): UserPrincipalDatabaseScope {
-  requireAuth(request);
-  return resolvePrincipalDatabaseScope(request) as UserPrincipalDatabaseScope;
+  const auth = requireAuth(request);
+  const params = request.params as Record<string, string> | undefined;
+  const organizationId = params?.organization_id ?? auth.organizationPublicId;
+  return createPrincipalDatabaseScope({
+    userPublicId: auth.userId,
+    // Org-less is legitimate on the user family (the /users/me self-heal
+    // provisions the personal organization on demand); include the org GUC
+    // only when a validated claim/param is present.
+    organizationPublicId: organizationId
+      ? validatePublicIdParam(organizationId, 'organization_id')
+      : undefined,
+    source: 'token',
+  }) as UserPrincipalDatabaseScope;
 }

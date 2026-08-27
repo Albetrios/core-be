@@ -148,16 +148,22 @@ describe('AuthMeContextService.getContext', () => {
       authorizationService as never,
     );
 
-    // Personal/team-organization invariant: a scope ALWAYS carries an active
-    // organization, so the active-org slice is always resolved.
+    // Org-less token = the /users/me self-heal transitional state: the active-org
+    // slice is skipped rather than erroring.
+    const orgLessScope = createPrincipalDatabaseScope({
+      userPublicId: 'usr_1',
+      source: 'token',
+    }) as UserPrincipalDatabaseScope;
     const data = await service.getContext({
-      scope: meScope,
+      scope: orgLessScope,
       globalRole: undefined,
     });
 
-    expect(data.activeOrganizationPublicId).toBe('org_active');
-    expect(organizationService.getByPublicId).toHaveBeenCalled();
-    expect(authorizationService.resolveUserOrganizationPermissions).toHaveBeenCalled();
+    expect(data.activeOrganization).toBeNull();
+    expect(data.activeOrganizationPublicId).toBeNull();
+    expect(data.myPermissions).toEqual([]);
+    expect(organizationService.getByPublicId).not.toHaveBeenCalled();
+    expect(authorizationService.resolveUserOrganizationPermissions).not.toHaveBeenCalled();
   });
 });
 
