@@ -50,6 +50,25 @@ authority becomes a connection-level property instead of a GUC-only one.
    `rls-table-scope-map` expectations. From then on a compromised `core_be_app`
    connection cannot use a bypass GUC at all.
 
+## Local parity provisioning (all roles)
+
+Local mirrors live: migration `20260827050000` creates `core_be_owner` /
+`core_be_migrator` / `core_be_operator` and moves table ownership to the owner group.
+Local provisioning (once, as the compose superuser):
+
+```sql
+ALTER ROLE core_be_app LOGIN PASSWORD '<generated>';
+ALTER ROLE core_be_operator LOGIN BYPASSRLS PASSWORD '<generated>';
+ALTER ROLE core_be_migrator LOGIN CREATEROLE PASSWORD '<generated>';
+```
+
+Then the gitignored local env file carries `DATABASE_URL` as `core_be_app` (runtime
+parity), `DATABASE_OPERATOR_URL` as `core_be_operator` (harness + full/bulk seeds pick
+it up automatically), and `DATABASE_MAINTENANCE_URL` as `core_be_maintenance`.
+`DATABASE_MIGRATION_URL` may stay on the compose superuser for bootstrap (fresh clones
+must run migrations before the roles exist). `DATABASE_OPERATOR_URL` is NEVER set in
+hosted environments.
+
 ## Related
 
 - Bypass-kind registry + per-path usage allowlists:

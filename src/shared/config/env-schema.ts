@@ -215,6 +215,15 @@ const envSchemaBase = z.object({
    * making bypass authority a connection-level property instead of a GUC-only one.
    */
   DATABASE_MAINTENANCE_URL: z.string().min(1).optional(),
+  /**
+   * Elevated LOCAL/CI connection for the test harness, full/bulk seeds, and fixture
+   * tooling, connecting as `core_be_operator` (member of `core_be_owner`; local
+   * provisioning grants LOGIN + BYPASSRLS so cross-tenant fixtures work). Unset in
+   * hosted environments — the operator role is never provisioned there. When set,
+   * the Vitest harness and seed entrypoints run on it so DATABASE_URL can stay the
+   * production-parity `core_be_app` login.
+   */
+  DATABASE_OPERATOR_URL: z.string().min(1).optional(),
 
   // Redis (managed service)
   REDIS_URL: z.string().min(1),

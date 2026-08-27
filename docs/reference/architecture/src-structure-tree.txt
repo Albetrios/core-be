@@ -1408,6 +1408,7 @@ src/
     │   ├── production-guard.ts
     │   ├── seed-contract.ts
     │   ├── seed-registry.ts
+    │   ├── seed-runtime-url.ts
     │   ├── seed.overview.md
     │   └── sync-demo-permissions.ts
     ├── tooling/
@@ -2105,6 +2106,7 @@ src/
     │   │   │   ├── retention-database.context.unit.test.ts
     │   │   │   ├── rls-offboarding-regressions.db.unit.test.ts
     │   │   │   ├── rls-table-scope-map.db.unit.test.ts
+    │   │   │   ├── role-taxonomy.db.unit.test.ts
     │   │   │   ├── session-context-confinement.policy.unit.test.ts
     │   │   │   ├── transaction.util.db.unit.test.ts
     │   │   │   ├── verified-scope-usage.policy.unit.test.ts

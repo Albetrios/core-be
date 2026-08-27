@@ -5,6 +5,7 @@
  * Usage: pnpm db:seed:full
  */
 import '@/shared/config/load-env-files.js';
+import '@/scripts/seed/seed-runtime-url.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { closeDatabase } from './helpers.js';

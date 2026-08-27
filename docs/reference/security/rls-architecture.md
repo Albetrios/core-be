@@ -216,13 +216,30 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 
 ---
 
-## 7. Roles and pools
+## 7. Roles and pools — the five-role taxonomy (local mirrors live)
+
+Postgres note: "role" and "user" are the same object — `CREATE USER` is just
+`CREATE ROLE … LOGIN`. `core_be_owner` is a pure NOLOGIN group; the other four gain
+LOGIN when provisioned and act as connection users.
 
 | Role | Connects via | RLS posture | Purpose |
 | ---- | ------------ | ----------- | ------- |
-| **owner / migration role** — local: `core` (compose superuser, a convenience); hosted: the provider's database **owner** (managed Postgres has no true superusers) | `DATABASE_MIGRATION_URL` / operator psql | local `core`: exempt (superuser). Hosted owner: **subject** on data (FORCE RLS binds the owner too) — what it uniquely holds is **DDL power** (create/alter tables and policies) | migrations, test-harness fixtures — never the running app. Optional future formalization: a NOLOGIN `core_be_owner` that owns all objects, with the migration login granted membership (same three-tier naming everywhere; owner stays non-superuser) |
-| `core_be_app` | `DATABASE_URL` | subject | ALL request/worker traffic |
-| `core_be_maintenance` | `DATABASE_MAINTENANCE_URL` (optional) | subject | maintenance (bypass) contexts on a dedicated pool; NOLOGIN until provisioned per the [runbook](../../deployment/runbooks/maintenance-database-role.md) |
+| `core_be_owner` | never (NOLOGIN group) | subject (FORCE binds owners) | owns every app schema/table/sequence — DDL + TRUNCATE authority lives here; migrator/operator act through membership |
+| `core_be_migrator` | `DATABASE_MIGRATION_URL` (dedicated; local bootstrap may keep the compose `core` superuser — fresh clones must migrate before the roles exist) | subject | migrations/DDL (owner-member, `CREATEROLE`) |
+| `core_be_app` | `DATABASE_URL` | **subject** | ALL runtime traffic — local `pnpm dev` now connects as it too (production parity; boot logs `rls_safety.ok` locally) |
+| `core_be_maintenance` | `DATABASE_MAINTENANCE_URL` | **subject** | maintenance (bypass) contexts — authority comes only from the GUC arms, never the connection |
+| `core_be_operator` | `DATABASE_OPERATOR_URL` (**local/CI only — never hosted**) | **BYPASSRLS** | test-harness fixtures, full/bulk seeds, ops scratch; owner-member + member of app/maintenance so suites can `SET LOCAL ROLE core_be_app` to exercise real policies |
+
+Locks: `role-taxonomy.db.unit.test.ts` pins the role set, non-superuser/non-BYPASSRLS
+posture (operator excepted), the owner's table-ownership sweep (drift lock — new tables
+must `ALTER TABLE … OWNER TO core_be_owner`), and membership edges.
+
+**SECURITY DEFINER nuance (empirically proven):** a definer function executes as its
+OWNER, and FORCE RLS binds a non-exempt owner — so resolver functions are deliberately
+NOT owned by `core_be_owner` (they would silently return zero rows). They stay owned by
+the per-environment elevated role: local `core` (superuser) / hosted provider owner
+(BYPASSRLS via the provider's elevated grant). Verify resolver behavior after
+provisioning any new hosted environment.
 
 End-state (operator-gated): after every hosted environment provisions the maintenance
 URL, a migration adds `current_user = 'core_be_maintenance'` to the bypass arms — bypass

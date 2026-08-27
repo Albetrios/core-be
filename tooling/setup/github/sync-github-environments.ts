@@ -371,6 +371,7 @@ function classifyKey(key: string): 'secret' | 'variable' {
   // Connection strings with embedded credentials → Secret
   if (key === 'DATABASE_URL' || key === 'DATABASE_MIGRATION_URL') return 'secret';
   if (key === 'DATABASE_MAINTENANCE_URL') return 'secret';
+  if (key === 'DATABASE_OPERATOR_URL') return 'secret';
   if (key === 'REDIS_URL' || key === 'REDIS_BULLMQ_URL') return 'secret';
 
   // Auth secrets → Secret

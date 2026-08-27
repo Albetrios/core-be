@@ -18,6 +18,7 @@
  *   pnpm db:seed:loadtest                    (runs bulk seed then this script)
  */
 import '@/shared/config/load-env-files.js';
+import '@/scripts/seed/seed-runtime-url.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { and, eq, isNull, like, sql } from 'drizzle-orm';

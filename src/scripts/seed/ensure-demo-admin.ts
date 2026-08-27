@@ -21,6 +21,7 @@
  * Usage: pnpm db:seed:demo-admin   (or DEMO_EMAIL=… DEMO_PASSWORD=… pnpm db:seed:demo-admin)
  */
 import '@/shared/config/load-env-files.js';
+import '@/scripts/seed/seed-runtime-url.js';
 import { closeDatabase } from './helpers.js';
 import {
   seedPermissions,
