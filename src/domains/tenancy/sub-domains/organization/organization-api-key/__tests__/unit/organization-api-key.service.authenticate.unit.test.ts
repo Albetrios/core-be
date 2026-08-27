@@ -24,7 +24,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
 const _asScope = (organizationPublicId: string) =>
   createPrincipalDatabaseScope({
     organizationPublicId,
-    source: 'token',
+    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('OrganizationApiKeyService.authenticate', () => {

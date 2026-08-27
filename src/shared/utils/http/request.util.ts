@@ -119,17 +119,15 @@ export function resolveActiveOrganizationId(request: FastifyRequest): string {
  *   organization (users hold a personal-or-team `org` claim from login/switch;
  *   API keys are pinned to one). A token without one is stale/malformed, not a
  *   different scope, so this single common minter rejects it rather than
- *   modelling an org-less variant. Use {@link resolveTokenUserPrincipalScope}
+ *   modelling an org-less variant. Use {@link REQUEST_SCOPE}.user
  *   when the route additionally requires a real end user (rejects API keys).
  */
-export function resolveTokenPrincipalScope(
-  request: FastifyRequest,
-): OrganizationPrincipalDatabaseScope {
+function mintOrganizationRequestScope(request: FastifyRequest): OrganizationPrincipalDatabaseScope {
   const auth = requirePrincipal(request);
   if (auth.kind === 'apiKey') {
     return createPrincipalDatabaseScope({
       organizationPublicId: validatePublicIdParam(auth.organizationPublicId, 'organization_id'),
-      source: 'token',
+      source: 'request',
     }) as OrganizationPrincipalDatabaseScope;
   }
   const params = request.params as Record<string, string> | undefined;
@@ -142,7 +140,7 @@ export function resolveTokenPrincipalScope(
   return createPrincipalDatabaseScope({
     userPublicId: auth.userId,
     organizationPublicId: validatePublicIdParam(organizationId, 'organization_id'),
-    source: 'token',
+    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 }
 
@@ -152,9 +150,7 @@ export function resolveTokenPrincipalScope(
  * {@link UnauthorizedError} (matching {@link requireAuth} semantics), so
  * `userPublicId` is guaranteed; the organization is included when present (org-less tokens are the /users/me self-heal transitional state).
  */
-export function resolveTokenUserPrincipalScope(
-  request: FastifyRequest,
-): UserPrincipalDatabaseScope {
+function mintUserRequestScope(request: FastifyRequest): UserPrincipalDatabaseScope {
   const auth = requireAuth(request);
   const params = request.params as Record<string, string> | undefined;
   const organizationId = params?.organization_id ?? auth.organizationPublicId;
@@ -166,6 +162,25 @@ export function resolveTokenUserPrincipalScope(
     organizationPublicId: organizationId
       ? validatePublicIdParam(organizationId, 'organization_id')
       : undefined,
-    source: 'token',
+    source: 'request',
   }) as UserPrincipalDatabaseScope;
 }
+
+/**
+ * The request-scope factories — the HTTP member of the scope-namespace family
+ * (session/maintenance namespaces in `database-context.ts`): one namespace, kind-differentiated. Both kinds read the
+ * verified request principal and stamp `source: 'request'`; the KIND selects the
+ * boundary rule (the two rules genuinely differ, so they are kinds, not one
+ * function):
+ * - `REQUEST_SCOPE.organization(request)` — org REQUIRED (403 without one;
+ *   API-key principals allowed — org identity without a human).
+ * - `REQUEST_SCOPE.user(request)` — real end user REQUIRED (API keys rejected);
+ *   org optional (the /users/me self-heal transitional state).
+ * Controllers normally use the `request.principalScope` /
+ * `request.userPrincipalScope` getters, which delegate here.
+ */
+export const REQUEST_SCOPE = Object.freeze({
+  organization: (request: FastifyRequest): OrganizationPrincipalDatabaseScope =>
+    mintOrganizationRequestScope(request),
+  user: (request: FastifyRequest): UserPrincipalDatabaseScope => mintUserRequestScope(request),
+});

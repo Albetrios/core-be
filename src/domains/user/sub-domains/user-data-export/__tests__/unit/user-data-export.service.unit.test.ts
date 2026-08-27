@@ -61,7 +61,7 @@ const asUserScope = (userPublicId: string) =>
   createPrincipalDatabaseScope({
     userPublicId,
     organizationPublicId: 'org_scope_test',
-    source: 'token',
+    source: 'request',
   }) as UserPrincipalDatabaseScope;
 
 describe('UserDataExportService', () => {

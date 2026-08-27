@@ -47,7 +47,7 @@ describe('createNotificationController', () => {
       {} as FastifyReply,
     );
     expect(service.listForUser).toHaveBeenCalledWith(
-      expect.objectContaining({ source: 'token' }),
+      expect.objectContaining({ source: 'request' }),
       expect.objectContaining({ limit: 25, include_total: false }),
     );
     expect(
@@ -69,7 +69,7 @@ describe('createNotificationController', () => {
     );
     expect(service.get).toHaveBeenCalledWith(
       notificationId,
-      expect.objectContaining({ source: 'token' }),
+      expect.objectContaining({ source: 'request' }),
     );
   });
 

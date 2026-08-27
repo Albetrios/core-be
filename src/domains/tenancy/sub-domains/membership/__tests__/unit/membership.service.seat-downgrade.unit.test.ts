@@ -38,7 +38,7 @@ import {
 const _asScope = (organizationPublicId: string) =>
   createPrincipalDatabaseScope({
     organizationPublicId,
-    source: 'token',
+    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MembershipService.suspendExcessActiveMembersToFitCeiling (F2 downgrade enforcement)', () => {

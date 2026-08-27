@@ -1,8 +1,5 @@
 import type { FastifyRequest } from 'fastify';
-import {
-  resolveTokenUserPrincipalScope,
-  resolveTokenPrincipalScope,
-} from '@/shared/utils/http/request.util.js';
+import { REQUEST_SCOPE } from '@/shared/utils/http/request.util.js';
 
 /**
  * Mirrors the auth middleware's lazy `request.principalScope` /
@@ -13,11 +10,11 @@ import {
 export function attachPrincipalScopeGetters<T extends object>(request: T): T {
   Object.defineProperty(request, 'principalScope', {
     configurable: true,
-    get: () => resolveTokenPrincipalScope(request as unknown as FastifyRequest),
+    get: () => REQUEST_SCOPE.organization(request as unknown as FastifyRequest),
   });
   Object.defineProperty(request, 'userPrincipalScope', {
     configurable: true,
-    get: () => resolveTokenUserPrincipalScope(request as unknown as FastifyRequest),
+    get: () => REQUEST_SCOPE.user(request as unknown as FastifyRequest),
   });
   return request;
 }

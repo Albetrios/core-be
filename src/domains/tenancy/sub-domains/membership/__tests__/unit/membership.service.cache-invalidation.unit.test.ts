@@ -35,7 +35,7 @@ import {
 const asScope = (organizationPublicId: string) =>
   createPrincipalDatabaseScope({
     organizationPublicId,
-    source: 'token',
+    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MembershipService — permission cache invalidation', () => {

@@ -58,7 +58,7 @@ const stubPermissionRepository = {} as unknown as PermissionRepository;
 const asScope = (organizationPublicId: string) =>
   createPrincipalDatabaseScope({
     organizationPublicId,
-    source: 'token',
+    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MemberRoleService.delete — sec-T3 guards (route-audit C2 atomic)', () => {

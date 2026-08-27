@@ -7,10 +7,7 @@ import type { AuthContext } from '@/shared/types/index.js';
 import { GLOBAL_ROLES, type GlobalRole } from '@/shared/constants/roles.constants.js';
 import { resolveGlobalRoleForEmail } from '@/shared/utils/auth/global-admin-role.util.js';
 import { applyApiKeyAuthentication } from '@/shared/middlewares/security/api-key-auth.middleware.js';
-import {
-  resolveTokenUserPrincipalScope,
-  resolveTokenPrincipalScope,
-} from '@/shared/utils/http/request.util.js';
+import { REQUEST_SCOPE } from '@/shared/utils/http/request.util.js';
 
 function getBearerToken(request: FastifyRequest): string {
   const authorizationHeader = request.headers.authorization;
@@ -137,12 +134,12 @@ const authMiddleware: FastifyPluginAsync = async (app) => {
   // authority semantics are identical to calling the minters directly.
   app.decorateRequest('principalScope', {
     getter(this: FastifyRequest) {
-      return resolveTokenPrincipalScope(this);
+      return REQUEST_SCOPE.organization(this);
     },
   });
   app.decorateRequest('userPrincipalScope', {
     getter(this: FastifyRequest) {
-      return resolveTokenUserPrincipalScope(this);
+      return REQUEST_SCOPE.user(this);
     },
   });
   app.decorate('authenticate', authenticate);

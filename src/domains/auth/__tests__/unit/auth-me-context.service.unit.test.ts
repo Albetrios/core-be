@@ -30,7 +30,7 @@ import {
 const meScope = createPrincipalDatabaseScope({
   userPublicId: 'usr_1',
   organizationPublicId: 'org_active',
-  source: 'token',
+  source: 'request',
 }) as UserPrincipalDatabaseScope;
 
 describe('AuthMeContextService.getContext', () => {
@@ -150,7 +150,7 @@ describe('AuthMeContextService.getContext', () => {
     // slice is skipped rather than erroring.
     const orgLessScope = createPrincipalDatabaseScope({
       userPublicId: 'usr_1',
-      source: 'token',
+      source: 'request',
     }) as UserPrincipalDatabaseScope;
     const data = await service.getContext({
       scope: orgLessScope,

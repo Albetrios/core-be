@@ -270,13 +270,13 @@ export class MfaService {
       }),
       organizationPublicId,
     });
-    const tokenHash = createHash('sha256').update(jsonWebToken).digest('hex');
+    const sessionTokenHash = createHash('sha256').update(jsonWebToken).digest('hex');
     const sessionMaxAgeDays = env.AUTH_SESSION_MAX_AGE_DAYS;
     const expiresAt = new Date(Date.now() + sessionMaxAgeDays * MILLISECONDS_PER_DAY);
     const authSession = await this.authSessionService.createSessionForUser(
       user.public_id,
       omitUndefined({
-        token_hash: tokenHash,
+        token_hash: sessionTokenHash,
         ip_address: ipAddress,
         user_agent: userAgent,
         expires_at: expiresAt,

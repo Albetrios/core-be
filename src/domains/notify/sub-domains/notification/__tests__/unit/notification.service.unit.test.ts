@@ -32,12 +32,12 @@ const user = { id: 1, public_id: 'user_public' };
 const scope = createPrincipalDatabaseScope({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public',
-  source: 'token',
+  source: 'request',
 }) as UserPrincipalDatabaseScope;
 const missingUserScope = createPrincipalDatabaseScope({
   userPublicId: 'missing',
   organizationPublicId: 'org_public',
-  source: 'token',
+  source: 'request',
 }) as UserPrincipalDatabaseScope;
 const notification = {
   id: 2,

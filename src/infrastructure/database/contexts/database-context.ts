@@ -61,11 +61,11 @@ declare const PRINCIPAL_SCOPE_BRAND: unique symbol;
 
 /**
  * Where a {@link PrincipalDatabaseScope} was minted — the legitimate "tops" of a call
- * chain. `token` = authenticated HTTP request (JWT or API key), `job` = validated
+ * chain. `request` = authenticated HTTP request (JWT or API key) (JWT or API key), `job` = validated
  * BullMQ job payload, `provisioning` = a row the current flow just created (e.g. a
  * personal organization during signup, before any claim can exist for it).
  */
-export type PrincipalScopeSource = 'token' | 'job' | 'provisioning';
+export type PrincipalScopeSource = 'request' | 'job' | 'provisioning';
 
 /**
  * Unforgeable identity scope for one unit of database work: the verified user and/or
@@ -75,7 +75,7 @@ export type PrincipalScopeSource = 'token' | 'job' | 'provisioning';
  * @remarks
  * The brand is compile-time only — services and repositories can relay a scope but
  * cannot construct one from raw strings. Only the confined minters build it:
- * `resolveTokenPrincipalScope` / `resolveTokenUserPrincipalScope`
+ * `REQUEST_SCOPE.organization` / `REQUEST_SCOPE.user`
  * (request layer, claim-precedence) and, in later phases, the worker-payload and
  * provisioning minters. Enforced by
  * `src/tests/unit/infrastructure/database/principal-scope-minting.policy.unit.test.ts`.
@@ -91,7 +91,7 @@ export interface PrincipalDatabaseScope {
  * A {@link PrincipalDatabaseScope} guaranteed to carry an organization — what
  * org-scoped service methods accept. Under the personal/team organization model
  * every authenticated principal has an active organization, so this is what the
- * single request minter `resolveTokenPrincipalScope` returns.
+ * single request minter `REQUEST_SCOPE.organization` returns.
  */
 export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
   readonly organizationPublicId: string;
@@ -99,7 +99,7 @@ export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
 
 /**
  * The common token scope narrowed to a real end user: `userPublicId` guaranteed,
- * organization OPTIONAL — produced by `resolveTokenUserPrincipalScope` for
+ * organization OPTIONAL — produced by `REQUEST_SCOPE.user` for
  * user-owned resources (API keys rejected).
  *
  * @remarks

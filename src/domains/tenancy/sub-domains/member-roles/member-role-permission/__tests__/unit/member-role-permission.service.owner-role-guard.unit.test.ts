@@ -49,7 +49,7 @@ import {
 const asScope = (organizationPublicId: string) =>
   createPrincipalDatabaseScope({
     organizationPublicId,
-    source: 'token',
+    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MemberRolePermissionService.put — owner-role protection (sec-T2)', () => {

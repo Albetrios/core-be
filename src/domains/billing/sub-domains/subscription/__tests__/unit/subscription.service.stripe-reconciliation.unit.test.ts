@@ -66,7 +66,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
 const scope = createPrincipalDatabaseScope({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public',
-  source: 'token',
+  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 describe('SubscriptionService — Stripe reconciliation (sec-B1+B2+B3+B4)', () => {

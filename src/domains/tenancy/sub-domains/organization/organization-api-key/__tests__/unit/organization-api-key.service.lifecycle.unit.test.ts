@@ -79,7 +79,7 @@ function buildService() {
 const asScope = (organizationPublicId: string) =>
   createPrincipalDatabaseScope({
     organizationPublicId,
-    source: 'token',
+    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('OrganizationApiKeyService lifecycle', () => {

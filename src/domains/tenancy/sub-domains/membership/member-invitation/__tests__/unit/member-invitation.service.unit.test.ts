@@ -77,7 +77,7 @@ function makeInvitationRow(overrides: Record<string, unknown> = {}) {
 const asScope = (organizationPublicId: string) =>
   createPrincipalDatabaseScope({
     organizationPublicId,
-    source: 'token',
+    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MemberInvitationService', () => {

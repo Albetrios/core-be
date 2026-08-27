@@ -91,7 +91,7 @@ const BILLING_REJECTION = {
 const personalScope = createPrincipalDatabaseScope({
   userPublicId: 'user_public',
   organizationPublicId: 'org_personal',
-  source: 'token',
+  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 describe('SubscriptionService — personal-org billing guard', () => {

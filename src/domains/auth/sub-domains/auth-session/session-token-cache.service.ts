@@ -13,8 +13,8 @@ const SESSION_TOKEN_CACHE_PREFIX = 'session:tok';
  */
 const SESSION_TOKEN_REVOKED_TOMBSTONE = '__revoked__';
 
-function buildSessionTokenCacheKey(tokenHash: string): string {
-  return `${SESSION_TOKEN_CACHE_PREFIX}:${tokenHash}`;
+function buildSessionTokenCacheKey(sessionTokenHash: string): string {
+  return `${SESSION_TOKEN_CACHE_PREFIX}:${sessionTokenHash}`;
 }
 
 /**
@@ -35,9 +35,9 @@ function buildSessionTokenCacheKey(tokenHash: string): string {
  *   so step-up binding (sec-A2) can resolve which session a bearer belongs to without
  *   re-reading the row.
  */
-export async function getCachedSessionTokenValid(tokenHash: string): Promise<string | null> {
+export async function getCachedSessionTokenValid(sessionTokenHash: string): Promise<string | null> {
   try {
-    const cached = await redisConnection.get(buildSessionTokenCacheKey(tokenHash));
+    const cached = await redisConnection.get(buildSessionTokenCacheKey(sessionTokenHash));
     if (cached === null || cached.length === 0) return null;
     // A revocation tombstone reads as a MISS so the caller re-checks Postgres (which denies the
     // revoked session) instead of trusting a value that a racing populate might otherwise have set.
@@ -60,11 +60,11 @@ export async function getCachedSessionTokenValid(tokenHash: string): Promise<str
  *   caller derives the cache TTL as `min(SESSION_TOKEN_CACHE_TTL_SECONDS, expires_at - now)`.
  * - **Failure modes:** none — this is a plain data carrier with no behavior.
  * - **Side effects:** none.
- * - **Notes:** `tokenHash` is the hashed access token (never the raw bearer); pairing it with
+ * - **Notes:** `sessionTokenHash` is the hashed access token (never the raw bearer); pairing it with
  *   `sessionExpiresAt` is what prevents a cached "valid" sentinel from outliving the session.
  */
 export interface SetCachedSessionTokenValidInput {
-  tokenHash: string;
+  sessionTokenHash: string;
   sessionPublicId: string;
   sessionExpiresAt: Date;
 }
@@ -88,7 +88,7 @@ export interface SetCachedSessionTokenValidInput {
  *   {@link invalidateCachedSessionToken} to bound staleness to that TTL.
  */
 export async function setCachedSessionTokenValid({
-  tokenHash,
+  sessionTokenHash,
   sessionPublicId,
   sessionExpiresAt,
 }: SetCachedSessionTokenValidInput): Promise<void> {
@@ -102,7 +102,7 @@ export async function setCachedSessionTokenValid({
     // tombstone, this in-flight (pre-revoke) populate is a no-op, so a revoked bearer can't be
     // re-cached as valid (route-audit session-#1).
     await redisConnection.set(
-      buildSessionTokenCacheKey(tokenHash),
+      buildSessionTokenCacheKey(sessionTokenHash),
       sessionPublicId,
       'EX',
       ttlSeconds,
@@ -128,10 +128,10 @@ export async function setCachedSessionTokenValid({
  * - **Notes:** must be called on session revoke (single + bulk) and on every token-hash rotation so
  *   newly-rotated JWTs don't read a stale cache entry.
  */
-export async function invalidateCachedSessionToken(tokenHash: string): Promise<void> {
+export async function invalidateCachedSessionToken(sessionTokenHash: string): Promise<void> {
   try {
     await redisConnection.set(
-      buildSessionTokenCacheKey(tokenHash),
+      buildSessionTokenCacheKey(sessionTokenHash),
       SESSION_TOKEN_REVOKED_TOMBSTONE,
       'EX',
       SESSION_TOKEN_CACHE_TTL_SECONDS,

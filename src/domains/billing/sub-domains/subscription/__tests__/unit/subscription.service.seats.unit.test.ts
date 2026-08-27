@@ -61,7 +61,7 @@ function baseRow(overrides: Record<string, unknown> = {}) {
 const scope = createPrincipalDatabaseScope({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public',
-  source: 'token',
+  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 describe('SubscriptionService seat counters (REQ-4)', () => {

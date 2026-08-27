@@ -47,7 +47,7 @@ describe('createOrganizationSettingsController', () => {
       mockReply(),
     );
     expect(service.get).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationPublicId, source: 'token' }),
+      expect.objectContaining({ organizationPublicId, source: 'request' }),
     );
     expect(response).toMatchObject({ data: settingsRow });
   });
@@ -84,7 +84,7 @@ describe('createOrganizationSettingsController', () => {
       mockReply(),
     );
     expect(service.update).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationPublicId, userPublicId: userId, source: 'token' }),
+      expect.objectContaining({ organizationPublicId, userPublicId: userId, source: 'request' }),
       body,
       userId,
     );

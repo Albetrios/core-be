@@ -53,7 +53,7 @@ import {
 const asScope = (organizationPublicId: string) =>
   createPrincipalDatabaseScope({
     organizationPublicId,
-    source: 'token',
+    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MembershipService.create — grantable-permissions guard (sec-T1)', () => {

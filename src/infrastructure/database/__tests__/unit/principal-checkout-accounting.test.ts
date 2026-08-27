@@ -6,7 +6,7 @@ import {
 } from '@/infrastructure/database/contexts/database-context.js';
 
 const asOrgScope = (organizationPublicId: string) =>
-  createPrincipalDatabaseScope({ organizationPublicId, source: 'token' });
+  createPrincipalDatabaseScope({ organizationPublicId, source: 'request' });
 import {
   getActiveOrganizationRlsCheckoutCount,
   type OrganizationRlsCheckoutHoldSample,

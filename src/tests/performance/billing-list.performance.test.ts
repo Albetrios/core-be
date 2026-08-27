@@ -50,7 +50,7 @@ const LARGE_LIST_ROW_COUNT = 25;
 const budgetScope = createPrincipalDatabaseScope({
   userPublicId: 'user_public',
   organizationPublicId: 'org_budget',
-  source: 'token',
+  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 describe('Performance: billing list routes stay O(1) in cross-domain work', () => {

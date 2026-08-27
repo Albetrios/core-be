@@ -82,14 +82,14 @@ export async function completeFirstFactorAuth(options: {
     organizationPublicId,
   });
 
-  const tokenHash = createHash('sha256').update(jsonWebToken).digest('hex');
+  const sessionTokenHash = createHash('sha256').update(jsonWebToken).digest('hex');
   const sessionMaxAgeDays = env.AUTH_SESSION_MAX_AGE_DAYS;
   const expiresAt = new Date(Date.now() + sessionMaxAgeDays * MILLISECONDS_PER_DAY);
 
   const session = await options.authSessionService.createSessionForUser(
     options.user.public_id,
     omitUndefined({
-      token_hash: tokenHash,
+      token_hash: sessionTokenHash,
       ip_address: options.ipAddress,
       user_agent: options.userAgent,
       expires_at: expiresAt,

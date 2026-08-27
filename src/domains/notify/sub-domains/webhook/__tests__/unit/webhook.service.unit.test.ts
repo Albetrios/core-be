@@ -62,7 +62,7 @@ const organization = { id: 1, public_id: 'org_public' };
 const scope = createPrincipalDatabaseScope({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public',
-  source: 'token',
+  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 const webhook = {

@@ -47,7 +47,7 @@ const organization = { id: 1, public_id: 'org_public_abc', name: 'Test Org' };
 const scope = createPrincipalDatabaseScope({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public_abc',
-  source: 'token',
+  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 const settingsRow = {
   is_email_notifications_enabled: true,

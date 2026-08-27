@@ -94,8 +94,8 @@ export class AuthSessionService {
     await Promise.all(
       revokedSessions
         .map((session) => session.token_hash)
-        .filter((tokenHash): tokenHash is string => Boolean(tokenHash))
-        .map((tokenHash) => invalidateCachedSessionToken(tokenHash)),
+        .filter((sessionTokenHash): sessionTokenHash is string => Boolean(sessionTokenHash))
+        .map((sessionTokenHash) => invalidateCachedSessionToken(sessionTokenHash)),
     );
   }
 
@@ -178,11 +178,11 @@ export class AuthSessionService {
   }
 
   async revokeSessionByAccessToken(token: string): Promise<void> {
-    const tokenHash = hashAccessToken(token);
-    await invalidateCachedSessionToken(tokenHash);
+    const sessionTokenHash = hashAccessToken(token);
+    await invalidateCachedSessionToken(sessionTokenHash);
     const revoked = await withSessionDatabaseContext(
-      SESSION_SCOPE.session_token_hash(tokenHash),
-      (_databaseHandle) => this.sessionRepository.revokeByTokenHash(tokenHash),
+      SESSION_SCOPE.session_token_hash(sessionTokenHash),
+      (_databaseHandle) => this.sessionRepository.revokeByTokenHash(sessionTokenHash),
     );
     if (!revoked) {
       throw new UnauthorizedError('errors:invalidOrRevokedToken');
@@ -211,8 +211,8 @@ export class AuthSessionService {
     rawToken: string,
     userPublicId: string,
   ): Promise<{ sessionPublicId: string }> {
-    const tokenHash = hashAccessToken(rawToken);
-    const cachedSessionPublicId = await getCachedSessionTokenValid(tokenHash);
+    const sessionTokenHash = hashAccessToken(rawToken);
+    const cachedSessionPublicId = await getCachedSessionTokenValid(sessionTokenHash);
     if (cachedSessionPublicId !== null) {
       // Cache hit: session was valid ≤60 s ago; user status is implicitly valid at
       // that point. Suspension propagates on the next cache miss (≤60 s window).
@@ -224,8 +224,9 @@ export class AuthSessionService {
     // otherwise-authenticated request. Only connection-level errors are retried (see
     // runReadWithTransientRetry); an invalid/expired session still returns null on the first attempt.
     const session = await runReadWithTransientRetry(() =>
-      withSessionDatabaseContext(SESSION_SCOPE.session_token_hash(tokenHash), (_databaseHandle) =>
-        this.sessionRepository.findActiveByTokenHash(tokenHash),
+      withSessionDatabaseContext(
+        SESSION_SCOPE.session_token_hash(sessionTokenHash),
+        (_databaseHandle) => this.sessionRepository.findActiveByTokenHash(sessionTokenHash),
       ),
     );
 
@@ -244,7 +245,7 @@ export class AuthSessionService {
     }
 
     await setCachedSessionTokenValid({
-      tokenHash,
+      sessionTokenHash,
       sessionPublicId: session.public_id,
       sessionExpiresAt: session.expires_at,
     });
@@ -273,7 +274,7 @@ export class AuthSessionService {
     );
   }
 
-  async rotateSessionTokenHash(sessionPublicId: string, tokenHash: string): Promise<void> {
+  async rotateSessionTokenHash(sessionPublicId: string, sessionTokenHash: string): Promise<void> {
     await withSessionDatabaseContext(
       SESSION_SCOPE.session_public_id(sessionPublicId),
       async (_databaseHandle) => {
@@ -281,7 +282,7 @@ export class AuthSessionService {
         if (existing?.token_hash) {
           await invalidateCachedSessionToken(existing.token_hash);
         }
-        await this.sessionRepository.rotateTokenHash(sessionPublicId, tokenHash);
+        await this.sessionRepository.rotateTokenHash(sessionPublicId, sessionTokenHash);
       },
     );
   }

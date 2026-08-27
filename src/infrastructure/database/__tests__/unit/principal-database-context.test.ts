@@ -41,7 +41,7 @@ describe('withPrincipalDatabaseContext', () => {
     const scope = createPrincipalDatabaseScope({
       userPublicId: 'usr_a',
       organizationPublicId: 'org_x',
-      source: 'token',
+      source: 'request',
     });
 
     await withPrincipalDatabaseContext(scope, async () => undefined);
@@ -53,7 +53,10 @@ describe('withPrincipalDatabaseContext', () => {
   });
 
   it('sets only the organization GUC for an org-only (API-key) scope', async () => {
-    const scope = createPrincipalDatabaseScope({ organizationPublicId: 'org_x', source: 'token' });
+    const scope = createPrincipalDatabaseScope({
+      organizationPublicId: 'org_x',
+      source: 'request',
+    });
 
     await withPrincipalDatabaseContext(scope, async () => undefined);
 
@@ -63,7 +66,7 @@ describe('withPrincipalDatabaseContext', () => {
   });
 
   it('sets only the user GUC for a user-only scope', async () => {
-    const scope = createPrincipalDatabaseScope({ userPublicId: 'usr_a', source: 'token' });
+    const scope = createPrincipalDatabaseScope({ userPublicId: 'usr_a', source: 'request' });
 
     await withPrincipalDatabaseContext(scope, async () => undefined);
 
@@ -76,7 +79,7 @@ describe('withPrincipalDatabaseContext', () => {
     const scope = createPrincipalDatabaseScope({
       userPublicId: 'usr_a',
       organizationPublicId: 'org_x',
-      source: 'token',
+      source: 'request',
     });
 
     await withPrincipalDatabaseContext(scope, async (handle) => {
@@ -93,7 +96,10 @@ describe('withPrincipalDatabaseContext', () => {
 
   it('does not lift statement/lock timeouts outside worker runtime (HTTP caps stay)', async () => {
     delete process.env.CORE_BE_RUNTIME;
-    const scope = createPrincipalDatabaseScope({ organizationPublicId: 'org_x', source: 'token' });
+    const scope = createPrincipalDatabaseScope({
+      organizationPublicId: 'org_x',
+      source: 'request',
+    });
 
     await withPrincipalDatabaseContext(scope, async () => undefined);
 
@@ -116,7 +122,10 @@ describe('withPrincipalDatabaseContext', () => {
   });
 
   it('pins ALS so getRequestDatabase resolves to the same handle inside the callback', async () => {
-    const scope = createPrincipalDatabaseScope({ organizationPublicId: 'org_x', source: 'token' });
+    const scope = createPrincipalDatabaseScope({
+      organizationPublicId: 'org_x',
+      source: 'request',
+    });
 
     await withPrincipalDatabaseContext(scope, async (databaseHandle) => {
       expect(getRequestDatabase()).toBe(databaseHandle);
@@ -127,12 +136,12 @@ describe('withPrincipalDatabaseContext', () => {
     const scope = createPrincipalDatabaseScope({
       userPublicId: 'usr_a',
       organizationPublicId: 'org_x',
-      source: 'token',
+      source: 'request',
     });
 
     const outerScope = createPrincipalDatabaseScope({
       organizationPublicId: 'org_x',
-      source: 'token',
+      source: 'request',
     });
     await withPrincipalDatabaseContext(outerScope, async (outerHandle) => {
       mockExecute.mockClear();
@@ -154,7 +163,7 @@ describe('withPrincipalDatabaseContext', () => {
   it('user-only scopes reuse ANY pinned handle and layer only the user GUC (FK atomicity)', async () => {
     const orgScope = createPrincipalDatabaseScope({
       organizationPublicId: 'org_x',
-      source: 'token',
+      source: 'request',
     });
     const userOnly = createPrincipalDatabaseScope({
       userPublicId: 'usr_a',
@@ -178,11 +187,11 @@ describe('withPrincipalDatabaseContext', () => {
   it('an org-bearing scope for a DIFFERENT org opens its own transaction (second checkout)', async () => {
     const orgScope = createPrincipalDatabaseScope({
       organizationPublicId: 'org_x',
-      source: 'token',
+      source: 'request',
     });
     const otherOrg = createPrincipalDatabaseScope({
       organizationPublicId: 'org_y',
-      source: 'token',
+      source: 'request',
     });
 
     await withPrincipalDatabaseContext(orgScope, async () => {
@@ -196,7 +205,10 @@ describe('withPrincipalDatabaseContext', () => {
   });
 
   it('counts one organization checkout for a fresh org-bearing scope and releases it', async () => {
-    const scope = createPrincipalDatabaseScope({ organizationPublicId: 'org_x', source: 'token' });
+    const scope = createPrincipalDatabaseScope({
+      organizationPublicId: 'org_x',
+      source: 'request',
+    });
 
     await withPrincipalDatabaseContext(scope, async () => {
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
@@ -205,7 +217,10 @@ describe('withPrincipalDatabaseContext', () => {
   });
 
   it('propagates callback errors (transaction rollback path) and still releases the checkout', async () => {
-    const scope = createPrincipalDatabaseScope({ organizationPublicId: 'org_x', source: 'token' });
+    const scope = createPrincipalDatabaseScope({
+      organizationPublicId: 'org_x',
+      source: 'request',
+    });
 
     await expect(
       withPrincipalDatabaseContext(scope, async () => {
@@ -218,6 +233,6 @@ describe('withPrincipalDatabaseContext', () => {
 
 describe('createPrincipalDatabaseScope', () => {
   it('throws ConfigurationError for an empty scope', () => {
-    expect(() => createPrincipalDatabaseScope({ source: 'token' })).toThrow(ConfigurationError);
+    expect(() => createPrincipalDatabaseScope({ source: 'request' })).toThrow(ConfigurationError);
   });
 });
