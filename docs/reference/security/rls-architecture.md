@@ -19,8 +19,10 @@ those GUCs by entering a **database context**, and a context can only be entered
 **unforgeable scope** minted at a trust boundary. There are exactly **three scope
 patterns** — principal (who), session (pre-auth artifact), maintenance (bypass) — living
 in exactly **two files**, and the connection itself is an RLS-subject role
-(`core_be_app` in production; `core_be_maintenance` for bypass contexts once
-provisioned), so nothing short of a policy arm grants a row.
+(`core_be_app` for runtime traffic — in production AND local, which mirrors it;
+`core_be_maintenance` for bypass contexts), so nothing short of a policy arm grants a
+row. Elevated access exists only as the named fixture role `core_be_operator`
+(local/CI) and the bootstrap superuser (fresh-clone first migrate only).
 
 ---
 

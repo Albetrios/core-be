@@ -2100,10 +2100,10 @@ src/
     │   │   │   ├── connection.options.unit.test.ts
     │   │   │   ├── context-directory-standard.policy.unit.test.ts
     │   │   │   ├── maintenance-context-confinement.policy.unit.test.ts
+    │   │   │   ├── maintenance-database-context.unit.test.ts
     │   │   │   ├── maintenance-role.db.unit.test.ts
     │   │   │   ├── migration-execution-mode.unit.test.ts
     │   │   │   ├── principal-scope-minting.policy.unit.test.ts
-    │   │   │   ├── retention-database.context.unit.test.ts
     │   │   │   ├── rls-offboarding-regressions.db.unit.test.ts
     │   │   │   ├── rls-table-scope-map.db.unit.test.ts
     │   │   │   ├── role-taxonomy.db.unit.test.ts
