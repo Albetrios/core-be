@@ -54,6 +54,23 @@ tests. Holding a scope IS the authority.
 
 ---
 
+### 2.3 Name evolution (GUCs and roles)
+
+| Old | New | Why |
+| --- | --- | --- |
+| `app.current_organization_id` | `app.current_organization_public_id` | the GUC carries a PUBLIC id (`org_…`), never the internal bigserial — the name now says so (migration `20260827060000`, all 30 policies ALTERed) |
+| `app.current_user_id` | `app.current_user_public_id` | same reasoning (`usr_…`) |
+| `app.current_session_refresh_token_hash` | *(removed)* | dead policy arm no code ever set — dropped by the InitPlan-hygiene migration |
+| local superuser runtime (`core`) | `core_be_app` login | local↔live parity: `pnpm dev` now connects RLS-subject exactly like production |
+| implicit superuser fixtures | `core_be_operator` (BYPASSRLS, local/CI only) | fixture power is a named, auditable role instead of a superuser side effect |
+| "provider superuser" mental model | `core_be_owner` NOLOGIN group + `core_be_migrator` | ownership and DDL authority are named roles; managed Postgres has no true superusers anyway |
+
+**Naming symmetry (end-to-end, no translation anywhere):** scope field
+`organizationPublicId` → GUC `app.current_organization_public_id` → policy compares
+`public_id`. The same string flows token/payload → minter (adds provenance only) →
+`set_config` → policy arm; internal ids never enter scopes or GUCs (policies translate
+public→internal inside the arm where an FK column needs it).
+
 ## 3. Layers — text diagram
 
 ```text
@@ -192,6 +209,21 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 
 ---
 
+## 5.5 Quick reference — scopes, contexts, minters, kinds
+
+| Pattern | Scope type | Minted by (per-file confined) | Context call |
+| --- | --- | --- | --- |
+| Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `resolvePrincipalDatabaseScope(request)` · `resolveOrganizationJobScope(orgId)` · `resolveVerifiedOrganizationPrincipalScope(orgId)` | `withPrincipalDatabaseContext` |
+| Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `requireUserPrincipalDatabaseScope(request)` · `resolveUserJobScope(userId)` · `resolveVerifiedUserPrincipalScope(userId)` | `withPrincipalDatabaseContext` |
+| Session | `SessionDatabaseScope` — kinds `public_id` \| `token_hash` | `createSessionDatabaseScope(kind, value)` (auth domain only; token values are pre-hashed) | `withSessionDatabaseContext` |
+| Maintenance | `MaintenanceDatabaseScope` — 7 frozen singletons: `global_retention_cleanup`, `session_retention_cleanup`, `global_admin`, `system_audit_insert`, `audit_outbox_drain`, `system_table_retention`, `system_table_worker` | nothing to mint — `MAINTENANCE_SCOPE.<kind>` | `withMaintenanceDatabaseContext` |
+| (any) | `DatabaseScope` union | — | `withDatabaseContext(scope, cb)` — the one common dispatcher |
+
+Provenance (`scope.source`): `token` = authenticated HTTP request · `job` = validated
+BullMQ payload · `provisioning` = the caller itself verified the id (invite flow,
+Stripe event mapping, admin, signup provisioning) — ledgered per importer by
+`verified-scope-usage.policy.unit.test.ts`.
+
 ## 6. Postgres semantics that shaped the design (learned the hard way)
 
 1. **An UPDATE's NEW row must stay SELECT-visible** whenever the statement reads the
@@ -245,3 +277,25 @@ End-state (operator-gated): after every hosted environment provisions the mainte
 URL, a migration adds `current_user = 'core_be_maintenance'` to the bypass arms — bypass
 authority then requires the dedicated **connection**, not just a GUC, so a compromised
 `core_be_app` session cannot use any bypass at all.
+
+---
+
+## 8. Bug ledger — what RLS-subject execution caught before first deployment
+
+All eight were pre-existing, invisible on a superuser connection, and each is pinned by
+an as-`core_be_app` (or maintenance-role) regression:
+
+| # | Bug (production impact) | Fix |
+| - | ----------------------- | --- |
+| 1 | `audit.outbox` staging silently dropped — `INSERT … RETURNING` requires SELECT-policy visibility and outbox SELECT is drain-only | plain INSERT + affected-count guard |
+| 2 | Outbox claim escalated past its LIMIT — nested-loop rescans of the `FOR UPDATE SKIP LOCKED` FROM-subquery | `WITH claimable AS MATERIALIZED` |
+| 3 | Upload pending-sweep confirm/fail UPDATEs rejected — retention bypass was USING-only on `uploads_tenant_isolation` | retention arm added to WITH CHECK |
+| 4 | `DELETE /users/me` failed at the final step (half-offboarded accounts) — tombstoned NEW row loses self-arm SELECT visibility | final softDelete under `MAINTENANCE_SCOPE.global_admin` |
+| 5 | `DELETE /tenancy/organization` always 500'd after Stripe cancellation — same NEW-row rule vs the sec-new-D3 gate (which is kept) | tombstone under retention scope + retention arm in org WITH CHECK |
+| 6 | Audit drain permanently discarded org / API-key-actor rows — `global_admin` grants nothing on `tenancy.*` | `SECURITY DEFINER` resolvers `audit.resolve_*_ids_for_public_ids` |
+| 7 | User tombstone purge + offboarding reconciler were silent no-ops — users policy had no retention arm | USING-only retention arm on `users_self_or_admin_access` |
+| 8 | Manual DLQ replay always failed its actor pre-condition — lookup ran with no RLS context | wrapped in `MAINTENANCE_SCOPE.global_admin` |
+
+The recurring root causes worth remembering: superuser masking (local + fixtures),
+`RETURNING`/NEW-row SELECT-visibility, and bypass arms present in USING but missing in
+WITH CHECK.
