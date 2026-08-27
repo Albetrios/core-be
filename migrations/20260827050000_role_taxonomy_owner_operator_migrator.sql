@@ -65,12 +65,19 @@ GRANT core_be_maintenance TO core_be_operator;
 -- non-owners, which the previous superuser harness never noticed.
 GRANT USAGE, CREATE ON SCHEMA public TO core_be_operator;
 --> statement-breakpoint
--- Harness reads the migration ledger (migrations-forward integration test); the table
--- is created by migrate.ts before any migration runs, but guard for exotic replays.
+-- Migration-ledger access: the harness READS it (migrations-forward test, operator)
+-- and the dedicated migrator WRITES it (recording applied files once
+-- DATABASE_MIGRATION_URL points at core_be_migrator — the bootstrap superuser is then
+-- needed only for a fresh clone's very first migrate). Created by migrate.ts before
+-- any migration runs; guarded for exotic replays.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'schema_migrations') THEN
     GRANT SELECT ON TABLE public.schema_migrations TO core_be_operator;
+    GRANT SELECT, INSERT ON TABLE public.schema_migrations TO core_be_migrator;
+    -- migrate.ts opens with CREATE TABLE IF NOT EXISTS on the ledger — schema CREATE
+    -- is checked even when the table already exists.
+    GRANT USAGE, CREATE ON SCHEMA public TO core_be_migrator;
   END IF;
 END $$;
 --> statement-breakpoint

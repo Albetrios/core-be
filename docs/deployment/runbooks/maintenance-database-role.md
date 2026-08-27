@@ -65,9 +65,10 @@ ALTER ROLE core_be_migrator LOGIN CREATEROLE PASSWORD '<generated>';
 Then the gitignored local env file carries `DATABASE_URL` as `core_be_app` (runtime
 parity), `DATABASE_OPERATOR_URL` as `core_be_operator` (harness + full/bulk seeds pick
 it up automatically), and `DATABASE_MAINTENANCE_URL` as `core_be_maintenance`.
-`DATABASE_MIGRATION_URL` may stay on the compose superuser for bootstrap (fresh clones
-must run migrations before the roles exist). `DATABASE_OPERATOR_URL` is NEVER set in
-hosted environments.
+`DATABASE_MIGRATION_URL` points at `core_be_migrator` for day-to-day migrations; the
+compose superuser is needed ONLY for a fresh clone's very first `pnpm db:migrate`
+(before the roles exist) and is otherwise used by nothing. `DATABASE_OPERATOR_URL` is
+NEVER set in hosted environments.
 
 ## Related
 

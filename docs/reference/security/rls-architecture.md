@@ -257,7 +257,7 @@ LOGIN when provisioned and act as connection users.
 | Role | Connects via | RLS posture | Purpose |
 | ---- | ------------ | ----------- | ------- |
 | `core_be_owner` | never (NOLOGIN group) | subject (FORCE binds owners) | owns every app schema/table/sequence — DDL + TRUNCATE authority lives here; migrator/operator act through membership |
-| `core_be_migrator` | `DATABASE_MIGRATION_URL` (dedicated; local bootstrap may keep the compose `core` superuser — fresh clones must migrate before the roles exist) | subject | migrations/DDL (owner-member, `CREATEROLE`) |
+| `core_be_migrator` | `DATABASE_MIGRATION_URL` (local + the hosted slot; the bootstrap superuser is needed ONLY for a fresh clone's first migrate, before the roles exist) | subject | migrations/DDL (owner-member, `CREATEROLE`, ledger read/write) |
 | `core_be_app` | `DATABASE_URL` | **subject** | ALL runtime traffic — local `pnpm dev` now connects as it too (production parity; boot logs `rls_safety.ok` locally) |
 | `core_be_maintenance` | `DATABASE_MAINTENANCE_URL` | **subject** | maintenance (bypass) contexts — authority comes only from the GUC arms, never the connection |
 | `core_be_operator` | `DATABASE_OPERATOR_URL` (**local/CI only — never hosted**) | **BYPASSRLS** | test-harness fixtures, full/bulk seeds, ops scratch; owner-member + member of app/maintenance so suites can `SET LOCAL ROLE core_be_app` to exercise real policies |
