@@ -40,6 +40,19 @@ When you add a **new table in a tenant-owned schema** (`tenancy`, `billing`, `no
 
 For **worker / processor** code touching tenant data:
 
+- [ ] **NEW-row visibility:** an UPDATE's NEW row must still pass the SELECT arms of the
+      writing context (Postgres enforces this whenever the statement reads the table — a
+      column WHERE is enough). A soft-delete under a scope whose SELECT arm gates on
+      `deleted_at IS NULL` gets 42501 — run tombstoning under a bypass arm that covers
+      the NEW row (see user/org softDelete).
+- [ ] **RETURNING visibility:** `INSERT/UPDATE/DELETE … RETURNING` requires the returned
+      row to pass SELECT arms. On tables with write-only arms (audit.outbox), drop
+      RETURNING and guard on the affected-row count instead.
+- [ ] **Locking subqueries:** any `FOR UPDATE SKIP LOCKED` claim query must live in a
+      `WITH … AS MATERIALIZED` CTE — a FROM-subquery can be rescanned per target row
+      under RLS-subject plans, locking `limit` MORE rows each rescan.
+- [ ] Verify against an RLS-subject role (`SET LOCAL ROLE core_be_app`, or the
+      maintenance pool) — the superuser pool masks ALL of the above.
 - [ ] Never call `getRequestDatabase()` (returns the GUC-less pool; throws in worker runtime). Importing DB-handle types / `setLocalDatabaseConfig` from `database-context-runtime` is fine — bind the handle via a context wrapper or a `run*WorkerJob` runner.
 - [ ] Tenant-scoped jobs carry `organizationPublicId` in the payload (typed `TenantScopedJobData`); user-scoped jobs carry `userPublicId`.
 - [ ] Worker repositories accept an explicit `databaseHandle` (`createWorker*Repository(databaseHandle)`) — the nominal brand prevents passing the pool at compile time.

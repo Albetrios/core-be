@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mockDatabaseContexts } from '@/tests/helpers/database-context-mock.helper.js';
 
 const invalidateOrganizationPermissionsMock = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', () => ({
@@ -17,20 +18,9 @@ vi.mock('@/domains/tenancy/sub-domains/organization/organization-provisioning.js
   OWNER_ROLE_NAME: 'Owner',
 }));
 
-vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
-      callback(),
-    ),
-    // The tombstoning softDelete now runs under the retention maintenance context —
-    // passthrough so the suite stays Postgres-free (CI's unit lane has no database).
-    withMaintenanceDatabaseContext: vi.fn(
-      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-    ),
-  };
-});
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) =>
+  mockDatabaseContexts(await importOriginal<Record<string, unknown>>()),
+);
 
 import {
   ConflictError,

@@ -185,7 +185,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/rls-tenant-isolation-guard/SKILL.md",
-      "computedHash": "579c114784d1f74052199f777ad17324ab6d29cd5d3dc8474763dc23b28cd18c"
+      "computedHash": "3d3fa1ab598dca589447e4070f06d736d9e8b7fad2ac57614f2a6ec27727e74b"
     },
     "route-catalog": {
       "source": "local",

@@ -78,6 +78,22 @@ describe('Policy: permission-cache invalidation runs post-commit (audit R11)', (
     expect(files.length).toBeGreaterThan(3);
   });
 
+  it('is not vacuous — the scanned services actually contain wrapper spans', () => {
+    // This lock silently disarmed once when the wrapper was renamed (the marker matched
+    // zero call sites and every case passed with nothing to check). Guard the guard: if
+    // no scanned file contains the marker, the marker is stale — fail loudly.
+    const totalSpans = files
+      .map(
+        (file) =>
+          organizationContextCallSpans(stripCommentsAndStrings(readFileSync(file, 'utf8'))).length,
+      )
+      .reduce((sum, count) => sum + count, 0);
+    expect(
+      totalSpans,
+      'zero wrapper spans found — update the marker to the current wrapper name',
+    ).toBeGreaterThan(0);
+  });
+
   for (const file of files) {
     const relativePath = relative(PROJECT_ROOT, file);
     it(`no permission-cache invalidation inside a withPrincipalDatabaseContext callback — ${relativePath}`, () => {
