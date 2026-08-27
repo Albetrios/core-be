@@ -11,6 +11,19 @@ vi.mock('@/shared/utils/security/password.util.js', () => ({
   verifyPassword: vi.fn().mockResolvedValue({ valid: true, needsRehash: false }),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 import { ForbiddenError, UnauthorizedError } from '@/shared/errors/index.js';
 import { AuthMethodService } from '@/domains/auth/sub-domains/auth-method/auth-method.service.js';
 import { verifyPassword } from '@/shared/utils/security/password.util.js';

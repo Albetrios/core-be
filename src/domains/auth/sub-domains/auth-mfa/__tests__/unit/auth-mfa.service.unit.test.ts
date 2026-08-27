@@ -64,6 +64,19 @@ vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 const user = {
   id: 1,
   public_id: 'user_public',
@@ -608,13 +621,13 @@ describe('MfaService', () => {
     // Regression: the previous code called updateMfaEnabled AFTER withUserDatabaseContext
     // returned, leaving a TOCTOU gap where a concurrent enroll could flip is_mfa_enabled
     // back to true between the revoke commit and the flag update.
-    const { withUserDatabaseContext } = await import(
-      '@/infrastructure/database/contexts/user-database.context.js'
+    const { withPrincipalDatabaseContext } = await import(
+      '@/infrastructure/database/contexts/principal-database.context.js'
     );
 
     const callOrder: string[] = [];
-    vi.mocked(withUserDatabaseContext).mockImplementationOnce(
-      async (_userPublicId: string, callback: Parameters<typeof withUserDatabaseContext>[1]) => {
+    vi.mocked(withPrincipalDatabaseContext).mockImplementationOnce(
+      async (_scope: unknown, callback: Parameters<typeof withPrincipalDatabaseContext>[1]) => {
         callOrder.push('txn_start');
         await callback(null as never);
         callOrder.push('txn_end');

@@ -12,6 +12,19 @@ vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 // Stable 21-char test public ids used across all scenarios in this suite.
 const METHOD_PUB_A = 'testmethodpuba123456'; // being deleted
 

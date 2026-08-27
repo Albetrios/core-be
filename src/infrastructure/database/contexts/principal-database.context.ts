@@ -163,6 +163,28 @@ export async function withPrincipalDatabaseContext<T>(
     });
   }
 
+  // USER-ONLY scopes reuse ANY pinned handle (carried over from the legacy user
+  // context): under FORCE RLS, auth.users / auth.auth_methods / auth.sessions FK
+  // and RLS-subquery a user row that may be UNCOMMITTED in the surrounding
+  // transaction (OAuth find-or-create), so a second pooled connection could
+  // neither see it nor preserve atomicity. Only the user GUC is layered — the
+  // pinned session's org GUC (if any) is left untouched, so an outer org scope
+  // is never overwritten.
+  if (
+    activeSession !== undefined &&
+    organizationPublicId === undefined &&
+    userPublicId !== undefined
+  ) {
+    return runWithWorkerDatabaseContext(workerContext, async () => {
+      await setLocalDatabaseConfig(
+        activeSession.databaseHandle,
+        'app.current_user_id',
+        userPublicId,
+      );
+      return callback(brandWorkerContextDatabaseHandle(activeSession.databaseHandle));
+    });
+  }
+
   const countsAsOrganizationCheckout = organizationPublicId !== undefined;
   if (countsAsOrganizationCheckout) {
     incrementOrganizationRlsCheckoutCount();

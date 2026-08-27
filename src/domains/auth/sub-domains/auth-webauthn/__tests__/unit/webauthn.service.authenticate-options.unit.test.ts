@@ -23,6 +23,19 @@ vi.mock('@simplewebauthn/server', () => ({
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 describe('WebauthnService.generateAuthenticationOptions', () => {
   const userService = {
     findByEmail: vi.fn(),

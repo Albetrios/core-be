@@ -1,7 +1,8 @@
 import type { UserDataExportService } from '@/domains/user/sub-domains/user-data-export/user-data-export.service.js';
 import type { UserDataExportJobData } from '@/domains/user/sub-domains/user-data-export/queues/user-data-export.job.schema.js';
 import { UserDataExportCancelledError } from '@/domains/user/sub-domains/user-data-export/user-data-export.types.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveUserJobScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import { gzipBufferAsync } from '@/shared/utils/infrastructure/gzip.util.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 
@@ -28,39 +29,42 @@ export async function runUserDataExportJob(
   const { exportPublicId, userPublicId, userInternalId } = jobData;
 
   try {
-    const shouldContinue = await withUserDatabaseContext(userPublicId, async (databaseHandle) => {
-      const cancelledBeforeStart = await userDataExportService.isExportJobCancelled({
-        exportPublicId,
-        userInternalId,
-        userPublicId,
-        databaseHandle,
-      });
-      if (cancelledBeforeStart) {
-        logger.info({ exportPublicId, userPublicId }, 'user-data-export.worker.cancelled');
-        return false;
-      }
-
-      await userDataExportService.markProcessing(
-        exportPublicId,
-        userInternalId,
-        databaseHandle,
-        userPublicId,
-      );
-
-      if (
-        await userDataExportService.isExportJobCancelled({
+    const shouldContinue = await withPrincipalDatabaseContext(
+      resolveUserJobScope(userPublicId),
+      async (databaseHandle) => {
+        const cancelledBeforeStart = await userDataExportService.isExportJobCancelled({
           exportPublicId,
           userInternalId,
           userPublicId,
           databaseHandle,
-        })
-      ) {
-        logger.info({ exportPublicId, userPublicId }, 'user-data-export.worker.cancelled');
-        return false;
-      }
+        });
+        if (cancelledBeforeStart) {
+          logger.info({ exportPublicId, userPublicId }, 'user-data-export.worker.cancelled');
+          return false;
+        }
 
-      return true;
-    });
+        await userDataExportService.markProcessing(
+          exportPublicId,
+          userInternalId,
+          databaseHandle,
+          userPublicId,
+        );
+
+        if (
+          await userDataExportService.isExportJobCancelled({
+            exportPublicId,
+            userInternalId,
+            userPublicId,
+            databaseHandle,
+          })
+        ) {
+          logger.info({ exportPublicId, userPublicId }, 'user-data-export.worker.cancelled');
+          return false;
+        }
+
+        return true;
+      },
+    );
 
     if (!shouldContinue) {
       return;
@@ -84,7 +88,7 @@ export async function runUserDataExportJob(
       return;
     }
     logger.error({ error, exportPublicId, userPublicId }, 'user-data-export.worker.failed');
-    await withUserDatabaseContext(userPublicId, (databaseHandle) =>
+    await withPrincipalDatabaseContext(resolveUserJobScope(userPublicId), (databaseHandle) =>
       userDataExportService.failExportJob(
         exportPublicId,
         userInternalId,

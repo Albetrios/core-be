@@ -148,6 +148,50 @@ describe('withPrincipalDatabaseContext', () => {
     });
   });
 
+  it('user-only scopes reuse ANY pinned handle and layer only the user GUC (FK atomicity)', async () => {
+    const orgScope = createPrincipalDatabaseScope({
+      organizationPublicId: 'org_x',
+      source: 'token',
+    });
+    const userOnly = createPrincipalDatabaseScope({
+      userPublicId: 'usr_a',
+      source: 'provisioning',
+    });
+
+    await withPrincipalDatabaseContext(orgScope, async (outerHandle) => {
+      mockExecute.mockClear();
+      await withPrincipalDatabaseContext(userOnly, async (innerHandle) => {
+        // Same transaction handle — no second pool checkout, atomic with the outer trx.
+        expect(innerHandle).toBe(outerHandle);
+      });
+      const sqlTexts = executedSqlTexts();
+      expect(sqlTexts).toHaveLength(1);
+      expect(sqlTexts[0]).toContain('app.current_user_id');
+      // The pinned session's org GUC is never rewritten by a user-only scope.
+      expect(sqlTexts[0]).not.toContain('app.current_organization_id');
+    });
+  });
+
+  it('an org-bearing scope for a DIFFERENT org opens its own transaction (second checkout)', async () => {
+    const orgScope = createPrincipalDatabaseScope({
+      organizationPublicId: 'org_x',
+      source: 'token',
+    });
+    const otherOrg = createPrincipalDatabaseScope({
+      organizationPublicId: 'org_y',
+      source: 'token',
+    });
+
+    await withPrincipalDatabaseContext(orgScope, async () => {
+      expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
+      await withPrincipalDatabaseContext(otherOrg, async () => {
+        // Cross-org nesting must NOT reuse — a fresh transaction takes a second checkout.
+        expect(getActiveOrganizationRlsCheckoutCount()).toBe(2);
+      });
+      expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
+    });
+  });
+
   it('counts one organization checkout for a fresh org-bearing scope and releases it', async () => {
     const scope = createPrincipalDatabaseScope({ organizationPublicId: 'org_x', source: 'token' });
 

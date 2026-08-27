@@ -11,6 +11,19 @@ vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
   ),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 const user = { id: 7, public_id: 'usr_abcdefghijklmnopqrstu' };
 
 function buildCredential(publicId: string, id: number) {

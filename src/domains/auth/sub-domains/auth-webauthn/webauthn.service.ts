@@ -25,7 +25,6 @@ import {
   assertEmailVerifiedForCredentialEnrollment,
   assertUserAccountActive,
 } from '@/shared/utils/auth/account-status.util.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { AuthSessionService } from '@/domains/auth/sub-domains/auth-session/auth-session.service.js';
 import type { AuthMethodService } from '@/domains/auth/sub-domains/auth-method/auth-method.service.js';
@@ -48,6 +47,8 @@ import {
   validateWebauthnAuthenticateVerify,
   validateWebauthnRegisterVerify,
 } from './webauthn.validator.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveVerifiedUserPrincipalScope } from '@/domains/auth/shared/verified-user-principal-scope.util.js';
 
 /**
  * Result envelope returned by {@link WebauthnService.generateRegistrationOptions}.
@@ -127,8 +128,9 @@ export class WebauthnService {
     // pre-hijacking, Trojan-credential variant).
     assertEmailVerifiedForCredentialEnrollment(user);
 
-    const existingCredentials = await withUserDatabaseContext(user.public_id, () =>
-      this.credentialRepository.listActiveByUserId(user.id),
+    const existingCredentials = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(user.public_id),
+      () => this.credentialRepository.listActiveByUserId(user.id),
     );
     const relyingPartyId = resolveWebauthnRelyingPartyId();
     const options = await generateRegistrationOptions({
@@ -200,27 +202,30 @@ export class WebauthnService {
     const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
     let created: Awaited<ReturnType<WebauthnCredentialRepository['createCredential']>>;
     try {
-      created = await withUserDatabaseContext(user.public_id, async () => {
-        // Serialize the count + insert under a per-user advisory lock so concurrent registrations
-        // cannot both pass the cap check and overshoot MAX_WEBAUTHN_CREDENTIALS_PER_USER. The xact
-        // lock auto-releases at commit.
-        await this.credentialRepository.acquireCreationQuotaLock(user.id);
-        const activeCount = await this.credentialRepository.countActiveByUserId(user.id);
-        if (activeCount >= MAX_WEBAUTHN_CREDENTIALS_PER_USER) {
-          throw new ConflictError('errors:webauthnCredentialMaxReached', {
-            max: MAX_WEBAUTHN_CREDENTIALS_PER_USER,
+      created = await withPrincipalDatabaseContext(
+        resolveVerifiedUserPrincipalScope(user.public_id),
+        async () => {
+          // Serialize the count + insert under a per-user advisory lock so concurrent registrations
+          // cannot both pass the cap check and overshoot MAX_WEBAUTHN_CREDENTIALS_PER_USER. The xact
+          // lock auto-releases at commit.
+          await this.credentialRepository.acquireCreationQuotaLock(user.id);
+          const activeCount = await this.credentialRepository.countActiveByUserId(user.id);
+          if (activeCount >= MAX_WEBAUTHN_CREDENTIALS_PER_USER) {
+            throw new ConflictError('errors:webauthnCredentialMaxReached', {
+              max: MAX_WEBAUTHN_CREDENTIALS_PER_USER,
+            });
+          }
+          return this.credentialRepository.createCredential({
+            user_id: user.id,
+            credential_id: credential.id,
+            public_key: Buffer.from(credential.publicKey).toString('base64url'),
+            counter: credential.counter,
+            device_type: credentialDeviceType,
+            backed_up: credentialBackedUp,
+            transports: credential.transports ?? [],
           });
-        }
-        return this.credentialRepository.createCredential({
-          user_id: user.id,
-          credential_id: credential.id,
-          public_key: Buffer.from(credential.publicKey).toString('base64url'),
-          counter: credential.counter,
-          device_type: credentialDeviceType,
-          backed_up: credentialBackedUp,
-          transports: credential.transports ?? [],
-        });
-      });
+        },
+      );
     } catch (error) {
       // This passkey is already enrolled (webauthn_credentials_credential_id_unique).
       // excludeCredentials is only a client-side hint, so a replayed/forced registration
@@ -250,8 +255,9 @@ export class WebauthnService {
     // RLS policy + `user_id = 0` filter return zero rows), so the DB work matches.
     const lookupUserPublicId = user?.public_id ?? `decoy:${generatePublicId('authMethod')}`;
     const lookupUserId = user?.id ?? 0;
-    const credentials = await withUserDatabaseContext(lookupUserPublicId, () =>
-      this.credentialRepository.listActiveByUserId(lookupUserId),
+    const credentials = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(lookupUserPublicId),
+      () => this.credentialRepository.listActiveByUserId(lookupUserId),
     );
 
     // Anti-enumeration: never let the response reveal whether `email` maps to an account
@@ -355,8 +361,9 @@ export class WebauthnService {
     }
     // The challenge binds this assertion to a user; auth.webauthn_credentials is FORCE RLS keyed on
     // app.current_user_id, so look the credential up inside that user's context.
-    const storedCredential = await withUserDatabaseContext(challenge.user_public_id, () =>
-      this.credentialRepository.findActiveByCredentialId(response.id),
+    const storedCredential = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(challenge.user_public_id),
+      () => this.credentialRepository.findActiveByCredentialId(response.id),
     );
     if (storedCredential?.user_id === undefined) {
       throw new UnauthorizedError('errors:webauthnCredentialNotFound');
@@ -389,7 +396,7 @@ export class WebauthnService {
     }
 
     const { newCounter } = verification.authenticationInfo;
-    await withUserDatabaseContext(user.public_id, () =>
+    await withPrincipalDatabaseContext(resolveVerifiedUserPrincipalScope(user.public_id), () =>
       this.credentialRepository.updateCounter(storedCredential.credential_id, newCounter),
     );
 
@@ -428,8 +435,9 @@ export class WebauthnService {
     if (!user) {
       throw new UnauthorizedError('errors:userNotFound');
     }
-    const rows = await withUserDatabaseContext(user.public_id, () =>
-      this.credentialRepository.listActiveByUserId(user.id),
+    const rows = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(user.public_id),
+      () => this.credentialRepository.listActiveByUserId(user.id),
     );
     return serializeWebauthnCredentialList(rows);
   }
@@ -458,24 +466,27 @@ export class WebauthnService {
     if (!user) {
       throw new UnauthorizedError('errors:userNotFound');
     }
-    await withUserDatabaseContext(user.public_id, async () => {
-      // Serialize concurrent credential mutations for this user so the "is this the last
-      // login credential?" check + revoke cannot interleave with a sibling passkey/MFA delete.
-      await this.authMethodService.acquireCredentialMutationLock(user.id);
-      const active = await this.credentialRepository.listActiveByUserId(user.id);
-      const target = active.find((credential) => credential.public_id === credentialPublicId);
-      if (!target) {
-        throw new NotFoundError('Passkey');
-      }
-      if (active.length <= 1) {
-        const hasOtherLoginMethod = await this.authMethodService.hasLoginCapableMethod(
-          user.public_id,
-        );
-        if (!hasOtherLoginMethod) {
-          throw new ConflictError('errors:webauthnCannotRevokeLastCredential');
+    await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(user.public_id),
+      async () => {
+        // Serialize concurrent credential mutations for this user so the "is this the last
+        // login credential?" check + revoke cannot interleave with a sibling passkey/MFA delete.
+        await this.authMethodService.acquireCredentialMutationLock(user.id);
+        const active = await this.credentialRepository.listActiveByUserId(user.id);
+        const target = active.find((credential) => credential.public_id === credentialPublicId);
+        if (!target) {
+          throw new NotFoundError('Passkey');
         }
-      }
-      await this.credentialRepository.revokeByUserId(user.id, target.id);
-    });
+        if (active.length <= 1) {
+          const hasOtherLoginMethod = await this.authMethodService.hasLoginCapableMethod(
+            user.public_id,
+          );
+          if (!hasOtherLoginMethod) {
+            throw new ConflictError('errors:webauthnCannotRevokeLastCredential');
+          }
+        }
+        await this.credentialRepository.revokeByUserId(user.id, target.id);
+      },
+    );
   }
 }

@@ -27,7 +27,6 @@ import type { AuthSessionService } from './sub-domains/auth-session/auth-session
 import type { MfaService } from './sub-domains/auth-mfa/auth-mfa.service.js';
 import type { AuthMethodService } from './sub-domains/auth-method/auth-method.service.js';
 import { validateLogin } from './auth.validator.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { completeFirstFactorAuth } from './shared/complete-first-factor-auth.js';
 import {
   resolveDefaultActiveOrganizationPublicId,
@@ -36,6 +35,8 @@ import {
   ensurePersonalOrganization,
 } from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
 import type { UserAuthRecord } from '@/domains/user/user.types.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveVerifiedUserPrincipalScope } from '@/domains/auth/shared/verified-user-principal-scope.util.js';
 
 const IP_FAILED_LOGIN_KEY_PREFIX = 'auth:failed_login:ip:';
 
@@ -381,16 +382,19 @@ export class AuthService {
     // `app.current_session_public_id`, a different guc, so it must own its transaction — and
     // nesting it here would hold this checkout open across it, making the request peak at two
     // concurrent connections instead of taking them one after another.
-    const { user, resolved } = await withUserDatabaseContext(userPublicId, async () => {
-      const record = await this.userService.requireUserRecordByPublicId(userPublicId);
-      if (record.status !== 'ACTIVE') throw new UnauthorizedError('errors:accountNotActive');
-      const organization = await findUserActiveOrganizationByPublicId(
-        record.id,
-        organizationPublicId,
-      );
-      if (!organization) throw new ForbiddenError('errors:insufficientOrganizationPermissions');
-      return { user: record, resolved: organization };
-    });
+    const { user, resolved } = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      async () => {
+        const record = await this.userService.requireUserRecordByPublicId(userPublicId);
+        if (record.status !== 'ACTIVE') throw new UnauthorizedError('errors:accountNotActive');
+        const organization = await findUserActiveOrganizationByPublicId(
+          record.id,
+          organizationPublicId,
+        );
+        if (!organization) throw new ForbiddenError('errors:insufficientOrganizationPermissions');
+        return { user: record, resolved: organization };
+      },
+    );
     return this.mintForActiveOrganization(user, sessionPublicId, resolved);
   }
 

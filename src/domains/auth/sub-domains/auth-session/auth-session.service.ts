@@ -4,7 +4,6 @@ import { MAX_ACTIVE_SESSIONS_PER_USER } from '@/shared/constants/security.consta
 import { captureMessage } from '@/infrastructure/observability/sentry/sentry.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import { generateRefreshSecret } from '@/domains/auth/auth.http.util.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import {
   createSessionDatabaseScope,
   withSessionDatabaseContext,
@@ -17,6 +16,8 @@ import {
   setCachedSessionTokenValid,
 } from './session-token-cache.service.js';
 import { runReadWithTransientRetry } from '@/shared/utils/infrastructure/postgres-error.util.js';
+import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/principal-database.context.js';
+import { resolveVerifiedUserPrincipalScope } from '@/domains/auth/shared/verified-user-principal-scope.util.js';
 
 function hashAccessToken(rawToken: string): string {
   return createHash('sha256').update(rawToken).digest('hex');
@@ -56,8 +57,9 @@ export class AuthSessionService {
   async list(userPublicId: string) {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    return withUserDatabaseContext(userPublicId, (_databaseHandle) =>
-      this.sessionRepository.listByUserId(user.id),
+    return withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      (_databaseHandle) => this.sessionRepository.listByUserId(user.id),
     );
   }
 
@@ -67,16 +69,18 @@ export class AuthSessionService {
    */
   async listForUserDataExport(options: { userPublicId: string; limit: number }) {
     const user = await this.userService.requireUserRecordByPublicId(options.userPublicId);
-    return withUserDatabaseContext(options.userPublicId, (_databaseHandle) =>
-      this.sessionRepository.listForUserDataExport(user.id, options.limit),
+    return withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(options.userPublicId),
+      (_databaseHandle) => this.sessionRepository.listForUserDataExport(user.id, options.limit),
     );
   }
 
   async revoke(userPublicId: string, sessionPublicId: string) {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    const revoked = await withUserDatabaseContext(userPublicId, (_databaseHandle) =>
-      this.sessionRepository.revoke(sessionPublicId, user.id),
+    const revoked = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      (_databaseHandle) => this.sessionRepository.revoke(sessionPublicId, user.id),
     );
     if (!revoked) throw new NotFoundError('Session');
     if (revoked.token_hash) {
@@ -98,8 +102,9 @@ export class AuthSessionService {
   async revokeAllSessions(userPublicId: string): Promise<void> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    const revokedSessions = await withUserDatabaseContext(userPublicId, (_databaseHandle) =>
-      this.sessionRepository.revokeAllByUserId(user.id),
+    const revokedSessions = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      (_databaseHandle) => this.sessionRepository.revokeAllByUserId(user.id),
     );
     await this.invalidateRevokedSessionCaches(revokedSessions);
   }
@@ -130,8 +135,10 @@ export class AuthSessionService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     const currentTokenHash = hashAccessToken(currentAccessToken);
-    const revokedSessions = await withUserDatabaseContext(userPublicId, (_databaseHandle) =>
-      this.sessionRepository.revokeAllByUserIdExcept(user.id, currentTokenHash),
+    const revokedSessions = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
+      (_databaseHandle) =>
+        this.sessionRepository.revokeAllByUserIdExcept(user.id, currentTokenHash),
     );
     await this.invalidateRevokedSessionCaches(revokedSessions);
   }
@@ -143,8 +150,8 @@ export class AuthSessionService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     const refreshSecret = generateRefreshSecret();
-    const { session, evictedSessions } = await withUserDatabaseContext(
-      userPublicId,
+    const { session, evictedSessions } = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(userPublicId),
       async (_databaseHandle) => {
         // Bound the user's concurrent live sessions. Under a per-user advisory lock (so concurrent
         // logins cannot overshoot), evict the oldest sessions beyond MAX_ACTIVE_SESSIONS_PER_USER - 1
@@ -418,8 +425,9 @@ export class AuthSessionService {
   private async revokeAllSessionsForReusedRefreshSecret(userId: number): Promise<void> {
     const user = await this.userService.findById(userId);
     if (!user) return;
-    const revokedSessions = await withUserDatabaseContext(user.public_id, (_databaseHandle) =>
-      this.sessionRepository.revokeAllByUserId(user.id),
+    const revokedSessions = await withPrincipalDatabaseContext(
+      resolveVerifiedUserPrincipalScope(user.public_id),
+      (_databaseHandle) => this.sessionRepository.revokeAllByUserId(user.id),
     );
     await this.invalidateRevokedSessionCaches(revokedSessions);
   }

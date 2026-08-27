@@ -119,7 +119,8 @@ src/
     │   │   │   │   ├── audit-login.util.unit.test.ts
     │   │   │   │   └── complete-first-factor-auth.unit.test.ts
     │   │   ├── audit-login.util.ts
-    │   │   └── complete-first-factor-auth.ts
+    │   │   ├── complete-first-factor-auth.ts
+    │   │   └── verified-user-principal-scope.util.ts
     │   ├── sub-domains/
     │   │   ├── auth-method/
     │   │   │   ├── __tests__/

@@ -52,6 +52,19 @@ vi.mock('@simplewebauthn/server', () => ({
   generateAuthenticationOptions: vi.fn(),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 const user = { id: 7, public_id: 'usr_abcdefghijklmnopqrstu', status: 'ACTIVE', deleted_at: null };
 
 /**

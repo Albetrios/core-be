@@ -57,6 +57,19 @@ vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => 
   setLocalDatabaseConfig: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: vi.fn(
+        async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+      ),
+    };
+  },
+);
+
 const user = {
   id: 1,
   public_id: 'user_public',

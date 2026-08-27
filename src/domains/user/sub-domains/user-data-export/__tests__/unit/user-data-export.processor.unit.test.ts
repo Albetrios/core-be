@@ -4,12 +4,19 @@ import { UserDataExportCancelledError } from '@/domains/user/sub-domains/user-da
 
 const fakeDatabaseHandle = { __fake: true } as const;
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: async (
-    _userPublicId: string,
-    callback: (databaseHandle: unknown) => Promise<unknown>,
-  ) => callback(fakeDatabaseHandle),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/principal-database.context.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      withPrincipalDatabaseContext: async (
+        _scope: unknown,
+        callback: (databaseHandle: unknown) => Promise<unknown>,
+      ) => callback(fakeDatabaseHandle),
+    };
+  },
+);
 
 const { loggerInfoMock, loggerErrorMock } = vi.hoisted(() => ({
   loggerInfoMock: vi.fn(),
