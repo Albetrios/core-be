@@ -34,7 +34,7 @@ row. Elevated access exists only as the named fixture role `core_be_operator`
 | --- | ----- | ------- |
 | **Old** (pre-overhaul) | 9+ ad-hoc wrappers, one file each: `withOrganizationContext`, `withOrganizationDatabaseContext`, `withUserDatabaseContext`, `withGlobalRetentionCleanupDatabaseContext`, `withSessionRetentionCleanupDatabaseContext`, `withGlobalAdminDatabaseContext`, `withSystemAuditInsertContext`, `withSystemTableWorkerContext`, `withSystemTableRetentionContext` | Any code could call any wrapper with any string (forgeable authority); every new need added a new file/wrapper; no registry of what a bypass grants; untrackable |
 | **Transitional** (phases 1–7.5) | Three pattern files: `principal-database.context.ts`, `session-database.context.ts`, `maintenance-database.context.ts`; legacy wrappers migrated in, then deleted | — |
-| **New** (current, A5) | **Two files**: `database-context.ts` (all three patterns + registries + the common `withDatabaseContext(scope)` dispatcher) and `database-context-runtime.ts` (plumbing: ALS storages, worker asserts, timeout lift, handle guards) | Locked by `context-directory-standard.policy.unit.test.ts` — a new file in `contexts/` fails the build |
+| **New** (current, A5) | **Two files**: `database-context.ts` (all three patterns + registries) and `database-context-runtime.ts` (plumbing: ALS storages, worker asserts, timeout lift, handle guards) | Locked by `context-directory-standard.policy.unit.test.ts` — a new file in `contexts/` fails the build |
 
 ### 2.2 Old wrapper → new call, one-to-one
 
@@ -93,12 +93,9 @@ public→internal inside the arm where an FK column needs it).
                                                 ▼
 ┌──────────────────────────── PATTERN LAYER  (contexts/database-context.ts) ───────────────────────────┐
 │                                                                                                      │
-│   withDatabaseContext(scope, cb)   ← ONE common dispatcher (scope.source → principal;                │
-│                                      scope.kind ∈ MAINTENANCE_CONTEXTS → maintenance; else session)  │
-│        │                                                                                             │
-│        ├── withPrincipalDatabaseContext(scope, cb)      identity GUCs (org and/or user)              │
-│        ├── withSessionDatabaseContext(scope, cb)        one session-artifact GUC (kind-dispatched)   │
-│        └── withMaintenanceDatabaseContext(scope, cb)    one bypass GUC = 'true' (registry-dispatched)│
+│   withPrincipalDatabaseContext(scope, cb)     identity GUCs (org and/or user)                       │
+│   withSessionDatabaseContext(scope, cb)       one session-artifact GUC (kind-dispatched)            │
+│   withMaintenanceDatabaseContext(scope, cb)   one bypass GUC = 'true' (registry-dispatched)         │
 │                                                                                                      │
 │   Registries (single source of truth):                                                               │
 │     MAINTENANCE_CONTEXTS  { kind → guc | null, opensTransaction, workerContextKind,                  │
@@ -219,7 +216,6 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 | Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `requireUserPrincipalDatabaseScope(request)` · `resolveUserJobScope(userPublicId)` · `resolveVerifiedUserPrincipalScope(userPublicId)` | `withPrincipalDatabaseContext` |
 | Session | `SessionDatabaseScope` — kinds `public_id` \| `token_hash` | `createSessionDatabaseScope(kind, value)` (auth domain only; token values are pre-hashed) | `withSessionDatabaseContext` |
 | Maintenance | `MaintenanceDatabaseScope` — 7 frozen singletons: `global_retention_cleanup`, `session_retention_cleanup`, `global_admin`, `system_audit_insert`, `audit_outbox_drain`, `system_table_retention`, `system_table_worker` | nothing to mint — `MAINTENANCE_SCOPE.<kind>` | `withMaintenanceDatabaseContext` |
-| (any) | `DatabaseScope` union | — | `withDatabaseContext(scope, cb)` — the one common dispatcher |
 
 Provenance (`scope.source`): `token` = authenticated HTTP request · `job` = validated
 BullMQ payload · `provisioning` = the caller itself verified the id (invite flow,

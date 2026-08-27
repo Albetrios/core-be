@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * THE STANDARD: `src/infrastructure/database/contexts/` holds exactly TWO files —
  * `database-context.ts` (the three scope patterns: principal / session /
- * maintenance, plus the common `withDatabaseContext` dispatcher) and
+ * maintenance) and
  * `database-context-runtime.ts` (non-scope plumbing). A new way to open an
  * RLS-scoped database context is a new KIND inside one of the three registries,
  * never a new file/wrapper. Adding a file here means either extending a pattern

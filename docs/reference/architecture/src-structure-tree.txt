@@ -1126,7 +1126,6 @@ src/
     │   │   │   ├── assert-connection-budget.unit.test.ts
     │   │   │   ├── assert-database-rls-safety.unit.test.ts
     │   │   │   ├── assert-database-tls-safety.unit.test.ts
-    │   │   │   ├── database-context-dispatcher.test.ts
     │   │   │   ├── maintenance-pool-selection.test.ts
     │   │   │   ├── principal-checkout-accounting.test.ts
     │   │   │   ├── principal-database.context.test.ts

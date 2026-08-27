@@ -1,8 +1,8 @@
 /**
  * THE database-context module — the three RLS scope patterns behind one roof:
  * principal (minted identity), session (pre-auth artifacts), and maintenance
- * (registry-dispatched bypasses), plus the common {@link withDatabaseContext}
- * dispatcher that accepts any scope and routes it to its pattern wrapper.
+ * (registry-dispatched bypasses). Callers use the pattern wrapper matching their
+ * scope; a generic any-scope dispatcher was deliberately removed as unused API.
  *
  * @remarks
  * - **Notes:** this file and `database-context-runtime.ts` (plumbing) are the
@@ -571,37 +571,4 @@ export async function withMaintenanceDatabaseContext<T>(
         Number(process.hrtime.bigint() - checkoutStartedAtNanoseconds) / 1_000_000_000,
     });
   }
-}
-
-/** Any scope accepted by {@link withDatabaseContext} — one of the three patterns. */
-export type DatabaseScope =
-  | PrincipalDatabaseScope
-  | SessionDatabaseScope
-  | MaintenanceDatabaseScope;
-
-/**
- * The ONE common entry point for every database context: dispatches the scope
- * to its pattern wrapper (principal / session / maintenance).
- *
- * @remarks
- * - **Algorithm:** principal scopes carry `source`; maintenance scopes carry a
- *   `kind` present in {@link MAINTENANCE_CONTEXTS}; everything else is a session
- *   scope. All three scope types are unforgeable (branded, minted only by their
- *   confined factories), so dispatch never needs to validate authority — the
- *   scope IS the authority.
- * - **Notes:** the per-pattern wrappers stay exported for callers that want the
- *   narrower signature (e.g. maintenance options); this dispatcher exists so
- *   generic plumbing can take "a scope" without knowing its pattern.
- */
-export async function withDatabaseContext<T>(
-  scope: DatabaseScope,
-  callback: (databaseHandle: never) => Promise<T>,
-): Promise<T> {
-  if ('source' in scope) {
-    return withPrincipalDatabaseContext(scope, callback as never);
-  }
-  if (scope.kind in MAINTENANCE_CONTEXTS) {
-    return withMaintenanceDatabaseContext(scope as MaintenanceDatabaseScope, callback as never);
-  }
-  return withSessionDatabaseContext(scope as SessionDatabaseScope, callback as never);
 }

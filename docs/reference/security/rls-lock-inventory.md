@@ -8,7 +8,7 @@ editing the lock deliberately.
 
 | Lock | File | What it pins |
 | ---- | ---- | ------------ |
-| Context directory standard | `src/tests/unit/infrastructure/database/context-directory-standard.policy.unit.test.ts` | `contexts/` holds exactly `database-context.ts` (3 scope patterns + `withDatabaseContext` dispatcher) and `database-context-runtime.ts` (plumbing). New RLS access = new registry KIND, never a new file. |
+| Context directory standard | `src/tests/unit/infrastructure/database/context-directory-standard.policy.unit.test.ts` | `contexts/` holds exactly `database-context.ts` (the 3 scope patterns + registries) and `database-context-runtime.ts` (plumbing). New RLS access = new registry KIND, never a new file. |
 | Principal-scope minting confinement | `src/tests/unit/infrastructure/database/principal-scope-minting.policy.unit.test.ts` | `createPrincipalDatabaseScope` is imported only by the confined minters (request minters, job minter, verified minter, the context module itself). |
 | Verified-scope usage ledger | `src/tests/unit/infrastructure/database/verified-scope-usage.policy.unit.test.ts` | Every importer of the verified/provisioning minters is enumerated — a new import is a deliberate "I verified this identity myself" claim. |
 | Job-minter path confinement | (describe block in the principal minting policy test) | Job scopes are minted only from worker-runtime code. |
