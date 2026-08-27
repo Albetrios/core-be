@@ -12,7 +12,27 @@
  *   never a new file or wrapper.
  */
 import { sql as drizzleSql } from 'drizzle-orm';
+import * as databaseConnection from '@/infrastructure/database/connection.js';
 import { database } from '@/infrastructure/database/connection.js';
+
+/**
+ * Pool selector for maintenance (bypass) contexts: the dedicated maintenance
+ * pool when `DATABASE_MAINTENANCE_URL` is provisioned, else the shared pool.
+ * Accessed via the module namespace with an optional call so unit tests that
+ * mock `connection.js` with only `database` keep working unchanged.
+ */
+function resolveMaintenancePool(): typeof database {
+  // try/catch (not just optional call): a Vitest module mock THROWS on access to
+  // an export its factory did not define, and many suites mock connection.js with
+  // only `database` — they must keep the historical shared-pool behavior.
+  try {
+    return (
+      (databaseConnection.getMaintenanceDatabase?.() as typeof database | undefined) ?? database
+    );
+  } catch {
+    return database;
+  }
+}
 import {
   applyWorkerStatementTimeout,
   getOrganizationRequestDatabaseSession,
@@ -331,11 +351,22 @@ export async function withSessionDatabaseContext<T>(
   callback: (databaseHandle: RequestScopedPostgresDatabase) => Promise<T>,
 ): Promise<T> {
   const definition = SESSION_CONTEXTS[scope.kind];
-  return database.transaction(async (transaction) => {
-    const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-    await setLocalDatabaseConfig(databaseHandle, definition.guc, scope.value);
-    return runWithPinnedDatabaseHandle(databaseHandle, () => callback(databaseHandle));
-  });
+  incrementOrganizationRlsCheckoutCount();
+  const checkoutStartedAtNanoseconds = process.hrtime.bigint();
+  try {
+    return await database.transaction(async (transaction) => {
+      const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+      await setLocalDatabaseConfig(databaseHandle, definition.guc, scope.value);
+      return runWithPinnedDatabaseHandle(databaseHandle, () => callback(databaseHandle));
+    });
+  } finally {
+    decrementOrganizationRlsCheckoutCount();
+    observeOrganizationRlsCheckoutHold({
+      path: 'session_context',
+      durationSeconds:
+        Number(process.hrtime.bigint() - checkoutStartedAtNanoseconds) / 1_000_000_000,
+    });
+  }
 }
 
 /** One row of the maintenance-context registry — the GUC it arms and how its transaction is tuned. */
@@ -494,36 +525,52 @@ export async function withMaintenanceDatabaseContext<T>(
     // handle is passed straight through with no ALS pinning — an HTTP caller
     // (stripe-webhook service, commit-dispatch executor) must not have its
     // request-pinned transaction handle shadowed by the bare pool.
+    const maintenancePool = resolveMaintenancePool();
     if (!isWorkerRuntime()) {
       return callback(
-        brandWorkerContextDatabaseHandle(database as unknown as RequestScopedPostgresDatabase),
+        brandWorkerContextDatabaseHandle(
+          maintenancePool as unknown as RequestScopedPostgresDatabase,
+        ),
       );
     }
     return runWithWorkerDatabaseContext({ kind: definition.workerContextKind }, () =>
-      runWithPinnedDatabaseHandle(database as unknown as RequestScopedPostgresDatabase, () =>
+      runWithPinnedDatabaseHandle(maintenancePool as unknown as RequestScopedPostgresDatabase, () =>
         callback(
-          brandWorkerContextDatabaseHandle(database as unknown as RequestScopedPostgresDatabase),
+          brandWorkerContextDatabaseHandle(
+            maintenancePool as unknown as RequestScopedPostgresDatabase,
+          ),
         ),
       ),
     );
   }
-  return runWithWorkerDatabaseContext({ kind: definition.workerContextKind }, () =>
-    database.transaction(async (transaction) => {
-      const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-      if (options?.useApplicationDatabaseRole === true) {
-        await databaseHandle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
-      }
-      if (definition.appliesWorkerStatementTimeout) {
-        await applyWorkerStatementTimeout(databaseHandle);
-      }
-      if (definition.guc !== null) {
-        await setLocalDatabaseConfig(databaseHandle, definition.guc, 'true');
-      }
-      return runWithPinnedDatabaseHandle(databaseHandle, () =>
-        callback(brandWorkerContextDatabaseHandle(databaseHandle)),
-      );
-    }),
-  );
+  incrementOrganizationRlsCheckoutCount();
+  const checkoutStartedAtNanoseconds = process.hrtime.bigint();
+  try {
+    return await runWithWorkerDatabaseContext({ kind: definition.workerContextKind }, () =>
+      resolveMaintenancePool().transaction(async (transaction) => {
+        const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+        if (options?.useApplicationDatabaseRole === true) {
+          await databaseHandle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
+        }
+        if (definition.appliesWorkerStatementTimeout) {
+          await applyWorkerStatementTimeout(databaseHandle);
+        }
+        if (definition.guc !== null) {
+          await setLocalDatabaseConfig(databaseHandle, definition.guc, 'true');
+        }
+        return runWithPinnedDatabaseHandle(databaseHandle, () =>
+          callback(brandWorkerContextDatabaseHandle(databaseHandle)),
+        );
+      }),
+    );
+  } finally {
+    decrementOrganizationRlsCheckoutCount();
+    observeOrganizationRlsCheckoutHold({
+      path: 'maintenance_context',
+      durationSeconds:
+        Number(process.hrtime.bigint() - checkoutStartedAtNanoseconds) / 1_000_000_000,
+    });
+  }
 }
 
 /** Any scope accepted by {@link withDatabaseContext} — one of the three patterns. */

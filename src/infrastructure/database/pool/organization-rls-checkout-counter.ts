@@ -8,7 +8,15 @@ let activeOrganizationRlsCheckouts = 0;
  * - `request_transaction` — the legacy per-HTTP-request `organization-rls-transaction` middleware
  *   that pins one checkout for the full request (only when `DATABASE_RLS_SCOPED_CONTEXTS=false`).
  */
-export type OrganizationRlsCheckoutPath = 'scoped_context' | 'request_transaction';
+export type OrganizationRlsCheckoutPath =
+  | 'scoped_context'
+  | 'request_transaction'
+  // A5 all-scope coverage: session (pre-auth artifact) and maintenance (bypass)
+  // pattern transactions also hold pooled checkouts — counted so the
+  // pool-exhaustion alerter and hold histogram see the WHOLE checkout load
+  // (retention sweeps can hold long transactions), not just org-scoped work.
+  | 'session_context'
+  | 'maintenance_context';
 
 /** One completed org-RLS checkout: how long the pooled connection was held and by which path. */
 export type OrganizationRlsCheckoutHoldSample = {

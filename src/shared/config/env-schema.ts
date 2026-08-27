@@ -206,6 +206,15 @@ const envSchemaBase = z.object({
   // Database (managed service)
   DATABASE_URL: z.string().min(1),
   DATABASE_MIGRATION_URL: z.string().min(1).optional(), // elevated-privilege user for migrations
+  /**
+   * Dedicated connection string for maintenance (RLS-bypass) database contexts,
+   * connecting as the `core_be_maintenance` role. Unset (the default) keeps every
+   * maintenance context on DATABASE_URL / `core_be_app` — current behavior. Once every
+   * hosted environment provisions it (see docs/deployment/runbooks/maintenance-database-role.md),
+   * the bypass policy arms can be tightened to `current_user = 'core_be_maintenance'`,
+   * making bypass authority a connection-level property instead of a GUC-only one.
+   */
+  DATABASE_MAINTENANCE_URL: z.string().min(1).optional(),
 
   // Redis (managed service)
   REDIS_URL: z.string().min(1),
