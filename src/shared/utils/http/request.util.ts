@@ -119,10 +119,10 @@ export function resolveActiveOrganizationId(request: FastifyRequest): string {
  *   organization (users hold a personal-or-team `org` claim from login/switch;
  *   API keys are pinned to one). A token without one is stale/malformed, not a
  *   different scope, so this single common minter rejects it rather than
- *   modelling an org-less variant. Use {@link requireUserPrincipalDatabaseScope}
+ *   modelling an org-less variant. Use {@link resolveTokenUserPrincipalScope}
  *   when the route additionally requires a real end user (rejects API keys).
  */
-export function resolvePrincipalDatabaseScope(
+export function resolveTokenPrincipalScope(
   request: FastifyRequest,
 ): OrganizationPrincipalDatabaseScope {
   const auth = requirePrincipal(request);
@@ -152,7 +152,7 @@ export function resolvePrincipalDatabaseScope(
  * {@link UnauthorizedError} (matching {@link requireAuth} semantics), so
  * `userPublicId` is guaranteed; the organization is included when present (org-less tokens are the /users/me self-heal transitional state).
  */
-export function requireUserPrincipalDatabaseScope(
+export function resolveTokenUserPrincipalScope(
   request: FastifyRequest,
 ): UserPrincipalDatabaseScope {
   const auth = requireAuth(request);

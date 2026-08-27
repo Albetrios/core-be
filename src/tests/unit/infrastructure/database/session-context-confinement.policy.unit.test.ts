@@ -9,16 +9,12 @@ import { describe, expect, it } from 'vitest';
 const ALLOWED_PATH_FRAGMENTS = ['src/domains/auth/'];
 
 describe('session-context confinement', () => {
-  it('createSessionDatabaseScope is imported only from the auth domain (and tests)', () => {
+  it('SESSION_SCOPE is imported only from the auth domain (and tests)', () => {
     let output = '';
     try {
-      output = execFileSync(
-        'grep',
-        ['-rl', 'createSessionDatabaseScope', 'src', '--include=*.ts'],
-        {
-          encoding: 'utf8',
-        },
-      );
+      output = execFileSync('grep', ['-rl', 'SESSION_SCOPE', 'src', '--include=*.ts'], {
+        encoding: 'utf8',
+      });
     } catch {
       // no matches
     }
@@ -34,7 +30,7 @@ describe('session-context confinement', () => {
 
     expect(
       offenders,
-      `createSessionDatabaseScope referenced outside the auth domain: ${offenders.join(', ')}.`,
+      `SESSION_SCOPE referenced outside the auth domain: ${offenders.join(', ')}.`,
     ).toEqual([]);
   });
 });

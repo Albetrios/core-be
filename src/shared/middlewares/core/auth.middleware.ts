@@ -8,8 +8,8 @@ import { GLOBAL_ROLES, type GlobalRole } from '@/shared/constants/roles.constant
 import { resolveGlobalRoleForEmail } from '@/shared/utils/auth/global-admin-role.util.js';
 import { applyApiKeyAuthentication } from '@/shared/middlewares/security/api-key-auth.middleware.js';
 import {
-  requireUserPrincipalDatabaseScope,
-  resolvePrincipalDatabaseScope,
+  resolveTokenUserPrincipalScope,
+  resolveTokenPrincipalScope,
 } from '@/shared/utils/http/request.util.js';
 
 function getBearerToken(request: FastifyRequest): string {
@@ -137,12 +137,12 @@ const authMiddleware: FastifyPluginAsync = async (app) => {
   // authority semantics are identical to calling the minters directly.
   app.decorateRequest('principalScope', {
     getter(this: FastifyRequest) {
-      return resolvePrincipalDatabaseScope(this);
+      return resolveTokenPrincipalScope(this);
     },
   });
   app.decorateRequest('userPrincipalScope', {
     getter(this: FastifyRequest) {
-      return requireUserPrincipalDatabaseScope(this);
+      return resolveTokenUserPrincipalScope(this);
     },
   });
   app.decorate('authenticate', authenticate);

@@ -12,7 +12,7 @@ editing the lock deliberately.
 | Principal-scope minting confinement | `src/tests/unit/infrastructure/database/principal-scope-minting.policy.unit.test.ts` | `createPrincipalDatabaseScope` is imported only by the confined minters (request minters, job minter, verified minter, the context module itself). |
 | Verified-scope usage ledger | `src/tests/unit/infrastructure/database/verified-scope-usage.policy.unit.test.ts` | Every importer of the verified/provisioning minters is enumerated — a new import is a deliberate "I verified this identity myself" claim. |
 | Job-minter path confinement | (describe block in the principal minting policy test) | Job scopes are minted only from worker-runtime code. |
-| Session minting confinement | `src/tests/unit/infrastructure/database/session-context-confinement.policy.unit.test.ts` | `createSessionDatabaseScope` is auth-domain-only. |
+| Session minting confinement | `src/tests/unit/infrastructure/database/session-context-confinement.policy.unit.test.ts` | `SESSION_SCOPE.<kind>(value)` factories are auth-domain-only. |
 | Maintenance per-kind allowlists | `src/tests/unit/infrastructure/database/maintenance-context-confinement.policy.unit.test.ts` | Each `MAINTENANCE_SCOPE.<kind>` is referenced only from its allowlisted paths. |
 | Table → required-scope map | `src/tests/unit/infrastructure/database/rls-table-scope-map.db.unit.test.ts` | Per FORCE-RLS table, the exact `app.*` GUC set its LIVE policies reference; every GUC must be registry-known (or a documented dead arm — currently none). |
 | FORCE-RLS table set | `src/infrastructure/database/utils/force-rls-tables.constants.ts` + boot guard | The live database's FORCE-RLS tables match the intentional list exactly. |

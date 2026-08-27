@@ -23,7 +23,7 @@ export function resolveJobPrincipalScope(payload: {
 }): PrincipalDatabaseScope;
 /**
  * Mints the `job`-source {@link PrincipalDatabaseScope} for a BullMQ processor —
- * the worker-runtime counterpart of `resolvePrincipalDatabaseScope`.
+ * the worker-runtime counterpart of `resolveTokenPrincipalScope`.
  *
  * @remarks
  * - **Algorithm:** trusts the validated job payload discriminators

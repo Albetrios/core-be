@@ -5,7 +5,7 @@ import { captureMessage } from '@/infrastructure/observability/sentry/sentry.js'
 import type { UserService } from '@/domains/user/user.service.js';
 import { generateRefreshSecret } from '@/domains/auth/auth.http.util.js';
 import {
-  createSessionDatabaseScope,
+  SESSION_SCOPE,
   withSessionDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { AuthSessionRepository } from './auth-session.repository.js';
@@ -181,7 +181,7 @@ export class AuthSessionService {
     const tokenHash = hashAccessToken(token);
     await invalidateCachedSessionToken(tokenHash);
     const revoked = await withSessionDatabaseContext(
-      createSessionDatabaseScope('session_token_hash', tokenHash),
+      SESSION_SCOPE.session_token_hash(tokenHash),
       (_databaseHandle) => this.sessionRepository.revokeByTokenHash(tokenHash),
     );
     if (!revoked) {
@@ -224,9 +224,8 @@ export class AuthSessionService {
     // otherwise-authenticated request. Only connection-level errors are retried (see
     // runReadWithTransientRetry); an invalid/expired session still returns null on the first attempt.
     const session = await runReadWithTransientRetry(() =>
-      withSessionDatabaseContext(
-        createSessionDatabaseScope('session_token_hash', tokenHash),
-        (_databaseHandle) => this.sessionRepository.findActiveByTokenHash(tokenHash),
+      withSessionDatabaseContext(SESSION_SCOPE.session_token_hash(tokenHash), (_databaseHandle) =>
+        this.sessionRepository.findActiveByTokenHash(tokenHash),
       ),
     );
 
@@ -254,7 +253,7 @@ export class AuthSessionService {
 
   async findActiveSessionByPublicId(sessionPublicId: string) {
     return withSessionDatabaseContext(
-      createSessionDatabaseScope('session_public_id', sessionPublicId),
+      SESSION_SCOPE.session_public_id(sessionPublicId),
       (_databaseHandle) => this.sessionRepository.findByPublicId(sessionPublicId),
     );
   }
@@ -269,14 +268,14 @@ export class AuthSessionService {
    */
   async findSessionByPublicIdIncludingRevoked(sessionPublicId: string) {
     return withSessionDatabaseContext(
-      createSessionDatabaseScope('session_public_id', sessionPublicId),
+      SESSION_SCOPE.session_public_id(sessionPublicId),
       (_databaseHandle) => this.sessionRepository.findByPublicIdIncludingRevoked(sessionPublicId),
     );
   }
 
   async rotateSessionTokenHash(sessionPublicId: string, tokenHash: string): Promise<void> {
     await withSessionDatabaseContext(
-      createSessionDatabaseScope('session_public_id', sessionPublicId),
+      SESSION_SCOPE.session_public_id(sessionPublicId),
       async (_databaseHandle) => {
         const existing = await this.sessionRepository.findByPublicId(sessionPublicId);
         if (existing?.token_hash) {
@@ -302,7 +301,7 @@ export class AuthSessionService {
     const nextTokenHash = hashAccessToken(nextAccessToken);
 
     const rotated = await withSessionDatabaseContext(
-      createSessionDatabaseScope('session_public_id', sessionPublicId),
+      SESSION_SCOPE.session_public_id(sessionPublicId),
       async (_databaseHandle) => {
         const existing = await this.sessionRepository.findByPublicId(sessionPublicId);
         if (!existing?.refresh_token_hash) {
@@ -335,7 +334,7 @@ export class AuthSessionService {
       // to use its refresh secret." We capture every refresh-secret mismatch to Sentry
       // for breach detection, separate from whether we re-revoke.
       const reuseDetection = await withSessionDatabaseContext(
-        createSessionDatabaseScope('session_public_id', sessionPublicId),
+        SESSION_SCOPE.session_public_id(sessionPublicId),
         async (_databaseHandle) => {
           const existing =
             await this.sessionRepository.findByPublicIdIncludingRevoked(sessionPublicId);
@@ -389,7 +388,7 @@ export class AuthSessionService {
   }): Promise<void> {
     const nextTokenHash = hashAccessToken(nextAccessToken);
     await withSessionDatabaseContext(
-      createSessionDatabaseScope('session_public_id', sessionPublicId),
+      SESSION_SCOPE.session_public_id(sessionPublicId),
       async (_databaseHandle) => {
         const existing = await this.sessionRepository.findByPublicId(sessionPublicId);
         if (!existing) {

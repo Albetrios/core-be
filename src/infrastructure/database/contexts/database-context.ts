@@ -75,7 +75,7 @@ export type PrincipalScopeSource = 'token' | 'job' | 'provisioning';
  * @remarks
  * The brand is compile-time only — services and repositories can relay a scope but
  * cannot construct one from raw strings. Only the confined minters build it:
- * `resolvePrincipalDatabaseScope` / `requireUserPrincipalDatabaseScope`
+ * `resolveTokenPrincipalScope` / `resolveTokenUserPrincipalScope`
  * (request layer, claim-precedence) and, in later phases, the worker-payload and
  * provisioning minters. Enforced by
  * `src/tests/unit/infrastructure/database/principal-scope-minting.policy.unit.test.ts`.
@@ -91,7 +91,7 @@ export interface PrincipalDatabaseScope {
  * A {@link PrincipalDatabaseScope} guaranteed to carry an organization — what
  * org-scoped service methods accept. Under the personal/team organization model
  * every authenticated principal has an active organization, so this is what the
- * single request minter `resolvePrincipalDatabaseScope` returns.
+ * single request minter `resolveTokenPrincipalScope` returns.
  */
 export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
   readonly organizationPublicId: string;
@@ -99,7 +99,7 @@ export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
 
 /**
  * The common token scope narrowed to a real end user: `userPublicId` guaranteed,
- * organization OPTIONAL — produced by `requireUserPrincipalDatabaseScope` for
+ * organization OPTIONAL — produced by `resolveTokenUserPrincipalScope` for
  * user-owned resources (API keys rejected).
  *
  * @remarks
@@ -323,7 +323,7 @@ export interface SessionDatabaseScope<K extends SessionContextKind = SessionCont
  *   value — an empty GUC would silently match no session row.
  * - **Side effects:** none.
  */
-export function createSessionDatabaseScope<K extends SessionContextKind>(
+function createSessionDatabaseScope<K extends SessionContextKind>(
   kind: K,
   value: string,
 ): SessionDatabaseScope<K> {
@@ -332,6 +332,25 @@ export function createSessionDatabaseScope<K extends SessionContextKind>(
   }
   return { kind, value } as SessionDatabaseScope<K>;
 }
+
+/**
+ * The session-scope factories — the SESSION_CONTEXTS mirror of
+ * {@link MAINTENANCE_SCOPE}. Session authority carries a per-request artifact
+ * value, so each kind is a FACTORY rather than a frozen singleton:
+ * `SESSION_SCOPE.session_public_id(value)` / `SESSION_SCOPE.session_token_hash(value)`.
+ * These are the ONLY way to obtain a {@link SessionDatabaseScope}; usage is
+ * confined to the auth domain by `session-context-confinement.policy.unit.test.ts`.
+ */
+export const SESSION_SCOPE: {
+  readonly [K in SessionContextKind]: (value: string) => SessionDatabaseScope<K>;
+} = Object.freeze(
+  Object.fromEntries(
+    (Object.keys(SESSION_CONTEXTS) as SessionContextKind[]).map((kind) => [
+      kind,
+      (value: string) => createSessionDatabaseScope(kind, value),
+    ]),
+  ),
+) as never;
 
 /**
  * The single wrapper for pre-auth session database contexts: opens one

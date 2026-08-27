@@ -1,7 +1,7 @@
 import type { FastifyRequest } from 'fastify';
 import {
-  requireUserPrincipalDatabaseScope,
-  resolvePrincipalDatabaseScope,
+  resolveTokenUserPrincipalScope,
+  resolveTokenPrincipalScope,
 } from '@/shared/utils/http/request.util.js';
 
 /**
@@ -13,11 +13,11 @@ import {
 export function attachPrincipalScopeGetters<T extends object>(request: T): T {
   Object.defineProperty(request, 'principalScope', {
     configurable: true,
-    get: () => resolvePrincipalDatabaseScope(request as unknown as FastifyRequest),
+    get: () => resolveTokenPrincipalScope(request as unknown as FastifyRequest),
   });
   Object.defineProperty(request, 'userPrincipalScope', {
     configurable: true,
-    get: () => requireUserPrincipalDatabaseScope(request as unknown as FastifyRequest),
+    get: () => resolveTokenUserPrincipalScope(request as unknown as FastifyRequest),
   });
   return request;
 }
