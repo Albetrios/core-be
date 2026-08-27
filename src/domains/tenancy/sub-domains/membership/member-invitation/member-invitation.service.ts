@@ -109,11 +109,11 @@ export interface CreateInvitationForMembershipParams {
  * - **Algorithm:** invitations carry a single-use opaque token. On issue/resend
  *   {@link generateInvitationToken} produces a 64-char hex secret; only the SHA-256 hash from
  *   {@link hashInvitationToken} is persisted as `token_hash`. Org-scoped methods (resend/revoke)
- *   run inside {@link withOrganizationDatabaseContext}; {@link MemberInvitationService.createForMembership}
+ *   run inside {@link withPrincipalDatabaseContext}; {@link MemberInvitationService.createForMembership}
  *   is called from within `MembershipService.create`'s existing org transaction (it does not open its
  *   own). The public accept route has no org context up front — it calls the SECURITY DEFINER lookup
  *   `lookupOrganizationByInvitationPublicId` to resolve the owning org, then wraps the UPDATE in
- *   `withOrganizationDatabaseContext`.
+ *   `withPrincipalDatabaseContext`.
  * - **Failure modes:** `NotFoundError` for missing org/membership/invitation; `ValidationError`
  *   (i18n keys `errors:validation.invalidToken`, `invitationRevoked`, `invitationAlreadyAccepted`,
  *   `invitationExpired`) for state/input violations; `ForbiddenError('errors:invitationRequiresVerifiedEmail')`
@@ -148,7 +148,7 @@ export class MemberInvitationService {
    *   surrounding membership transaction.
    * - **Failure modes:** propagates a failed outbox write (rolls back the org transaction).
    * - **Side effects:** INSERTs `member_invitations`; enqueues the invitation email (raw token only via email).
-   * - **Notes:** MUST be called inside the caller's `withOrganizationDatabaseContext` (it does not open one).
+   * - **Notes:** MUST be called inside the caller's `withPrincipalDatabaseContext` (it does not open one).
    */
   async createForMembership(
     params: CreateInvitationForMembershipParams,
@@ -222,7 +222,7 @@ export class MemberInvitationService {
     /**
      * Public route: no org context up front. Resolve the owning org via the
      * SECURITY DEFINER lookup, then wrap the read + UPDATE in
-     * `withOrganizationDatabaseContext` so RLS sees the org GUC.
+     * `withPrincipalDatabaseContext` so RLS sees the org GUC.
      */
     const lookup =
       await this.invitationRepository.lookupOrganizationByInvitationPublicId(invitation_public_id);

@@ -31,7 +31,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
 });
 
 /**
- * UserService wraps repository calls in `withUserDatabaseContext` /
+ * UserService wraps repository calls in `withPrincipalDatabaseContext (user scope)` /
  * `withMaintenanceDatabaseContext` (see `softDeleteUserWithOffboarding`, `updatePassword`,
  * `updateMfaEnabled`, admin listing). Those helpers open a real `database.transaction()` and would
  * hang in pure unit tests with mocked repositories. Run the inner callback directly so the test

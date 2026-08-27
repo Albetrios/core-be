@@ -12,9 +12,9 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     withMaintenanceDatabaseContext: vi.fn(
       (scope: { kind: string }, callback: (handle: unknown) => Promise<unknown>) =>
         scope.kind === 'global_admin'
-          ? (
-              withGlobalAdminDatabaseContextMock as unknown as (...parameters: unknown[]) => unknown
-            )(callback)
+          ? (globalAdminMaintenanceContextMock as unknown as (...parameters: unknown[]) => unknown)(
+              callback,
+            )
           : callback({}),
     ),
     // Arg-shift adapter: the org-branch spy keeps its (organizationPublicId, callback)
@@ -25,8 +25,8 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
         callback: (handle: unknown) => Promise<unknown>,
       ) =>
         scope.organizationPublicId !== undefined
-          ? withOrganizationContextMock(scope.organizationPublicId, callback)
-          : withUserDatabaseContextMock(scope.userPublicId, callback),
+          ? organizationPrincipalContextMock(scope.organizationPublicId, callback)
+          : userPrincipalContextMock(scope.userPublicId, callback),
     ),
   };
 });
@@ -37,9 +37,9 @@ const isMailConfiguredMock = vi.fn();
 const isNotificationEmailDispatchedMock = vi.fn();
 const markNotificationEmailDispatchedMock = vi.fn();
 
-const withGlobalAdminDatabaseContextMock = vi.fn();
-const withUserDatabaseContextMock = vi.fn();
-const withOrganizationContextMock = vi.fn();
+const globalAdminMaintenanceContextMock = vi.fn();
+const userPrincipalContextMock = vi.fn();
+const organizationPrincipalContextMock = vi.fn();
 const createWorkerNotificationRepositoryMock = vi.fn();
 
 vi.mock('@/infrastructure/mail/queues/mail.queue.js', () => ({
@@ -276,7 +276,7 @@ describe('notification.worker', () => {
 
   describe('sec-re-01: tenant-less notifications enter loadNotificationForScope', () => {
     // The sec-D #10 fix added a `loadNotificationForScope` flow that pins
-    // `withUserDatabaseContext` for tenant-less notifications (instead of the prior
+    // `withPrincipalDatabaseContext (user scope)` for tenant-less notifications (instead of the prior
     // `runGlobalRetentionWorkerJob` retention GUC). The sec-re-01 regression caught
     // that the worker wiring still injected a repository, which short-circuited the
     // new flow at `notificationRepository !== undefined` so production behavior was
@@ -284,25 +284,25 @@ describe('notification.worker', () => {
     // narrow-context behavior so future wiring changes can't silently re-introduce
     // the dead-code path.
     beforeEach(() => {
-      withGlobalAdminDatabaseContextMock.mockReset();
-      withUserDatabaseContextMock.mockReset();
-      withOrganizationContextMock.mockReset();
+      globalAdminMaintenanceContextMock.mockReset();
+      userPrincipalContextMock.mockReset();
+      organizationPrincipalContextMock.mockReset();
       createWorkerNotificationRepositoryMock.mockReset();
 
-      withGlobalAdminDatabaseContextMock.mockImplementation(
+      globalAdminMaintenanceContextMock.mockImplementation(
         async (callback: (handle: unknown) => Promise<unknown>) => callback({}),
       );
-      withUserDatabaseContextMock.mockImplementation(
+      userPrincipalContextMock.mockImplementation(
         async (_userPublicId: string, callback: (handle: unknown) => Promise<unknown>) =>
           callback({}),
       );
-      withOrganizationContextMock.mockImplementation(
+      organizationPrincipalContextMock.mockImplementation(
         async (_organizationPublicId: string, callback: (handle: unknown) => Promise<unknown>) =>
           callback({}),
       );
     });
 
-    it('resolves the recipient user public id under global_admin scope and pins withUserDatabaseContext', async () => {
+    it('resolves the recipient user public id under global_admin scope and pins withPrincipalDatabaseContext (user scope)', async () => {
       const findUserPublicIdMock = vi.fn().mockResolvedValue('usr_public_id_42');
       const findByIdMock = vi.fn().mockResolvedValue(buildNotificationRow({ data: {} }));
       createWorkerNotificationRepositoryMock.mockReturnValue({
@@ -317,15 +317,15 @@ describe('notification.worker', () => {
         // NB: no 4th argument — this is the wiring shape after sec-re-01.
       );
 
-      expect(withGlobalAdminDatabaseContextMock).toHaveBeenCalledTimes(1);
+      expect(globalAdminMaintenanceContextMock).toHaveBeenCalledTimes(1);
       expect(findUserPublicIdMock).toHaveBeenCalledWith(42);
-      expect(withUserDatabaseContextMock).toHaveBeenCalledWith(
+      expect(userPrincipalContextMock).toHaveBeenCalledWith(
         'usr_public_id_42',
         expect.any(Function),
       );
       expect(findByIdMock).toHaveBeenCalledWith(42, null);
-      // No tenant scope means withOrganizationContext is never touched.
-      expect(withOrganizationContextMock).not.toHaveBeenCalled();
+      // No tenant scope means withPrincipalDatabaseContext is never touched.
+      expect(organizationPrincipalContextMock).not.toHaveBeenCalled();
       expect(result).toEqual({ channels: ['in_app:persisted'] });
     });
 
@@ -340,7 +340,7 @@ describe('notification.worker', () => {
       );
     });
 
-    it('uses withOrganizationContext (not the user-scope path) when organizationPublicId is set and no repo is injected', async () => {
+    it('uses withPrincipalDatabaseContext (not the user-scope path) when organizationPublicId is set and no repo is injected', async () => {
       const findByIdMock = vi.fn().mockResolvedValue(buildNotificationRow({ data: {} }));
       createWorkerNotificationRepositoryMock.mockReturnValue({
         findUserPublicIdForNotificationDispatch: vi.fn(),
@@ -354,13 +354,13 @@ describe('notification.worker', () => {
         // No injected repo — exercises loadNotificationForScope's tenant branch.
       );
 
-      expect(withOrganizationContextMock).toHaveBeenCalledWith(
+      expect(organizationPrincipalContextMock).toHaveBeenCalledWith(
         'organization_public_id',
         expect.any(Function),
       );
       // The global-admin / user pair are exclusive to the tenant-less branch.
-      expect(withGlobalAdminDatabaseContextMock).not.toHaveBeenCalled();
-      expect(withUserDatabaseContextMock).not.toHaveBeenCalled();
+      expect(globalAdminMaintenanceContextMock).not.toHaveBeenCalled();
+      expect(userPrincipalContextMock).not.toHaveBeenCalled();
       expect(findByIdMock).toHaveBeenCalledWith(7, 'organization_public_id');
     });
   });

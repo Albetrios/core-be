@@ -164,7 +164,7 @@ export class UploadRepository {
    * reservations for a single user. The lock is released automatically at COMMIT/ROLLBACK,
    * so it must be acquired inside the same transaction as the subsequent
    * {@link UploadRepository.countPendingByUserId} + {@link UploadRepository.create}
-   * (e.g. within `withUserDatabaseContext`). This closes the race where concurrent
+   * (e.g. within `withPrincipalDatabaseContext (user scope)`). This closes the race where concurrent
    * create-upload requests each pass the pending-count check before any row is inserted.
    */
   async acquirePendingUploadQuotaLock(user_id: number): Promise<void> {

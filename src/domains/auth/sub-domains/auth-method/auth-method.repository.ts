@@ -194,7 +194,7 @@ export class AuthMethodRepository {
   /**
    * Takes a transaction-scoped advisory lock serializing concurrent credential mutations for one
    * user. Released automatically at COMMIT/ROLLBACK, so it must be acquired inside the same
-   * `withUserDatabaseContext` transaction as a subsequent count-then-mutate (e.g. the MFA-delete
+   * `withPrincipalDatabaseContext (user scope)` transaction as a subsequent count-then-mutate (e.g. the MFA-delete
    * "would this remove the last factor?" check), closing that race (route-audit C1 / deleteMfa).
    */
   async acquireCredentialMutationLock(userId: number): Promise<void> {

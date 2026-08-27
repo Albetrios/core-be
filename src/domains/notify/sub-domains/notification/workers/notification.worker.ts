@@ -141,7 +141,7 @@ async function dispatchNotificationEmail(options: {
  *   scope when `organizationPublicId` is set, global retention scope otherwise), then iterate
  *   `data.channels ?? ['in_app']`; for each channel, look up the recipient and send. The email
  *   channel renders the shared transactional template and persists/dispatches via the mail
- *   outbox under `withSystemTableWorkerContext`, guarded by a one-time Redis dispatch marker
+ *   outbox under `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker)`, guarded by a one-time Redis dispatch marker
  *   so retries of the same notification job never enqueue a duplicate email.
  * - **Failure modes:** missing notification row → throws `notification.not_found:<id>`; absent
  *   mail configuration or recipient logs `notification.worker.channel_skipped` and continues;
@@ -171,7 +171,7 @@ export async function processNotificationDispatchJob(
   // GUC's blast radius is a future-regression risk: any patch that adds a write
   // inside this scope (e.g. "stamp delivered_at") would silently inherit cross-tenant
   // write privileges. Resolve the recipient's public id via the narrow SECURITY
-  // DEFINER function and pin `withUserDatabaseContext` so the
+  // DEFINER function and pin `withPrincipalDatabaseContext (user scope)` so the
   // `notifications_owner_access` policy authorises the read on its intended branch.
   const loadNotificationForScope = async () => {
     if (organizationPublicId === null || organizationPublicId === undefined) {
@@ -272,7 +272,7 @@ async function processTenantScopedNotificationJob(
  *   `runTenantScopedWorkerJob` (`withPrincipalDatabaseContext`) so RLS pins reads to the org;
  *   tenant-less notifications delegate directly to {@link processNotificationDispatchJob}
  *   which then enters its own `loadNotificationForScope` flow — resolving the recipient
- *   public id under `withMaintenanceDatabaseContext` and pinning `withUserDatabaseContext`
+ *   public id under `withMaintenanceDatabaseContext` and pinning `withPrincipalDatabaseContext (user scope)`
  *   for the load (sec-re-01: the prior wiring wrapped this branch in
  *   `runGlobalRetentionWorkerJob` and injected a repository, which short-circuited the new
  *   `loadNotificationForScope` flow — making the sec-D #10 user-context fix dead code).
@@ -300,7 +300,7 @@ export function createNotificationWorker(): WorkerHandle {
       return runWithPropagatedTraceContext({ traceparent, tracestate }, job.name, () => {
         // sec-re-01: tenant-less notifications delegate directly to
         // processNotificationDispatchJob so it can enter its own loadNotificationForScope
-        // flow (withMaintenanceDatabaseContext → withUserDatabaseContext). The prior
+        // flow (withMaintenanceDatabaseContext → withPrincipalDatabaseContext (user scope)). The prior
         // wiring wrapped this branch in runGlobalRetentionWorkerJob AND injected a
         // repository, which short-circuited the new flow and left the sec-D #10 fix
         // dead code.

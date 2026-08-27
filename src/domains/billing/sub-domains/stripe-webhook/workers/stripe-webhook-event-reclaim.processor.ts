@@ -33,7 +33,7 @@ export type StripeWebhookEventReclaimJobResult = {
  * retry them.
  *
  * @remarks
- * - **Algorithm:** Within {@link withSystemTableWorkerContext}, asks
+ * - **Algorithm:** Within {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker)}, asks
  *   {@link StripeWebhookEventRepository.sweepReclaimableEvents} for up to
  *   `env.STRIPE_WEBHOOK_EVENT_RECLAIM_BATCH_SIZE` candidate ids — a pure read,
  *   no row mutation (sec-re-02). For each candidate the processor enqueues a

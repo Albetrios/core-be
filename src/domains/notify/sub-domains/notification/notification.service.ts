@@ -33,7 +33,7 @@ export interface NotificationListServiceOptions {
  *   {@link UserPrincipalDatabaseScope}, resolve the user public id to an internal id via
  *   {@link UserService}, then run the repository call inside `withPrincipalDatabaseContext` so
  *   Postgres RLS sees the correct identity GUCs; the data-export path
- *   (`listForUserDataExport`, a worker caller) stays on `withUserDatabaseContext`. `dispatchNotification` looks up the
+ *   (`listForUserDataExport`, a worker caller) stays on `withPrincipalDatabaseContext (user scope)`. `dispatchNotification` looks up the
  *   organization public id and re-enqueues a notification job for the BullMQ worker.
  * - **Failure modes:** `UnauthorizedError` for unknown user public ids; repository errors
  *   propagate; `enqueueNotification` failures bubble to the caller.

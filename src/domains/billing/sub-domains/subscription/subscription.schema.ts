@@ -95,7 +95,7 @@ export const subscriptions = billingSchema
       // subscription row under an arbitrary `organization_id`. Pinning WITH
       // CHECK to the current-org GUC forces every write to land in the active
       // tenant (HTTP request context or the Stripe-webhook
-      // `withOrganizationContext`), closing the cross-tenant write hole. No
+      // `withPrincipalDatabaseContext`), closing the cross-tenant write hole. No
       // legitimate writer ever inserts/updates subscriptions under the
       // retention GUC, so dropping the bypass on the write side is safe.
       pgPolicy('subscriptions_tenant_isolation', {

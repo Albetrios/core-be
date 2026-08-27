@@ -7,7 +7,7 @@ import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identi
 
 /**
  * Production hardening item 2: when many concurrent requests use scoped
- * `withOrganizationDatabaseContext` blocks (rather than full-request transaction pinning),
+ * `withPrincipalDatabaseContext` blocks (rather than full-request transaction pinning),
  * external network I/O — simulated here as `pg_sleep` — must run OUTSIDE the context so a
  * burst of slow external calls cannot drain the pool. The chaos invariant: at least one
  * additional autocommit query keeps succeeding throughout the burst.

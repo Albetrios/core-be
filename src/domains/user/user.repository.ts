@@ -113,7 +113,7 @@ export class UserRepository {
    * (`POST /auth/login` no longer authenticates with the previous credential).
    * Pre-fix, removing the PASSWORD auth-method only flipped `auth_methods.revoked_at`
    * but left the stale hash on `auth.users`, so the credential remained valid.
-   * Caller MUST be inside `withUserDatabaseContext` so the FORCE-RLS owner-access
+   * Caller MUST be inside `withPrincipalDatabaseContext (user scope)` so the FORCE-RLS owner-access
    * policy is satisfied.
    */
   async clearPasswordHash(publicId: string) {
@@ -194,7 +194,7 @@ export class UserRepository {
   /**
    * Inserts a user from an OAuth profile (no password) with a caller-supplied `public_id`.
    *
-   * Public-id generation, unique-collision retry, and the `withUserDatabaseContext` wrapper that
+   * Public-id generation, unique-collision retry, and the `withPrincipalDatabaseContext (user scope)` wrapper that
    * satisfies the FORCE RLS owner WITH CHECK (`public_id = app.current_user_public_id`) live in
    * {@link UserService.createFromOAuth}: the context must be set to the exact `public_id` used for
    * the insert, so the service owns the generate → enter-context → insert sequence per attempt.

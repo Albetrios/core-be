@@ -14,7 +14,7 @@ import {
 import { authSchema } from '@/infrastructure/database/pg-schemas.js';
 import { users } from '@/domains/user/user.schema.js';
 
-/** Drizzle table for `auth.webauthn_credentials` — registered passkeys (credential id, public key, signature counter, transports); revocation is soft via `revoked_at` and the unique index is partial on `revoked_at IS NULL`. RLS-gated by `app.current_user_public_id` (set via `withUserDatabaseContext`) so passkeys are isolated per user. */
+/** Drizzle table for `auth.webauthn_credentials` — registered passkeys (credential id, public key, signature counter, transports); revocation is soft via `revoked_at` and the unique index is partial on `revoked_at IS NULL`. RLS-gated by `app.current_user_public_id` (set via `withPrincipalDatabaseContext (user scope)`) so passkeys are isolated per user. */
 export const webauthn_credentials = authSchema
   .table(
     'webauthn_credentials',

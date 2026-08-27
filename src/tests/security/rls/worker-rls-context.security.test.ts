@@ -27,7 +27,7 @@ describe('Security: worker RLS database context', () => {
     await expect(repository.listByOrganization(1)).rejects.toThrow(WorkerDatabaseContextError);
   });
 
-  it('allows tenant-scoped reads when wrapped in withOrganizationContext and createWorkerSubscriptionRepository', async () => {
+  it('allows tenant-scoped reads when wrapped in withPrincipalDatabaseContext and createWorkerSubscriptionRepository', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
     const owner = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: owner.id });

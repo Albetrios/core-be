@@ -14,7 +14,7 @@ import {
  *
  * @remarks
  * - **Algorithm:** resolve the user via {@link UserService.findUserRecordByPublicId}, then run the
- *   repository call inside `withUserDatabaseContext` so RLS scopes the SELECT/DELETE/INSERT to the
+ *   repository call inside `withPrincipalDatabaseContext (user scope)` so RLS scopes the SELECT/DELETE/INSERT to the
  *   owning user. `put` validates first, then cascades by deleting all existing rows for the user
  *   and inserting the supplied list in one repository call.
  * - **Failure modes:** unknown / soft-deleted user → {@link NotFoundError}; invalid body →

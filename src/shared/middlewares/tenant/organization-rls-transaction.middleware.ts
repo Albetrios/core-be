@@ -6,7 +6,7 @@ import fp from 'fastify-plugin';
  *
  * @remarks
  * - **Algorithm:** legacy request-pinned transactions were removed; settlement always reports
- *   `no_transaction` because org-scoped work runs in `withOrganizationDatabaseContext`.
+ *   `no_transaction` because org-scoped work runs in `withPrincipalDatabaseContext`.
  * - **Failure modes:** none — this is a compatibility stub for the lifecycle coordinator.
  * - **Side effects:** none.
  * - **Notes:** idempotency cache writes and on-commit dispatch proceed whenever settlement is
@@ -40,7 +40,7 @@ export async function settleAndAwaitOrganizationRlsTransaction(
  *
  * @remarks
  * sec-M4: this plugin used to pin a pooled DB checkout for the duration of
- * the request. Now `withOrganizationDatabaseContext` opens its own short-
+ * the request. Now `withPrincipalDatabaseContext` opens its own short-
  * lived transaction at each call site, so there is nothing for this plugin
  * to do — it registers, owns no hooks, and returns. It is NOT safe to delete
  * yet because `request-lifecycle.middleware.ts` imports

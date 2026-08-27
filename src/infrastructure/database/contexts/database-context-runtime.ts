@@ -181,7 +181,7 @@ export function workerDatabaseContextForOrganization(
 /**
  * Builds a `user`-kind {@link WorkerDatabaseContext} for user-scoped retention/export
  * jobs (e.g. GDPR data export, user-tombstone retention). Pairs with
- * `withUserDatabaseContext` to pin ALS for the duration of the job.
+ * `withPrincipalDatabaseContext (user scope)` to pin ALS for the duration of the job.
  */
 export function workerDatabaseContextForUser(userPublicId: string): WorkerDatabaseContext {
   return { kind: 'user', userPublicId };

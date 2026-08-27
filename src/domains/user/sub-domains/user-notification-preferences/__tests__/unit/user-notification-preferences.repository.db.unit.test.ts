@@ -88,7 +88,7 @@ describe('UserNotificationPreferencesRepository (database)', () => {
   // sec-U7: defense-in-depth pin on `organization_id`. The original RLS
   // policy carried an org branch that only verified the `app.current_organization_public_id`
   // GUC matched, NOT membership — a future route wrapping this table in
-  // `withOrganizationDatabaseContext` would have let any user write
+  // `withPrincipalDatabaseContext` would have let any user write
   // preferences against any org id they passed in `X-Organization-Id`,
   // bypassing membership entirely. The schema-level CHECK constraint
   // (`chk_user_notif_prefs_no_org`) refuses non-null `organization_id`

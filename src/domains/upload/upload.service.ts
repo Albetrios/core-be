@@ -63,7 +63,7 @@ interface ReservePendingUploadSlotParams {
  * - **Algorithm:** {@link UploadService.createUpload} resolves owner/organization
  *   context, computes the S3 key from {@link UPLOAD_PURPOSE_CONFIG} + a canonical
  *   extension, then atomically reserves the PENDING row inside
- *   {@link withUserDatabaseContext} (a per-user advisory lock guards the
+ *   {@link withPrincipalDatabaseContext (user scope)} (a per-user advisory lock guards the
  *   pending-count check + insert in one transaction so the quota holds under
  *   concurrency and the owner-access RLS policy authorizes the write) and only
  *   AFTER the slot is committed requests a presigned URL (PUT or POST per
@@ -209,11 +209,11 @@ export class UploadService {
    * @remarks
    * - **sec-r7/M4:** the RLS context MUST match the row being inserted. An org-scoped
    *   upload (`organization_id` set) only satisfies the `uploads_tenant_isolation`
-   *   `WITH CHECK` under `withOrganizationDatabaseContext` (`app.current_organization_public_id`);
-   *   under `withUserDatabaseContext` the INSERT is rejected by RLS as the production
+   *   `WITH CHECK` under `withPrincipalDatabaseContext` (`app.current_organization_public_id`);
+   *   under `withPrincipalDatabaseContext (user scope)` the INSERT is rejected by RLS as the production
    *   `core_be_app` role (FORCE RLS) — every org-logo / org-file upload would 500.
    *   User-scoped uploads (`organization_id` NULL, e.g. avatars) run under
-   *   `withUserDatabaseContext` so the `uploads_owner_access` policy applies. The org cap
+   *   `withPrincipalDatabaseContext (user scope)` so the `uploads_owner_access` policy applies. The org cap
    *   is the primary abuse guard for org uploads (sec-UP4); the per-user cap is enforced
    *   against the user's pending rows visible in the active context.
    */

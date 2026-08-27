@@ -438,7 +438,7 @@ export class MfaService {
         // arbitrary one via `findTotpByUserId(.limit(1))`, frequently rejecting
         // the user's codes against a stale secret. Revoking old factors AND
         // invalidating unused recovery codes BEFORE inserting the new ones keeps
-        // the whole transition inside one `withUserDatabaseContext` transaction
+        // the whole transition inside one `withPrincipalDatabaseContext (user scope)` transaction
         // — a crash partway through rolls everything back and the user can
         // simply restart the enroll-confirm flow.
         const existingMfaMethods = await this.authMethodService.listMfaMethodsByUserId(user.id);
@@ -457,13 +457,13 @@ export class MfaService {
           created_by_user_id: user.id,
         });
         await insertMfaRecoveryCodes(user.id, recoveryCodeHashes);
-        // sec-re-06: flip is_mfa_enabled INSIDE the same withUserDatabaseContext
+        // sec-re-06: flip is_mfa_enabled INSIDE the same withPrincipalDatabaseContext (user scope)
         // callback so it is part of the same transaction as the auth_methods insert
         // and recovery-codes insert. Previously it ran AFTER commit on a separate
         // connection; a crash / pool timeout between commit and the flip left the
         // user with valid TOTP + recovery codes but is_mfa_enabled = false, so the
         // next login skipped the MFA challenge entirely.
-        // The nested withUserDatabaseContext call reuses the already-pinned handle
+        // The nested withPrincipalDatabaseContext (user scope) call reuses the already-pinned handle
         // (the outer callback is still inside the same transaction), so no separate
         // transaction is opened — all three writes still commit atomically.
         await this.userService.updateMfaEnabled(user.public_id, true);
@@ -523,10 +523,10 @@ export class MfaService {
         }
         await this.authMethodService.revokeAuthMethod(found.id, user.id);
         const remaining = await this.authMethodService.listMfaMethodsByUserId(user.id);
-        // sec-new-A4: flip is_mfa_enabled INSIDE the same withUserDatabaseContext
+        // sec-new-A4: flip is_mfa_enabled INSIDE the same withPrincipalDatabaseContext (user scope)
         // transaction as the revoke so there is no TOCTOU window where a concurrent
         // enroll could set is_mfa_enabled = true between the delete and the flag flip.
-        // The nested withUserDatabaseContext call reuses the already-pinned handle.
+        // The nested withPrincipalDatabaseContext (user scope) call reuses the already-pinned handle.
         if (remaining.length === 0) {
           await this.userService.updateMfaEnabled(user.public_id, false);
         }

@@ -3,9 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   const inner = ((callback: (databaseHandle: unknown) => unknown) =>
-    withGlobalRetentionCleanupDatabaseContextMock(callback)) as unknown as (
-    ...parameters: unknown[]
-  ) => unknown;
+    globalRetentionContextMock(callback)) as unknown as (...parameters: unknown[]) => unknown;
   return {
     ...actual,
     withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
@@ -20,7 +18,7 @@ const workerState = vi.hoisted(() => ({
   onHandlers: {} as Record<string, (...args: unknown[]) => void>,
 }));
 
-const withGlobalRetentionCleanupDatabaseContextMock = vi.fn();
+const globalRetentionContextMock = vi.fn();
 const runWebhookDeliveryAttemptRetentionJobMock = vi.fn();
 
 vi.mock('bullmq', () => ({
@@ -77,10 +75,10 @@ describe('webhook-delivery-attempt-retention.worker', () => {
     workerState.processor = undefined;
     workerState.options = undefined;
     workerState.onHandlers = {};
-    withGlobalRetentionCleanupDatabaseContextMock.mockReset();
+    globalRetentionContextMock.mockReset();
     runWebhookDeliveryAttemptRetentionJobMock.mockReset();
 
-    withGlobalRetentionCleanupDatabaseContextMock.mockImplementation(
+    globalRetentionContextMock.mockImplementation(
       async (callback: (databaseHandle: unknown) => Promise<unknown>) =>
         callback({ kind: 'global-retention' }),
     );
@@ -112,7 +110,7 @@ describe('webhook-delivery-attempt-retention.worker', () => {
     createWebhookDeliveryAttemptRetentionWorker();
     const result = await workerState.processor?.();
 
-    expect(withGlobalRetentionCleanupDatabaseContextMock).toHaveBeenCalledOnce();
+    expect(globalRetentionContextMock).toHaveBeenCalledOnce();
     expect(runWebhookDeliveryAttemptRetentionJobMock).toHaveBeenCalledWith({
       kind: 'global-retention',
     });

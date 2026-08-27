@@ -3,9 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   const inner = ((callback: (databaseHandle: unknown) => unknown) =>
-    withSessionRetentionCleanupDatabaseContextMock(callback)) as unknown as (
-    ...parameters: unknown[]
-  ) => unknown;
+    sessionRetentionContextMock(callback)) as unknown as (...parameters: unknown[]) => unknown;
   return {
     ...actual,
     withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
@@ -20,7 +18,7 @@ const workerState = vi.hoisted(() => ({
 }));
 
 const deleteInBatchesByConditionMock = vi.fn();
-const withSessionRetentionCleanupDatabaseContextMock = vi.fn();
+const sessionRetentionContextMock = vi.fn();
 
 vi.mock('bullmq', () => ({
   Worker: vi.fn().mockImplementation(function WorkerMock(_queueName, processor, options) {
@@ -72,9 +70,9 @@ describe('session-cleanup.worker', () => {
     workerState.processor = undefined;
     workerState.options = undefined;
     deleteInBatchesByConditionMock.mockReset();
-    withSessionRetentionCleanupDatabaseContextMock.mockReset();
+    sessionRetentionContextMock.mockReset();
     deleteInBatchesByConditionMock.mockResolvedValue({ deletedCount: 3, blockedCount: 1 });
-    withSessionRetentionCleanupDatabaseContextMock.mockImplementation(
+    sessionRetentionContextMock.mockImplementation(
       async (callback: (databaseHandle: unknown) => Promise<unknown>) =>
         callback({ kind: 'session-retention' }),
     );
@@ -86,7 +84,7 @@ describe('session-cleanup.worker', () => {
 
     expect(handle.queueName).toBe('session-cleanup');
     expect(workerState.options).toEqual(expect.objectContaining({ concurrency: 1 }));
-    expect(withSessionRetentionCleanupDatabaseContextMock).toHaveBeenCalledOnce();
+    expect(sessionRetentionContextMock).toHaveBeenCalledOnce();
     expect(deleteInBatchesByConditionMock).toHaveBeenCalledWith(
       expect.objectContaining({
         databaseHandle: { kind: 'session-retention' },

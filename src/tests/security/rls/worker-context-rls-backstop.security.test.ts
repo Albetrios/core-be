@@ -14,7 +14,7 @@ import { resolveVerifiedOrganizationPrincipalScope } from '@/shared/utils/identi
  * Worker context RLS backstop.
  *
  * Workers run without the HTTP tenant middleware and establish their own organization
- * context via {@link withOrganizationContext} (the real wrapper used by every tenant-scoped
+ * context via {@link withPrincipalDatabaseContext} (the real wrapper used by every tenant-scoped
  * job). `worker-tenant-isolation.security.test.ts` proves the repository layer scopes by
  * `organizationPublicId`; this proves the LAST line of defense: even a raw query run inside
  * `withPrincipalDatabaseContext(resolveVerifiedOrganizationPrincipalScope(orgB)` cannot read or mutate orgA's rows), because the wrapper sets

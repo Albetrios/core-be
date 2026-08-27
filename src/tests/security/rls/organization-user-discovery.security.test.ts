@@ -28,7 +28,7 @@ import { grantCoreBeAppRoleForTests } from '@/tests/helpers/rls-matrix.helper.js
  *      `tenancy.list_pending_member_invitations_for_email` SECURITY DEFINER helpers
  *      let the invitation accept route resolve the owning organization
  *      without an active `app.current_organization_public_id` GUC, then wrap the actual write
- *      in `withOrganizationDatabaseContext`.
+ *      in `withPrincipalDatabaseContext`.
  *
  * All assertions run under `core_be_app` so RLS is enforced (the test runner role
  * `core` typically inherits BYPASSRLS, which would mask regressions).

@@ -10,7 +10,7 @@ import { mfa_recovery_codes } from './auth-mfa-recovery-code.schema.js';
  * {@link hashMfaRecoveryCode} so this repository never sees the plaintext. Idempotent by the
  * unique `(user_id, code_hash)` partial index — duplicate hashes silently skip on conflict.
  * RLS-gated by `app.current_user_public_id`, so callers must invoke this inside
- * `withUserDatabaseContext`.
+ * `withPrincipalDatabaseContext (user scope)`.
  */
 export async function insertMfaRecoveryCodes(
   userId: number,
@@ -41,7 +41,7 @@ export function hashMfaRecoveryCode(plainCode: string): string {
  * user can't authenticate against codes that belonged to a TOTP secret they no longer hold
  * (sec-re-04). Idempotent — re-running the call does nothing because all rows are already
  * marked used. RLS-gated by `app.current_user_public_id`, so callers must invoke this inside
- * `withUserDatabaseContext`.
+ * `withPrincipalDatabaseContext (user scope)`.
  */
 export async function invalidateAllUnusedRecoveryCodesForUser(userId: number): Promise<void> {
   await getRequestDatabase()
@@ -54,7 +54,7 @@ export async function invalidateAllUnusedRecoveryCodesForUser(userId: number): P
  * Atomically consumes a recovery code for `userId`: sets `used_at` only when the row is still unused;
  * returns `true` on success and `false` on unknown / already-consumed codes. Enforces the single-use
  * invariant via the UPDATE filter. `auth.mfa_recovery_codes` is FORCE RLS keyed on
- * `app.current_user_public_id`, so callers must invoke this inside `withUserDatabaseContext`.
+ * `app.current_user_public_id`, so callers must invoke this inside `withPrincipalDatabaseContext (user scope)`.
  */
 export async function consumeMfaRecoveryCode(userId: number, plainCode: string): Promise<boolean> {
   const codeHash = hashMfaRecoveryCode(plainCode);

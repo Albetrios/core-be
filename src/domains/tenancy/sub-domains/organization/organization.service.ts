@@ -83,9 +83,9 @@ export type OrganizationOffboardingDependencies = {
  * create / update / soft-delete plus logo lifecycle.
  *
  * @remarks
- * - **Algorithm:** every mutation runs inside `withOrganizationDatabaseContext`
+ * - **Algorithm:** every mutation runs inside `withPrincipalDatabaseContext`
  *   (sets `app.current_organization_public_id` for RLS) and reads use
- *   `withUserDatabaseContext` to satisfy the `organizations_user_discovery`
+ *   `withPrincipalDatabaseContext (user scope)` to satisfy the `organizations_user_discovery`
  *   policy. Slug uniqueness is enforced explicitly; access checks short-
  *   circuit for global admins and otherwise require ownership or an active
  *   membership via {@link OrganizationRepository.userCanAccessOrganization}.
@@ -341,7 +341,7 @@ export class OrganizationService {
   }
 
   /**
-   * Cross-organization read for the current user. Wraps in `withUserDatabaseContext`
+   * Cross-organization read for the current user. Wraps in `withPrincipalDatabaseContext (user scope)`
    * so the `organizations_user_discovery` and `memberships_user_self_discovery`
    * RLS policies see `app.current_user_public_id` (introduced by migration
    * `20260520000004_organization_discovery_and_invitation_lookup_rls.sql`). Without

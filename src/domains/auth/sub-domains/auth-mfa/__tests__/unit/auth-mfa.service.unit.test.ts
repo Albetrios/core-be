@@ -359,8 +359,8 @@ describe('MfaService', () => {
     redis.getdel.mockResolvedValueOnce('TESTSECRET');
 
     // Track call order: createAuthMethodRecord → insertMfaRecoveryCodes → updateMfaEnabled
-    // must all happen inside the withUserDatabaseContext callback (same transaction).
-    // sec-re-06: the prior code called updateMfaEnabled AFTER withUserDatabaseContext
+    // must all happen inside the withPrincipalDatabaseContext (user scope) callback (same transaction).
+    // sec-re-06: the prior code called updateMfaEnabled AFTER withPrincipalDatabaseContext (user scope)
     // returned, on a separate connection; a crash between commit and the flip left the
     // user with valid TOTP + codes but is_mfa_enabled=false, bypassing MFA at login.
     const callOrder: string[] = [];
@@ -614,8 +614,8 @@ describe('MfaService', () => {
     );
   });
 
-  it('sec-new-A4: updateMfaEnabled is called inside the withUserDatabaseContext transaction (no TOCTOU window)', async () => {
-    // Regression: the previous code called updateMfaEnabled AFTER withUserDatabaseContext
+  it('sec-new-A4: updateMfaEnabled is called inside the withPrincipalDatabaseContext (user scope) transaction (no TOCTOU window)', async () => {
+    // Regression: the previous code called updateMfaEnabled AFTER withPrincipalDatabaseContext (user scope)
     // returned, leaving a TOCTOU gap where a concurrent enroll could flip is_mfa_enabled
     // back to true between the revoke commit and the flag update.
     const { withPrincipalDatabaseContext } = await import(

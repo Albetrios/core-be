@@ -79,7 +79,7 @@ describe('AuthMeContextService.getContext', () => {
    * The route's reads split by DATABASE CONTEXT, not by dependency.
    *
    * `getMe`, `list` and `getByPublicId` all want `app.current_user_public_id` set to the same value, so
-   * they share one `withUserDatabaseContext` and therefore one pooled checkout — they serialize
+   * they share one `withPrincipalDatabaseContext (user scope)` and therefore one pooled checkout — they serialize
    * on it deliberately, and asserting they run concurrently would pin the opposite of the design.
    * `resolveUserOrganizationPermissions` drives `app.current_organization_public_id` instead, so it owns
    * a separate transaction and MUST still overlap the user-scoped block; chaining it after would

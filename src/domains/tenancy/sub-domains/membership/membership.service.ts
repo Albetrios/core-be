@@ -99,7 +99,7 @@ export interface MembershipPermissionsOutput {
  *
  * @remarks
  * - **Algorithm:** every public method runs inside
- *   {@link withOrganizationDatabaseContext} and resolves the caller's
+ *   {@link withPrincipalDatabaseContext} and resolves the caller's
  *   organization through
  *   {@link OrganizationService.requireOrganizationRecordByPublicId}
  *   before touching the membership repository. `transferOwnership` is
@@ -715,7 +715,7 @@ export class MembershipService {
    *
    * @remarks
    * - **Algorithm:** runs {@link MembershipRepository.countActiveByOrganization} inside
-   *   {@link withOrganizationDatabaseContext} so the `memberships` RLS policy resolves the
+   *   {@link withPrincipalDatabaseContext} so the `memberships` RLS policy resolves the
    *   org's rows. Resolves the org's internal id from its public id first.
    * - **Failure modes:** `NotFoundError('Organization')` when the public id does not resolve.
    * - **Side effects:** one read-only COUNT query under the org GUC.

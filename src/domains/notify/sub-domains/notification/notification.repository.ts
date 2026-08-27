@@ -100,7 +100,7 @@ export class NotificationRepository {
   /**
    * sec-D #10: resolve the recipient's user public id from a notification id via the
    * `notify.resolve_user_public_id_for_notification` SECURITY DEFINER function. Used by
-   * the notification dispatch worker to pin `withUserDatabaseContext` for NULL-organization
+   * the notification dispatch worker to pin `withPrincipalDatabaseContext (user scope)` for NULL-organization
    * notifications instead of the wider `app.global_retention_cleanup` retention scope.
    * Returns null when the notification or recipient cannot be resolved (worker treats this
    * as a hard error and throws).

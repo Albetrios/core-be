@@ -19,7 +19,7 @@ import { serializeOrganizationNotificationPolicy } from './organization-notifica
  *
  * @remarks
  * - **Algorithm:** every operation is wrapped in
- *   `withOrganizationDatabaseContext` so RLS (`app.current_organization_public_id`)
+ *   `withPrincipalDatabaseContext` so RLS (`app.current_organization_public_id`)
  *   matches the resource. Create defers to the repository's upsert which
  *   resurrects soft-deleted rows on `(organization_id, notification_type,
  *   channel)` conflicts. Update copies only defined fields and converts

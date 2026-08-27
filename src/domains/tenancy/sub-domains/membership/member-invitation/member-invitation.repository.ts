@@ -21,7 +21,7 @@ import {
  * `tenancy.resolve_member_invitation_lookup_by_public_id` function. Used by
  * `MemberInvitationService.accept` so the caller can resolve the owning
  * organization without RLS context, then wrap the actual UPDATE in
- * `withOrganizationDatabaseContext`.
+ * `withPrincipalDatabaseContext`.
  */
 export interface MemberInvitationOrganizationLookupRow {
   organization_public_id: string;

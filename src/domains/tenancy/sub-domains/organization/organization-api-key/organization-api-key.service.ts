@@ -57,7 +57,7 @@ function getKeyPrefix(key: string): string {
  *   validation errors propagate from the DTO validators.
  * - **Side effects:** persistent row writes (`create`, `update`,
  *   `softDelete`, `touchLastUsedAt`); mutations are wrapped in
- *   `withOrganizationDatabaseContext` to satisfy RLS.
+ *   `withPrincipalDatabaseContext` to satisfy RLS.
  * - **Notes:** raw secret is returned to the caller exactly once (creation
  *   and rotation responses); revocation = soft-delete or status flip to
  *   `REVOKED`; key prefix is non-secret and used purely as a lookup index.

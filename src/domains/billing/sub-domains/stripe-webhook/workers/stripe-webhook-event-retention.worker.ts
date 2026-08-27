@@ -22,7 +22,7 @@ import {
  * @remarks
  * - **Algorithm:** BullMQ {@link Worker} bound to the retention queue. Each job
  *   runs {@link runStripeWebhookEventRetentionJob} inside
- *   {@link withSystemTableRetentionContext} so the delete uses the system-table
+ *   {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_retention)} so the delete uses the system-table
  *   retention context with a worker statement-timeout (sec-new-Q4); no
  *   organization GUC required.
  * - **Failure modes:** Stalled jobs are logged; processor errors propagate to

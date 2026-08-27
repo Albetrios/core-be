@@ -12,7 +12,7 @@ import {
  * and BullMQ before a Prometheus scrape.
  *
  * @remarks
- * The `mail_outbox` count runs inside {@link withSystemTableWorkerContext} so the scrape
+ * The `mail_outbox` count runs inside {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker)} so the scrape
  * succeeds in the BullMQ worker process, which has no request/tenant database context — the
  * worker `/metrics` endpoint would otherwise throw `WorkerDatabaseContextError`. In the API
  * process the wrapper is a transparent pass-through, so request-path behaviour is unchanged.

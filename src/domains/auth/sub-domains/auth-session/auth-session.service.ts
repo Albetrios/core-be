@@ -236,7 +236,7 @@ export class AuthSessionService {
 
     // sec-new-A2: verify the owning user is still active. Runs only on cache miss
     // (first request per 60 s window) to avoid a per-request DB round-trip.
-    // findUserRecordByPublicId wraps withUserDatabaseContext internally.
+    // findUserRecordByPublicId wraps withPrincipalDatabaseContext (user scope) internally.
     const user = await runReadWithTransientRetry(() =>
       this.userService.findUserRecordByPublicId(userPublicId),
     );

@@ -102,7 +102,7 @@ export type UserOffboardingDependencies = {
  * - **Side effects:** writes `auth.users`; deletes S3 avatar objects; revokes sessions /
  *   credentials via auth services; tombstones uploads; purges data-export rows + S3 objects.
  *   No domain events emitted (offboarding is synchronous; export completion uses direct mail).
- * - **Notes:** password / MFA / email-verification updates run inside `withUserDatabaseContext`
+ * - **Notes:** password / MFA / email-verification updates run inside `withPrincipalDatabaseContext (user scope)`
  *   so RLS policies on user-scoped child tables continue to work; `wireOffboardingServices` is
  *   the only seam for cross-domain dependencies — keep them off the constructor to avoid
  *   circular DI between user, auth, upload, and user-data-export.
@@ -328,7 +328,7 @@ export class UserService {
    *
    * @remarks
    * Delegates to {@link UserService.createFromOAuth} (the shared passwordless-insert path: generate
-   * `public_id`, enter the owner `withUserDatabaseContext` so the FORCE-RLS owner WITH CHECK passes,
+   * `public_id`, enter the owner `withPrincipalDatabaseContext (user scope)` so the FORCE-RLS owner WITH CHECK passes,
    * retry on the rare public-id collision). Used when `POST /auth/email/send-code` receives an
    * unknown email — the account is created on the spot (no password) and the verification code it then
    * receives is the proof-of-email-control that flips `is_email_verified` on login.

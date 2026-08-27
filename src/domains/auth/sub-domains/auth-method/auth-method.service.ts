@@ -137,7 +137,7 @@ export class AuthMethodService {
    * @remarks
    * - **Algorithm:** under the owner DB context, short-circuits on the first login-capable
    *   `auth_methods` row; otherwise checks for at least one non-revoked `webauthn_credentials` row.
-   *   Both tables are FORCE RLS keyed on the owner, so the read runs inside `withUserDatabaseContext`.
+   *   Both tables are FORCE RLS keyed on the owner, so the read runs inside `withPrincipalDatabaseContext (user scope)`.
    * - **Failure modes:** `NotFoundError` when the user record is missing.
    * - **Side effects:** transient owner-scoped DB context only.
    * - **Notes:** unlike {@link AuthMethodService.hasLoginCapableMethod} (which intentionally EXCLUDES
@@ -238,7 +238,7 @@ export class AuthMethodService {
         // intact, so `POST /auth/login` continued to accept the old credential
         // — the user-facing "I removed my password" view did not match the
         // auth-layer view. Clear the hash atomically in the same
-        // withUserDatabaseContext transaction so the invariant is real.
+        // withPrincipalDatabaseContext (user scope) transaction so the invariant is real.
         if (existing.method_type === 'PASSWORD') {
           await this.userService.clearPasswordHash(userPublicId);
         }
@@ -261,7 +261,7 @@ export class AuthMethodService {
    * for the deleted user.
    *
    * @remarks
-   * Runs inside `withUserDatabaseContext` so the RLS-scoped UPDATE only touches rows
+   * Runs inside `withPrincipalDatabaseContext (user scope)` so the RLS-scoped UPDATE only touches rows
    * owned by the target user; the operation is idempotent (already-used or expired
    * tokens are no-ops). Safe to call at any point in the offboarding sequence — there is
    * no rollback risk because invalidation is a strict superset of natural token expiry.
@@ -314,7 +314,7 @@ export class AuthMethodService {
    *
    * @remarks
    * - **Algorithm:** inserts one `method_type=EMAIL_CODE` row owned by the user, pinning the owner
-   *   `withUserDatabaseContext` so the FORCE-RLS owner WITH CHECK authorizes the write. Intended to
+   *   `withPrincipalDatabaseContext (user scope)` so the FORCE-RLS owner WITH CHECK authorizes the write. Intended to
    *   run inside the auto-signup pinned transaction so it commits atomically with the user row.
    * - **Failure modes:** propagates the insert error (e.g. a CHECK/constraint violation) to roll the
    *   auto-signup transaction back.
@@ -353,7 +353,7 @@ export class AuthMethodService {
 
   /**
    * Serializes concurrent credential mutations for one user via a transaction-scoped advisory lock.
-   * Must be called inside the caller's `withUserDatabaseContext` transaction, before a
+   * Must be called inside the caller's `withPrincipalDatabaseContext (user scope)` transaction, before a
    * count-then-mutate, so concurrent requests cannot interleave the count and the write.
    */
   async acquireCredentialMutationLock(userId: number): Promise<void> {
@@ -452,7 +452,7 @@ export class AuthMethodService {
     // Token consume, password update, token invalidation and session revocation must be atomic.
     // A partial apply (password changed but sessions not revoked) would leave a potentially
     // compromised account's existing sessions live after a recovery reset. One pinned
-    // transaction makes every nested `withUserDatabaseContext` call reuse it (all-or-nothing);
+    // transaction makes every nested `withPrincipalDatabaseContext (user scope)` call reuse it (all-or-nothing);
     // a mid-operation failure rolls the password change back rather than committing it alone.
     // Returns the reset user so the caller (AuthService.resetPassword) can mint a fresh session
     // AFTER this revoke-all-sessions, leaving the resetter's new session as the only live one.
@@ -515,7 +515,7 @@ export class AuthMethodService {
     // failure in between left the new password in place while every existing (potentially
     // attacker-held) session stayed live, so a user changing their password to evict an attacker
     // could believe the account was secured while the stolen bearer token remained usable. The
-    // pinned transaction makes nested `withUserDatabaseContext` calls reuse it, so a mid-operation
+    // pinned transaction makes nested `withPrincipalDatabaseContext (user scope)` calls reuse it, so a mid-operation
     // failure rolls the password change back rather than committing it alone.
     await withTransaction((transaction) =>
       runWithPinnedDatabaseHandle(transaction as RequestScopedPostgresDatabase, async () => {

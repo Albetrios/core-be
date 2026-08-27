@@ -116,7 +116,7 @@ export class AuditService {
     // sec-R10: the `audit.outbox` INSERT is gated by RLS (audit_outbox_tenant_isolation_insert:
     // org rows need `app.current_organization_public_id`, tenantless rows need `app.system_audit_insert`).
     // Post-sec-M4 the per-request org RLS transaction is a no-op and controllers emit audit AFTER
-    // the service's withOrganizationDatabaseContext block has closed — so without establishing the
+    // the service's withPrincipalDatabaseContext block has closed — so without establishing the
     // matching context here the bare-pool INSERT is rejected under the production core_be_app role
     // and the row is silently dropped by `recordAuditEvent`. Open the right context per row.
     if (input.organization_public_id) {

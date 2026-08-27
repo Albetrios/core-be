@@ -148,7 +148,7 @@ function assertProviderPriceForStripeBackedPlanChange(
  *
  * @remarks
  * - **Algorithm:** Each public method runs the database portion inside
- *   {@link withOrganizationDatabaseContext} so Postgres sees the org GUC for
+ *   {@link withPrincipalDatabaseContext} so Postgres sees the org GUC for
  *   RLS, then performs the Stripe API call (create / change-plan / cancel /
  *   resume) outside that context, then re-opens an organization context to
  *   write back the resulting row. Webhook-triggered methods

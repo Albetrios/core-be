@@ -47,7 +47,7 @@ export class OrganizationRepository extends BaseRepository {
    * @remarks
    * `auth.users` is FORCE RLS and its only policy is
    * `public_id = app.current_user_public_id OR app.global_admin`. Most callers here run inside
-   * `withOrganizationDatabaseContext`, which sets ONLY `app.current_organization_public_id` — so a
+   * `withPrincipalDatabaseContext`, which sets ONLY `app.current_organization_public_id` — so a
    * direct SELECT matched no row and returned `null`, silently nulling the
    * `created_by_user_id` / `updated_by_user_id` attribution it feeds. The resolver carries the
    * identical `deleted_at IS NULL` predicate, so behaviour is unchanged where RLS already
