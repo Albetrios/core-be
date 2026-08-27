@@ -4,8 +4,6 @@ import { createDrainAuditOutboxRepository } from '@/domains/audit/audit-outbox.r
 import type { AuditOutboxRow } from '@/domains/audit/audit-outbox.schema.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import { users } from '@/domains/user/user.schema.js';
-import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
-import { api_keys } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.schema.js';
 import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { env } from '@/shared/config/env.config.js';
@@ -63,6 +61,19 @@ function collectAuditOutboxPublicIds(batch: readonly AuditOutboxRow[]): {
   return { userPublicIds, orgPublicIds, apiKeyPublicIds };
 }
 
+/** Runs one SECURITY DEFINER resolver query and normalizes the driver's row shape. */
+async function executeResolverFunction(
+  databaseHandle: RequestScopedPostgresDatabase,
+  statement: ReturnType<typeof drizzleSql>,
+): Promise<{ id: number | string; public_id: string }[]> {
+  const result = await databaseHandle.execute<{ id: number | string; public_id: string }>(
+    statement,
+  );
+  return Array.isArray(result)
+    ? (result as { id: number | string; public_id: string }[])
+    : ((result as { rows?: { id: number | string; public_id: string }[] }).rows ?? []);
+}
+
 /**
  * Pre-resolves every distinct actor / target / org / API-key public id in the batch
  * to its internal id in 3 round trips (one per table). Done UNDER `app.global_admin = true`
@@ -94,22 +105,31 @@ async function buildResolutionMaps(
     for (const row of rows) userIdsByPublicId.set(row.public_id, row.id);
   }
 
+  // Org and API-key ids resolve through SECURITY DEFINER functions (migration
+  // 20260827040000): app.global_admin grants NOTHING on tenancy.*, so plain
+  // selects here returned ZERO rows under the RLS-subject roles and every
+  // org-scoped / api-key-actor outbox row was permanently discarded after max
+  // attempts. The functions are narrow id lookups, mirroring the existing
+  // billing.resolve_organization_public_id_for_stripe_subscription pattern.
   const orgIdsByPublicId = new Map<string, number>();
   if (orgPublicIds.size > 0) {
-    const rows = await databaseHandle
-      .select({ id: organizations.id, public_id: organizations.public_id })
-      .from(organizations)
-      .where(inArray(organizations.public_id, [...orgPublicIds]));
-    for (const row of rows) orgIdsByPublicId.set(row.public_id, row.id);
+    const rows = await executeResolverFunction(
+      databaseHandle,
+      // Bound as one comma-joined param + string_to_array: the driver's JS-array
+      // binding is not a reliable text[] literal, and public ids are [a-z0-9_] so
+      // the join is unambiguous.
+      drizzleSql`SELECT id, public_id FROM audit.resolve_organization_ids_for_public_ids(string_to_array(${[...orgPublicIds].join(',')}, ','))`,
+    );
+    for (const row of rows) orgIdsByPublicId.set(row.public_id, Number(row.id));
   }
 
   const apiKeyIdsByPublicId = new Map<string, number>();
   if (apiKeyPublicIds.size > 0) {
-    const rows = await databaseHandle
-      .select({ id: api_keys.id, public_id: api_keys.public_id })
-      .from(api_keys)
-      .where(inArray(api_keys.public_id, [...apiKeyPublicIds]));
-    for (const row of rows) apiKeyIdsByPublicId.set(row.public_id, row.id);
+    const rows = await executeResolverFunction(
+      databaseHandle,
+      drizzleSql`SELECT id, public_id FROM audit.resolve_api_key_ids_for_public_ids(string_to_array(${[...apiKeyPublicIds].join(',')}, ','))`,
+    );
+    for (const row of rows) apiKeyIdsByPublicId.set(row.public_id, Number(row.id));
   }
 
   return { userIdsByPublicId, orgIdsByPublicId, apiKeyIdsByPublicId };

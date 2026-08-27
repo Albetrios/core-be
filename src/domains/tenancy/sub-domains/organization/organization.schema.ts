@@ -84,13 +84,23 @@ export const organizations = tenancySchema
       // are allowed; team slugs must match the kebab pattern.
       check('chk_organizations_slug', sql`${table.slug} ~ '^[a-z0-9-]+$'`),
       check('chk_organizations_updated', sql`${table.updated_at} >= ${table.created_at}`),
+      // sec-new-D3 keeps `deleted_at IS NULL` on the tenant SELECT arm (a stale org claim
+      // must never read a soft-deleted org). Because Postgres requires an UPDATE's NEW row
+      // to stay SELECT-visible, the tombstoning soft-delete cannot run under the plain org
+      // scope — the service runs it under the global-retention context, whose arm appears
+      // in BOTH USING and WITH CHECK (mirroring uploads_tenant_isolation; the tombstone
+      // never changes the org's identity columns).
       pgPolicy('organizations_tenant_isolation', {
         as: 'permissive',
         for: 'all',
         to: 'public',
-        using: sql`${table.public_id} = current_setting('app.current_organization_id', true)
+        using: sql`(
+            ${table.public_id} = current_setting('app.current_organization_id', true)
+            AND ${table.deleted_at} IS NULL
+          )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
-        withCheck: sql`${table.public_id} = current_setting('app.current_organization_id', true)`,
+        withCheck: sql`${table.public_id} = current_setting('app.current_organization_id', true)
+          OR current_setting('app.global_retention_cleanup', true) = 'true'`,
       }),
     ],
   )

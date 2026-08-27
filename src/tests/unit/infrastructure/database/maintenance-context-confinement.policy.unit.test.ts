@@ -18,12 +18,16 @@ const ALLOWED_PATH_FRAGMENTS: Record<MaintenanceContextKind, readonly string[]> 
     'notification.repository.ts', // retention delete helper invoked by the notify retention worker
     'worker-runtime/worker-processor.util.ts', // runGlobalRetentionWorkerJob
     'scripts/ops/', // operator reconcile scripts
+    // Tombstoning soft-delete: sec-new-D3 hides the tombstoned NEW row from the tenant
+    // SELECT arm, so the final UPDATE must carry the retention arm (see the service).
+    'organization/organization.service.ts',
   ],
   session_retention_cleanup: ['auth-session/workers/'],
   global_admin: [
     'user/user.service.ts', // admin user suspend / soft-delete / cross-user actor lookups
     'audit/audit.service.ts', // admin audit listing
     'notification/workers/notification.worker.ts', // cross-user recipient resolution
+    'queue/dlq/dlq-replay.util.ts', // replay-audit actor lookup (cross-user read)
     'tests/helpers/rls-matrix.helper.ts',
   ],
   system_audit_insert: [

@@ -55,7 +55,7 @@ const RLS_TABLE_SCOPE_MAP: Record<string, readonly string[]> = {
   'auth.user_data_exports': ['app.current_user_id', 'app.global_retention_cleanup'],
   'auth.user_notification_preferences': ['app.current_user_id'],
   'auth.user_settings': ['app.current_user_id'],
-  'auth.users': ['app.current_user_id', 'app.global_admin'],
+  'auth.users': ['app.current_user_id', 'app.global_admin', 'app.global_retention_cleanup'],
   'auth.webauthn_credentials': ['app.current_user_id'],
   'billing.subscriptions': ['app.current_organization_id', 'app.global_retention_cleanup'],
   'notify.notifications': [

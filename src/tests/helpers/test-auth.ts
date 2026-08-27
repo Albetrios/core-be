@@ -6,7 +6,7 @@ import { signAccessToken } from '@/shared/utils/security/jwt.util.js';
 import { AuthSessionRepository } from '@/domains/auth/sub-domains/auth-session/auth-session.repository.js';
 import { database } from '@/infrastructure/database/connection.js';
 import { users } from '@/domains/user/user.schema.js';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { injectUnauthenticated } from '@/tests/helpers/test-http-inject.helper.js';
 
@@ -64,6 +64,13 @@ async function alignUserWithSuperAdminAllowlist(userPublicId: string): Promise<v
     );
   }
 
+  // Idempotency vs stale state: an interrupted earlier run (or out-of-band probe) can
+  // leave a committed user already holding the allowlist email — the reassignment below
+  // would then violate idx_users_email_unique in suites that never truncate (mcp-auth).
+  // Hard-delete any OTHER row holding the email first; this is a test-only helper.
+  await database
+    .delete(users)
+    .where(and(eq(users.email, superAdminEmail), ne(users.public_id, userPublicId)));
   await database
     .update(users)
     .set({

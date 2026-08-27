@@ -90,6 +90,7 @@ export const users = authSchema
             AND ${table.deleted_at} IS NULL
           )
           OR current_setting('app.global_admin', true) = 'true'
+          OR current_setting('app.global_retention_cleanup', true) = 'true'
         )`,
         withCheck: sql`(
           ${table.public_id} = current_setting('app.current_user_id', true)

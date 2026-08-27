@@ -8,6 +8,8 @@ import { assertTeamOrganization } from './organization-capability.js';
 import { env } from '@/shared/config/env.config.js';
 import { GLOBAL_ROLES, type GlobalRole } from '@/shared/constants/roles.constants.js';
 import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
   withPrincipalDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
@@ -560,8 +562,14 @@ export class OrganizationService {
         public_id,
       );
     }
-    const deleted = await withPrincipalDatabaseContext(scope, () =>
-      this.repository.softDelete(public_id),
+    // The tombstoning UPDATE runs under the global-retention context: sec-new-D3 keeps
+    // `deleted_at IS NULL` on the tenant SELECT arm, and Postgres requires the UPDATE's
+    // NEW row to stay SELECT-visible — under the plain org scope the soft-delete is
+    // RLS-rejected (42501) AFTER Stripe cancellation already ran. The retention arm
+    // covers USING, WITH CHECK, and new-row visibility; identity columns are unchanged.
+    const deleted = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.global_retention_cleanup,
+      () => this.repository.softDelete(public_id),
     );
     if (!deleted) throw new NotFoundError('Organization');
     // Purge every member's cached permissions for this org so access stops

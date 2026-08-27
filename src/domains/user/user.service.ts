@@ -188,9 +188,11 @@ export class UserService {
         () => this.repository.markDeletionStarted(public_id),
       );
       if (!marked) throw new NotFoundError('User');
-      const deleted = await withPrincipalDatabaseContext(
-        resolveVerifiedUserPrincipalScope(public_id),
-        () => this.repository.softDelete(public_id),
+      // The tombstoning UPDATE must run under global_admin: the users SELECT arm gates on
+      // `deleted_at IS NULL`, and Postgres requires the UPDATE's NEW row to stay
+      // SELECT-visible — under the plain user scope the soft-delete is RLS-rejected (42501).
+      const deleted = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+        this.repository.softDelete(public_id),
       );
       if (!deleted) throw new NotFoundError('User');
       return;
@@ -242,9 +244,10 @@ export class UserService {
     await offboarding.authMethodService.invalidateAllVerificationTokensForUser(public_id);
     await offboarding.uploadService.tombstoneAllByUserId(user.id);
     await offboarding.userDataExportService.deleteAllExportsForUser(user.id, public_id);
-    const deleted = await withPrincipalDatabaseContext(
-      resolveVerifiedUserPrincipalScope(public_id),
-      () => this.repository.softDelete(public_id),
+    // global_admin for the same NEW-row SELECT-visibility reason as the short-circuit path
+    // above — the self arm can never see its own tombstoned row.
+    const deleted = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+      this.repository.softDelete(public_id),
     );
     if (!deleted) throw new NotFoundError('User');
     await this.clearAvatarStorage(public_id, user.avatar_url);

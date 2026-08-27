@@ -81,7 +81,18 @@ function buildDatabaseHandle(
     }),
   }));
 
-  const execute = vi.fn().mockResolvedValue(undefined);
+  // execute() serves both the per-row GUC set_config statements (return undefined)
+  // and the two SECURITY DEFINER resolver calls (org / api-key id lookup) — the
+  // resolver SQL is routed by function name and answered from the same fixtures
+  // the table-routed selects use.
+  const execute = vi.fn().mockImplementation(async (statement: unknown) => {
+    const text = JSON.stringify(
+      (statement as { queryChunks?: unknown[] })?.queryChunks ?? statement ?? '',
+    );
+    if (text.includes('resolve_organization_ids_for_public_ids')) return { rows: orgRows };
+    if (text.includes('resolve_api_key_ids_for_public_ids')) return { rows: apiKeyRows };
+    return undefined;
+  });
 
   const handle = { select, insert, execute } as FakeDatabaseHandle;
   // Nested transaction (SAVEPOINT): run the callback with the same handle so its insert hits the
