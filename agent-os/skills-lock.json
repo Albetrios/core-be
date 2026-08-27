@@ -185,7 +185,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/rls-tenant-isolation-guard/SKILL.md",
-      "computedHash": "3d3fa1ab598dca589447e4070f06d736d9e8b7fad2ac57614f2a6ec27727e74b"
+      "computedHash": "00c4a81bac3380201c0cc20273970968413d084472ca6efbca44e8b60c216523"
     },
     "route-catalog": {
       "source": "local",
@@ -251,7 +251,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/test-generator/SKILL.md",
-      "computedHash": "a6e9df605a5e2196fc5d5da2124c8824c1aee7b7f2eab0afd8f9f24d97d1afa7"
+      "computedHash": "502464448c065ac52090fac98f4b1cc54c721482f7b635c060c6a84cded0e7d7"
     },
     "tsdoc-export-guard": {
       "source": "local",

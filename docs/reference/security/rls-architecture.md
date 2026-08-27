@@ -222,6 +222,12 @@ BullMQ payload · `provisioning` = the caller itself verified the id (invite flo
 Stripe event mapping, admin, signup provisioning) — ledgered per importer by
 `verified-scope-usage.policy.unit.test.ts`.
 
+Controller ergonomics: the auth middleware decorates lazy getters
+`request.principalScope` (org-required) and `request.userPrincipalScope`
+(user-required) over the two HTTP minters — controllers relay
+`request.principalScope` into services; authority semantics are identical to
+calling the minters directly.
+
 ## 6. Postgres semantics that shaped the design (learned the hard way)
 
 1. **An UPDATE's NEW row must stay SELECT-visible** whenever the statement reads the

@@ -27,6 +27,8 @@ editing the lock deliberately.
 | Permission-cache post-commit | `src/tests/unit/api/permission-cache-post-commit.policy.unit.test.ts` | Permission-cache invalidation is never called INSIDE a `withPrincipalDatabaseContext` callback (audit R11 — post-commit only; retargeted after the wrapper rename, previously vacuous). |
 | Maintenance role posture | `src/tests/unit/infrastructure/database/maintenance-role.db.unit.test.ts` | `core_be_maintenance` exists, is never superuser/BYPASSRLS, and holds data-plane grants (provisioning: [maintenance-database-role runbook](../../deployment/runbooks/maintenance-database-role.md)). |
 
+| Nightly RLS parity canary | `.github/workflows/scheduled-rls-parity.yml` | The DB suites re-run every night under the PRODUCTION role posture (operator fixtures, RLS-subject maintenance pool, `SET LOCAL ROLE core_be_app`) — regressions that only bite RLS-subject roles open a `ci-failure` issue by morning. |
+
 ## Owner-decision backlog (not yet locked)
 
 - **Bypass arm role-tightening** — after every hosted environment provisions

@@ -283,7 +283,7 @@ Typical flow: `service` → `eventBus.emit` → handler → `recordOutboxEmail()
 - **DI flow**: Container (repos → services) → Routes (controllers) → `src/routes.ts` (domain containers + route registration)
 - **API versioning**: Major versions use `/api/v1`, …; additive/non-breaking changes ship on the same major, a breaking change gets a new major prefix — see **`docs/reference/api/api-versioning.md`** and `src/shared/utils/http/api-versioning.util.ts`.
 - **Data lifecycle**: Soft-delete (`deleted_at`), revocation vs immutable billing ledgers, session/audit retention — see **`docs/reference/data/data-lifecycle-deletion.md`**.
-- **Controllers**: Thin layer; export `create<Resource>Controller(service)` or `create<Resource>Controller(container)` returning handler map. Use `getRequestIdentifier()` and `requireAuth()` from `@/shared/utils/http/request.util.js`.
+- **Controllers**: Thin layer; export `create<Resource>Controller(service)` or `create<Resource>Controller(container)` returning handler map. Use `getRequestIdentifier()` and `requireAuth()` from `@/shared/utils/http/request.util.js`; database scopes come from the lazy `request.principalScope` (org-required) / `request.userPrincipalScope` (user-required) getters and are relayed into services.
 - **Validation**: DTO (Zod schemas in `.dto.ts`), Validator (function-based, calls `.safeParse()`, throws `ValidationError`)
 - **Serializer**: Function-based response shaping in `.serializer.ts` (e.g. `serializeOrganization(row)`)
 - **Containers**: `<domain>.container.ts` handles DI; export services for routes/controllers. Multi-sub-domain domains (auth, user, billing, tenancy) wire sub-domain services via the container — controllers call the appropriate service directly.
