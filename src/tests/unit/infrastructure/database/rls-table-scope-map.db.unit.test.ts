@@ -158,7 +158,7 @@ describe('RLS table → required-scope map (Phase 8)', () => {
 
     const unknown = Object.values(RLS_TABLE_SCOPE_MAP)
       .flat()
-      .filter((guc) => !legal.has(guc) && !KNOWN_DEAD_POLICY_GUCS.has(guc));
+      .filter((guc) => !(legal.has(guc) || KNOWN_DEAD_POLICY_GUCS.has(guc)));
     expect(
       unknown,
       `Policy GUC(s) with no registry entry and no dead-arm note: ${unknown.join(', ')}. ` +
