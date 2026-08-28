@@ -3,7 +3,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { provisionPersonalOrganization } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
 import { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Orchestrates the login/active-organization lookups under the caller's own user RLS context. The
@@ -11,7 +11,7 @@ import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts
  * repository's `null` to `undefined` for their callers.
  *
  * @remarks
- * - **RLS:** every tenancy lookup runs under {@link withPrincipalDatabaseContext (user scope)} via
+ * - **RLS:** every tenancy lookup runs under {@link withAppDatabaseContext (user scope)} via
  *   {@link withUserContextForInternalId}, which sets `app.current_user_public_id` so the
  *   `organizations_user_discovery` / `memberships_user_self_discovery` policies (migration
  *   `20260520000004`) match the caller's own rows. These reads must NOT run under the
@@ -28,7 +28,7 @@ const organizationRepository = new OrganizationRepository();
 
 /**
  * Resolves `userInternalId` → `auth.users.public_id` through the `auth.resolve_user_by_internal_id`
- * SECURITY DEFINER resolver, then runs `callback` under {@link withPrincipalDatabaseContext (user scope)} so the
+ * SECURITY DEFINER resolver, then runs `callback` under {@link withAppDatabaseContext (user scope)} so the
  * tenancy policies see `app.current_user_public_id`.
  *
  * Returns `undefined` when the internal id resolves to no live user, so callers degrade to
@@ -46,7 +46,7 @@ async function withUserContextForInternalId<T>(
 ): Promise<T | undefined> {
   const userPublicId = await organizationRepository.resolveUserPublicIdByInternalId(userInternalId);
   if (userPublicId === null) return undefined;
-  return withPrincipalDatabaseContext(
+  return withAppDatabaseContext(
     resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
     callback,
   );
@@ -174,7 +174,7 @@ export async function resolvePersonalOrganization(
  *   owner). A concurrent provision that loses the race raises a unique violation; we absorb it
  *   and re-resolve, so this function never creates a duplicate and never surfaces the race to
  *   the caller.
- * - **RLS:** provisioning runs inside its own `withPrincipalDatabaseContext` write
+ * - **RLS:** provisioning runs inside its own `withAppDatabaseContext` write
  *   transaction scoped to the new org's pre-generated `public_id` (see
  *   {@link provisionPersonalOrganization}); the surrounding reads run under the caller's own
  *   user context, constrained to the caller's own `user_id`.

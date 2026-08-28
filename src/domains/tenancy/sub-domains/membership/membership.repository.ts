@@ -615,7 +615,7 @@ export class MembershipRepository extends BaseRepository {
    * status to `ACTIVE` and stamps `joined_at` only when the row is still
    * pending (`status <> 'ACTIVE'`). Scoped by internal membership id +
    * organization id so it runs inside the invitation-accept transaction
-   * (shared `withPrincipalDatabaseContext` unit of work) and stays
+   * (shared `withAppDatabaseContext` unit of work) and stays
    * idempotent for a membership that is already active.
    */
   async activateForInvitationAccept(

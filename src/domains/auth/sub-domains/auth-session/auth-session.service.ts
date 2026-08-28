@@ -6,7 +6,7 @@ import type { UserService } from '@/domains/user/user.service.js';
 import { generateRefreshSecret } from '@/domains/auth/auth.http.util.js';
 import {
   SESSION_SCOPE,
-  withSessionDatabaseContext,
+  withAppDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { AuthSessionRepository } from './auth-session.repository.js';
 import type { AuthSessionCreateData } from './auth-session.types.js';
@@ -16,7 +16,6 @@ import {
   setCachedSessionTokenValid,
 } from './session-token-cache.service.js';
 import { runReadWithTransientRetry } from '@/shared/utils/infrastructure/postgres-error.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 function hashAccessToken(rawToken: string): string {
@@ -57,7 +56,7 @@ export class AuthSessionService {
   async list(userPublicId: string) {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       (_databaseHandle) => this.sessionRepository.listByUserId(user.id),
     );
@@ -69,7 +68,7 @@ export class AuthSessionService {
    */
   async listForUserDataExport(options: { userPublicId: string; limit: number }) {
     const user = await this.userService.requireUserRecordByPublicId(options.userPublicId);
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
       (_databaseHandle) => this.sessionRepository.listForUserDataExport(user.id, options.limit),
     );
@@ -78,7 +77,7 @@ export class AuthSessionService {
   async revoke(userPublicId: string, sessionPublicId: string) {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    const revoked = await withPrincipalDatabaseContext(
+    const revoked = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       (_databaseHandle) => this.sessionRepository.revoke(sessionPublicId, user.id),
     );
@@ -102,7 +101,7 @@ export class AuthSessionService {
   async revokeAllSessions(userPublicId: string): Promise<void> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    const revokedSessions = await withPrincipalDatabaseContext(
+    const revokedSessions = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       (_databaseHandle) => this.sessionRepository.revokeAllByUserId(user.id),
     );
@@ -135,7 +134,7 @@ export class AuthSessionService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     const currentTokenHash = hashAccessToken(currentAccessToken);
-    const revokedSessions = await withPrincipalDatabaseContext(
+    const revokedSessions = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       (_databaseHandle) =>
         this.sessionRepository.revokeAllByUserIdExcept(user.id, currentTokenHash),
@@ -150,7 +149,7 @@ export class AuthSessionService {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
     const refreshSecret = generateRefreshSecret();
-    const { session, evictedSessions } = await withPrincipalDatabaseContext(
+    const { session, evictedSessions } = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       async (_databaseHandle) => {
         // Bound the user's concurrent live sessions. Under a per-user advisory lock (so concurrent
@@ -180,7 +179,7 @@ export class AuthSessionService {
   async revokeSessionByAccessToken(token: string): Promise<void> {
     const sessionTokenHash = hashAccessToken(token);
     await invalidateCachedSessionToken(sessionTokenHash);
-    const revoked = await withSessionDatabaseContext(
+    const revoked = await withAppDatabaseContext(
       SESSION_SCOPE.session_token_hash(sessionTokenHash),
       (_databaseHandle) => this.sessionRepository.revokeByTokenHash(sessionTokenHash),
     );
@@ -224,7 +223,7 @@ export class AuthSessionService {
     // otherwise-authenticated request. Only connection-level errors are retried (see
     // runReadWithTransientRetry); an invalid/expired session still returns null on the first attempt.
     const session = await runReadWithTransientRetry(() =>
-      withSessionDatabaseContext(
+      withAppDatabaseContext(
         SESSION_SCOPE.session_token_hash(sessionTokenHash),
         (_databaseHandle) => this.sessionRepository.findActiveByTokenHash(sessionTokenHash),
       ),
@@ -236,7 +235,7 @@ export class AuthSessionService {
 
     // sec-new-A2: verify the owning user is still active. Runs only on cache miss
     // (first request per 60 s window) to avoid a per-request DB round-trip.
-    // findUserRecordByPublicId wraps withPrincipalDatabaseContext (user scope) internally.
+    // findUserRecordByPublicId wraps withAppDatabaseContext (user scope) internally.
     const user = await runReadWithTransientRetry(() =>
       this.userService.findUserRecordByPublicId(userPublicId),
     );
@@ -253,7 +252,7 @@ export class AuthSessionService {
   }
 
   async findActiveSessionByPublicId(sessionPublicId: string) {
-    return withSessionDatabaseContext(
+    return withAppDatabaseContext(
       SESSION_SCOPE.session_public_id(sessionPublicId),
       (_databaseHandle) => this.sessionRepository.findByPublicId(sessionPublicId),
     );
@@ -268,14 +267,14 @@ export class AuthSessionService {
    * to filter revoked rows.
    */
   async findSessionByPublicIdIncludingRevoked(sessionPublicId: string) {
-    return withSessionDatabaseContext(
+    return withAppDatabaseContext(
       SESSION_SCOPE.session_public_id(sessionPublicId),
       (_databaseHandle) => this.sessionRepository.findByPublicIdIncludingRevoked(sessionPublicId),
     );
   }
 
   async rotateSessionTokenHash(sessionPublicId: string, sessionTokenHash: string): Promise<void> {
-    await withSessionDatabaseContext(
+    await withAppDatabaseContext(
       SESSION_SCOPE.session_public_id(sessionPublicId),
       async (_databaseHandle) => {
         const existing = await this.sessionRepository.findByPublicId(sessionPublicId);
@@ -301,7 +300,7 @@ export class AuthSessionService {
     const nextRefreshHash = hashRefreshSecret(nextRefreshSecret);
     const nextTokenHash = hashAccessToken(nextAccessToken);
 
-    const rotated = await withSessionDatabaseContext(
+    const rotated = await withAppDatabaseContext(
       SESSION_SCOPE.session_public_id(sessionPublicId),
       async (_databaseHandle) => {
         const existing = await this.sessionRepository.findByPublicId(sessionPublicId);
@@ -334,7 +333,7 @@ export class AuthSessionService {
       // most informative — "we already revoked this session and someone is still trying
       // to use its refresh secret." We capture every refresh-secret mismatch to Sentry
       // for breach detection, separate from whether we re-revoke.
-      const reuseDetection = await withSessionDatabaseContext(
+      const reuseDetection = await withAppDatabaseContext(
         SESSION_SCOPE.session_public_id(sessionPublicId),
         async (_databaseHandle) => {
           const existing =
@@ -388,7 +387,7 @@ export class AuthSessionService {
     activeOrganizationId: number;
   }): Promise<void> {
     const nextTokenHash = hashAccessToken(nextAccessToken);
-    await withSessionDatabaseContext(
+    await withAppDatabaseContext(
       SESSION_SCOPE.session_public_id(sessionPublicId),
       async (_databaseHandle) => {
         const existing = await this.sessionRepository.findByPublicId(sessionPublicId);
@@ -425,7 +424,7 @@ export class AuthSessionService {
   private async revokeAllSessionsForReusedRefreshSecret(userId: number): Promise<void> {
     const user = await this.userService.findById(userId);
     if (!user) return;
-    const revokedSessions = await withPrincipalDatabaseContext(
+    const revokedSessions = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       (_databaseHandle) => this.sessionRepository.revokeAllByUserId(user.id),
     );

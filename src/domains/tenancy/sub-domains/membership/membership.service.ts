@@ -9,7 +9,7 @@ import { isPostgresUniqueViolation } from '@/shared/utils/infrastructure/postgre
 import { isDisposableEmailBlocked } from '@/shared/utils/text/email.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import {
@@ -96,7 +96,7 @@ export interface MembershipPermissionsOutput {
  *
  * @remarks
  * - **Algorithm:** every public method runs inside
- *   {@link withPrincipalDatabaseContext} and resolves the caller's
+ *   {@link withAppDatabaseContext} and resolves the caller's
  *   organization through
  *   {@link OrganizationService.requireOrganizationRecordByPublicId}
  *   before touching the membership repository. `transferOwnership` is
@@ -324,7 +324,7 @@ export class MembershipService {
   async list(scope: OrganizationPrincipalDatabaseScope, query: unknown) {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateListMembershipsQuery(query);
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const result = await this.membershipRepository.findByOrganizationId(
@@ -350,7 +350,7 @@ export class MembershipService {
     membership_public_id: string,
   ): Promise<MembershipOutput> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -390,7 +390,7 @@ export class MembershipService {
     const inviteeUser = await userService.findOrCreateInvitedByEmail({
       email: parsed.email,
     });
-    const result = await withPrincipalDatabaseContext(scope, async () => {
+    const result = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       // Capability matrix: a PERSONAL organization is single-member by definition. Collaboration
@@ -476,7 +476,7 @@ export class MembershipService {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateMembership(body);
     let affectedUserInternalId: number | undefined;
-    const result = await withPrincipalDatabaseContext(scope, async () => {
+    const result = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -558,7 +558,7 @@ export class MembershipService {
   ): Promise<void> {
     const organization_public_id = scope.organizationPublicId;
     let affectedUserInternalId: number | undefined;
-    await withPrincipalDatabaseContext(scope, async () => {
+    await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -605,7 +605,7 @@ export class MembershipService {
     membership_public_id: string,
   ): Promise<MembershipPermissionsOutput> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -625,7 +625,7 @@ export class MembershipService {
     user_public_id: string,
   ): Promise<void> {
     const organization_public_id = scope.organizationPublicId;
-    await withPrincipalDatabaseContext(scope, async () => {
+    await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const userId = await this.organizationService.resolveUserInternalIdByPublicId(user_public_id);
@@ -671,7 +671,7 @@ export class MembershipService {
   ): Promise<MembershipOutput> {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateTransferOwnership(body);
-    const result = await withPrincipalDatabaseContext(scope, async () => {
+    const result = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       // A PERSONAL organization belongs solely to its owner and cannot be handed off.
@@ -712,7 +712,7 @@ export class MembershipService {
    *
    * @remarks
    * - **Algorithm:** runs {@link MembershipRepository.countActiveByOrganization} inside
-   *   {@link withPrincipalDatabaseContext} so the `memberships` RLS policy resolves the
+   *   {@link withAppDatabaseContext} so the `memberships` RLS policy resolves the
    *   org's rows. Resolves the org's internal id from its public id first.
    * - **Failure modes:** `NotFoundError('Organization')` when the public id does not resolve.
    * - **Side effects:** one read-only COUNT query under the org GUC.
@@ -721,7 +721,7 @@ export class MembershipService {
    *   directly (cross-domain reads go service→service).
    */
   async countActiveMembers(options: { organizationPublicId: string }): Promise<number> {
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ organizationPublicId: options.organizationPublicId }),
       async () => {
         const organization = await this.organizationService.requireOrganizationByPublicId(
@@ -753,7 +753,7 @@ export class MembershipService {
     organizationPublicId: string;
     ceiling: number;
   }): Promise<number> {
-    const suspendedUserIds = await withPrincipalDatabaseContext(
+    const suspendedUserIds = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ organizationPublicId: options.organizationPublicId }),
       async () => {
         const organization = await this.organizationService.requireOrganizationRecordByPublicId(
@@ -789,7 +789,7 @@ export class MembershipService {
     userInternalId: number;
     limit: number;
   }) {
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
       (_databaseHandle) =>
         this.membershipRepository.listOrganizationsForUserDataExport(

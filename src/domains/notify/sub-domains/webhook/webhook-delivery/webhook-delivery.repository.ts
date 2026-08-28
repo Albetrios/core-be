@@ -227,7 +227,7 @@ export async function createPendingWebhookDeliveryAttempt(input: {
   return rows[0]!.id;
 }
 
-/** Worker-only — requires an explicit handle from `withPrincipalDatabaseContext`. */
+/** Worker-only — requires an explicit handle from `withAppDatabaseContext`. */
 export function createWorkerWebhookDeliveryQueries(databaseHandle: WorkerDatabaseHandle) {
   assertWorkerDatabaseContext(['organization']);
   return {

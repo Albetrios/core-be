@@ -11,7 +11,7 @@ import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock
 import type { UserService } from '@/domains/user/user.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const ORG_CAP = 3;
@@ -115,7 +115,7 @@ describe('UploadService org pending-quota concurrency (database)', () => {
       expect(result.reason).toBeInstanceOf(ValidationError);
     }
 
-    const orgPendingCount = await withPrincipalDatabaseContext(
+    const orgPendingCount = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: owner.public_id }),
       () => repository.countPendingByOrganizationId(organization.id),
     );

@@ -1,7 +1,7 @@
 import { env } from '@/shared/config/env.config.js';
 import { ConflictError, NotFoundError } from '@/shared/errors/index.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
@@ -19,7 +19,7 @@ import { serializeOrganizationNotificationPolicy } from './organization-notifica
  *
  * @remarks
  * - **Algorithm:** every operation is wrapped in
- *   `withPrincipalDatabaseContext` so RLS (`app.current_organization_public_id`)
+ *   `withAppDatabaseContext` so RLS (`app.current_organization_public_id`)
  *   matches the resource. Create defers to the repository's upsert which
  *   resurrects soft-deleted rows on `(organization_id, notification_type,
  *   channel)` conflicts. Update copies only defined fields and converts
@@ -44,7 +44,7 @@ export class OrganizationNotificationPolicyService {
     scope: OrganizationPrincipalDatabaseScope,
   ): Promise<OrganizationNotificationPolicyOutput[]> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const rows = await this.policyRepository.findByOrganizationId(organization.id);
@@ -59,7 +59,7 @@ export class OrganizationNotificationPolicyService {
     policy_public_id: string,
   ): Promise<OrganizationNotificationPolicyOutput> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.policyRepository.findByPublicId(policy_public_id, organization.id);
@@ -75,7 +75,7 @@ export class OrganizationNotificationPolicyService {
   ): Promise<OrganizationNotificationPolicyOutput> {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateCreateOrganizationNotificationPolicy(body);
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       // sec-r5-followup-ratelimit-dos-3 + audit-#8: serialize the per-org count + insert with a
@@ -112,7 +112,7 @@ export class OrganizationNotificationPolicyService {
   ): Promise<OrganizationNotificationPolicyOutput> {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateOrganizationNotificationPolicy(body);
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const userId =
@@ -140,7 +140,7 @@ export class OrganizationNotificationPolicyService {
 
   async delete(scope: OrganizationPrincipalDatabaseScope, policy_public_id: string): Promise<void> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const deleted = await this.policyRepository.softDelete(policy_public_id, organization.id);

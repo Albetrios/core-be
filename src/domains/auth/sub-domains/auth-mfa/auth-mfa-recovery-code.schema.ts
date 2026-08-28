@@ -11,7 +11,7 @@ import {
 import { authSchema } from '@/infrastructure/database/pg-schemas.js';
 import { users } from '@/domains/user/user.schema.js';
 
-/** Drizzle table for `auth.mfa_recovery_codes` — one-time recovery codes hashed at rest; partial index `idx_mfa_recovery_codes_user_unused` keeps lookups cheap for the unused set. RLS-gated by `app.current_user_public_id` (set via `withPrincipalDatabaseContext (user scope)`) so recovery codes are isolated per user. */
+/** Drizzle table for `auth.mfa_recovery_codes` — one-time recovery codes hashed at rest; partial index `idx_mfa_recovery_codes_user_unused` keeps lookups cheap for the unused set. RLS-gated by `app.current_user_public_id` (set via `withAppDatabaseContext (user scope)`) so recovery codes are isolated per user. */
 export const mfa_recovery_codes = authSchema
   .table(
     'mfa_recovery_codes',

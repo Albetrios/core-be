@@ -32,7 +32,7 @@ import { decryptFieldSecret } from '@/shared/utils/security/field-secret-encrypt
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import { MILLISECONDS_PER_HOUR, TEN_SECONDS_MS } from '@/shared/constants/ttl.constants.js';
 import { env } from '@/shared/config/env.config.js';
@@ -179,7 +179,7 @@ async function claimWebhookDeliveryAttempt(options: {
 }): Promise<WebhookDeliveryClaim> {
   const { deliveryAttemptId, organizationPublicId, attemptNumber, deliveryAttemptRepository } =
     options;
-  return withPrincipalDatabaseContext(
+  return withAppDatabaseContext(
     resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
     async (databaseHandle) => {
       const attemptRepository =
@@ -231,7 +231,7 @@ async function recordWebhookDeliveryOutcome(options: {
   deliveryAttemptRepository?: WebhookDeliveryAttemptRepository | undefined;
 }): Promise<void> {
   const { deliveryAttemptId, organizationPublicId, outcome, deliveryAttemptRepository } = options;
-  await withPrincipalDatabaseContext(
+  await withAppDatabaseContext(
     resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
     async (databaseHandle) => {
       const attemptRepository =
@@ -547,7 +547,7 @@ async function deliverClaimedWebhook(options: {
  * @remarks
  * - **Algorithm:** three sequential phases, each owning its own short Postgres transaction so no
  *   pool checkout is held across the network call:
- *   1. **claim** (short txn) — load the attempt + webhook secret under `withPrincipalDatabaseContext`
+ *   1. **claim** (short txn) — load the attempt + webhook secret under `withAppDatabaseContext`
  *      and atomically transition `PENDING → SENDING` (or reclaim a stale lease; no-op on
  *      `already_sent` / `in_flight`);
  *   2. **deliver** (no DB context) — HMAC-SHA256 sign `<timestamp>.<payload>` and POST through

@@ -23,14 +23,14 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
  * `app.system_audit_insert = 'true'` (tenantless rows). There is NO user arm.
  *
  * Post-sec-M4 the per-request org RLS transaction is a no-op, and HTTP controllers emit audit AFTER
- * the service's `withPrincipalDatabaseContext` block has already closed — so `AuditService.record`
+ * the service's `withAppDatabaseContext` block has already closed — so `AuditService.record`
  * used to call `insertAuditOutboxRow` on the bare pool with NO GUC set. Under the production
  * `core_be_app` role (FORCE/ENABLE RLS, NOBYPASSRLS) the WITH CHECK rejected EVERY such INSERT, and
  * `recordAuditEvent` swallowed the error — so the production audit trail was silently dropped. The
  * harness never caught it because tests run as the superuser `core` owner role, which bypasses RLS.
  *
  * The fix opens the matching context inside `AuditService.record`: org rows under
- * `withPrincipalDatabaseContext`, tenantless rows under `withMaintenanceDatabaseContext`. These
+ * `withAppDatabaseContext`, tenantless rows under `withMaintenanceDatabaseContext`. These
  * tests prove the policy behavior under `SET LOCAL ROLE core_be_app`.
  */
 

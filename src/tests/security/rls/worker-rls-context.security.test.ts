@@ -5,7 +5,7 @@ import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/d
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 describe('Security: worker RLS database context', () => {
@@ -27,12 +27,12 @@ describe('Security: worker RLS database context', () => {
     await expect(repository.listByOrganization(1)).rejects.toThrow(WorkerDatabaseContextError);
   });
 
-  it('allows tenant-scoped reads when wrapped in withPrincipalDatabaseContext and createWorkerSubscriptionRepository', async () => {
+  it('allows tenant-scoped reads when wrapped in withAppDatabaseContext and createWorkerSubscriptionRepository', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
     const owner = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: owner.id });
 
-    await withPrincipalDatabaseContext(
+    await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ organizationPublicId: organization.public_id }),
       async (databaseHandle) => {
         const repository = createWorkerSubscriptionRepository(databaseHandle);

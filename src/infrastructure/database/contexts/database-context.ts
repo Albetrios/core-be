@@ -144,30 +144,10 @@ export function createPrincipalDatabaseScope(input: {
   } as PrincipalDatabaseScope;
 }
 
-/**
- * The common unit-of-work wrapper for principal-scoped database access: opens one
- * transaction, sets the identity GUCs the scope carries (`app.current_user_public_id`
- * and/or `app.current_organization_public_id`) in a single `set_config` statement, pins the
- * handle in ALS, and releases everything at COMMIT/ROLLBACK.
- *
- * @remarks
- * - **Algorithm:** when a pinned session for the SAME organization is already active
- *   (an outer principal/organization unit of work), the existing handle is reused —
- *   the user GUC is layered onto it and no new transaction or pool checkout is
- *   opened. Otherwise a fresh transaction is opened and both GUCs are set in one
- *   round trip.
- * - **Failure modes:** any error from the callback rolls the transaction back; the
- *   GUCs die with the transaction (`SET LOCAL` semantics — nothing to unset).
- * - **Side effects:** organization-bearing scopes take one pooled checkout, counted
- *   for the pool-exhaustion alerter and the `database_rls_checkout_hold_seconds`
- *   histogram.
- * - **Notes:** this wrapper lifts the HTTP statement/lock timeouts only in worker
- *   runtime (job-scope units of work); HTTP paths keep the connection-level caps and can only ever set the two identity
- *   GUCs — bypass GUCs (`app.global_*`, retention, audit-drain) have no path through
- *   it, pinned by its unit tests. External I/O (Stripe, S3, Resend) must not run
- *   inside the callback.
- */
-export async function withPrincipalDatabaseContext<T>(
+// The principal branch of withAppDatabaseContext: same-org reuse, user-GUC
+// layering, and a fresh transaction with both identity GUCs in one round trip
+// otherwise. Only reachable through the exported app wrapper.
+async function runPrincipalDatabaseContext<T>(
   scope: PrincipalDatabaseScope,
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
 ): Promise<T> {
@@ -352,22 +332,12 @@ export const SESSION_SCOPE: {
   ),
 ) as never;
 
-/**
- * The single wrapper for pre-auth session database contexts: opens one
- * transaction, sets the scope's session-artifact GUC, pins the handle in ALS,
- * and releases everything at COMMIT/ROLLBACK.
- *
- * @remarks
- * - **Algorithm:** dispatches on `scope.kind` through {@link SESSION_CONTEXTS};
- *   RLS then admits exactly the one `auth.sessions` row matching the artifact.
- * - **Failure modes:** callback errors roll the transaction back; the GUC dies
- *   with the transaction.
- * - **Side effects:** one Postgres transaction per call; HTTP statement/lock
- *   timeouts stay (these are request-path flows).
- */
-export async function withSessionDatabaseContext<T>(
+// The session branch of withAppDatabaseContext: exactly one session-artifact
+// GUC, always a fresh transaction (pre-auth flows never nest), HTTP timeouts
+// kept. Only reachable through the exported app wrapper.
+async function runSessionDatabaseContext<T>(
   scope: SessionDatabaseScope,
-  callback: (databaseHandle: RequestScopedPostgresDatabase) => Promise<T>,
+  callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
 ): Promise<T> {
   const definition = SESSION_CONTEXTS[scope.kind];
   incrementOrganizationRlsCheckoutCount();
@@ -376,7 +346,9 @@ export async function withSessionDatabaseContext<T>(
     return await database.transaction(async (transaction) => {
       const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
       await setLocalDatabaseConfig(databaseHandle, definition.guc, scope.value);
-      return runWithPinnedDatabaseHandle(databaseHandle, () => callback(databaseHandle));
+      return runWithPinnedDatabaseHandle(databaseHandle, () =>
+        callback(brandWorkerContextDatabaseHandle(databaseHandle)),
+      );
     });
   } finally {
     decrementOrganizationRlsCheckoutCount();
@@ -386,6 +358,51 @@ export async function withSessionDatabaseContext<T>(
         Number(process.hrtime.bigint() - checkoutStartedAtNanoseconds) / 1_000_000_000,
     });
   }
+}
+
+/**
+ * A scope accepted by {@link withAppDatabaseContext} — a verified principal
+ * (organization/user identity) or a pre-auth session artifact. Both run on the
+ * shared `core_be_app` pool; the scope alone decides which GUCs are armed.
+ */
+export type AppDatabaseScope = PrincipalDatabaseScope | SessionDatabaseScope;
+
+/**
+ * THE unit-of-work wrapper for the application (`core_be_app`) pool: opens one
+ * transaction, arms exactly the GUCs the scope carries, pins the handle in ALS,
+ * and releases everything at COMMIT/ROLLBACK. The name states the connection
+ * role; the scope states the identity — principal scopes arm
+ * `app.current_user_public_id` / `app.current_organization_public_id`, session
+ * scopes arm their single session-artifact GUC.
+ *
+ * @remarks
+ * - **Algorithm:** dispatches on the scope brand. Principal scopes reuse a
+ *   pinned same-organization unit of work (user GUC layered, no second
+ *   checkout) and otherwise open a fresh transaction setting both identity
+ *   GUCs in one round trip; session scopes always open a fresh transaction
+ *   (pre-auth flows never nest) and set the artifact GUC via
+ *   {@link SESSION_CONTEXTS}.
+ * - **Failure modes:** any callback error rolls the transaction back; the GUCs
+ *   die with the transaction (`SET LOCAL` semantics — nothing to unset).
+ * - **Side effects:** organization-bearing and session scopes take one pooled
+ *   checkout, counted for the pool-exhaustion alerter and the
+ *   `database_rls_checkout_hold_seconds` histogram.
+ * - **Notes:** worker runtime lifts the HTTP statement/lock timeouts for
+ *   job-scope units of work; HTTP paths keep the connection-level caps. This
+ *   wrapper can only ever set identity/session GUCs — bypass GUCs
+ *   (`app.global_*`, retention, audit-drain) have no path through it, pinned by
+ *   its unit tests. External I/O (Stripe, S3, Resend) must not run inside the
+ *   callback. The callback shape is deliberate — release is impossible to
+ *   forget, commit-vs-rollback is automatic, and nesting reuses the transaction
+ *   (see rls-architecture.md).
+ */
+export async function withAppDatabaseContext<T>(
+  scope: AppDatabaseScope,
+  callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
+): Promise<T> {
+  return 'kind' in scope
+    ? runSessionDatabaseContext(scope, callback)
+    : runPrincipalDatabaseContext(scope, callback);
 }
 
 /** One row of the maintenance-context registry — the GUC it arms and how its transaction is tuned. */

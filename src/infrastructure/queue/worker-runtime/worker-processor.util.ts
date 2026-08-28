@@ -5,7 +5,7 @@ import {
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { WorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
 import { brandWorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
@@ -47,7 +47,7 @@ export async function runTenantScopedWorkerJob<TJob, TResult>(
   processor: (databaseHandle: WorkerDatabaseHandle, job: TJob) => Promise<TResult>,
 ): Promise<TResult> {
   const { organizationPublicId, ...jobPayload } = job;
-  return withPrincipalDatabaseContext(
+  return withAppDatabaseContext(
     resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
     (databaseHandle) =>
       processor(brandWorkerContextDatabaseHandle(databaseHandle), jobPayload as TJob),
@@ -74,7 +74,7 @@ export async function runUserScopedWorkerJob<TJob, TResult>(
   processor: (databaseHandle: WorkerDatabaseHandle, job: TJob) => Promise<TResult>,
 ): Promise<TResult> {
   const { userPublicId, ...jobPayload } = job;
-  return withPrincipalDatabaseContext(
+  return withAppDatabaseContext(
     resolveJobPrincipalScope({ userPublicId: userPublicId }),
     (databaseHandle) =>
       processor(brandWorkerContextDatabaseHandle(databaseHandle), jobPayload as TJob),
@@ -83,7 +83,7 @@ export async function runUserScopedWorkerJob<TJob, TResult>(
 
 /**
  * BullMQ worker factory for jobs that include `organizationPublicId` in the payload.
- * Runs each job inside `withPrincipalDatabaseContext` and passes a pinned `databaseHandle` to the handler.
+ * Runs each job inside `withAppDatabaseContext` and passes a pinned `databaseHandle` to the handler.
  */
 export function createTenantScopedBullMQWorker<TJobData extends TenantScopedJobData>(
   queueName: string,

@@ -16,7 +16,7 @@ import { database } from '@/infrastructure/database/connection.js';
 import { sessions } from '@/domains/auth/sub-domains/auth-session/auth-session.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { createDomainContainers } from '@/worker-containers.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 describe('UserDataExportService (database)', () => {
@@ -66,7 +66,7 @@ describe('UserDataExportService (database)', () => {
       resource_id: user.id,
     });
 
-    const exported = await withPrincipalDatabaseContext(
+    const exported = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => service.buildExportPayload(user.public_id),
     );
@@ -86,7 +86,7 @@ describe('UserDataExportService (database)', () => {
 
   it('buildExportPayload throws when user is missing', async () => {
     await expect(
-      withPrincipalDatabaseContext(
+      withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: 'missing_public_id' }),
         () => service.buildExportPayload('missing_public_id'),
       ),
@@ -103,7 +103,7 @@ describe('UserDataExportService (database)', () => {
       expires_at: new Date(Date.now() + 60_000),
     });
 
-    const exported = await withPrincipalDatabaseContext(
+    const exported = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => service.buildExportPayload(user.public_id),
     );
@@ -119,7 +119,7 @@ describe('UserDataExportService (database)', () => {
       lastName: '',
     });
 
-    const exported = await withPrincipalDatabaseContext(
+    const exported = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => service.buildExportPayload(user.public_id),
     );

@@ -29,7 +29,7 @@ import {
   type WorkerDatabaseHandle,
 } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
@@ -171,7 +171,7 @@ export async function processNotificationDispatchJob(
   // GUC's blast radius is a future-regression risk: any patch that adds a write
   // inside this scope (e.g. "stamp delivered_at") would silently inherit cross-tenant
   // write privileges. Resolve the recipient's public id via the narrow SECURITY
-  // DEFINER function and pin `withPrincipalDatabaseContext (user scope)` so the
+  // DEFINER function and pin `withAppDatabaseContext (user scope)` so the
   // `notifications_owner_access` policy authorises the read on its intended branch.
   const loadNotificationForScope = async () => {
     if (organizationPublicId === null || organizationPublicId === undefined) {
@@ -186,12 +186,12 @@ export async function processNotificationDispatchJob(
       if (!userPublicId) {
         throw new Error(`notification.user_unknown:${String(notificationId)}`);
       }
-      return withPrincipalDatabaseContext(
+      return withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
         loadNotification,
       );
     }
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
       loadNotification,
     );
@@ -269,10 +269,10 @@ async function processTenantScopedNotificationJob(
  *
  * @remarks
  * - **Algorithm:** for each job, branch on `organizationPublicId`: tenant-scoped jobs run inside
- *   `runTenantScopedWorkerJob` (`withPrincipalDatabaseContext`) so RLS pins reads to the org;
+ *   `runTenantScopedWorkerJob` (`withAppDatabaseContext`) so RLS pins reads to the org;
  *   tenant-less notifications delegate directly to {@link processNotificationDispatchJob}
  *   which then enters its own `loadNotificationForScope` flow — resolving the recipient
- *   public id under `withMaintenanceDatabaseContext` and pinning `withPrincipalDatabaseContext (user scope)`
+ *   public id under `withMaintenanceDatabaseContext` and pinning `withAppDatabaseContext (user scope)`
  *   for the load (sec-re-01: the prior wiring wrapped this branch in
  *   `runGlobalRetentionWorkerJob` and injected a repository, which short-circuited the new
  *   `loadNotificationForScope` flow — making the sec-D #10 user-context fix dead code).
@@ -300,7 +300,7 @@ export function createNotificationWorker(): WorkerHandle {
       return runWithPropagatedTraceContext({ traceparent, tracestate }, job.name, () => {
         // sec-re-01: tenant-less notifications delegate directly to
         // processNotificationDispatchJob so it can enter its own loadNotificationForScope
-        // flow (withMaintenanceDatabaseContext → withPrincipalDatabaseContext (user scope)). The prior
+        // flow (withMaintenanceDatabaseContext → withAppDatabaseContext (user scope)). The prior
         // wiring wrapped this branch in runGlobalRetentionWorkerJob AND injected a
         // repository, which short-circuited the new flow and left the sec-D #10 fix
         // dead code.

@@ -16,7 +16,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     withMaintenanceDatabaseContext: vi.fn(
       async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
     ),
-    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
       callback(),
     ),
   };
@@ -79,7 +79,7 @@ describe('AuthMeContextService.getContext', () => {
    * The route's reads split by DATABASE CONTEXT, not by dependency.
    *
    * `getMe`, `list` and `getByPublicId` all want `app.current_user_public_id` set to the same value, so
-   * they share one `withPrincipalDatabaseContext (user scope)` and therefore one pooled checkout — they serialize
+   * they share one `withAppDatabaseContext (user scope)` and therefore one pooled checkout — they serialize
    * on it deliberately, and asserting they run concurrently would pin the opposite of the design.
    * `resolveUserOrganizationPermissions` drives `app.current_organization_public_id` instead, so it owns
    * a separate transaction and MUST still overlap the user-scoped block; chaining it after would

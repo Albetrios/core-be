@@ -21,14 +21,11 @@ import { vi } from 'vitest';
 export function mockDatabaseContexts(actual: Record<string, unknown>): Record<string, unknown> {
   return {
     ...actual,
-    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
       callback(),
     ),
     withMaintenanceDatabaseContext: vi.fn(
       async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
-    ),
-    withSessionDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
-      callback(),
     ),
   };
 }

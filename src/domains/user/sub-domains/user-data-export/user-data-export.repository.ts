@@ -161,7 +161,7 @@ export class UserDataExportRepository {
   }
 }
 
-/** Worker-only factory — requires an explicit handle from `withPrincipalDatabaseContext (user scope)`. */
+/** Worker-only factory — requires an explicit handle from `withAppDatabaseContext (user scope)`. */
 export function createWorkerUserDataExportRepository(
   databaseHandle: WorkerDatabaseHandle,
 ): UserDataExportRepository {

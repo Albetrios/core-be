@@ -6,7 +6,7 @@ import {
   UserDataExportRepository,
   createWorkerUserDataExportRepository,
 } from '@/domains/user/sub-domains/user-data-export/user-data-export.repository.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
@@ -82,7 +82,7 @@ describe('UserDataExportRepository (database)', () => {
     const user = await createTestUser();
     const created = await repository.create(exportRow(user.id));
 
-    const found = await withPrincipalDatabaseContext(
+    const found = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       async (databaseHandle) => {
         const workerRepository = createWorkerUserDataExportRepository(databaseHandle);

@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * NOT a schema, NOT a test, NOT a seed. Fails if any such file imports one
  * of the DB-query primitives — the `database` connection singleton, the
  * raw postgres-js `sql` template, or `getRequestDatabase`. Context wrappers
- * (`withPrincipalDatabaseContext`, `withMaintenanceDatabaseContext`,
+ * (`withAppDatabaseContext`, `withMaintenanceDatabaseContext`,
  * `withTransaction`, etc.) and DB-handle TYPES are allowed because they
  * model service-layer orchestration; the SQL queries they wrap still go
  * through repositories.

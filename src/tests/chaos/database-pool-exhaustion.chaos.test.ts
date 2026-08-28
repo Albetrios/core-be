@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { env } from '@/shared/config/env.config.js';
 import { sql } from '@/infrastructure/database/connection.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Production hardening item 2: when many concurrent requests use scoped
- * `withPrincipalDatabaseContext` blocks (rather than full-request transaction pinning),
+ * `withAppDatabaseContext` blocks (rather than full-request transaction pinning),
  * external network I/O — simulated here as `pg_sleep` — must run OUTSIDE the context so a
  * burst of slow external calls cannot drain the pool. The chaos invariant: at least one
  * additional autocommit query keeps succeeding throughout the burst.
@@ -22,7 +22,7 @@ describe('Chaos resilience: database pool stays available under bursty scoped-co
     const burstSize = Math.max(poolMax * 2, 20);
 
     const scopedUnitsOfWork = Array.from({ length: burstSize }, (_, index) =>
-      withPrincipalDatabaseContext(
+      withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ organizationPublicId: organizationPublicId }),
         async (databaseHandle) => {
           const rows = await databaseHandle.execute<{ value: number }>(

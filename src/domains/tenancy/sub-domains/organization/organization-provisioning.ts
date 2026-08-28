@@ -7,7 +7,7 @@ import { memberships } from '@/domains/tenancy/sub-domains/membership/membership
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import type { Organization } from '@/domains/tenancy/sub-domains/organization/organization.types.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
 /** Name of the auto-provisioned, undeletable owner role created with every organization. */
 export const OWNER_ROLE_NAME = 'Owner';
@@ -111,7 +111,7 @@ export interface ProvisionOrganizationResult {
  *
  * @remarks
  * - **Algorithm:** pre-generates the org `public_id` and runs every insert inside one
- *   `withPrincipalDatabaseContext(resolveVerifiedPrincipalScope({ organizationPublicId: publicId }), …)` transaction, so `app.current_organization_public_id`
+ *   `withAppDatabaseContext(resolveVerifiedPrincipalScope({ organizationPublicId: publicId }), …)` transaction, so `app.current_organization_public_id`
  *   equals the org being created. The org row then satisfies its tenant-isolation WITH CHECK
  *   (`public_id = app.current_organization_public_id`) and the child rows (roles, role_permissions,
  *   memberships) satisfy theirs (`organization_id` → the just-inserted org) — all under the
@@ -170,7 +170,7 @@ async function provisionOrganization(
   // auth/audit do), so the org INSERT failed its WITH CHECK with SQLSTATE 42501 under the
   // non-superuser `core_be_app` role in deployed environments.
   const organizationPublicId = generatePublicId('organization');
-  return withPrincipalDatabaseContext(
+  return withAppDatabaseContext(
     resolveVerifiedPrincipalScope({ organizationPublicId: organizationPublicId }),
     async (databaseHandle) => {
       const [organization] = await databaseHandle

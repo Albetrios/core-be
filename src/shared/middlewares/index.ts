@@ -37,7 +37,7 @@ import shutdownMiddleware from './core/shutdown.middleware.js';
  * never open a DB transaction". That justification has been stale since
  * `organization-rls-transaction.middleware.ts` became a no-op stub that
  * returns `'no_transaction'` immediately — no HTTP-side transaction is opened
- * anywhere now; org-scoped work runs inside `withPrincipalDatabaseContext`.
+ * anywhere now; org-scoped work runs inside `withAppDatabaseContext`.
  * The no-op is kept registered because `request-lifecycle.middleware.ts`
  * imports its settlement-outcome type as part of the lifecycle contract; a
  * future drop must update both files together. See the no-op's own TSDoc.

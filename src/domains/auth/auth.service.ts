@@ -35,7 +35,7 @@ import {
   ensurePersonalOrganization,
 } from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
 import type { UserAuthRecord } from '@/domains/user/user.types.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const IP_FAILED_LOGIN_KEY_PREFIX = 'auth:failed_login:ip:';
@@ -382,7 +382,7 @@ export class AuthService {
     // `app.current_session_public_id`, a different guc, so it must own its transaction — and
     // nesting it here would hold this checkout open across it, making the request peak at two
     // concurrent connections instead of taking them one after another.
-    const { user, resolved } = await withPrincipalDatabaseContext(
+    const { user, resolved } = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       async () => {
         const record = await this.userService.requireUserRecordByPublicId(userPublicId);

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   createPrincipalDatabaseScope,
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 
 const asOrgScope = (organizationPublicId: string) =>
@@ -26,7 +26,7 @@ vi.mock('@/infrastructure/database/connection.js', () => ({
   },
 }));
 
-describe('withPrincipalDatabaseContext checkout accounting (organization scopes)', () => {
+describe('withAppDatabaseContext checkout accounting (organization scopes)', () => {
   beforeEach(() => {
     resetOrganizationRlsCheckoutCountForTests();
   });
@@ -36,7 +36,7 @@ describe('withPrincipalDatabaseContext checkout accounting (organization scopes)
   });
 
   it('pins ALS so getRequestDatabase returns the same handle passed to the callback', async () => {
-    await withPrincipalDatabaseContext(asOrgScope('org_public_test'), async (databaseHandle) => {
+    await withAppDatabaseContext(asOrgScope('org_public_test'), async (databaseHandle) => {
       expect(getRequestDatabase()).toBe(databaseHandle);
       expect(databaseHandle).toBe(mockTransactionHandle);
     });
@@ -48,7 +48,7 @@ describe('withPrincipalDatabaseContext checkout accounting (organization scopes)
   it('counts a pooled checkout for the unit of work and releases it afterwards', async () => {
     expect(getActiveOrganizationRlsCheckoutCount()).toBe(0);
 
-    await withPrincipalDatabaseContext(asOrgScope('org_public_checkout'), async () => {
+    await withAppDatabaseContext(asOrgScope('org_public_checkout'), async () => {
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
     });
 
@@ -56,9 +56,9 @@ describe('withPrincipalDatabaseContext checkout accounting (organization scopes)
   });
 
   it('does not open a second checkout when the same organization is reused in a nested context', async () => {
-    await withPrincipalDatabaseContext(asOrgScope('org_public_nested'), async () => {
+    await withAppDatabaseContext(asOrgScope('org_public_nested'), async () => {
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
-      await withPrincipalDatabaseContext(asOrgScope('org_public_nested'), async () => {
+      await withAppDatabaseContext(asOrgScope('org_public_nested'), async () => {
         expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
       });
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
@@ -73,7 +73,7 @@ describe('withPrincipalDatabaseContext checkout accounting (organization scopes)
       samples.push(sample);
     });
 
-    await withPrincipalDatabaseContext(asOrgScope('org_public_hold'), async () => undefined);
+    await withAppDatabaseContext(asOrgScope('org_public_hold'), async () => undefined);
 
     expect(samples).toHaveLength(1);
     expect(samples[0]?.path).toBe('scoped_context');
@@ -87,7 +87,7 @@ describe('withPrincipalDatabaseContext checkout accounting (organization scopes)
     });
 
     await expect(
-      withPrincipalDatabaseContext(asOrgScope('org_public_throw'), async () => {
+      withAppDatabaseContext(asOrgScope('org_public_throw'), async () => {
         throw new Error('unit-of-work failed');
       }),
     ).rejects.toThrow('unit-of-work failed');

@@ -6,7 +6,7 @@ import { serializeUserSettings } from './user-settings.serializer.js';
 import type { UserSettingsOutput } from './user-settings.types.js';
 import { validateUpdateUserSettings } from './user-settings.validator.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
@@ -35,7 +35,7 @@ export class UserSettingsService {
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
     // auth.user_settings is FORCE RLS keyed on app.current_user_public_id — read inside the user context.
-    const settings = await withPrincipalDatabaseContext(scope, () =>
+    const settings = await withAppDatabaseContext(scope, () =>
       this.repository.getByUserId(user.id),
     );
     return serializeUserSettings(settings);
@@ -47,7 +47,7 @@ export class UserSettingsService {
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
     // auth.user_settings is FORCE RLS keyed on app.current_user_public_id — upsert inside the user context.
-    const result = await withPrincipalDatabaseContext(scope, () =>
+    const result = await withAppDatabaseContext(scope, () =>
       this.repository.upsert(user.id, omitUndefined(parsed)),
     );
     return serializeUserSettings(result);
@@ -63,7 +63,7 @@ export class UserSettingsService {
   async getForInvitedUser(user_public_id: string): Promise<UserSettingsOutput> {
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    const settings = await withPrincipalDatabaseContext(
+    const settings = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user_public_id }),
       () => this.repository.getByUserId(user.id),
     );
@@ -79,7 +79,7 @@ export class UserSettingsService {
     const parsed = validateUpdateUserSettings(body);
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    const result = await withPrincipalDatabaseContext(
+    const result = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user_public_id }),
       () => this.repository.upsert(user.id, omitUndefined(parsed)),
     );

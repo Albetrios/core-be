@@ -69,7 +69,7 @@ function resolveBillingCycleForStripePrice(
  *   stage; unhandled event types are logged and skipped.
  * - **Notes:** Runs inside {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker)} so the ledger
  *   write happens without an organization GUC; the subscription write then
- *   switches into {@link withPrincipalDatabaseContext} for RLS-safe mutation. The
+ *   switches into {@link withAppDatabaseContext} for RLS-safe mutation. The
  *   `customer.subscription.created` race that left a missing local row
  *   silently advancing to `processed` is now recovered by the sec-B9 fallback
  *   INSERT path; see `tryFallbackInsertForCreated`.

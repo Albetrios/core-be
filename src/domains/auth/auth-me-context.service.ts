@@ -1,5 +1,5 @@
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { GlobalRole } from '@/shared/constants/roles.constants.js';
@@ -52,7 +52,7 @@ export class AuthMeContextService {
     // the SAME guc, the SAME value. Called separately that is three transactions, three
     // `SELECT set_config(...)` round trips and three pooled checkouts held at once — measured
     // at six BEGINs for one request. Opening the user context ONCE lets all three take the
-    // reuse branch in `withPrincipalDatabaseContext` and share a single checkout, which is the
+    // reuse branch in `withAppDatabaseContext` and share a single checkout, which is the
     // amplification that made a 50-connection pool starve at 50 users.
     //
     // They serialize on that one connection, so this trades a little latency at low load for a
@@ -61,7 +61,7 @@ export class AuthMeContextService {
     // (`app.current_organization_public_id`), so it must keep its own transaction and can still
     // overlap with the block below.
     const [userScoped, myPermissions] = await Promise.all([
-      withPrincipalDatabaseContext(scope, async () => ({
+      withAppDatabaseContext(scope, async () => ({
         user: await this.userService.getMe(scope),
         organizationsPage: await this.organizationService.list({}, userPublicId, globalRole),
         activeOrganization: activeOrganizationPublicId

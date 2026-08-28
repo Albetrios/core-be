@@ -1,6 +1,6 @@
 import { UnauthorizedError } from '@/shared/errors/index.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { enqueueNotification } from '@/domains/notify/sub-domains/notification/queues/notification.queue.js';
@@ -31,9 +31,9 @@ export interface NotificationListServiceOptions {
  * @remarks
  * - **Algorithm:** controller-facing methods take the token-minted
  *   {@link UserPrincipalDatabaseScope}, resolve the user public id to an internal id via
- *   {@link UserService}, then run the repository call inside `withPrincipalDatabaseContext` so
+ *   {@link UserService}, then run the repository call inside `withAppDatabaseContext` so
  *   Postgres RLS sees the correct identity GUCs; the data-export path
- *   (`listForUserDataExport`, a worker caller) stays on `withPrincipalDatabaseContext (user scope)`. `dispatchNotification` looks up the
+ *   (`listForUserDataExport`, a worker caller) stays on `withAppDatabaseContext (user scope)`. `dispatchNotification` looks up the
  *   organization public id and re-enqueues a notification job for the BullMQ worker.
  * - **Failure modes:** `UnauthorizedError` for unknown user public ids; repository errors
  *   propagate; `enqueueNotification` failures bubble to the caller.
@@ -64,7 +64,7 @@ export class NotificationService {
   ) {
     const limit = options.limit ?? PAGINATION.DEFAULT_LIMIT;
     const userId = await this.resolveUserId(scope.userPublicId);
-    return withPrincipalDatabaseContext(scope, () =>
+    return withAppDatabaseContext(scope, () =>
       this.repository.findByUser(
         userId,
         omitUndefined({
@@ -79,7 +79,7 @@ export class NotificationService {
   /** Lists notification metadata for a GDPR data-export bundle (capped by caller). */
   async listForUserDataExport(options: { userPublicId: string; limit: number }) {
     const userId = await this.resolveUserId(options.userPublicId);
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
       () => this.repository.listForUserDataExport(userId, options.limit),
     );
@@ -87,29 +87,29 @@ export class NotificationService {
 
   async get(public_id: string, scope: UserPrincipalDatabaseScope) {
     const userId = await this.resolveUserId(scope.userPublicId);
-    return withPrincipalDatabaseContext(scope, () =>
+    return withAppDatabaseContext(scope, () =>
       this.repository.findByPublicIdForUser(public_id, userId),
     );
   }
 
   async markRead(public_id: string, scope: UserPrincipalDatabaseScope) {
     const userId = await this.resolveUserId(scope.userPublicId);
-    return withPrincipalDatabaseContext(scope, () => this.repository.markRead(public_id, userId));
+    return withAppDatabaseContext(scope, () => this.repository.markRead(public_id, userId));
   }
 
   async markAllRead(scope: UserPrincipalDatabaseScope) {
     const userId = await this.resolveUserId(scope.userPublicId);
-    return withPrincipalDatabaseContext(scope, () => this.repository.markAllReadForUser(userId));
+    return withAppDatabaseContext(scope, () => this.repository.markAllReadForUser(userId));
   }
 
   async getUnreadCount(scope: UserPrincipalDatabaseScope) {
     const userId = await this.resolveUserId(scope.userPublicId);
-    return withPrincipalDatabaseContext(scope, () => this.repository.countUnreadForUser(userId));
+    return withAppDatabaseContext(scope, () => this.repository.countUnreadForUser(userId));
   }
 
   async deleteNotification(public_id: string, scope: UserPrincipalDatabaseScope) {
     const userId = await this.resolveUserId(scope.userPublicId);
-    return withPrincipalDatabaseContext(scope, () =>
+    return withAppDatabaseContext(scope, () =>
       this.repository.deleteByPublicIdForUser(public_id, userId),
     );
   }

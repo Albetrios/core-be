@@ -69,7 +69,7 @@ describe('Global: tenancy code never uses the global-admin RLS escape hatch', ()
     expect(
       violations,
       'Tenancy RLS policies do not honor app.global_admin — the hatch reads/writes ZERO rows there.\n' +
-        'Use withPrincipalDatabaseContext (user scope) (app.current_user_public_id), withPrincipalDatabaseContext\n' +
+        'Use withAppDatabaseContext (user scope) (app.current_user_public_id), withAppDatabaseContext\n' +
         '(app.current_organization_public_id), or an auth.* SECURITY DEFINER resolver instead.\n' +
         `Offending file(s):\n  ${violations.join('\n  ')}`,
     ).toEqual([]);

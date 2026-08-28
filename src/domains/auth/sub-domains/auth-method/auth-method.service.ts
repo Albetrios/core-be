@@ -38,7 +38,7 @@ import {
   validateResetPassword,
   validateChangePassword,
 } from '@/domains/auth/auth.validator.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const PASSWORD_RESET_EXPIRES_IN_MINUTES = 60;
@@ -98,7 +98,7 @@ export class AuthMethodService {
     if (!user) throw new NotFoundError('User');
     // auth.auth_methods is FORCE RLS (audit #7); pin the owner context so the owner policy authorizes
     // the read for this user's own credentials.
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.authMethodRepository.listByUserId(user.id),
     );
@@ -122,7 +122,7 @@ export class AuthMethodService {
   async hasLoginCapableMethod(userPublicId: string): Promise<boolean> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    const methods = await withPrincipalDatabaseContext(
+    const methods = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.authMethodRepository.listByUserId(user.id),
     );
@@ -138,7 +138,7 @@ export class AuthMethodService {
    * @remarks
    * - **Algorithm:** under the owner DB context, short-circuits on the first login-capable
    *   `auth_methods` row; otherwise checks for at least one non-revoked `webauthn_credentials` row.
-   *   Both tables are FORCE RLS keyed on the owner, so the read runs inside `withPrincipalDatabaseContext (user scope)`.
+   *   Both tables are FORCE RLS keyed on the owner, so the read runs inside `withAppDatabaseContext (user scope)`.
    * - **Failure modes:** `NotFoundError` when the user record is missing.
    * - **Side effects:** transient owner-scoped DB context only.
    * - **Notes:** unlike {@link AuthMethodService.hasLoginCapableMethod} (which intentionally EXCLUDES
@@ -149,7 +149,7 @@ export class AuthMethodService {
   async hasActiveLoginCredential(userPublicId: string): Promise<boolean> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       async () => {
         const methods = await this.authMethodRepository.listByUserId(user.id);
@@ -170,7 +170,7 @@ export class AuthMethodService {
     const parsed = validateCreateAuthMethod(body);
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       async () => {
         // Serialize the count + insert under the same per-user credential-mutation advisory lock the
@@ -210,7 +210,7 @@ export class AuthMethodService {
   async delete(userPublicId: string, methodPublicId: string) {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    await withPrincipalDatabaseContext(
+    await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       async () => {
         const existing = await this.authMethodRepository.findByPublicIdForUser(
@@ -239,7 +239,7 @@ export class AuthMethodService {
         // intact, so `POST /auth/login` continued to accept the old credential
         // — the user-facing "I removed my password" view did not match the
         // auth-layer view. Clear the hash atomically in the same
-        // withPrincipalDatabaseContext (user scope) transaction so the invariant is real.
+        // withAppDatabaseContext (user scope) transaction so the invariant is real.
         if (existing.method_type === 'PASSWORD') {
           await this.userService.clearPasswordHash(userPublicId);
         }
@@ -250,7 +250,7 @@ export class AuthMethodService {
   async revokeAllForUser(userPublicId: string): Promise<void> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    await withPrincipalDatabaseContext(
+    await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.authMethodRepository.revokeAllByUserId(user.id),
     );
@@ -263,7 +263,7 @@ export class AuthMethodService {
    * for the deleted user.
    *
    * @remarks
-   * Runs inside `withPrincipalDatabaseContext (user scope)` so the RLS-scoped UPDATE only touches rows
+   * Runs inside `withAppDatabaseContext (user scope)` so the RLS-scoped UPDATE only touches rows
    * owned by the target user; the operation is idempotent (already-used or expired
    * tokens are no-ops). Safe to call at any point in the offboarding sequence — there is
    * no rollback risk because invalidation is a strict superset of natural token expiry.
@@ -271,7 +271,7 @@ export class AuthMethodService {
   async invalidateAllVerificationTokensForUser(userPublicId: string): Promise<void> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
-    await withPrincipalDatabaseContext(
+    await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.verificationTokenRepository.invalidateAllByUser(user.id),
     );
@@ -298,7 +298,7 @@ export class AuthMethodService {
       data.provider_user_id,
     );
     if (!existing) {
-      await withPrincipalDatabaseContext(
+      await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: ownerPublicId }),
         () => this.authMethodRepository.create(data),
       );
@@ -318,7 +318,7 @@ export class AuthMethodService {
    *
    * @remarks
    * - **Algorithm:** inserts one `method_type=EMAIL_CODE` row owned by the user, pinning the owner
-   *   `withPrincipalDatabaseContext (user scope)` so the FORCE-RLS owner WITH CHECK authorizes the write. Intended to
+   *   `withAppDatabaseContext (user scope)` so the FORCE-RLS owner WITH CHECK authorizes the write. Intended to
    *   run inside the auto-signup pinned transaction so it commits atomically with the user row.
    * - **Failure modes:** propagates the insert error (e.g. a CHECK/constraint violation) to roll the
    *   auto-signup transaction back.
@@ -328,7 +328,7 @@ export class AuthMethodService {
    *   `GET /auth/me/auth-methods` and is counted by the last-login-capable-credential guard.
    */
   async createEmailCodeMethod(userId: number, userPublicId: string): Promise<void> {
-    await withPrincipalDatabaseContext(
+    await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () =>
         this.authMethodRepository.create({
@@ -359,7 +359,7 @@ export class AuthMethodService {
 
   /**
    * Serializes concurrent credential mutations for one user via a transaction-scoped advisory lock.
-   * Must be called inside the caller's `withPrincipalDatabaseContext (user scope)` transaction, before a
+   * Must be called inside the caller's `withAppDatabaseContext (user scope)` transaction, before a
    * count-then-mutate, so concurrent requests cannot interleave the count and the write.
    */
   async acquireCredentialMutationLock(userId: number): Promise<void> {
@@ -458,7 +458,7 @@ export class AuthMethodService {
     // Token consume, password update, token invalidation and session revocation must be atomic.
     // A partial apply (password changed but sessions not revoked) would leave a potentially
     // compromised account's existing sessions live after a recovery reset. One pinned
-    // transaction makes every nested `withPrincipalDatabaseContext (user scope)` call reuse it (all-or-nothing);
+    // transaction makes every nested `withAppDatabaseContext (user scope)` call reuse it (all-or-nothing);
     // a mid-operation failure rolls the password change back rather than committing it alone.
     // Returns the reset user so the caller (AuthService.resetPassword) can mint a fresh session
     // AFTER this revoke-all-sessions, leaving the resetter's new session as the only live one.
@@ -521,7 +521,7 @@ export class AuthMethodService {
     // failure in between left the new password in place while every existing (potentially
     // attacker-held) session stayed live, so a user changing their password to evict an attacker
     // could believe the account was secured while the stolen bearer token remained usable. The
-    // pinned transaction makes nested `withPrincipalDatabaseContext (user scope)` calls reuse it, so a mid-operation
+    // pinned transaction makes nested `withAppDatabaseContext (user scope)` calls reuse it, so a mid-operation
     // failure rolls the password change back rather than committing it alone.
     await withTransaction((transaction) =>
       runWithPinnedDatabaseHandle(transaction as RequestScopedPostgresDatabase, async () => {

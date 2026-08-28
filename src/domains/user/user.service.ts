@@ -33,7 +33,7 @@ import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js'
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { runInsertWithPublicIdentifierRetry } from '@/shared/utils/infrastructure/postgres-error.util.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
@@ -102,7 +102,7 @@ export type UserOffboardingDependencies = {
  * - **Side effects:** writes `auth.users`; deletes S3 avatar objects; revokes sessions /
  *   credentials via auth services; tombstones uploads; purges data-export rows + S3 objects.
  *   No domain events emitted (offboarding is synchronous; export completion uses direct mail).
- * - **Notes:** password / MFA / email-verification updates run inside `withPrincipalDatabaseContext (user scope)`
+ * - **Notes:** password / MFA / email-verification updates run inside `withAppDatabaseContext (user scope)`
  *   so RLS policies on user-scoped child tables continue to work; `wireOffboardingServices` is
  *   the only seam for cross-domain dependencies — keep them off the constructor to avoid
  *   circular DI between user, auth, upload, and user-data-export.
@@ -170,9 +170,8 @@ export class UserService {
     const expectedPrefix = buildUserAvatarKeyPrefix(public_id);
     if (!avatar_url.startsWith(expectedPrefix)) return;
     await this.deleteOwnedAvatarObject(public_id, avatar_url);
-    await withPrincipalDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: public_id }),
-      () => this.repository.update(public_id, { avatar_url: null }),
+    await withAppDatabaseContext(resolveVerifiedPrincipalScope({ userPublicId: public_id }), () =>
+      this.repository.update(public_id, { avatar_url: null }),
     );
   }
 
@@ -184,7 +183,7 @@ export class UserService {
     if (!user) throw new NotFoundError('User');
     const offboarding = this.offboardingDependencies;
     if (!offboarding) {
-      const marked = await withPrincipalDatabaseContext(
+      const marked = await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: public_id }),
         () => this.repository.markDeletionStarted(public_id),
       );
@@ -211,12 +210,12 @@ export class UserService {
         throw new ConflictError('errors:userOwnsOrganizations');
       }
     }
-    const marked = await withPrincipalDatabaseContext(
+    const marked = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: public_id }),
       () => this.repository.markDeletionStarted(public_id),
     );
     if (!marked) {
-      const current = await withPrincipalDatabaseContext(
+      const current = await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: public_id }),
         () => this.repository.findByPublicId(public_id),
       );
@@ -268,14 +267,13 @@ export class UserService {
     // auth.users is FORCE RLS (audit #7); a by-public-id lookup pins the matching owner context so
     // the owner policy returns exactly that one row (it can never enumerate the table). Works for
     // self reads and single-target admin/system lookups alike.
-    return withPrincipalDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: public_id }),
-      () => this.repository.findByPublicId(public_id),
+    return withAppDatabaseContext(resolveVerifiedPrincipalScope({ userPublicId: public_id }), () =>
+      this.repository.findByPublicId(public_id),
     );
   }
 
   async requireUserRecordByPublicId(public_id: string): Promise<UserAuthRecord> {
-    const user = await withPrincipalDatabaseContext(
+    const user = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: public_id }),
       () => this.repository.findByPublicId(public_id),
     );
@@ -295,9 +293,8 @@ export class UserService {
     // regenerates id + re-enters context on the (rare) public_id unique collision.
     return runInsertWithPublicIdentifierRetry(async () => {
       const publicId = generatePublicId('user');
-      return withPrincipalDatabaseContext(
-        resolveVerifiedPrincipalScope({ userPublicId: publicId }),
-        () => this.repository.insertOAuthUser(publicId, data),
+      return withAppDatabaseContext(resolveVerifiedPrincipalScope({ userPublicId: publicId }), () =>
+        this.repository.insertOAuthUser(publicId, data),
       );
     });
   }
@@ -331,7 +328,7 @@ export class UserService {
    *
    * @remarks
    * Delegates to {@link UserService.createFromOAuth} (the shared passwordless-insert path: generate
-   * `public_id`, enter the owner `withPrincipalDatabaseContext (user scope)` so the FORCE-RLS owner WITH CHECK passes,
+   * `public_id`, enter the owner `withAppDatabaseContext (user scope)` so the FORCE-RLS owner WITH CHECK passes,
    * retry on the rare public-id collision). Used when `POST /auth/email/send-code` receives an
    * unknown email — the account is created on the spot (no password) and the verification code it then
    * receives is the proof-of-email-control that flips `is_email_verified` on login.
@@ -344,9 +341,8 @@ export class UserService {
   }
 
   async updatePassword(public_id: string, password_hash: string): Promise<UserAuthRecord | null> {
-    return withPrincipalDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: public_id }),
-      () => this.repository.updatePassword(public_id, password_hash),
+    return withAppDatabaseContext(resolveVerifiedPrincipalScope({ userPublicId: public_id }), () =>
+      this.repository.updatePassword(public_id, password_hash),
     );
   }
 
@@ -360,9 +356,8 @@ export class UserService {
    * password" but the stale hash on `auth.users` continues to authenticate.
    */
   async clearPasswordHash(public_id: string): Promise<UserAuthRecord | null> {
-    return withPrincipalDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: public_id }),
-      () => this.repository.clearPasswordHash(public_id),
+    return withAppDatabaseContext(resolveVerifiedPrincipalScope({ userPublicId: public_id }), () =>
+      this.repository.clearPasswordHash(public_id),
     );
   }
 
@@ -373,9 +368,8 @@ export class UserService {
   ): Promise<UserAuthRecord | null> {
     // Login is pre-session, but the TARGET public_id is known after the email resolver, so pin the
     // owner context — the owner WITH CHECK authorizes the lockout-counter write under FORCE RLS.
-    return withPrincipalDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: public_id }),
-      () => this.repository.updateLoginAttempt(public_id, failed_login_count, account_locked_until),
+    return withAppDatabaseContext(resolveVerifiedPrincipalScope({ userPublicId: public_id }), () =>
+      this.repository.updateLoginAttempt(public_id, failed_login_count, account_locked_until),
     );
   }
 
@@ -389,30 +383,27 @@ export class UserService {
     public_id: string,
     options: { maxAttempts: number; lockoutMinutes: number },
   ): Promise<UserAuthRecord | null> {
-    return withPrincipalDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: public_id }),
-      () => this.repository.incrementFailedLoginAttempt(public_id, options),
+    return withAppDatabaseContext(resolveVerifiedPrincipalScope({ userPublicId: public_id }), () =>
+      this.repository.incrementFailedLoginAttempt(public_id, options),
     );
   }
 
   async updateMfaEnabled(public_id: string, enabled: boolean): Promise<UserAuthRecord | null> {
-    return withPrincipalDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: public_id }),
-      () => this.repository.updateMfaEnabled(public_id, enabled),
+    return withAppDatabaseContext(resolveVerifiedPrincipalScope({ userPublicId: public_id }), () =>
+      this.repository.updateMfaEnabled(public_id, enabled),
     );
   }
 
   async updateEmailVerified(public_id: string): Promise<UserAuthRecord | null> {
     // Email-verify consumes a token pre-session; the TARGET public_id is known, so pin the owner
     // context so the owner WITH CHECK authorizes the verified-flag write under FORCE RLS.
-    return withPrincipalDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: public_id }),
-      () => this.repository.updateEmailVerified(public_id),
+    return withAppDatabaseContext(resolveVerifiedPrincipalScope({ userPublicId: public_id }), () =>
+      this.repository.updateEmailVerified(public_id),
     );
   }
 
   async resolveInternalIdByPublicId(public_id: string): Promise<number | null> {
-    const user = await withPrincipalDatabaseContext(
+    const user = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: public_id }),
       () => this.repository.findByPublicId(public_id),
     );
@@ -456,7 +447,7 @@ export class UserService {
     if (ownerInternalId === null) {
       throw new ValidationError('errors:validation.avatarNotFound');
     }
-    await withPrincipalDatabaseContext(
+    await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: ownerPublicId }),
       () =>
         this.offboardingUploadService!.assertKeyConfirmedForOwner({
@@ -484,7 +475,7 @@ export class UserService {
 
   async getMe(scope: UserPrincipalDatabaseScope): Promise<UserOutput> {
     const publicId = scope.userPublicId;
-    const user = await withPrincipalDatabaseContext(scope, () =>
+    const user = await withAppDatabaseContext(scope, () =>
       this.repository.findByPublicId(publicId),
     );
     if (!user || user.deleted_at) throw new NotFoundError('User');
@@ -510,12 +501,12 @@ export class UserService {
     if (avatarKey) {
       await this.assertAvatarObjectInStorage(avatarKey, publicId);
       avatarUrl = avatarKey;
-      const previous = await withPrincipalDatabaseContext(scope, () =>
+      const previous = await withAppDatabaseContext(scope, () =>
         this.repository.findByPublicId(publicId),
       );
       previousAvatarUrl = previous?.avatar_url ?? null;
     }
-    const user = await withPrincipalDatabaseContext(scope, () =>
+    const user = await withAppDatabaseContext(scope, () =>
       this.repository.update(
         publicId,
         omitUndefined({
@@ -539,9 +530,7 @@ export class UserService {
    */
   async completeOnboarding(scope: UserPrincipalDatabaseScope): Promise<UserOutput> {
     const publicId = scope.userPublicId;
-    await withPrincipalDatabaseContext(scope, () =>
-      this.repository.markOnboardingComplete(publicId),
-    );
+    await withAppDatabaseContext(scope, () => this.repository.markOnboardingComplete(publicId));
     return this.getMe(scope);
   }
 
@@ -571,11 +560,11 @@ export class UserService {
   async uploadAvatar(publicId: string, body: unknown): Promise<UserOutput> {
     const { avatar_key: avatarKey } = validateUploadAvatar(body);
     await this.assertAvatarObjectInStorage(avatarKey, publicId);
-    const previous = await withPrincipalDatabaseContext(
+    const previous = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: publicId }),
       () => this.repository.findByPublicId(publicId),
     );
-    const user = await withPrincipalDatabaseContext(
+    const user = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: publicId }),
       () => this.repository.update(publicId, { avatar_url: avatarKey }),
     );
@@ -589,7 +578,7 @@ export class UserService {
   }
 
   async deleteAvatar(publicId: string): Promise<UserOutput> {
-    const existing = await withPrincipalDatabaseContext(
+    const existing = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: publicId }),
       () => this.repository.findByPublicId(publicId),
     );
@@ -597,7 +586,7 @@ export class UserService {
     // Reclaim the backing S3 object before clearing the column — previously `DELETE` left the bytes
     // in the bucket (storage leak + incomplete GDPR erasure on the per-asset delete path).
     await this.deleteOwnedAvatarObject(publicId, existing.avatar_url);
-    const user = await withPrincipalDatabaseContext(
+    const user = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: publicId }),
       () => this.repository.update(publicId, { avatar_url: null }),
     );

@@ -11,7 +11,7 @@ import type { UserService } from '@/domains/user/user.service.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Collects the distinct internal user ids (actor + target) and organization ids referenced by a
@@ -113,11 +113,11 @@ export class AuditService {
     // sec-R10: the `audit.outbox` INSERT is gated by RLS (audit_outbox_tenant_isolation_insert:
     // org rows need `app.current_organization_public_id`, tenantless rows need `app.system_audit_insert`).
     // Post-sec-M4 the per-request org RLS transaction is a no-op and controllers emit audit AFTER
-    // the service's withPrincipalDatabaseContext block has closed — so without establishing the
+    // the service's withAppDatabaseContext block has closed — so without establishing the
     // matching context here the bare-pool INSERT is rejected under the production core_be_app role
     // and the row is silently dropped by `recordAuditEvent`. Open the right context per row.
     if (input.organization_public_id) {
-      await withPrincipalDatabaseContext(
+      await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ organizationPublicId: input.organization_public_id }),
         insert,
       );
@@ -149,7 +149,7 @@ export class AuditService {
    * at the tenancy route via `requireOrganizationPermission`).
    */
   async listForOrganization(organization_public_id: string, query: Record<string, unknown>) {
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
       () => this.list(query),
     );
@@ -256,7 +256,7 @@ export class AuditService {
    */
   async listActivityForUserDataExport(options: { userPublicId: string; limit: number }) {
     const user = await this.userService.requireUserRecordByPublicId(options.userPublicId);
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
       (_databaseHandle) => this.repository.listActivityForUserDataExport(user.id, options.limit),
     );

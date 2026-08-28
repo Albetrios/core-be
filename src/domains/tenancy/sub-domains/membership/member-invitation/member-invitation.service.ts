@@ -6,7 +6,7 @@ import {
 } from '@/shared/errors/index.js';
 import { env } from '@/shared/config/env.config.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
@@ -109,11 +109,11 @@ export interface CreateInvitationForMembershipParams {
  * - **Algorithm:** invitations carry a single-use opaque token. On issue/resend
  *   {@link generateInvitationToken} produces a 64-char hex secret; only the SHA-256 hash from
  *   {@link hashInvitationToken} is persisted as `token_hash`. Org-scoped methods (resend/revoke)
- *   run inside {@link withPrincipalDatabaseContext}; {@link MemberInvitationService.createForMembership}
+ *   run inside {@link withAppDatabaseContext}; {@link MemberInvitationService.createForMembership}
  *   is called from within `MembershipService.create`'s existing org transaction (it does not open its
  *   own). The public accept route has no org context up front — it calls the SECURITY DEFINER lookup
  *   `lookupOrganizationByInvitationPublicId` to resolve the owning org, then wraps the UPDATE in
- *   `withPrincipalDatabaseContext`.
+ *   `withAppDatabaseContext`.
  * - **Failure modes:** `NotFoundError` for missing org/membership/invitation; `ValidationError`
  *   (i18n keys `errors:validation.invalidToken`, `invitationRevoked`, `invitationAlreadyAccepted`,
  *   `invitationExpired`) for state/input violations; `ForbiddenError('errors:invitationRequiresVerifiedEmail')`
@@ -148,7 +148,7 @@ export class MemberInvitationService {
    *   surrounding membership transaction.
    * - **Failure modes:** propagates a failed outbox write (rolls back the org transaction).
    * - **Side effects:** INSERTs `member_invitations`; enqueues the invitation email (raw token only via email).
-   * - **Notes:** MUST be called inside the caller's `withPrincipalDatabaseContext` (it does not open one).
+   * - **Notes:** MUST be called inside the caller's `withAppDatabaseContext` (it does not open one).
    */
   async createForMembership(
     params: CreateInvitationForMembershipParams,
@@ -222,13 +222,13 @@ export class MemberInvitationService {
     /**
      * Public route: no org context up front. Resolve the owning org via the
      * SECURITY DEFINER lookup, then wrap the read + UPDATE in
-     * `withPrincipalDatabaseContext` so RLS sees the org GUC.
+     * `withAppDatabaseContext` so RLS sees the org GUC.
      */
     const lookup =
       await this.invitationRepository.lookupOrganizationByInvitationPublicId(invitation_public_id);
     if (!lookup) throw new NotFoundError(MEMBER_INVITATION_RESOURCE);
     let acceptedMemberPublicId: string | null = null;
-    const result = await withPrincipalDatabaseContext(
+    const result = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ organizationPublicId: lookup.organization_public_id }),
       async () => {
         const row = await this.invitationRepository.findByPublicId(invitation_public_id);
@@ -317,7 +317,7 @@ export class MemberInvitationService {
     invitation_public_id: string,
   ): Promise<void> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.invitationRepository.findByPublicId(invitation_public_id);
@@ -343,7 +343,7 @@ export class MemberInvitationService {
   ): Promise<MemberInvitationOutput> {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateResendMemberInvitation(body);
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.invitationRepository.findByPublicId(invitation_public_id);

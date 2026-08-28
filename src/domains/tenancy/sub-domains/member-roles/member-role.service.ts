@@ -2,7 +2,7 @@ import { env } from '@/shared/config/env.config.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/shared/errors/index.js';
 import { isPostgresUniqueViolation } from '@/shared/utils/infrastructure/postgres-error.util.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
@@ -29,7 +29,7 @@ import type { ListMemberRolesQueryInput } from './member-role.dto.js';
  *
  * @remarks
  * - **Algorithm:** every public method runs inside
- *   `withPrincipalDatabaseContext` and resolves the caller's
+ *   `withAppDatabaseContext` and resolves the caller's
  *   organization through {@link OrganizationService.requireOrganizationRecordByPublicId}
  *   before touching the role repository, so RLS and membership checks happen
  *   before any data access.
@@ -59,7 +59,7 @@ export class MemberRoleService {
 
   async list(scope: OrganizationPrincipalDatabaseScope, pagination: ListMemberRolesQueryInput) {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       validateListMemberRolesQuery(pagination);
@@ -134,7 +134,7 @@ export class MemberRoleService {
     role_public_id: string,
   ): Promise<MemberRoleOutput> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const role = await this.memberRoleRepository.findByPublicId(role_public_id, organization.id);
@@ -166,7 +166,7 @@ export class MemberRoleService {
   ): Promise<MemberRoleOutput> {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateCreateMemberRole(body);
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       // Capability matrix: a PERSONAL organization is single-member by definition, so custom roles
@@ -190,7 +190,7 @@ export class MemberRoleService {
 
       // When an initial permission set is requested, verify the caller may grant every code
       // BEFORE creating the role. An escalation attempt (a code the caller does not hold) or an
-      // unknown code throws here, and the whole `withPrincipalDatabaseContext` transaction
+      // unknown code throws here, and the whole `withAppDatabaseContext` transaction
       // rolls back — no half-made role. A brand-new role has no current permissions and is never
       // the owner role, so the owner-protection / removed-codes checks the PUT path runs do not apply.
       const permissionCodes = parsed.permission_codes ?? [];
@@ -246,7 +246,7 @@ export class MemberRoleService {
   ): Promise<MemberRoleOutput> {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateMemberRole(body);
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const role = await this.memberRoleRepository.findByPublicId(role_public_id, organization.id);
@@ -296,7 +296,7 @@ export class MemberRoleService {
    */
   async delete(scope: OrganizationPrincipalDatabaseScope, role_public_id: string): Promise<void> {
     const organization_public_id = scope.organizationPublicId;
-    await withPrincipalDatabaseContext(scope, async () => {
+    await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const role = await this.memberRoleRepository.findByPublicId(role_public_id, organization.id);

@@ -19,7 +19,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     ),
     // Arg-shift adapter: the org-branch spy keeps its (organizationPublicId, callback)
     // signature so the existing implementations and assertions stay valid.
-    withPrincipalDatabaseContext: vi.fn(
+    withAppDatabaseContext: vi.fn(
       (
         scope: { organizationPublicId?: string; userPublicId?: string },
         callback: (handle: unknown) => Promise<unknown>,
@@ -276,7 +276,7 @@ describe('notification.worker', () => {
 
   describe('sec-re-01: tenant-less notifications enter loadNotificationForScope', () => {
     // The sec-D #10 fix added a `loadNotificationForScope` flow that pins
-    // `withPrincipalDatabaseContext (user scope)` for tenant-less notifications (instead of the prior
+    // `withAppDatabaseContext (user scope)` for tenant-less notifications (instead of the prior
     // `runGlobalRetentionWorkerJob` retention GUC). The sec-re-01 regression caught
     // that the worker wiring still injected a repository, which short-circuited the
     // new flow at `notificationRepository !== undefined` so production behavior was
@@ -302,7 +302,7 @@ describe('notification.worker', () => {
       );
     });
 
-    it('resolves the recipient user public id under global_admin scope and pins withPrincipalDatabaseContext (user scope)', async () => {
+    it('resolves the recipient user public id under global_admin scope and pins withAppDatabaseContext (user scope)', async () => {
       const findUserPublicIdMock = vi.fn().mockResolvedValue('usr_public_id_42');
       const findByIdMock = vi.fn().mockResolvedValue(buildNotificationRow({ data: {} }));
       createWorkerNotificationRepositoryMock.mockReturnValue({
@@ -324,7 +324,7 @@ describe('notification.worker', () => {
         expect.any(Function),
       );
       expect(findByIdMock).toHaveBeenCalledWith(42, null);
-      // No tenant scope means withPrincipalDatabaseContext is never touched.
+      // No tenant scope means withAppDatabaseContext is never touched.
       expect(organizationPrincipalContextMock).not.toHaveBeenCalled();
       expect(result).toEqual({ channels: ['in_app:persisted'] });
     });
@@ -340,7 +340,7 @@ describe('notification.worker', () => {
       );
     });
 
-    it('uses withPrincipalDatabaseContext (not the user-scope path) when organizationPublicId is set and no repo is injected', async () => {
+    it('uses withAppDatabaseContext (not the user-scope path) when organizationPublicId is set and no repo is injected', async () => {
       const findByIdMock = vi.fn().mockResolvedValue(buildNotificationRow({ data: {} }));
       createWorkerNotificationRepositoryMock.mockReturnValue({
         findUserPublicIdForNotificationDispatch: vi.fn(),

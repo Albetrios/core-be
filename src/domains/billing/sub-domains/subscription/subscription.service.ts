@@ -100,7 +100,7 @@ import {
 } from './subscription.validator.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { enqueueSubscriptionSeatSyncBestEffort } from './queues/subscription-seat-sync.queue.js';
@@ -148,7 +148,7 @@ function assertProviderPriceForStripeBackedPlanChange(
  *
  * @remarks
  * - **Algorithm:** Each public method runs the database portion inside
- *   {@link withPrincipalDatabaseContext} so Postgres sees the org GUC for
+ *   {@link withAppDatabaseContext} so Postgres sees the org GUC for
  *   RLS, then performs the Stripe API call (create / change-plan / cancel /
  *   resume) outside that context, then re-opens an organization context to
  *   write back the resulting row. Webhook-triggered methods
@@ -334,7 +334,7 @@ export class SubscriptionService {
       );
       return;
     }
-    const { organization, subscription } = await withPrincipalDatabaseContext(
+    const { organization, subscription } = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
       async () => {
         const organization =
@@ -369,7 +369,7 @@ export class SubscriptionService {
       );
     }
 
-    await withPrincipalDatabaseContext(
+    await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
       async () =>
         this.repository.update(subscription.public_id, organization.id, {
@@ -529,7 +529,7 @@ export class SubscriptionService {
 
   async list(scope: OrganizationPrincipalDatabaseScope) {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const rows = await this.repository.listByOrganization(organization.id);
@@ -540,7 +540,7 @@ export class SubscriptionService {
 
   async get(scope: OrganizationPrincipalDatabaseScope, subscription_public_id: string) {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const subscription = await this.repository.findByPublicId(
@@ -560,7 +560,7 @@ export class SubscriptionService {
    */
   async getPaymentSetup(scope: OrganizationPrincipalDatabaseScope, subscription_public_id: string) {
     const organization_public_id = scope.organizationPublicId;
-    const providerSubscriptionId = await withPrincipalDatabaseContext(scope, async () => {
+    const providerSubscriptionId = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const subscription = await this.repository.findByPublicId(
@@ -603,7 +603,7 @@ export class SubscriptionService {
     // (the loser was previously compensated via cancel). The partial unique index + compensating
     // cancel below remain the durable correctness backstop if the lock ever lapses.
     const runCreate = async () => {
-      const { organization, plan, createdByUserInternalId } = await withPrincipalDatabaseContext(
+      const { organization, plan, createdByUserInternalId } = await withAppDatabaseContext(
         scope,
         async () => {
           const organization =
@@ -648,7 +648,7 @@ export class SubscriptionService {
       );
 
       try {
-        const created = await withPrincipalDatabaseContext(scope, async () =>
+        const created = await withAppDatabaseContext(scope, async () =>
           this.repository.create(
             omitUndefined({
               organization_id: organization.id,
@@ -728,7 +728,7 @@ export class SubscriptionService {
     // PATCH `cancel_at_period_end` (or other billing-state fields) is rejected with 422
     // and must use the dedicated /cancel and /resume routes (which DO call Stripe).
     validateUpdateSubscription(body);
-    const existing = await withPrincipalDatabaseContext(scope, async () => {
+    const existing = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const found = await this.repository.findByPublicId(subscription_public_id, organization.id);
@@ -794,7 +794,7 @@ export class SubscriptionService {
   ) {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateChangePlan(body);
-    const { organization, plan, subscription, previousPlan } = await withPrincipalDatabaseContext(
+    const { organization, plan, subscription, previousPlan } = await withAppDatabaseContext(
       scope,
       async () => {
         const organization =
@@ -849,7 +849,7 @@ export class SubscriptionService {
     const periodStart = new Date(subscription.current_period_start);
     const periodEnd = new Date(subscription.current_period_end);
     try {
-      const updated = await withPrincipalDatabaseContext(scope, async () =>
+      const updated = await withAppDatabaseContext(scope, async () =>
         this.repository.update(subscription_public_id, organization.id, {
           plan_id: plan.id,
           current_period_start: periodStart,
@@ -895,7 +895,7 @@ export class SubscriptionService {
     idempotencyKey?: string,
   ) {
     const organization_public_id = scope.organizationPublicId;
-    const { organization, subscription } = await withPrincipalDatabaseContext(scope, async () => {
+    const { organization, subscription } = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       // Personal organizations cannot manage billing — reject before the subscription
@@ -925,7 +925,7 @@ export class SubscriptionService {
           buildStripeIdempotencyKey('sub-cancel-now', organization_public_id, idempotencyKey),
         );
       }
-      const canceled = await withPrincipalDatabaseContext(scope, async () =>
+      const canceled = await withAppDatabaseContext(scope, async () =>
         this.repository.update(subscription_public_id, organization.id, {
           status: 'CANCELED',
           canceled_at: new Date(),
@@ -947,7 +947,7 @@ export class SubscriptionService {
       );
     }
 
-    const updated = await withPrincipalDatabaseContext(scope, async () =>
+    const updated = await withAppDatabaseContext(scope, async () =>
       this.repository.update(subscription_public_id, organization.id, {
         cancel_at_period_end: true,
         // sec-B3: stamp the watermark so a stale Stripe `updated` event arriving later
@@ -974,7 +974,7 @@ export class SubscriptionService {
    *   path touched billing. Re-running after a partial failure finds no active sub → no-op.
    */
   async cancelActiveForOrganizationOffboarding(organization_public_id: string): Promise<void> {
-    const { organization, subscription } = await withPrincipalDatabaseContext(
+    const { organization, subscription } = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
       async () => {
         const organization =
@@ -1000,7 +1000,7 @@ export class SubscriptionService {
         ),
       );
     }
-    await withPrincipalDatabaseContext(
+    await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
       async () =>
         this.repository.update(subscription.public_id, organization.id, {
@@ -1017,7 +1017,7 @@ export class SubscriptionService {
     idempotencyKey?: string,
   ) {
     const organization_public_id = scope.organizationPublicId;
-    const { organization, subscription } = await withPrincipalDatabaseContext(scope, async () => {
+    const { organization, subscription } = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       // Personal organizations cannot manage billing — reject before the subscription
@@ -1043,7 +1043,7 @@ export class SubscriptionService {
       );
     }
 
-    const updated = await withPrincipalDatabaseContext(scope, async () =>
+    const updated = await withAppDatabaseContext(scope, async () =>
       this.repository.update(subscription_public_id, organization.id, {
         cancel_at_period_end: false,
         // sec-B4: do NOT force-write `status: 'ACTIVE'`. The Stripe webhook is the source
@@ -1151,7 +1151,7 @@ export class SubscriptionService {
     scope: OrganizationPrincipalDatabaseScope,
   ): Promise<string | null> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       assertTeamOrganization(organization, 'BILLING');

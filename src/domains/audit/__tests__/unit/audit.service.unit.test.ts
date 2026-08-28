@@ -4,7 +4,7 @@ import type { AuditRepository } from '@/domains/audit/audit.repository.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
 vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -17,7 +17,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
         : systemAuditInsertContextMock) as unknown as (...innerParameters: unknown[]) => unknown;
       return inner(...parameters);
     }),
-    withPrincipalDatabaseContext: vi.fn((_scope: unknown, callback: () => Promise<unknown>) =>
+    withAppDatabaseContext: vi.fn((_scope: unknown, callback: () => Promise<unknown>) =>
       callback(),
     ),
   };
@@ -159,7 +159,7 @@ describe('AuditService', () => {
         organization_public_id: 'org_public',
       });
       // Without this context the outbox WITH CHECK rejects the INSERT under core_be_app.
-      expect(vi.mocked(withPrincipalDatabaseContext)).toHaveBeenCalledWith(
+      expect(vi.mocked(withAppDatabaseContext)).toHaveBeenCalledWith(
         expect.objectContaining({ organizationPublicId: 'org_public' }),
         expect.any(Function),
       );
@@ -173,7 +173,7 @@ describe('AuditService', () => {
         resource_type: 'user',
       });
       expect(systemAuditInsertContextMock).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(withPrincipalDatabaseContext)).not.toHaveBeenCalled();
+      expect(vi.mocked(withAppDatabaseContext)).not.toHaveBeenCalled();
     });
 
     it('skips outbox INSERT when neither user nor API-key actor is supplied', async () => {

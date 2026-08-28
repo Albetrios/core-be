@@ -1,7 +1,7 @@
 import { NotFoundError } from '@/shared/errors/index.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
@@ -26,7 +26,7 @@ import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-
  * @remarks
  * - **Algorithm:** `get` and `update` take the token-minted
  *   {@link OrganizationPrincipalDatabaseScope} from the controller and run inside
- *   `withPrincipalDatabaseContext` (RLS) — they lazily upsert the row when
+ *   `withAppDatabaseContext` (RLS) — they lazily upsert the row when
  *   missing; `update` strips undefined fields with `omitUndefined` so PATCH
  *   semantics preserve unchanged columns.
  *   `resolveDefaultLocaleForOrganization` falls back to `'en'` when nothing
@@ -48,7 +48,7 @@ export class OrganizationSettingsService {
   ) {}
 
   async get(scope: OrganizationPrincipalDatabaseScope): Promise<OrganizationSettingsOutput> {
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(
         scope.organizationPublicId,
       );
@@ -68,7 +68,7 @@ export class OrganizationSettingsService {
     _updated_by_user_public_id: string | undefined,
   ): Promise<OrganizationSettingsOutput> {
     const parsed = validateUpdateOrganizationSettings(body);
-    const result = await withPrincipalDatabaseContext(scope, async () => {
+    const result = await withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(
         scope.organizationPublicId,
       );
@@ -110,7 +110,7 @@ export class OrganizationSettingsService {
     if (cached !== null) {
       return cached as OrganizationDefaultLocale;
     }
-    const locale = await withPrincipalDatabaseContext(
+    const locale = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ organizationPublicId: organizationPublicId }),
       async () => {
         const found =

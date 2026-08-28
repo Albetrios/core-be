@@ -14,9 +14,9 @@ The single most failure-prone, security-critical surface in core-be: a missed `F
 
 - Postgres RLS policies read transaction-scoped GUCs via `current_setting('app.<key>', true)`. The org GUC is **`app.current_organization_public_id`** and holds the organization **`public_id`** (not the bigint PK). Tenant policies resolve it as `organization_id = (SELECT id FROM tenancy.organizations WHERE public_id = current_setting('app.current_organization_public_id', true))`.
 - Because connections are pooled, the GUC is **always** set with `SET LOCAL` / `set_config(key, value, true)` inside a transaction, so it dies at COMMIT/ROLLBACK and never leaks across checkouts.
-- **HTTP path:** the tenant middleware (`src/shared/middlewares/tenant/tenant.middleware.ts`) only maps `X-Organization-Id → request.organizationId`; it is **not** the RLS authority. The active org is the signed `org` JWT claim. The GUC is set per service unit-of-work by `withPrincipalDatabaseContext(scope, cb)` (`src/infrastructure/database/contexts/database-context.ts`) — controllers relay the lazy `request.principalScope` / `request.userPrincipalScope` getters (auth middleware, over the confined request minters); job/verified paths use `resolveJobPrincipalScope` / `resolveVerifiedPrincipalScope`.
+- **HTTP path:** the tenant middleware (`src/shared/middlewares/tenant/tenant.middleware.ts`) only maps `X-Organization-Id → request.organizationId`; it is **not** the RLS authority. The active org is the signed `org` JWT claim. The GUC is set per service unit-of-work by `withAppDatabaseContext(scope, cb)` (`src/infrastructure/database/contexts/database-context.ts`) — controllers relay the lazy `request.principalScope` / `request.userPrincipalScope` getters (auth middleware, over the confined request minters); job/verified paths use `resolveJobPrincipalScope` / `resolveVerifiedPrincipalScope`.
 - **Worker path:** `src/worker.ts` sets `CORE_BE_RUNTIME=worker`. Context wrappers open a txn, set their GUC, pin the handle in AsyncLocalStorage, and pass a branded `WorkerContextDatabaseHandle`:
-  - `withPrincipalDatabaseContext` (job-minted org/user scope) → `app.current_organization_public_id` / `app.current_user_public_id`
+  - `withAppDatabaseContext` (job-minted org/user scope) → `app.current_organization_public_id` / `app.current_user_public_id`
   - `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup)` → `app.global_retention_cleanup = 'true'`
   - `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.session_retention_cleanup)` → `app.session_retention_cleanup = 'true'`
   - Every bypass kind lives in the `MAINTENANCE_CONTEXTS` registry (`database-context.ts`); usage is per-path allowlisted by `maintenance-context-confinement.policy.unit.test.ts`.
@@ -76,15 +76,15 @@ A `with*DatabaseContext` wrapper sets **one** GUC and grants access only on tabl
 
 | Context | GUC | Grants on |
 | --- | --- | --- |
-| `withPrincipalDatabaseContext` (org scope) | `app.current_organization_public_id` | tenant-scoped tables (`*_tenant_isolation`) |
-| `withPrincipalDatabaseContext` (user scope) | `app.current_user_public_id` | user-owned rows (`auth.*`, uploads, notifications) **and** the tenancy discovery policies (`organizations_user_discovery`, `memberships_user_self_discovery`) |
+| `withAppDatabaseContext` (org scope) | `app.current_organization_public_id` | tenant-scoped tables (`*_tenant_isolation`) |
+| `withAppDatabaseContext` (user scope) | `app.current_user_public_id` | user-owned rows (`auth.*`, uploads, notifications) **and** the tenancy discovery policies (`organizations_user_discovery`, `memberships_user_self_discovery`) |
 | `withGlobalAdminDatabaseContext` | `app.global_admin` | **`auth.*` and `audit.logs` ONLY** |
 | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup)` | `app.global_retention_cleanup` | retention-sweep tables |
 
 **`app.global_admin` is NOT a tenancy bypass.** No `tenancy.*` policy carries that arm, so the admin context reads zero rows from `tenancy.organizations` / `tenancy.memberships` and fails their `WITH CHECK` on write. (The `WITH CHECK` checklist item above warns about a `global_admin` arm leaking from `USING` — that concerns tables where such an arm exists, e.g. `audit.logs`; on tenancy tables there is none to leak.) This shipped to production three times — organization provisioning (42501), active-org resolution at login (zero rows → no `org` claim, empty permissions), and the `OrganizationRepository` user-id resolvers (`null` → permission-cache purge skipped, attribution nulled).
 
 - **Never import `withGlobalAdminDatabaseContext` under `src/domains/tenancy/**`** — enforced by `no-global-admin-in-tenancy.global.test.ts`. The policy fact itself is pinned by `tenancy-global-admin-invisibility.security.test.ts`.
-- For an auth-flow read that has no org GUC yet (login, MFA, org switch, refresh), use `withPrincipalDatabaseContext` with a user scope (verified minter on auth flows) — the tenancy discovery policies are keyed on `app.current_user_public_id`, so the caller sees exactly their own orgs and memberships.
+- For an auth-flow read that has no org GUC yet (login, MFA, org switch, refresh), use `withAppDatabaseContext` with a user scope (verified minter on auth flows) — the tenancy discovery policies are keyed on `app.current_user_public_id`, so the caller sees exactly their own orgs and memberships.
 - The joined-table rule above applies to **any** context that cannot satisfy the target policy — org-only context *and* post-commit paths running with no GUC at all (a frequent miss: `sec-R11`-style "invalidate AFTER commit, outside the org block" code).
 
 ### Savepoints do NOT restore session settings

@@ -14,7 +14,7 @@ const INVITE_ACCEPTED_ACTION_URL = '/settings/members';
  * Fans out an `membership.invite_accepted` notification (in-app + email) to each org
  * `membership:manage` holder resolved by the tenancy accept path.
  *
- * @remarks Runs synchronously inside the accept's `withPrincipalDatabaseContext` (the event is
+ * @remarks Runs synchronously inside the accept's `withAppDatabaseContext` (the event is
  * awaited there), so each `createAndDispatchNotification` INSERT sees the org GUC and satisfies the
  * notification write-RLS. `requestId` is intentionally omitted so the commit-dispatch uses the
  * in-memory `onCommit` path — no Redis write inside the caller's RLS-context transaction. Per-recipient

@@ -194,7 +194,7 @@ export class WebhookRepository {
    *
    * @remarks
    * - **Algorithm:** identical projection to `findByPublicId` plus `.for('update')`;
-   *   must run inside the org transaction opened by `withPrincipalDatabaseContext`.
+   *   must run inside the org transaction opened by `withAppDatabaseContext`.
    * - **Failure modes:** none beyond Postgres errors; returns `null` when absent.
    * - **Side effects:** acquires a row-level write lock held until the surrounding
    *   transaction commits — a second rotation blocks here, then re-reads the

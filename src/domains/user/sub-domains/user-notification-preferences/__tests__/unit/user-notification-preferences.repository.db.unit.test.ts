@@ -5,7 +5,7 @@ import { createTestOrganization } from '@/tests/factories/organization.factory.j
 import { database } from '@/infrastructure/database/connection.js';
 import { user_notification_preferences } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.schema.js';
 import { UserNotificationPreferencesRepository } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.repository.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 describe('UserNotificationPreferencesRepository (database)', () => {
@@ -88,7 +88,7 @@ describe('UserNotificationPreferencesRepository (database)', () => {
   // sec-U7: defense-in-depth pin on `organization_id`. The original RLS
   // policy carried an org branch that only verified the `app.current_organization_public_id`
   // GUC matched, NOT membership — a future route wrapping this table in
-  // `withPrincipalDatabaseContext` would have let any user write
+  // `withAppDatabaseContext` would have let any user write
   // preferences against any org id they passed in `X-Organization-Id`,
   // bypassing membership entirely. The schema-level CHECK constraint
   // (`chk_user_notif_prefs_no_org`) refuses non-null `organization_id`
@@ -143,7 +143,7 @@ describe('UserNotificationPreferencesRepository (database)', () => {
     const CONCURRENT_REPLACES = 8;
     const settled = await Promise.allSettled(
       Array.from({ length: CONCURRENT_REPLACES }, (_, index) =>
-        withPrincipalDatabaseContext(
+        withAppDatabaseContext(
           resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
           () => repository.replaceAll(user.id, payload(index % 2 === 0), user.id),
         ),

@@ -5,7 +5,7 @@ import { serializeUserNotificationPreferenceList } from './user-notification-pre
 import type { NotificationPreferenceOutput } from './user-notification-preferences.types.js';
 import { validatePutUserNotificationPreferences } from './user-notification-preferences.validator.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -14,7 +14,7 @@ import {
  *
  * @remarks
  * - **Algorithm:** resolve the user via {@link UserService.findUserRecordByPublicId}, then run the
- *   repository call inside `withPrincipalDatabaseContext (user scope)` so RLS scopes the SELECT/DELETE/INSERT to the
+ *   repository call inside `withAppDatabaseContext (user scope)` so RLS scopes the SELECT/DELETE/INSERT to the
  *   owning user. `put` validates first, then cascades by deleting all existing rows for the user
  *   and inserting the supplied list in one repository call.
  * - **Failure modes:** unknown / soft-deleted user → {@link NotFoundError}; invalid body →
@@ -35,9 +35,7 @@ export class UserNotificationPreferencesService {
     const user_public_id = scope.userPublicId;
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    const rows = await withPrincipalDatabaseContext(scope, () =>
-      this.repository.listByUserId(user.id),
-    );
+    const rows = await withAppDatabaseContext(scope, () => this.repository.listByUserId(user.id));
     return serializeUserNotificationPreferenceList(rows);
   }
 
@@ -60,7 +58,7 @@ export class UserNotificationPreferencesService {
     }
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    const rows = await withPrincipalDatabaseContext(scope, () =>
+    const rows = await withAppDatabaseContext(scope, () =>
       this.repository.replaceAll(
         user.id,
         parsed.preferences.map((preference) => ({

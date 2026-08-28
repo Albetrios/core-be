@@ -14,7 +14,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     withMaintenanceDatabaseContext: vi.fn(
       async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
     ),
-    withPrincipalDatabaseContext: async (
+    withAppDatabaseContext: async (
       _scope: unknown,
       callback: (databaseHandle: unknown) => Promise<unknown>,
     ) => callback(fakeDatabaseHandle),

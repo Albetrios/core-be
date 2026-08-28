@@ -40,15 +40,15 @@ row. Elevated access exists only as the named fixture role `core_be_operator`
 
 | Old call | New call |
 | -------- | -------- |
-| `withOrganizationContext(orgId, cb)` / `withOrganizationDatabaseContext(orgId, cb)` | `withPrincipalDatabaseContext(scope, cb)` — scope minted by `REQUEST_SCOPE.organization(request)` (HTTP), `resolveJobPrincipalScope({ organizationPublicId })` (worker), or `resolveVerifiedPrincipalScope({ organizationPublicId })` (verified/port flows) |
-| `withUserDatabaseContext(userId, cb)` | `withPrincipalDatabaseContext(scope, cb)` — `REQUEST_SCOPE.user(request)`, `resolveJobPrincipalScope({ userPublicId })`, or `resolveVerifiedPrincipalScope({ userPublicId })` |
+| `withOrganizationContext(orgId, cb)` / `withOrganizationDatabaseContext(orgId, cb)` | `withAppDatabaseContext(scope, cb)` — scope minted by `REQUEST_SCOPE.organization(request)` (HTTP), `resolveJobPrincipalScope({ organizationPublicId })` (worker), or `resolveVerifiedPrincipalScope({ organizationPublicId })` (verified/port flows) |
+| `withUserDatabaseContext(userId, cb)` | `withAppDatabaseContext(scope, cb)` — `REQUEST_SCOPE.user(request)`, `resolveJobPrincipalScope({ userPublicId })`, or `resolveVerifiedPrincipalScope({ userPublicId })` |
 | `withGlobalRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, cb)` |
 | `withSessionRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.session_retention_cleanup, cb)` |
 | `withGlobalAdminDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, cb)` |
 | `withSystemAuditInsertContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_audit_insert, cb)` |
 | `withSystemTableRetentionContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_retention, cb)` |
 | `withSystemTableWorkerContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, cb)` |
-| (pre-auth session lookups, raw) | `withSessionDatabaseContext(SESSION_SCOPE.<kind>(value), cb)` |
+| (pre-auth session lookups, raw) | `withAppDatabaseContext(SESSION_SCOPE.<kind>(value), cb)` |
 
 The key upgrade: the first argument is no longer a string anyone can fabricate — it is a
 **branded scope object** whose factories are confined to allowlisted files by policy
@@ -66,6 +66,7 @@ tests. Holding a scope IS the authority.
 | local superuser runtime (`core`) | `core_be_app` login | local↔live parity: `pnpm dev` now connects RLS-subject exactly like production |
 | implicit superuser fixtures | `core_be_operator` (BYPASSRLS, local/CI only) | fixture power is a named, auditable role instead of a superuser side effect |
 | "provider superuser" mental model | `core_be_owner` NOLOGIN group + `core_be_migrator` | ownership and DDL authority are named roles; managed Postgres has no true superusers anyway |
+| `withPrincipalDatabaseContext` / `withSessionDatabaseContext` | `withAppDatabaseContext` | one wrapper per connection role: the name states the pool (`core_be_app` vs `core_be_maintenance`), the scope states the GUCs — principal and session stay distinct as SCOPE types (branded, separately confined), not as wrappers |
 
 **Naming symmetry (end-to-end, no translation anywhere):** scope field
 `organizationPublicId` → GUC `app.current_organization_public_id` → policy compares
@@ -93,8 +94,8 @@ public→internal inside the arm where an FK column needs it).
                                                 ▼
 ┌──────────────────────────── PATTERN LAYER  (contexts/database-context.ts) ───────────────────────────┐
 │                                                                                                      │
-│   withPrincipalDatabaseContext(scope, cb)     identity GUCs (org and/or user)                       │
-│   withSessionDatabaseContext(scope, cb)       one session-artifact GUC (kind-dispatched)            │
+│   withAppDatabaseContext(scope, cb)           principal scope → identity GUCs (org and/or user)     │
+│                                               session scope   → one artifact GUC (kind-dispatched)  │
 │   withMaintenanceDatabaseContext(scope, cb)   one bypass GUC = 'true' (registry-dispatched)         │
 │                                                                                                      │
 │   Registries (single source of truth):                                                               │
@@ -143,7 +144,7 @@ Rules the layers enforce:
   block:
 
   ```ts
-  await withPrincipalDatabaseContext(scope, async (db) => {
+  await withAppDatabaseContext(scope, async (db) => {
     // everything here: one trx, GUCs armed, auto commit/rollback/release
   });
   ```
@@ -176,7 +177,7 @@ ledger at zero).
 
 ```text
 request → controller mints scope ─┐
-                                  ├─ withPrincipalDatabaseContext(scope, cb)
+                                  ├─ withAppDatabaseContext(scope, cb)
 job → worker-runtime mints scope ─┘        │
                                            ▼
                      one SELECT set_config(...), set_config(...)   ← ONE round trip,
@@ -226,9 +227,9 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 
 | Pattern | Scope type | Minted by (per-file confined) | Context call |
 | --- | --- | --- | --- |
-| Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `REQUEST_SCOPE.organization(request)` · `resolveJobPrincipalScope({ organizationPublicId })` · `resolveVerifiedPrincipalScope({ organizationPublicId })` | `withPrincipalDatabaseContext` |
-| Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `REQUEST_SCOPE.user(request)` · `resolveJobPrincipalScope({ userPublicId })` · `resolveVerifiedPrincipalScope({ userPublicId })` | `withPrincipalDatabaseContext` |
-| Session | `SessionDatabaseScope` — kinds `session_public_id` \| `session_token_hash` | `SESSION_SCOPE.<kind>(value)` factories (auth domain only; token values are pre-hashed) | `withSessionDatabaseContext` |
+| Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `REQUEST_SCOPE.organization(request)` · `resolveJobPrincipalScope({ organizationPublicId })` · `resolveVerifiedPrincipalScope({ organizationPublicId })` | `withAppDatabaseContext` |
+| Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `REQUEST_SCOPE.user(request)` · `resolveJobPrincipalScope({ userPublicId })` · `resolveVerifiedPrincipalScope({ userPublicId })` | `withAppDatabaseContext` |
+| Session | `SessionDatabaseScope` — kinds `session_public_id` \| `session_token_hash` | `SESSION_SCOPE.<kind>(value)` factories (auth domain only; token values are pre-hashed) | `withAppDatabaseContext` |
 | Maintenance | `MaintenanceDatabaseScope` — 7 frozen singletons: `global_retention_cleanup`, `session_retention_cleanup`, `global_admin`, `system_audit_insert`, `audit_outbox_drain`, `system_table_retention`, `system_table_worker` | nothing to mint — `MAINTENANCE_SCOPE.<kind>` | `withMaintenanceDatabaseContext` |
 
 Provenance (`scope.source`): `request` = authenticated HTTP request (JWT or API key) · `job` = validated

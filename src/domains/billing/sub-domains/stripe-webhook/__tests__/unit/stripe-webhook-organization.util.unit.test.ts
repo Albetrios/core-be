@@ -11,7 +11,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     withMaintenanceDatabaseContext: vi.fn(
       async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
     ),
-    withPrincipalDatabaseContext: vi.fn(
+    withAppDatabaseContext: vi.fn(
       async (_scope: unknown, callback: (handle: unknown) => Promise<unknown>) =>
         callback({ tag: 'pinned-handle' }),
     ),

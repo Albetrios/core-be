@@ -18,7 +18,7 @@ export type WebauthnCredentialRow = typeof webauthn_credentials.$inferSelect;
  * {@link updateCounter} and revokes via `revoked_at` (partial unique index keeps `credential_id`
  * reusable after revocation). `auth.webauthn_credentials` is FORCE RLS keyed on
  * `app.current_user_public_id`, so every method reads/writes via the request-scoped handle and callers
- * must run inside `withPrincipalDatabaseContext (user scope)` (the owning user public id is always known at the call
+ * must run inside `withAppDatabaseContext (user scope)` (the owning user public id is always known at the call
  * site — authenticated request or WebAuthn challenge).
  */
 export class WebauthnCredentialRepository {

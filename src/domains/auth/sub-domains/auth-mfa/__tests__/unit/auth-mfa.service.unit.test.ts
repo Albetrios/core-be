@@ -68,7 +68,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     withMaintenanceDatabaseContext: vi.fn(
       async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
     ),
-    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
       callback(),
     ),
   };
@@ -359,8 +359,8 @@ describe('MfaService', () => {
     redis.getdel.mockResolvedValueOnce('TESTSECRET');
 
     // Track call order: createAuthMethodRecord → insertMfaRecoveryCodes → updateMfaEnabled
-    // must all happen inside the withPrincipalDatabaseContext (user scope) callback (same transaction).
-    // sec-re-06: the prior code called updateMfaEnabled AFTER withPrincipalDatabaseContext (user scope)
+    // must all happen inside the withAppDatabaseContext (user scope) callback (same transaction).
+    // sec-re-06: the prior code called updateMfaEnabled AFTER withAppDatabaseContext (user scope)
     // returned, on a separate connection; a crash between commit and the flip left the
     // user with valid TOTP + codes but is_mfa_enabled=false, bypassing MFA at login.
     const callOrder: string[] = [];
@@ -614,17 +614,17 @@ describe('MfaService', () => {
     );
   });
 
-  it('sec-new-A4: updateMfaEnabled is called inside the withPrincipalDatabaseContext (user scope) transaction (no TOCTOU window)', async () => {
-    // Regression: the previous code called updateMfaEnabled AFTER withPrincipalDatabaseContext (user scope)
+  it('sec-new-A4: updateMfaEnabled is called inside the withAppDatabaseContext (user scope) transaction (no TOCTOU window)', async () => {
+    // Regression: the previous code called updateMfaEnabled AFTER withAppDatabaseContext (user scope)
     // returned, leaving a TOCTOU gap where a concurrent enroll could flip is_mfa_enabled
     // back to true between the revoke commit and the flag update.
-    const { withPrincipalDatabaseContext } = await import(
+    const { withAppDatabaseContext } = await import(
       '@/infrastructure/database/contexts/database-context.js'
     );
 
     const callOrder: string[] = [];
-    vi.mocked(withPrincipalDatabaseContext).mockImplementationOnce(
-      async (_scope: unknown, callback: Parameters<typeof withPrincipalDatabaseContext>[1]) => {
+    vi.mocked(withAppDatabaseContext).mockImplementationOnce(
+      async (_scope: unknown, callback: Parameters<typeof withAppDatabaseContext>[1]) => {
         callOrder.push('txn_start');
         await callback(null as never);
         callOrder.push('txn_end');

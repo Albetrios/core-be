@@ -37,7 +37,7 @@ import type { UploadRepository, UploadRow } from './upload.repository.js';
 import { serializeUploadCreate, serializeUploadDetail } from './upload.serializer.js';
 import { validateUploadPublicIdParam } from './upload.validator.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
 /** Inputs for {@link UploadService}'s private atomic PENDING-slot reservation. */
 interface ReservePendingUploadSlotParams {
@@ -60,7 +60,7 @@ interface ReservePendingUploadSlotParams {
  * - **Algorithm:** {@link UploadService.createUpload} resolves owner/organization
  *   context, computes the S3 key from {@link UPLOAD_PURPOSE_CONFIG} + a canonical
  *   extension, then atomically reserves the PENDING row inside
- *   {@link withPrincipalDatabaseContext (user scope)} (a per-user advisory lock guards the
+ *   {@link withAppDatabaseContext (user scope)} (a per-user advisory lock guards the
  *   pending-count check + insert in one transaction so the quota holds under
  *   concurrency and the owner-access RLS policy authorizes the write) and only
  *   AFTER the slot is committed requests a presigned URL (PUT or POST per
@@ -206,11 +206,11 @@ export class UploadService {
    * @remarks
    * - **sec-r7/M4:** the RLS context MUST match the row being inserted. An org-scoped
    *   upload (`organization_id` set) only satisfies the `uploads_tenant_isolation`
-   *   `WITH CHECK` under `withPrincipalDatabaseContext` (`app.current_organization_public_id`);
-   *   under `withPrincipalDatabaseContext (user scope)` the INSERT is rejected by RLS as the production
+   *   `WITH CHECK` under `withAppDatabaseContext` (`app.current_organization_public_id`);
+   *   under `withAppDatabaseContext (user scope)` the INSERT is rejected by RLS as the production
    *   `core_be_app` role (FORCE RLS) — every org-logo / org-file upload would 500.
    *   User-scoped uploads (`organization_id` NULL, e.g. avatars) run under
-   *   `withPrincipalDatabaseContext (user scope)` so the `uploads_owner_access` policy applies. The org cap
+   *   `withAppDatabaseContext (user scope)` so the `uploads_owner_access` policy applies. The org cap
    *   is the primary abuse guard for org uploads (sec-UP4); the per-user cap is enforced
    *   against the user's pending rows visible in the active context.
    */
@@ -295,12 +295,12 @@ export class UploadService {
     };
 
     if (organizationInternalId !== null && organizationPublicId !== null) {
-      return withPrincipalDatabaseContext(
+      return withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ organizationPublicId: organizationPublicId }),
         runReservation,
       );
     }
-    return withPrincipalDatabaseContext(
+    return withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       runReservation,
     );
@@ -324,7 +324,7 @@ export class UploadService {
        * organization context or `app.current_user_public_id` + the `organizations_user_discovery`
        * policy. The latter is appropriate here because we have just authorized the user.
        */
-      const organization = await withPrincipalDatabaseContext(
+      const organization = await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
         () => this.organizationService.requireOrganizationByPublicId(input.organization_id!),
       );
@@ -398,7 +398,7 @@ export class UploadService {
       return;
     }
 
-    const organization = await withPrincipalDatabaseContext(
+    const organization = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.organizationService.findOrganizationByInternalId(row.organization_id!),
     );
@@ -421,7 +421,7 @@ export class UploadService {
     userInternalId: number;
   }): Promise<UploadRow> {
     const { public_id, userPublicId, userInternalId } = input;
-    const row = await withPrincipalDatabaseContext(
+    const row = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.repository.findByPublicId(public_id),
     );
@@ -540,7 +540,7 @@ export class UploadService {
     // legacy rows are at end-of-life; refuse and require re-upload via
     // a fresh pending key.
     if (!pendingKeyed) {
-      const failedRow = await withPrincipalDatabaseContext(
+      const failedRow = await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
         () => this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
       );
@@ -563,7 +563,7 @@ export class UploadService {
     });
 
     if (!verified) {
-      const failedRow = await withPrincipalDatabaseContext(
+      const failedRow = await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
         () => this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
       );
@@ -575,7 +575,7 @@ export class UploadService {
 
     // Repoint the row at the immutable final key in the same update that marks it UPLOADED, so a
     // servable row never references the overwritable pending key.
-    const updated = await withPrincipalDatabaseContext(
+    const updated = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.repository.markConfirmedByPublicId(validatedPublicId, finalKey),
     );
@@ -674,7 +674,7 @@ export class UploadService {
        */
       const organization =
         userPublicId !== undefined && userPublicId.length > 0
-          ? await withPrincipalDatabaseContext(
+          ? await withAppDatabaseContext(
               resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
               () => this.organizationService.findOrganizationByInternalId(row.organization_id!),
             )
@@ -702,7 +702,7 @@ export class UploadService {
       );
     }
 
-    const deleted = await withPrincipalDatabaseContext(
+    const deleted = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.repository.softDeleteByPublicId(validatedPublicId),
     );

@@ -1,6 +1,6 @@
 /**
  * Policy (audit R11): permission-cache invalidation MUST run AFTER the write transaction commits,
- * i.e. OUTSIDE the `withPrincipalDatabaseContext(...)` callback — never inside it.
+ * i.e. OUTSIDE the `withAppDatabaseContext(...)` callback — never inside it.
  *
  * Invalidating inside the callback (pre-commit) opens a race: a concurrent permission recompute for
  * the affected user reads the OLD committed permission set and re-caches it before the writer
@@ -10,7 +10,7 @@
  *
  * The scan strips comments and string/template literals, then asserts no `invalidatePermissions(`,
  * `invalidateOrganizationPermissions(`, or `invalidatePermissionsForMembership(` call appears inside
- * any `withPrincipalDatabaseContext(...)` call expression.
+ * any `withAppDatabaseContext(...)` call expression.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -47,10 +47,10 @@ function stripCommentsAndStrings(source: string): string {
     .replace(/"(?:\\.|[^"\\])*"/g, '""');
 }
 
-/** Returns the body spans (paren-balanced) of every `withPrincipalDatabaseContext(...)` call. */
+/** Returns the body spans (paren-balanced) of every `withAppDatabaseContext(...)` call. */
 function organizationContextCallSpans(source: string): string[] {
   const spans: string[] = [];
-  const marker = 'withPrincipalDatabaseContext(';
+  const marker = 'withAppDatabaseContext(';
   let searchFrom = 0;
   for (;;) {
     const start = source.indexOf(marker, searchFrom);
@@ -96,7 +96,7 @@ describe('Policy: permission-cache invalidation runs post-commit (audit R11)', (
 
   for (const file of files) {
     const relativePath = relative(PROJECT_ROOT, file);
-    it(`no permission-cache invalidation inside a withPrincipalDatabaseContext callback — ${relativePath}`, () => {
+    it(`no permission-cache invalidation inside a withAppDatabaseContext callback — ${relativePath}`, () => {
       const stripped = stripCommentsAndStrings(readFileSync(file, 'utf8'));
       const offenders: string[] = [];
       for (const span of organizationContextCallSpans(stripped)) {
@@ -106,7 +106,7 @@ describe('Policy: permission-cache invalidation runs post-commit (audit R11)', (
       }
       expect(
         offenders,
-        `${relativePath}: ${offenders.join(', ')} called INSIDE withPrincipalDatabaseContext — ` +
+        `${relativePath}: ${offenders.join(', ')} called INSIDE withAppDatabaseContext — ` +
           'move the invalidation AFTER the context block (post-commit) to avoid the stale re-cache race.',
       ).toEqual([]);
     });

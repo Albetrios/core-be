@@ -3,7 +3,7 @@ import { env } from '@/shared/config/env.config.js';
 import { ConflictError, NotFoundError } from '@/shared/errors/index.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
@@ -57,7 +57,7 @@ function getKeyPrefix(key: string): string {
  *   validation errors propagate from the DTO validators.
  * - **Side effects:** persistent row writes (`create`, `update`,
  *   `softDelete`, `touchLastUsedAt`); mutations are wrapped in
- *   `withPrincipalDatabaseContext` to satisfy RLS.
+ *   `withAppDatabaseContext` to satisfy RLS.
  * - **Notes:** raw secret is returned to the caller exactly once (creation
  *   and rotation responses); revocation = soft-delete or status flip to
  *   `REVOKED`; key prefix is non-secret and used purely as a lookup index.
@@ -73,7 +73,7 @@ export class OrganizationApiKeyService {
   async list(scope: OrganizationPrincipalDatabaseScope, query: unknown) {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateListOrganizationApiKeysQuery(query);
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const result = await this.apiKeyRepository.findByOrganizationId(
@@ -98,7 +98,7 @@ export class OrganizationApiKeyService {
     api_key_public_id: string,
   ): Promise<OrganizationApiKeyOutput> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.apiKeyRepository.findByPublicId(api_key_public_id, organization.id);
@@ -122,7 +122,7 @@ export class OrganizationApiKeyService {
       organizationPublicId: organization_public_id,
       requestedPermissionCodes: parsed.scopes,
     });
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       // sec-r5-followup-ratelimit-dos-1 + audit-#8: serialize the per-org count + insert with a
@@ -174,7 +174,7 @@ export class OrganizationApiKeyService {
   ): Promise<OrganizationApiKeyOutput> {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateOrganizationApiKey(body);
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.apiKeyRepository.findByPublicId(api_key_public_id, organization.id);
@@ -197,7 +197,7 @@ export class OrganizationApiKeyService {
     api_key_public_id: string,
   ): Promise<void> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const deleted = await this.apiKeyRepository.softDelete(api_key_public_id, organization.id);
@@ -218,7 +218,7 @@ export class OrganizationApiKeyService {
       // The resolver already returned the owning organization public id (FORCE RLS on
       // tenancy.organizations means we cannot read it here without an org context). Establish that
       // context so the last_used_at touch passes the api_keys tenant-isolation policy.
-      await withPrincipalDatabaseContext(
+      await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ organizationPublicId: candidate.organization_public_id }),
         () => this.apiKeyRepository.touchLastUsedAt(candidate.public_id),
       );
@@ -237,7 +237,7 @@ export class OrganizationApiKeyService {
     created_by_user_public_id: string,
   ): Promise<CreateOrganizationApiKeyResult> {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const existing = await this.apiKeyRepository.findByPublicId(

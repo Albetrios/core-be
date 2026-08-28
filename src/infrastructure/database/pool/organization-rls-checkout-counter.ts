@@ -3,7 +3,7 @@ let activeOrganizationRlsCheckouts = 0;
 
 /**
  * Which code path opened the org-scoped RLS checkout being measured:
- * - `scoped_context` — a `withPrincipalDatabaseContext` / `withPrincipalDatabaseContext` unit of work
+ * - `scoped_context` — a `withAppDatabaseContext` / `withAppDatabaseContext` unit of work
  *   (the default `DATABASE_RLS_SCOPED_CONTEXTS=true` path; also used by workers and scripts).
  * - `request_transaction` — the legacy per-HTTP-request `organization-rls-transaction` middleware
  *   that pins one checkout for the full request (only when `DATABASE_RLS_SCOPED_CONTEXTS=false`).

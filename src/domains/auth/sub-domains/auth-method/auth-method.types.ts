@@ -12,7 +12,7 @@ export interface AuthMethodCreateData {
 /**
  * Row returned by the `auth.resolve_auth_method_by_provider` SECURITY DEFINER resolver — the linked
  * credential plus the owning user's `public_id`, so the pre-session OAuth callback can enter
- * `withPrincipalDatabaseContext (user scope)` for any follow-up owner-scoped work under FORCE RLS.
+ * `withAppDatabaseContext (user scope)` for any follow-up owner-scoped work under FORCE RLS.
  */
 export interface AuthMethodProviderLookup {
   id: number;

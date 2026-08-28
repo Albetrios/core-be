@@ -47,7 +47,7 @@ import {
   validateWebauthnAuthenticateVerify,
   validateWebauthnRegisterVerify,
 } from './webauthn.validator.js';
-import { withPrincipalDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
@@ -128,7 +128,7 @@ export class WebauthnService {
     // pre-hijacking, Trojan-credential variant).
     assertEmailVerifiedForCredentialEnrollment(user);
 
-    const existingCredentials = await withPrincipalDatabaseContext(
+    const existingCredentials = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => this.credentialRepository.listActiveByUserId(user.id),
     );
@@ -202,7 +202,7 @@ export class WebauthnService {
     const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
     let created: Awaited<ReturnType<WebauthnCredentialRepository['createCredential']>>;
     try {
-      created = await withPrincipalDatabaseContext(
+      created = await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
         async () => {
           // Serialize the count + insert under a per-user advisory lock so concurrent registrations
@@ -255,7 +255,7 @@ export class WebauthnService {
     // RLS policy + `user_id = 0` filter return zero rows), so the DB work matches.
     const lookupUserPublicId = user?.public_id ?? `decoy:${generatePublicId('authMethod')}`;
     const lookupUserId = user?.id ?? 0;
-    const credentials = await withPrincipalDatabaseContext(
+    const credentials = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: lookupUserPublicId }),
       () => this.credentialRepository.listActiveByUserId(lookupUserId),
     );
@@ -361,7 +361,7 @@ export class WebauthnService {
     }
     // The challenge binds this assertion to a user; auth.webauthn_credentials is FORCE RLS keyed on
     // app.current_user_public_id, so look the credential up inside that user's context.
-    const storedCredential = await withPrincipalDatabaseContext(
+    const storedCredential = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: challenge.user_public_id }),
       () => this.credentialRepository.findActiveByCredentialId(response.id),
     );
@@ -396,7 +396,7 @@ export class WebauthnService {
     }
 
     const { newCounter } = verification.authenticationInfo;
-    await withPrincipalDatabaseContext(
+    await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => this.credentialRepository.updateCounter(storedCredential.credential_id, newCounter),
     );
@@ -436,7 +436,7 @@ export class WebauthnService {
     if (!user) {
       throw new UnauthorizedError('errors:userNotFound');
     }
-    const rows = await withPrincipalDatabaseContext(
+    const rows = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       () => this.credentialRepository.listActiveByUserId(user.id),
     );
@@ -467,7 +467,7 @@ export class WebauthnService {
     if (!user) {
       throw new UnauthorizedError('errors:userNotFound');
     }
-    await withPrincipalDatabaseContext(
+    await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
       async () => {
         // Serialize concurrent credential mutations for this user so the "is this the last

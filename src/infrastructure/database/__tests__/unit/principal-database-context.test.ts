@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   createPrincipalDatabaseScope,
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 import {
   getActiveOrganizationRlsCheckoutCount,
@@ -31,7 +31,7 @@ function executedSqlTexts(): string[] {
   });
 }
 
-describe('withPrincipalDatabaseContext', () => {
+describe('withAppDatabaseContext', () => {
   beforeEach(() => {
     mockExecute.mockClear();
     resetOrganizationRlsCheckoutCountForTests();
@@ -44,7 +44,7 @@ describe('withPrincipalDatabaseContext', () => {
       source: 'request',
     });
 
-    await withPrincipalDatabaseContext(scope, async () => undefined);
+    await withAppDatabaseContext(scope, async () => undefined);
 
     expect(mockExecute).toHaveBeenCalledTimes(1);
     const [sqlText] = executedSqlTexts();
@@ -58,7 +58,7 @@ describe('withPrincipalDatabaseContext', () => {
       source: 'request',
     });
 
-    await withPrincipalDatabaseContext(scope, async () => undefined);
+    await withAppDatabaseContext(scope, async () => undefined);
 
     const [sqlText] = executedSqlTexts();
     expect(sqlText).toContain('app.current_organization_public_id');
@@ -68,7 +68,7 @@ describe('withPrincipalDatabaseContext', () => {
   it('sets only the user GUC for a user-only scope', async () => {
     const scope = createPrincipalDatabaseScope({ userPublicId: 'usr_a', source: 'request' });
 
-    await withPrincipalDatabaseContext(scope, async () => undefined);
+    await withAppDatabaseContext(scope, async () => undefined);
 
     const [sqlText] = executedSqlTexts();
     expect(sqlText).toContain('app.current_user_public_id');
@@ -82,7 +82,7 @@ describe('withPrincipalDatabaseContext', () => {
       source: 'request',
     });
 
-    await withPrincipalDatabaseContext(scope, async (handle) => {
+    await withAppDatabaseContext(scope, async (handle) => {
       // Only the wrapper's own set_config is inspected — the callback issues none.
       void handle;
     });
@@ -101,7 +101,7 @@ describe('withPrincipalDatabaseContext', () => {
       source: 'request',
     });
 
-    await withPrincipalDatabaseContext(scope, async () => undefined);
+    await withAppDatabaseContext(scope, async () => undefined);
 
     for (const sqlText of executedSqlTexts()) {
       expect(sqlText).not.toMatch(/statement_timeout|lock_timeout/);
@@ -112,7 +112,7 @@ describe('withPrincipalDatabaseContext', () => {
     process.env.CORE_BE_RUNTIME = 'worker';
     try {
       const scope = createPrincipalDatabaseScope({ organizationPublicId: 'org_x', source: 'job' });
-      await withPrincipalDatabaseContext(scope, async () => undefined);
+      await withAppDatabaseContext(scope, async () => undefined);
       const combined = executedSqlTexts().join(' ');
       expect(combined).toMatch(/statement_timeout/);
       expect(combined).toMatch(/lock_timeout/);
@@ -127,7 +127,7 @@ describe('withPrincipalDatabaseContext', () => {
       source: 'request',
     });
 
-    await withPrincipalDatabaseContext(scope, async (databaseHandle) => {
+    await withAppDatabaseContext(scope, async (databaseHandle) => {
       expect(getRequestDatabase()).toBe(databaseHandle);
     });
   });
@@ -143,11 +143,11 @@ describe('withPrincipalDatabaseContext', () => {
       organizationPublicId: 'org_x',
       source: 'request',
     });
-    await withPrincipalDatabaseContext(outerScope, async (outerHandle) => {
+    await withAppDatabaseContext(outerScope, async (outerHandle) => {
       mockExecute.mockClear();
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
 
-      await withPrincipalDatabaseContext(scope, async (innerHandle) => {
+      await withAppDatabaseContext(scope, async (innerHandle) => {
         expect(innerHandle).toBe(outerHandle);
         // no second checkout — the pinned transaction is shared
         expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
@@ -170,9 +170,9 @@ describe('withPrincipalDatabaseContext', () => {
       source: 'provisioning',
     });
 
-    await withPrincipalDatabaseContext(orgScope, async (outerHandle) => {
+    await withAppDatabaseContext(orgScope, async (outerHandle) => {
       mockExecute.mockClear();
-      await withPrincipalDatabaseContext(userOnly, async (innerHandle) => {
+      await withAppDatabaseContext(userOnly, async (innerHandle) => {
         // Same transaction handle — no second pool checkout, atomic with the outer trx.
         expect(innerHandle).toBe(outerHandle);
       });
@@ -194,9 +194,9 @@ describe('withPrincipalDatabaseContext', () => {
       source: 'request',
     });
 
-    await withPrincipalDatabaseContext(orgScope, async () => {
+    await withAppDatabaseContext(orgScope, async () => {
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
-      await withPrincipalDatabaseContext(otherOrg, async () => {
+      await withAppDatabaseContext(otherOrg, async () => {
         // Cross-org nesting must NOT reuse — a fresh transaction takes a second checkout.
         expect(getActiveOrganizationRlsCheckoutCount()).toBe(2);
       });
@@ -210,7 +210,7 @@ describe('withPrincipalDatabaseContext', () => {
       source: 'request',
     });
 
-    await withPrincipalDatabaseContext(scope, async () => {
+    await withAppDatabaseContext(scope, async () => {
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
     });
     expect(getActiveOrganizationRlsCheckoutCount()).toBe(0);
@@ -223,7 +223,7 @@ describe('withPrincipalDatabaseContext', () => {
     });
 
     await expect(
-      withPrincipalDatabaseContext(scope, async () => {
+      withAppDatabaseContext(scope, async () => {
         throw new Error('unit-of-work failed');
       }),
     ).rejects.toThrow('unit-of-work failed');

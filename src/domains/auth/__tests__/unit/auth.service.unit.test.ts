@@ -65,10 +65,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     withMaintenanceDatabaseContext: vi.fn(
       async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
     ),
-    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
-      callback(),
-    ),
-    withSessionDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
       callback(),
     ),
   };
@@ -477,7 +474,7 @@ describe('AuthService', () => {
     });
 
     const order: string[] = [];
-    vi.mocked(databaseContext.withPrincipalDatabaseContext).mockImplementation(
+    vi.mocked(databaseContext.withAppDatabaseContext).mockImplementation(
       // The real signature hands the callback a pinned database handle; the mock never touches
       // it, so it is passed through as `never` rather than fabricating a fake handle.
       (async (_scope: unknown, callback: (handle: never) => Promise<unknown>) => {
@@ -485,7 +482,7 @@ describe('AuthService', () => {
         const result = await callback(undefined as never);
         order.push('context:close');
         return result;
-      }) as unknown as typeof databaseContext.withPrincipalDatabaseContext,
+      }) as unknown as typeof databaseContext.withAppDatabaseContext,
     );
     vi.mocked(authSessionService.rebindAccessToken).mockImplementation(async () => {
       order.push('session:rebind');
@@ -499,7 +496,7 @@ describe('AuthService', () => {
     });
 
     // One context for the whole route. Two would mean the same guc set twice, in two checkouts.
-    expect(databaseContext.withPrincipalDatabaseContext).toHaveBeenCalledTimes(1);
+    expect(databaseContext.withAppDatabaseContext).toHaveBeenCalledTimes(1);
     expect(order).toEqual(['context:open', 'context:close', 'session:rebind']);
   });
 

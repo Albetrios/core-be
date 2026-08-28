@@ -20,7 +20,7 @@ What this suite covers:
 - Serializer response leak guard — no credential-shaped output keys (`password`, `*_hash`, `secret`, `encrypted`) and no whole-row spreads in `*.serializer.ts` (`serializer-response-leak.global.test.ts`).
 - Event wiring parity — every `*_EVENT` key has an emitter and an `eventBus.on` handler; event string values are globally unique (`event-wiring-parity.global.test.ts`).
 - Import path policy — no parent-relative `../` in `src/` or `tooling/` TypeScript (`import-paths.global.test.ts`).
-- RLS database context network isolation — no outbound I/O inside `withPrincipalDatabaseContext` callbacks in domain code.
+- RLS database context network isolation — no outbound I/O inside `withAppDatabaseContext` callbacks in domain code.
 
 What it does **not** cover: API behavior (see integration / e2e), worker per-job behavior (see integration).
 

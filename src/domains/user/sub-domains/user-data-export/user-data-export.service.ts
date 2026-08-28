@@ -29,7 +29,7 @@ import type { MembershipService } from '@/domains/tenancy/sub-domains/membership
 import type { NotificationService } from '@/domains/notify/sub-domains/notification/notification.service.js';
 import type { AuditService } from '@/domains/audit/audit.service.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
@@ -137,7 +137,7 @@ export class UserDataExportService {
     const user = await this.userService.findUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
 
-    const existingPending = await withPrincipalDatabaseContext(scope, () =>
+    const existingPending = await withAppDatabaseContext(scope, () =>
       this.exportRepository.findPendingOrProcessingByUserId(user.id),
     );
     if (existingPending) {
@@ -156,7 +156,7 @@ export class UserDataExportService {
     // context so the row passes the owner-access policy in default scoped-RLS mode.
     let row: Awaited<ReturnType<UserDataExportRepository['create']>>;
     try {
-      row = await withPrincipalDatabaseContext(scope, () =>
+      row = await withAppDatabaseContext(scope, () =>
         this.exportRepository.create({
           public_id: exportPublicId,
           user_id: user.id,
@@ -169,7 +169,7 @@ export class UserDataExportService {
       if (!isPostgresUniqueViolation(error)) {
         throw error;
       }
-      const existingAfterRace = await withPrincipalDatabaseContext(scope, () =>
+      const existingAfterRace = await withAppDatabaseContext(scope, () =>
         this.exportRepository.findPendingOrProcessingByUserId(user.id),
       );
       if (existingAfterRace) {
@@ -205,7 +205,7 @@ export class UserDataExportService {
     const user = await this.userService.findUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
 
-    const row = await withPrincipalDatabaseContext(scope, () =>
+    const row = await withAppDatabaseContext(scope, () =>
       this.exportRepository.findByPublicIdAndUserId(exportPublicId, user.id),
     );
     if (!row) throw new NotFoundError('User data export');
@@ -284,7 +284,7 @@ export class UserDataExportService {
     userPublicId: string;
     body: Buffer;
   }): Promise<void> {
-    const s3Key = await withPrincipalDatabaseContext(
+    const s3Key = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
       async (scopedDatabaseHandle) =>
         this.resolveExportArtifactS3Key(
@@ -308,7 +308,7 @@ export class UserDataExportService {
     });
 
     try {
-      await withPrincipalDatabaseContext(
+      await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
         async (scopedDatabaseHandle) => {
           await this.finalizeExportAfterUpload(
@@ -432,7 +432,7 @@ export class UserDataExportService {
     // domain's `tombstoneAllByUserId` offboarding pattern.
     let afterId = 0;
     for (;;) {
-      const rows = await withPrincipalDatabaseContext(
+      const rows = await withAppDatabaseContext(
         resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
         () =>
           this.exportRepository.findS3KeysByUserIdAfter(
@@ -453,7 +453,7 @@ export class UserDataExportService {
         break;
       }
     }
-    const deletedCount = await withPrincipalDatabaseContext(
+    const deletedCount = await withAppDatabaseContext(
       resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
       () => this.exportRepository.deleteAllByUserId(userInternalId),
     );

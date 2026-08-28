@@ -92,7 +92,7 @@ process.env.DATABASE_SSL_ENABLED = 'false';
  * commits the per-request transaction in an `onResponse` hook — i.e. AFTER `fastify.inject()`
  * resolves. Tests that assert a DB side effect (e.g. an audit row) immediately after an
  * authenticated org request then race the deferred commit and flake. Forcing the scoped-context
- * mode (inline `withPrincipalDatabaseContext` commits) makes local runs deterministic and
+ * mode (inline `withAppDatabaseContext` commits) makes local runs deterministic and
  * match CI, the source of truth.
  */
 /**

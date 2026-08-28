@@ -6,7 +6,7 @@ import {
 import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   createPrincipalDatabaseScope,
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
@@ -55,13 +55,13 @@ describe('worker database context', () => {
     expect(() => getRequestDatabase()).toThrow(WorkerDatabaseContextError);
   });
 
-  it('withPrincipalDatabaseContext sets organization worker context kind', async () => {
+  it('withAppDatabaseContext sets organization worker context kind', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
     const scope = createPrincipalDatabaseScope({
       organizationPublicId: 'org_public_test',
       source: 'job',
     });
-    await withPrincipalDatabaseContext(scope, async () => {
+    await withAppDatabaseContext(scope, async () => {
       expect(getWorkerDatabaseContext()?.kind).toBe('organization');
       expect(getWorkerDatabaseContext()?.organizationPublicId).toBe('org_public_test');
     });
@@ -97,7 +97,7 @@ describe('worker database context', () => {
       organizationPublicId: 'org_public_test',
       source: 'job',
     });
-    await withPrincipalDatabaseContext(scope, async () => {
+    await withAppDatabaseContext(scope, async () => {
       expect(() =>
         assertWorkerForceRlsTableAccess({ schemaName: 'billing', tableName: 'subscriptions' }),
       ).not.toThrow();

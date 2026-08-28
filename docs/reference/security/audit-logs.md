@@ -4,7 +4,7 @@ Core-be records security-relevant mutations in `audit.logs` via `recordScopedAud
 
 ## Query API
 
-- `GET /api/v1/tenancy/organization/audit-logs` — requires `audit-log:read`, scoped to the active organization carried by the access token's `org` claim (`withPrincipalDatabaseContext`, org scope).
+- `GET /api/v1/tenancy/organization/audit-logs` — requires `audit-log:read`, scoped to the active organization carried by the access token's `org` claim (`withAppDatabaseContext`, org scope).
 - `GET /api/v1/audit/logs` — global admin only (`SUPER_ADMIN` / `ADMIN`); cross-tenant listing runs under `withGlobalAdminDatabaseContext` (`app.global_admin = true`) so FORCE RLS / `core_be_app` see all tenants explicitly.
 
 ## Action naming

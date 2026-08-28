@@ -1,6 +1,6 @@
 import { ForbiddenError, NotFoundError } from '@/shared/errors/index.js';
 import {
-  withPrincipalDatabaseContext,
+  withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
@@ -18,7 +18,7 @@ import { assertCallerCanGrantPermissionCodes } from '@/domains/tenancy/sub-domai
  * organization.
  *
  * @remarks
- * - **Algorithm:** every public method runs under `withPrincipalDatabaseContext`
+ * - **Algorithm:** every public method runs under `withAppDatabaseContext`
  *   so Postgres RLS sees `app.current_organization_public_id`; the org and role are
  *   resolved by public id, then the repository is invoked.
  * - **Failure modes:** `NotFoundError` when the organization or role does not
@@ -51,7 +51,7 @@ export class MemberRolePermissionService {
 
   async list(scope: OrganizationPrincipalDatabaseScope, role_public_id: string) {
     const organization_public_id = scope.organizationPublicId;
-    return withPrincipalDatabaseContext(scope, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const role = await this.memberRoleRepository.findByPublicId(role_public_id, organization.id);
@@ -68,7 +68,7 @@ export class MemberRolePermissionService {
   ) {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validatePutMemberRolePermissions(body);
-    const result = await withPrincipalDatabaseContext(scope, async () => {
+    const result = await withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const role = await this.memberRoleRepository.findByPublicId(role_public_id, organization.id);

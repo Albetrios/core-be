@@ -104,7 +104,7 @@ export function getWorkerDatabaseContext(): WorkerDatabaseContext | undefined {
 
 /**
  * Runs `callback` with the given {@link WorkerDatabaseContext} pinned in ALS. Worker
- * context wrappers (`withPrincipalDatabaseContext`, `withMaintenanceDatabaseContext`, etc.)
+ * context wrappers (`withAppDatabaseContext`, `withMaintenanceDatabaseContext`, etc.)
  * build on top of this primitive — application code should call the wrappers
  * directly rather than this raw helper.
  */
@@ -129,7 +129,7 @@ export function assertWorkerDatabaseContext(
   const context = getWorkerDatabaseContext();
   if (context === undefined) {
     throw new WorkerDatabaseContextError(
-      'Worker process must not use unpinned database access. Wrap the job in a context helper (withPrincipalDatabaseContext, runTenantScopedWorkerJob, withMaintenanceDatabaseContext, or withSessionDatabaseContext) and pass databaseHandle into createWorker*Repository() factories.',
+      'Worker process must not use unpinned database access. Wrap the job in a context helper (withAppDatabaseContext, runTenantScopedWorkerJob, withMaintenanceDatabaseContext, or withAppDatabaseContext) and pass databaseHandle into createWorker*Repository() factories.',
     );
   }
 
@@ -181,7 +181,7 @@ export function workerDatabaseContextForOrganization(
 /**
  * Builds a `user`-kind {@link WorkerDatabaseContext} for user-scoped retention/export
  * jobs (e.g. GDPR data export, user-tombstone retention). Pairs with
- * `withPrincipalDatabaseContext (user scope)` to pin ALS for the duration of the job.
+ * `withAppDatabaseContext (user scope)` to pin ALS for the duration of the job.
  */
 export function workerDatabaseContextForUser(userPublicId: string): WorkerDatabaseContext {
   return { kind: 'user', userPublicId };

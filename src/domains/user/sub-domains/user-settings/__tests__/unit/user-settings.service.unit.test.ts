@@ -9,7 +9,7 @@ import {
 } from '@/infrastructure/database/contexts/database-context.js';
 
 // auth.user_settings is FORCE RLS, so the service wraps repository calls in
-// `withPrincipalDatabaseContext (user scope)`, which opens a real `database.transaction()` and would hit Postgres
+// `withAppDatabaseContext (user scope)`, which opens a real `database.transaction()` and would hit Postgres
 // (unavailable in the unit lane). Run the inner callback directly so this stays a pure unit test.
 
 vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
@@ -22,7 +22,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     withMaintenanceDatabaseContext: vi.fn(
       async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
     ),
-    withPrincipalDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
       callback(),
     ),
   };

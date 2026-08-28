@@ -18,7 +18,7 @@ import { authSchema } from '@/infrastructure/database/pg-schemas.js';
  * billing FKs stay intact; the unique-by-email partial index excludes deleted rows so an address
  * can be reused after offboarding. Trigram indexes power admin search by email and display name;
  * lockout fields drive failed-login throttling. FORCE RLS-gated (audit #7) by `app.current_user_public_id`
- * (owner self-access via `withPrincipalDatabaseContext (user scope)`) or `app.global_admin` (cross-user admin via
+ * (owner self-access via `withAppDatabaseContext (user scope)`) or `app.global_admin` (cross-user admin via
  * `withMaintenanceDatabaseContext`); pre-session reads go through the `auth.resolve_user_*`
  * SECURITY DEFINER resolvers.
  */

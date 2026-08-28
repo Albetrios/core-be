@@ -65,7 +65,7 @@ describe('webhookDeliveryJobDataSchema', () => {
   });
 
   it('rejects a null organizationPublicId — every delivery is tenant-scoped', () => {
-    // The worker opens withPrincipalDatabaseContext from this value. A null here would mean the
+    // The worker opens withAppDatabaseContext from this value. A null here would mean the
     // attempt row is read outside the RLS scope it belongs to.
     const parsed = webhookDeliveryJobDataSchema.safeParse({
       deliveryAttemptId: 7,
