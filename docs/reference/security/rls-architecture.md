@@ -149,6 +149,31 @@ Rules the layers enforce:
   });
   ```
 
+- **Scope families are types on purpose — do not merge `PrincipalDatabaseScope` and
+  `SessionDatabaseScope`**, and never make GUC keys field-driven. Values are dynamic
+  (the context arms exactly the ids the scope carries); keys are static per family
+  (principal can only ever emit the two identity keys, session the two artifact keys —
+  bypass GUCs have no path through the app wrapper, pinned by its unit tests). The two
+  types carry different minting-confinement locks (session factories are
+  auth-domain-only; principal minters are per-source), so one merged/dynamic scope
+  would collapse the allowlists and re-open key selection to whoever constructs the
+  object. The wrappers already merged (`withAppDatabaseContext`) — that was the safe
+  half. Worked examples:
+
+  ```text
+  LEGAL — values dynamic, keys fixed per family
+    request.principalScope              → { organizationPublicId, userPublicId } → both identity GUCs
+    request.userPrincipalScope          → { userPublicId }                       → user GUC only
+    resolveJobPrincipalScope({ organizationPublicId }) → org GUC (worker parity with HTTP)
+    SESSION_SCOPE.session_token_hash(h) → { kind, value }                        → that one artifact GUC
+
+  ILLEGAL — unrepresentable, so the context never needs a runtime check
+    { organizationPublicId, session_token_hash }   no factory mixes trust stages
+    { 'app.global_admin': 'true' } as a field      keys are not field-driven
+    SESSION_SCOPE.* outside the auth domain        confinement policy test fails the build
+    hand-built { organizationPublicId: anyString } brand symbol missing — type error (IDOR dead)
+  ```
+
 ---
 
 ## 4. GUC catalog — which apply, who sets them, when
