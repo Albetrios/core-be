@@ -2108,6 +2108,7 @@ src/
     │   │   │   ├── rls-offboarding-regressions.db.unit.test.ts
     │   │   │   ├── rls-table-scope-map.db.unit.test.ts
     │   │   │   ├── role-taxonomy.db.unit.test.ts
+    │   │   │   ├── scope-shape-contract.policy.unit.test.ts
     │   │   │   ├── session-context-confinement.policy.unit.test.ts
     │   │   │   ├── transaction.util.db.unit.test.ts
     │   │   │   ├── verified-scope-usage.policy.unit.test.ts
