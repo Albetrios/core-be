@@ -106,8 +106,9 @@ export function resolveActiveOrganizationId(request: FastifyRequest): string {
  * @remarks
  * - **Algorithm:** requires an authenticated principal. A user principal yields
  *   `userPublicId` plus `organizationPublicId` resolved with the SAME
- *   path-param-else-claim precedence (and validation) as
- *   {@link resolveActiveOrganizationId}. An API-key principal yields only the
+ *   path-param-else-claim precedence as {@link resolveActiveOrganizationId};
+ *   only the caller-supplied path param is format-validated — the claim is a
+ *   value this server signed (verification happens once per boundary). An API-key principal yields only the
  *   organization pinned to the key — API keys have no user identity.
  * - **Failure modes:** {@link UnauthorizedError} when unauthenticated;
  *   {@link ForbiddenError} (`errors:organizationContextRequired`) when no
@@ -125,21 +126,30 @@ export function resolveActiveOrganizationId(request: FastifyRequest): string {
 function mintOrganizationRequestScope(request: FastifyRequest): OrganizationPrincipalDatabaseScope {
   const auth = requirePrincipal(request);
   if (auth.kind === 'apiKey') {
+    // Key-pinned org id — server-issued, no format re-validation (S2).
     return createPrincipalDatabaseScope({
-      organizationPublicId: validatePublicIdParam(auth.organizationPublicId, 'organization_id'),
+      organizationPublicId: auth.organizationPublicId,
       source: 'request',
     }) as OrganizationPrincipalDatabaseScope;
   }
   const params = request.params as Record<string, string> | undefined;
-  const organizationId = params?.organization_id ?? auth.organizationPublicId;
+  const pathOrganizationId = params?.organization_id;
+  // Only a caller-supplied path param needs format validation; the claim is a
+  // value this server signed (S2 — verification happens once per boundary).
   // Parity with resolveActiveOrganizationId: an empty-string path value is "no
-  // organization in scope" (403), not a malformed id (400).
+  // organization in scope" (403, never a claim fallback), not a malformed id (400).
+  const organizationId =
+    pathOrganizationId === undefined
+      ? auth.organizationPublicId
+      : pathOrganizationId === ''
+        ? undefined
+        : validatePublicIdParam(pathOrganizationId, 'organization_id');
   if (!organizationId) {
     throw new ForbiddenError('errors:organizationContextRequired');
   }
   return createPrincipalDatabaseScope({
     userPublicId: auth.userId,
-    organizationPublicId: validatePublicIdParam(organizationId, 'organization_id'),
+    organizationPublicId: organizationId,
     source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 }
@@ -153,15 +163,16 @@ function mintOrganizationRequestScope(request: FastifyRequest): OrganizationPrin
 function mintUserRequestScope(request: FastifyRequest): UserPrincipalDatabaseScope {
   const auth = requireAuth(request);
   const params = request.params as Record<string, string> | undefined;
-  const organizationId = params?.organization_id ?? auth.organizationPublicId;
+  const pathOrganizationId = params?.organization_id;
+  // Org-less is legitimate on the user family (the /users/me self-heal
+  // provisions the personal organization on demand). Only a caller-supplied
+  // path param needs format validation; the claim is server-signed (S2).
+  const organizationId = pathOrganizationId
+    ? validatePublicIdParam(pathOrganizationId, 'organization_id')
+    : (auth.organizationPublicId ?? undefined);
   return createPrincipalDatabaseScope({
     userPublicId: auth.userId,
-    // Org-less is legitimate on the user family (the /users/me self-heal
-    // provisions the personal organization on demand); include the org GUC
-    // only when a validated claim/param is present.
-    organizationPublicId: organizationId
-      ? validatePublicIdParam(organizationId, 'organization_id')
-      : undefined,
+    organizationPublicId: organizationId || undefined,
     source: 'request',
   }) as UserPrincipalDatabaseScope;
 }
