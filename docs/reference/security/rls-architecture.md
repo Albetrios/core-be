@@ -133,6 +133,20 @@ Rules the layers enforce:
   `audit-outbox-drain.processor.ts`).
 - **Network I/O never runs inside a context callback** (Stripe/S3/Resend) — enforced by
   the network-isolation global test.
+- **The callback shape is deliberate — do not replace it** with an open/commit API or
+  `await using`. The callback is the price of three guarantees at once: release is
+  impossible to forget (the wrapper's own `finally` rolls back and returns the
+  connection on any throw), commit-vs-rollback is automatic (callback resolved →
+  COMMIT, threw → ROLLBACK — no caller-side `commit()` to forget), and nesting reuses
+  the transaction (`AsyncLocalStorage.run` needs a function span to pin the handle;
+  `enterWith` leaks). In practice nesting is one level deep and reads as a scoped
+  block:
+
+  ```ts
+  await withPrincipalDatabaseContext(scope, async (db) => {
+    // everything here: one trx, GUCs armed, auto commit/rollback/release
+  });
+  ```
 
 ---
 
