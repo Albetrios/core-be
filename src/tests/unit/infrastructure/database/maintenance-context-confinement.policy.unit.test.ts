@@ -13,7 +13,7 @@ import {
  * without declaring who may use it.
  */
 const ALLOWED_PATH_FRAGMENTS: Record<MaintenanceContextKind, readonly string[]> = {
-  global_retention_cleanup: [
+  GLOBAL_RETENTION_CLEANUP: [
     '/workers/', // retention / tombstone / offboarding processors across domains
     'notification.repository.ts', // retention delete helper invoked by the notify retention worker
     'worker-runtime/worker-processor.util.ts', // runGlobalRetentionWorkerJob
@@ -22,23 +22,23 @@ const ALLOWED_PATH_FRAGMENTS: Record<MaintenanceContextKind, readonly string[]> 
     // SELECT arm, so the final UPDATE must carry the retention arm (see the service).
     'organization/organization.service.ts',
   ],
-  session_retention_cleanup: ['auth-session/workers/'],
-  global_admin: [
+  SESSION_RETENTION_CLEANUP: ['auth-session/workers/'],
+  GLOBAL_ADMIN: [
     'user/user.service.ts', // admin user suspend / soft-delete / cross-user actor lookups
     'audit/audit.service.ts', // admin audit listing
     'notification/workers/notification.worker.ts', // cross-user recipient resolution
     'queue/dlq/dlq-replay.util.ts', // replay-audit actor lookup (cross-user read)
     'tests/helpers/rls-matrix.helper.ts',
   ],
-  system_audit_insert: [
+  SYSTEM_AUDIT_INSERT: [
     'audit/audit.service.ts', // tenantless outbox staging
     'queue/dlq/', // DLQ replay audit entries
   ],
-  audit_outbox_drain: ['audit/audit-outbox.repository.ts', 'audit/workers/'],
-  system_table_retention: [
+  AUDIT_OUTBOX_DRAIN: ['audit/audit-outbox.repository.ts', 'audit/workers/'],
+  SYSTEM_TABLE_RETENTION: [
     'stripe-webhook/workers/', // stripe_webhook_events ledger retention (non-RLS table)
   ],
-  system_table_worker: [
+  SYSTEM_TABLE_WORKER: [
     'notification/workers/notification.worker.ts', // web-push subscription reads outside a request
     'stripe-webhook/stripe-webhook.service.ts', // webhook-event ledger claim/settle
     'stripe-webhook/workers/', // catchup / reclaim processors over the ledger

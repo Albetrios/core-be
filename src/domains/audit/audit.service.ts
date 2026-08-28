@@ -122,7 +122,7 @@ export class AuditService {
         insert,
       );
     } else {
-      await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_audit_insert, insert);
+      await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT, insert);
     }
   }
 
@@ -176,7 +176,7 @@ export class AuditService {
    * isolation and must never be reachable without that gate.
    */
   async listForAdmin(query: Record<string, unknown>) {
-    return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () => this.list(query));
+    return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, () => this.list(query));
   }
 
   async list(query: Record<string, unknown>) {

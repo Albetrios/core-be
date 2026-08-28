@@ -97,7 +97,7 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
     let caught: unknown;
     try {
       await withMaintenanceDatabaseContext(
-        MAINTENANCE_SCOPE.global_retention_cleanup,
+        MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
         async (databaseHandle) =>
           databaseHandle.execute(
             drizzleSql.raw(
@@ -121,7 +121,7 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
     const rowIds = fixture.rowIdsByTable.get(tableKey('billing', 'subscriptions'))!;
 
     const deletedCount = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       async (databaseHandle) => {
         const result = await databaseHandle.execute(
           drizzleSql.raw(

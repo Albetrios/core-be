@@ -40,14 +40,14 @@ row. Elevated access exists only as the named fixture role `core_be_operator`
 
 | Old call | New call |
 | -------- | -------- |
-| `withOrganizationContext(orgId, cb)` / `withOrganizationDatabaseContext(orgId, cb)` | `withAppDatabaseContext(scope, cb)` — scope minted by `REQUEST_SCOPE.organization(request)` (HTTP), `resolveJobPrincipalScope({ organizationPublicId })` (worker), or `resolveVerifiedPrincipalScope({ organizationPublicId })` (verified/port flows) |
-| `withUserDatabaseContext(userId, cb)` | `withAppDatabaseContext(scope, cb)` — `REQUEST_SCOPE.user(request)`, `resolveJobPrincipalScope({ userPublicId })`, or `resolveVerifiedPrincipalScope({ userPublicId })` |
-| `withGlobalRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, cb)` |
-| `withSessionRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.session_retention_cleanup, cb)` |
-| `withGlobalAdminDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, cb)` |
-| `withSystemAuditInsertContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_audit_insert, cb)` |
-| `withSystemTableRetentionContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_retention, cb)` |
-| `withSystemTableWorkerContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, cb)` |
+| `withOrganizationContext(orgId, cb)` / `withOrganizationDatabaseContext(orgId, cb)` | `withAppDatabaseContext(scope, cb)` — scope minted by `REQUEST_SCOPE.ORGANIZATION(request)` (HTTP), `resolveJobPrincipalScope({ organizationPublicId })` (worker), or `resolveVerifiedPrincipalScope({ organizationPublicId })` (verified/port flows) |
+| `withUserDatabaseContext(userId, cb)` | `withAppDatabaseContext(scope, cb)` — `REQUEST_SCOPE.USER(request)`, `resolveJobPrincipalScope({ userPublicId })`, or `resolveVerifiedPrincipalScope({ userPublicId })` |
+| `withGlobalRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, cb)` |
+| `withSessionRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP, cb)` |
+| `withGlobalAdminDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, cb)` |
+| `withSystemAuditInsertContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT, cb)` |
+| `withSystemTableRetentionContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_RETENTION, cb)` |
+| `withSystemTableWorkerContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, cb)` |
 | (pre-auth session lookups, raw) | `withAppDatabaseContext(SESSION_SCOPE.<kind>(value), cb)` |
 
 The key upgrade: the first argument is no longer a string anyone can fabricate — it is a
@@ -80,9 +80,9 @@ public→internal inside the arm where an FK column needs it).
 ┌────────────────────────────── TRUST BOUNDARIES (scopes are MINTED here) ─────────────────────────────┐
 │                                                                                                      │
 │  HTTP request (JWT verified)          Worker job (payload)             Verified/port flows           │
-│  ─ REQUEST_SCOPE.organization      ─ resolveJobPrincipalScope    ─ resolveVerified*Principal-  │
+│  ─ REQUEST_SCOPE.ORGANIZATION      ─ resolveJobPrincipalScope    ─ resolveVerified*Principal-  │
 │    (org REQUIRED, from `org` claim)     (organizationPublicId in         Scope (caller already       │
-│  ─ REQUEST_SCOPE.user    the job payload)                 authenticated the id:       │
+│  ─ REQUEST_SCOPE.USER    the job payload)                 authenticated the id:       │
 │    (user REQUIRED, org optional —     ─ resolveJobPrincipalScope              invite flow, Stripe event,  │
 │    self-heal transitional state)        (userPublicId in payload)        provisioning, admin)        │
 │                                                                                                      │
@@ -165,7 +165,7 @@ Rules the layers enforce:
     request.principalScope              → { organizationPublicId, userPublicId } → both identity GUCs
     request.userPrincipalScope          → { userPublicId }                       → user GUC only
     resolveJobPrincipalScope({ organizationPublicId }) → org GUC (worker parity with HTTP)
-    SESSION_SCOPE.session_token_hash(h) → { kind, value }                        → that one artifact GUC
+    SESSION_SCOPE.SESSION_TOKEN_HASH(h) → { kind, value }                        → that one artifact GUC
 
   ILLEGAL — unrepresentable, so the context never needs a runtime check
     { organizationPublicId, session_token_hash }   no factory mixes trust stages
@@ -252,8 +252,8 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 
 | Pattern | Scope type | Minted by (per-file confined) | Context call |
 | --- | --- | --- | --- |
-| Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `REQUEST_SCOPE.organization(request)` · `resolveJobPrincipalScope({ organizationPublicId })` · `resolveVerifiedPrincipalScope({ organizationPublicId })` | `withAppDatabaseContext` |
-| Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `REQUEST_SCOPE.user(request)` · `resolveJobPrincipalScope({ userPublicId })` · `resolveVerifiedPrincipalScope({ userPublicId })` | `withAppDatabaseContext` |
+| Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `REQUEST_SCOPE.ORGANIZATION(request)` · `resolveJobPrincipalScope({ organizationPublicId })` · `resolveVerifiedPrincipalScope({ organizationPublicId })` | `withAppDatabaseContext` |
+| Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `REQUEST_SCOPE.USER(request)` · `resolveJobPrincipalScope({ userPublicId })` · `resolveVerifiedPrincipalScope({ userPublicId })` | `withAppDatabaseContext` |
 | Session | `SessionDatabaseScope` — kinds `session_public_id` \| `session_token_hash` | `SESSION_SCOPE.<kind>(value)` factories (auth domain only; token values are pre-hashed) | `withAppDatabaseContext` |
 | Maintenance | `MaintenanceDatabaseScope` — 7 frozen singletons: `global_retention_cleanup`, `session_retention_cleanup`, `global_admin`, `system_audit_insert`, `audit_outbox_drain`, `system_table_retention`, `system_table_worker` | nothing to mint — `MAINTENANCE_SCOPE.<kind>` | `withMaintenanceDatabaseContext` |
 
@@ -334,11 +334,11 @@ an as-`core_be_app` (or maintenance-role) regression:
 | 1 | `audit.outbox` staging silently dropped — `INSERT … RETURNING` requires SELECT-policy visibility and outbox SELECT is drain-only | plain INSERT + affected-count guard |
 | 2 | Outbox claim escalated past its LIMIT — nested-loop rescans of the `FOR UPDATE SKIP LOCKED` FROM-subquery | `WITH claimable AS MATERIALIZED` |
 | 3 | Upload pending-sweep confirm/fail UPDATEs rejected — retention bypass was USING-only on `uploads_tenant_isolation` | retention arm added to WITH CHECK |
-| 4 | `DELETE /users/me` failed at the final step (half-offboarded accounts) — tombstoned NEW row loses self-arm SELECT visibility | final softDelete under `MAINTENANCE_SCOPE.global_admin` |
+| 4 | `DELETE /users/me` failed at the final step (half-offboarded accounts) — tombstoned NEW row loses self-arm SELECT visibility | final softDelete under `MAINTENANCE_SCOPE.GLOBAL_ADMIN` |
 | 5 | `DELETE /tenancy/organization` always 500'd after Stripe cancellation — same NEW-row rule vs the sec-new-D3 gate (which is kept) | tombstone under retention scope + retention arm in org WITH CHECK |
 | 6 | Audit drain permanently discarded org / API-key-actor rows — `global_admin` grants nothing on `tenancy.*` | `SECURITY DEFINER` resolvers `audit.resolve_*_ids_for_public_ids` |
 | 7 | User tombstone purge + offboarding reconciler were silent no-ops — users policy had no retention arm | USING-only retention arm on `users_self_or_admin_access` |
-| 8 | Manual DLQ replay always failed its actor pre-condition — lookup ran with no RLS context | wrapped in `MAINTENANCE_SCOPE.global_admin` |
+| 8 | Manual DLQ replay always failed its actor pre-condition — lookup ran with no RLS context | wrapped in `MAINTENANCE_SCOPE.GLOBAL_ADMIN` |
 
 The recurring root causes worth remembering: superuser masking (local + fixtures),
 `RETURNING`/NEW-row SELECT-visibility, and bypass arms present in USING but missing in

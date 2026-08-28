@@ -102,7 +102,7 @@ export async function processMailOutboxJob(
   jobData: MailJobData,
   options: ProcessMailOutboxJobOptions = {},
 ): Promise<ProcessMailOutboxJobResult> {
-  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, () =>
+  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, () =>
     processMailOutboxJobInner(jobData, options),
   );
 }

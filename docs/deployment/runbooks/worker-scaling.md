@@ -27,7 +27,7 @@ BullMQ workers run as a **separate process** (`node dist/worker.js` / `Dockerfil
 
 1. **One logical queue name per job type** — do not shard the same queue across incompatible processors.
 2. **Pass `organizationPublicId` in tenant-scoped job payloads** — workers set `app.current_organization_public_id` via `withAppDatabaseContext` (job-minted org scope) / `runTenantScopedWorkerJob`, not HTTP middleware. Unpinned DB access in the worker process throws `WorkerDatabaseContextError` at runtime.
-3. **System tables without tenant RLS** (`auth.mail_outbox`, `billing.stripe_webhook_events`) — use `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, …)` in processors; see [workers-and-events.md](../../reference/runtime/workers-and-events.md).
+3. **System tables without tenant RLS** (`auth.mail_outbox`, `billing.stripe_webhook_events`) — use `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, …)` in processors; see [workers-and-events.md](../../reference/runtime/workers-and-events.md).
 4. **Redis key prefix** — parallel agents or environments must use distinct `REDIS` namespaces to avoid queue collisions.
 5. **Graceful shutdown** — workers honor SIGTERM; allow drain time before force-kill during deploys.
 

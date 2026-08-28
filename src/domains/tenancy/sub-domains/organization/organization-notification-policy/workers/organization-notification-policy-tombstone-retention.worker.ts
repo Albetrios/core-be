@@ -33,7 +33,7 @@ export function createOrganizationNotificationPolicyTombstoneRetentionWorker(): 
   const worker = new Worker(
     ORGANIZATION_NOTIFICATION_POLICY_TOMBSTONE_RETENTION_QUEUE_NAME,
     async () =>
-      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, (databaseHandle) =>
         runOrganizationNotificationPolicyTombstoneRetentionJob(databaseHandle),
       ),
     {

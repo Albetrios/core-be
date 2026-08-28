@@ -35,7 +35,7 @@ export function createUploadPendingSweepWorker(): WorkerHandle {
   const worker = new Worker(
     UPLOAD_PENDING_SWEEP_QUEUE_NAME,
     async () =>
-      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, (databaseHandle) =>
         runUploadPendingSweepJob(databaseHandle),
       ),
     {

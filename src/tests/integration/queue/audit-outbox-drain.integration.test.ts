@@ -19,7 +19,7 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 const ACTOR_PUBLIC_ID = 'usr_auditoutboxdrain00001';
 
 async function pendingOutboxCount(): Promise<number> {
-  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.audit_outbox_drain, (databaseHandle) =>
+  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN, (databaseHandle) =>
     countPendingAuditOutboxRows(databaseHandle),
   );
 }
@@ -48,7 +48,7 @@ describe('Integration: audit transactional outbox drain', () => {
     expect(await pendingOutboxCount()).toBe(1);
 
     const result = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.audit_outbox_drain,
+      MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN,
       (databaseHandle) => runAuditOutboxDrainJob(databaseHandle),
     );
 
@@ -80,7 +80,7 @@ describe('Integration: audit transactional outbox drain', () => {
     });
 
     const result = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.audit_outbox_drain,
+      MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN,
       (databaseHandle) => runAuditOutboxDrainJob(databaseHandle),
     );
 
@@ -120,10 +120,10 @@ describe('Integration: audit transactional outbox drain', () => {
 
     // Two independent drain contexts (two worker replicas) racing the same backlog.
     const [resultA, resultB] = await Promise.all([
-      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.audit_outbox_drain, (databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN, (databaseHandle) =>
         runAuditOutboxDrainJob(databaseHandle),
       ),
-      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.audit_outbox_drain, (databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN, (databaseHandle) =>
         runAuditOutboxDrainJob(databaseHandle),
       ),
     ]);
@@ -162,7 +162,7 @@ describe('Integration: audit transactional outbox drain', () => {
       .where(eq(users.public_id, ACTOR_PUBLIC_ID));
 
     const failedThenRecovered = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.audit_outbox_drain,
+      MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN,
       async (databaseHandle) => {
         let failed = false;
         try {

@@ -17,7 +17,7 @@ describe('maintenance context pool selection', () => {
     // through — routing it via getMaintenanceDatabase() is what lets an operator
     // move ALL bypass contexts onto the dedicated core_be_maintenance connection
     // by provisioning DATABASE_MAINTENANCE_URL (no code change).
-    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, async (handle) => {
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, async (handle) => {
       expect(handle).toBe(maintenancePoolHandle);
     });
   });

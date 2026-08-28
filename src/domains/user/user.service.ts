@@ -191,7 +191,7 @@ export class UserService {
       // The tombstoning UPDATE must run under global_admin: the users SELECT arm gates on
       // `deleted_at IS NULL`, and Postgres requires the UPDATE's NEW row to stay
       // SELECT-visible — under the plain user scope the soft-delete is RLS-rejected (42501).
-      const deleted = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+      const deleted = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, () =>
         this.repository.softDelete(public_id),
       );
       if (!deleted) throw new NotFoundError('User');
@@ -246,7 +246,7 @@ export class UserService {
     await offboarding.userDataExportService.deleteAllExportsForUser(user.id, public_id);
     // global_admin for the same NEW-row SELECT-visibility reason as the short-circuit path
     // above — the self arm can never see its own tombstoned row.
-    const deleted = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+    const deleted = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, () =>
       this.repository.softDelete(public_id),
     );
     if (!deleted) throw new NotFoundError('User');
@@ -600,7 +600,7 @@ export class UserService {
     const parsed = validateListUsers(query);
     // Admin cross-user listing must read every row → global-admin context (route is guarded by
     // requireRole(SUPER_ADMIN, ADMIN), so entering the admin RLS escape hatch is authorized).
-    const result = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+    const result = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, () =>
       this.repository.findMany(
         omitUndefined({
           after: parsed.after,
@@ -622,7 +622,7 @@ export class UserService {
 
   async getUser(publicId: string): Promise<UserOutput> {
     // Admin read of another user → global-admin context (route guarded by requireRole).
-    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, () =>
       this.repository.findByPublicId(publicId),
     );
     if (!user) throw new NotFoundError('User');
@@ -640,7 +640,7 @@ export class UserService {
    * super-admin, change the env allowlist, not this endpoint.
    */
   private async assertTargetNotProtectedAdmin(targetPublicId: string): Promise<void> {
-    const target = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+    const target = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, () =>
       this.repository.findByPublicId(targetPublicId),
     );
     if (!target) throw new NotFoundError('User');
@@ -655,7 +655,7 @@ export class UserService {
     if (parsed.status !== undefined && parsed.status !== 'ACTIVE') {
       await this.assertTargetNotProtectedAdmin(publicId);
     }
-    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, () =>
       this.repository.adminUpdate(publicId, omitUndefined(parsed)),
     );
     if (!user) throw new NotFoundError('User');
@@ -672,7 +672,7 @@ export class UserService {
 
   async suspendUser(publicId: string): Promise<UserOutput> {
     await this.assertTargetNotProtectedAdmin(publicId);
-    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, () =>
       this.repository.suspend(publicId),
     );
     if (!user) throw new NotFoundError('User');
@@ -693,7 +693,7 @@ export class UserService {
   }
 
   async unsuspendUser(publicId: string): Promise<UserOutput> {
-    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_admin, () =>
+    const user = await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, () =>
       this.repository.unsuspend(publicId),
     );
     if (!user) throw new NotFoundError('User');

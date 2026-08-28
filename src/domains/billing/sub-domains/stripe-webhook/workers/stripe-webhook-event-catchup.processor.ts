@@ -80,7 +80,7 @@ export async function runStripeWebhookEventCatchupJob(
   }
 
   const existingEventIds = await withMaintenanceDatabaseContext(
-    MAINTENANCE_SCOPE.system_table_worker,
+    MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER,
     () => repository.findExistingStripeEventIds(stripeEventIds),
   );
   const missingEventIds = stripeEventIds.filter((eventId) => !existingEventIds.has(eventId));

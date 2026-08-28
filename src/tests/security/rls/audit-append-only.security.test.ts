@@ -139,7 +139,7 @@ describe('Security: audit.logs is append-only at the DB layer (sec-U3)', () => {
     const rowId = await seedAuditRowForOrganization(organization.id);
 
     await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       async (databaseHandle) => {
         await databaseHandle.execute(drizzleSql`DELETE FROM audit.logs WHERE id = ${rowId}`);
       },

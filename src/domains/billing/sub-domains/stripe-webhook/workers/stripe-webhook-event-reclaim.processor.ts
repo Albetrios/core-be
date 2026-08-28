@@ -33,7 +33,7 @@ export type StripeWebhookEventReclaimJobResult = {
  * retry them.
  *
  * @remarks
- * - **Algorithm:** Within {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker)}, asks
+ * - **Algorithm:** Within {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)}, asks
  *   {@link StripeWebhookEventRepository.sweepReclaimableEvents} for up to
  *   `env.STRIPE_WEBHOOK_EVENT_RECLAIM_BATCH_SIZE` candidate ids — a pure read,
  *   no row mutation (sec-re-02). For each candidate the processor enqueues a
@@ -56,7 +56,7 @@ export type StripeWebhookEventReclaimJobResult = {
 export async function runStripeWebhookEventReclaimJob(
   repository: StripeWebhookEventRepository = new StripeWebhookEventRepository(),
 ): Promise<StripeWebhookEventReclaimJobResult> {
-  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, () =>
+  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, () =>
     runStripeWebhookEventReclaimJobInner(repository),
   );
 }

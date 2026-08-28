@@ -35,7 +35,7 @@ export function createUserTombstoneRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     USER_TOMBSTONE_RETENTION_QUEUE_NAME,
     async () =>
-      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, (databaseHandle) =>
         runUserTombstoneRetentionJob(databaseHandle),
       ),
     {

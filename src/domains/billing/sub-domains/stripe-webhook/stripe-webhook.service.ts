@@ -67,7 +67,7 @@ function resolveBillingCycleForStripePrice(
  * - **Side effects:** Writes to `billing.stripe_webhook_events` (always) and
  *   `billing.subscriptions` (on subscription lifecycle events). Logs each
  *   stage; unhandled event types are logged and skipped.
- * - **Notes:** Runs inside {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker)} so the ledger
+ * - **Notes:** Runs inside {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)} so the ledger
  *   write happens without an organization GUC; the subscription write then
  *   switches into {@link withAppDatabaseContext} for RLS-safe mutation. The
  *   `customer.subscription.created` race that left a missing local row
@@ -95,7 +95,7 @@ export class StripeWebhookService {
    * when the ledger transition was `claimed` or `reclaimed`. Returns the claim result.
    *
    * @remarks
-   * - **Algorithm:** claims the event id under {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker)} (no org GUC),
+   * - **Algorithm:** claims the event id under {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)} (no org GUC),
    *   then enqueues on `claimed`/`reclaimed`. `processed_duplicate` (already terminal) and
    *   `still_processing_within_lease` (an in-flight worker will finish) skip the enqueue and log.
    * - **Failure modes:** an enqueue failure propagates so the caller returns non-2xx and Stripe
@@ -108,7 +108,7 @@ export class StripeWebhookService {
     context?: { requestId?: string },
   ): Promise<StripeWebhookEventClaimResult> {
     const claimResult = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.system_table_worker,
+      MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER,
       () =>
         this.stripeWebhookEventRepository.tryClaimEvent(
           omitUndefined({
@@ -138,7 +138,7 @@ export class StripeWebhookService {
   async handleEvent(event: Stripe.Event, context?: { requestId?: string }): Promise<void> {
     const stripeEventCreatedAt = new Date(event.created * 1000);
 
-    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, async () => {
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, async () => {
       const claimResult = await this.stripeWebhookEventRepository.tryClaimEvent(
         omitUndefined({
           stripe_event_id: event.id,

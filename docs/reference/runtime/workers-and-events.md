@@ -126,10 +126,10 @@ HTTP requests set `app.current_organization_public_id` via tenant middleware and
 | Context wrapper                                                             | GUC / purpose                                                            |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | `withAppDatabaseContext` (org job scope) / `runTenantScopedWorkerJob` | `app.current_organization_public_id` — tenant mutations and reads               |
-| `MAINTENANCE_SCOPE.global_retention_cleanup` / `runGlobalRetentionWorkerJob` | `app.global_retention_cleanup` — cross-tenant tombstone retention       |
+| `MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP` / `runGlobalRetentionWorkerJob` | `app.global_retention_cleanup` — cross-tenant tombstone retention       |
 | `withAppDatabaseContext` (user job scope) / `runUserScopedWorkerJob`  | `app.current_user_public_id` — GDPR export                                      |
-| `MAINTENANCE_SCOPE.session_retention_cleanup`                               | `app.session_retention_cleanup` — session cleanup worker                 |
-| `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker)`     | No tenant RLS — `auth.mail_outbox`, `billing.stripe_webhook_events` only |
+| `MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP`                               | `app.session_retention_cleanup` — session cleanup worker                 |
+| `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)`     | No tenant RLS — `auth.mail_outbox`, `billing.stripe_webhook_events` only |
 
 `src/worker.ts` sets `CORE_BE_RUNTIME=worker`. Calling `getRequestDatabase()` without a pinned ALS session throws `WorkerDatabaseContextError`. Pass `databaseHandle` into `createWorker*Repository(databaseHandle)` for tenant-scoped work.
 

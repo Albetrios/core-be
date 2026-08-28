@@ -86,7 +86,7 @@ describe('audit-retention.worker — purge', () => {
     await completion;
 
     const remaining = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       async (databaseHandle) => databaseHandle.select().from(logs),
     );
     expect(remaining).toHaveLength(1);
@@ -133,7 +133,7 @@ describe('audit-retention.worker — purge', () => {
     await completion;
 
     const remaining = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       async (databaseHandle) => databaseHandle.select().from(logs),
     );
     expect(remaining).toHaveLength(1);
@@ -147,7 +147,7 @@ describe('audit-retention.worker — purge', () => {
     const recentFailedAt = new Date();
 
     await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       async (databaseHandle) => {
         await databaseHandle.insert(dead_letter_jobs).values([
           {
@@ -180,7 +180,7 @@ describe('audit-retention.worker — purge', () => {
     await completion;
 
     const remaining = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       async (databaseHandle) => databaseHandle.select().from(dead_letter_jobs),
     );
     expect(remaining).toHaveLength(1);

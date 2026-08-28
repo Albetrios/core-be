@@ -32,7 +32,7 @@ export function createUserDataExportRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     USER_DATA_EXPORT_RETENTION_QUEUE_NAME,
     async () =>
-      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, (databaseHandle) =>
         runUserDataExportRetentionJob(databaseHandle),
       ),
     {

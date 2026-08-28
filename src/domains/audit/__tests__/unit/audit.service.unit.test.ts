@@ -12,7 +12,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     ...actual,
     // Dispatch per kind so the per-context spies keep their original assertions.
     withMaintenanceDatabaseContext: vi.fn((scope: { kind: string }, ...parameters: unknown[]) => {
-      const inner = (scope.kind === 'global_admin'
+      const inner = (scope.kind === 'GLOBAL_ADMIN'
         ? globalAdminContextMock
         : systemAuditInsertContextMock) as unknown as (...innerParameters: unknown[]) => unknown;
       return inner(...parameters);

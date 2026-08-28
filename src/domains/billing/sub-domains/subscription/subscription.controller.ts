@@ -18,7 +18,7 @@ function readIdempotencyKey(request: FastifyRequest): string | undefined {
 /**
  * Builds organization-scoped subscription handlers (list / get / create /
  * update / change-plan / cancel / resume). The active organization is resolved
- * from the signed `org` token claim via `REQUEST_SCOPE.organization`; handlers
+ * from the signed `org` token claim via `REQUEST_SCOPE.ORGANIZATION`; handlers
  * that take a `subscription_id` path param validate it (sec-B10); externally
  * mutating routes also require the `X-Idempotency-Key` header before delegating
  * to {@link SubscriptionService}.

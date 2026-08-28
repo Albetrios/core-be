@@ -566,7 +566,7 @@ export class OrganizationService {
     // RLS-rejected (42501) AFTER Stripe cancellation already ran. The retention arm
     // covers USING, WITH CHECK, and new-row visibility; identity columns are unchanged.
     const deleted = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       () => this.repository.softDelete(public_id),
     );
     if (!deleted) throw new NotFoundError('Organization');

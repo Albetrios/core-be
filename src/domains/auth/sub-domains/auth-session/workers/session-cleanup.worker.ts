@@ -47,7 +47,7 @@ export function createSessionCleanupWorker(): WorkerHandle {
       );
 
       return withMaintenanceDatabaseContext(
-        MAINTENANCE_SCOPE.session_retention_cleanup,
+        MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP,
         async (databaseHandle) => {
           const { deletedCount, blockedCount } = await deleteInBatchesByCondition({
             databaseHandle,

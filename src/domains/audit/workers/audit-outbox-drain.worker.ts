@@ -38,7 +38,7 @@ export function createAuditOutboxDrainWorker(): WorkerHandle {
   const worker = new Worker(
     AUDIT_OUTBOX_DRAIN_QUEUE_NAME,
     async () =>
-      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.audit_outbox_drain, (databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN, (databaseHandle) =>
         runAuditOutboxDrainJob(databaseHandle),
       ),
     {

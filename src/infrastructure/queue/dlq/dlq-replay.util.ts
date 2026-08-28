@@ -167,7 +167,7 @@ export async function recordDlqReplayAuditEntry(input: {
   // and the lookup returned zero rows — every manual DLQ replay failed at this
   // pre-condition. global_admin is the cross-user read arm the users policy grants.
   const [actorRow] = await withMaintenanceDatabaseContext(
-    MAINTENANCE_SCOPE.global_admin,
+    MAINTENANCE_SCOPE.GLOBAL_ADMIN,
     (databaseHandle) =>
       databaseHandle
         .select({ id: users.id })
@@ -186,7 +186,7 @@ export async function recordDlqReplayAuditEntry(input: {
   // `organization_id IS NULL`, so it cannot impersonate a tenant) to write
   // the row.
   await withMaintenanceDatabaseContext(
-    MAINTENANCE_SCOPE.system_audit_insert,
+    MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT,
     async (databaseHandle) => {
       await databaseHandle.insert(logs).values({
         actor_user_id: actorRow.id,
@@ -252,7 +252,7 @@ export async function recordDlqAutoRetryAuditEntry(input: {
   // entire DLQ auto-retry subsystem). The system-audit-insert context fires
   // the new policy arm gated on `organization_id IS NULL`.
   await withMaintenanceDatabaseContext(
-    MAINTENANCE_SCOPE.system_audit_insert,
+    MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT,
     async (databaseHandle) => {
       await databaseHandle.insert(logs).values({
         actor_user_id: null,

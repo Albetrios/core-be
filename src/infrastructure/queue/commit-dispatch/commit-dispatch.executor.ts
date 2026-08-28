@@ -45,7 +45,7 @@ export async function executeCommitDispatchTask(task: CommitDispatchTask): Promi
         // from `resolveRepositoryDatabaseHandle(undefined)`. The outer catch in
         // `commit-dispatch-recovery.processor.ts` would silently swallow that secondary
         // error and leave the orphan notification row in Postgres.
-        await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, () =>
+        await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, () =>
           new NotificationRepository().deleteByInternalId(task.notificationId),
         );
       }

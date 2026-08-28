@@ -10,11 +10,11 @@ import { REQUEST_SCOPE } from '@/shared/utils/http/request.util.js';
 export function attachPrincipalScopeGetters<T extends object>(request: T): T {
   Object.defineProperty(request, 'principalScope', {
     configurable: true,
-    get: () => REQUEST_SCOPE.organization(request as unknown as FastifyRequest),
+    get: () => REQUEST_SCOPE.ORGANIZATION(request as unknown as FastifyRequest),
   });
   Object.defineProperty(request, 'userPrincipalScope', {
     configurable: true,
-    get: () => REQUEST_SCOPE.user(request as unknown as FastifyRequest),
+    get: () => REQUEST_SCOPE.USER(request as unknown as FastifyRequest),
   });
   return request;
 }

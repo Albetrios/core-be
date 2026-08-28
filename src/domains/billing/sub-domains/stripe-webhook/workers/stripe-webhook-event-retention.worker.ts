@@ -22,7 +22,7 @@ import {
  * @remarks
  * - **Algorithm:** BullMQ {@link Worker} bound to the retention queue. Each job
  *   runs {@link runStripeWebhookEventRetentionJob} inside
- *   {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_retention)} so the delete uses the system-table
+ *   {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_RETENTION)} so the delete uses the system-table
  *   retention context with a worker statement-timeout (sec-new-Q4); no
  *   organization GUC required.
  * - **Failure modes:** Stalled jobs are logged; processor errors propagate to
@@ -38,7 +38,7 @@ export function createStripeWebhookEventRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     STRIPE_WEBHOOK_EVENT_RETENTION_QUEUE_NAME,
     async () =>
-      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_retention, (databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_RETENTION, (databaseHandle) =>
         runStripeWebhookEventRetentionJob(databaseHandle),
       ),
     {

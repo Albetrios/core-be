@@ -81,7 +81,7 @@ describe('Security: retention cleanup RLS', () => {
     expect(withoutRetentionGuc.deletedCount).toBe(0);
 
     const withRetentionGuc = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       async (databaseHandle) =>
         deleteInBatchesByCondition({
           databaseHandle,

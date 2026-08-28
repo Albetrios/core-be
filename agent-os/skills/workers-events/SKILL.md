@@ -122,10 +122,10 @@ billing events  →  notify/sub-domains/webhook/events/billing-webhook.event-han
      - **Runtime guard:** `src/worker.ts` sets `CORE_BE_RUNTIME=worker`. Unpinned `getRequestDatabase()` throws `WorkerDatabaseContextError`. Context kind is tracked in `database-context-runtime.ts` (ALS).
      - Use `runTenantScopedWorkerJob`, `runGlobalRetentionWorkerJob`, or `runUserScopedWorkerJob` from `worker-processor.util.ts`, or `createTenantScopedBullMQWorker` for tenant-scoped queues, or call the context wrappers directly
      - Tenant-scoped jobs → `withAppDatabaseContext(resolveJobPrincipalScope({ organizationPublicId }), (databaseHandle) => …)` — pins ALS + `SET LOCAL app.current_organization_public_id`
-     - Global tombstone/retention → `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) => …)` — `app.global_retention_cleanup`
+     - Global tombstone/retention → `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, (databaseHandle) => …)` — `app.global_retention_cleanup`
      - GDPR export → `withAppDatabaseContext(resolveJobPrincipalScope({ userPublicId }), (databaseHandle) => …)` — `app.current_user_public_id`
-     - Session cleanup → `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.session_retention_cleanup, …)` — `app.session_retention_cleanup`
-     - Mail outbox + Stripe webhook ledger (no tenant RLS) → `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, …)` in processors/workers
+     - Session cleanup → `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP, …)` — `app.session_retention_cleanup`
+     - Mail outbox + Stripe webhook ledger (no tenant RLS) → `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, …)` in processors/workers
      - Pass `databaseHandle` into `createWorker*Repository(databaseHandle)` factories; factories call `assertWorkerDatabaseContext` for the expected kind
 
 4. **Bootstrap**

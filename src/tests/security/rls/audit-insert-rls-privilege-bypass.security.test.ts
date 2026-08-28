@@ -101,7 +101,7 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
     let caught: unknown;
     try {
       await withMaintenanceDatabaseContext(
-        MAINTENANCE_SCOPE.global_retention_cleanup,
+        MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
         async (databaseHandle) => {
           // No app.current_organization_public_id set — only global_retention_cleanup
           // is active. Before the fix this would succeed. After the fix, RLS

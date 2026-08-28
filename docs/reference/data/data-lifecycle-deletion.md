@@ -163,4 +163,4 @@ When you change any `*.schema.ts` or `migrations/*.sql`, follow **db-migration-m
 
 - [`src/PATTERNS.md`](../../../src/PATTERNS.md) § Soft Delete, § Tenant Isolation, § Audit Emission — cross-cutting patterns referenced by every lifecycle decision
 - [`src/POLICIES.md`](../../../src/POLICIES.md) — `*_RETENTION_DAYS`, `TOMBSTONE_RETENTION_DAYS`, audit retention, GDPR export caps
-- [`src/infrastructure/database/database.overview.md`](../../../src/infrastructure/database/database.overview.md) — RLS context family used by retention workers (`withMaintenanceDatabaseContext` + `MAINTENANCE_SCOPE.global_retention_cleanup`)
+- [`src/infrastructure/database/database.overview.md`](../../../src/infrastructure/database/database.overview.md) — RLS context family used by retention workers (`withMaintenanceDatabaseContext` + `MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP`)

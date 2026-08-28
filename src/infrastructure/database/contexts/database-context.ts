@@ -75,7 +75,7 @@ export type PrincipalScopeSource = 'request' | 'job' | 'provisioning';
  * @remarks
  * The brand is compile-time only — services and repositories can relay a scope but
  * cannot construct one from raw strings. Only the confined minters build it:
- * `REQUEST_SCOPE.organization` / `REQUEST_SCOPE.user`
+ * `REQUEST_SCOPE.ORGANIZATION` / `REQUEST_SCOPE.USER`
  * (request layer, claim-precedence) and, in later phases, the worker-payload and
  * provisioning minters. Enforced by
  * `src/tests/unit/infrastructure/database/principal-scope-minting.policy.unit.test.ts`.
@@ -91,7 +91,7 @@ export interface PrincipalDatabaseScope {
  * A {@link PrincipalDatabaseScope} guaranteed to carry an organization — what
  * org-scoped service methods accept. Under the personal/team organization model
  * every authenticated principal has an active organization, so this is what the
- * single request minter `REQUEST_SCOPE.organization` returns.
+ * single request minter `REQUEST_SCOPE.ORGANIZATION` returns.
  */
 export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
   readonly organizationPublicId: string;
@@ -99,7 +99,7 @@ export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
 
 /**
  * The common token scope narrowed to a real end user: `userPublicId` guaranteed,
- * organization OPTIONAL — produced by `REQUEST_SCOPE.user` for
+ * organization OPTIONAL — produced by `REQUEST_SCOPE.USER` for
  * user-owned resources (API keys rejected).
  *
  * @remarks
@@ -271,8 +271,8 @@ function buildIdentityGucStatement(identity: {
  *   real minting call site (or drop the arm in a migration).
  */
 export const SESSION_CONTEXTS = {
-  session_public_id: { guc: 'app.current_session_public_id' },
-  session_token_hash: { guc: 'app.current_session_token_hash' },
+  SESSION_PUBLIC_ID: { guc: 'app.current_session_public_id' },
+  SESSION_TOKEN_HASH: { guc: 'app.current_session_token_hash' },
 } as const satisfies Record<string, { readonly guc: string }>;
 
 /** Derived — the closed set of session-context kinds. */
@@ -317,7 +317,7 @@ function createSessionDatabaseScope<K extends SessionContextKind>(
  * The session-scope factories — the SESSION_CONTEXTS mirror of
  * {@link MAINTENANCE_SCOPE}. Session authority carries a per-request artifact
  * value, so each kind is a FACTORY rather than a frozen singleton:
- * `SESSION_SCOPE.session_public_id(value)` / `SESSION_SCOPE.session_token_hash(value)`.
+ * `SESSION_SCOPE.SESSION_PUBLIC_ID(value)` / `SESSION_SCOPE.SESSION_TOKEN_HASH(value)`.
  * These are the ONLY way to obtain a {@link SessionDatabaseScope}; usage is
  * confined to the auth domain by `session-context-confinement.policy.unit.test.ts`.
  */
@@ -434,49 +434,49 @@ interface MaintenanceContextDefinition {
  *   nothing else.
  */
 export const MAINTENANCE_CONTEXTS = {
-  global_retention_cleanup: {
+  GLOBAL_RETENTION_CLEANUP: {
     guc: 'app.global_retention_cleanup',
     opensTransaction: true,
     workerContextKind: 'global_retention_cleanup',
     appliesWorkerStatementTimeout: true,
     grants: 'cross-tenant read/delete via the USING bypass arms on tenant policies',
   },
-  session_retention_cleanup: {
+  SESSION_RETENTION_CLEANUP: {
     guc: 'app.session_retention_cleanup',
     opensTransaction: true,
     workerContextKind: 'session_retention_cleanup',
     appliesWorkerStatementTimeout: true,
     grants: 'cross-user delete on auth.sessions',
   },
-  global_admin: {
+  GLOBAL_ADMIN: {
     guc: 'app.global_admin',
     opensTransaction: true,
     workerContextKind: 'global_admin',
     appliesWorkerStatementTimeout: false,
     grants: 'cross-user/cross-tenant reads on auth.users, auth.auth_methods, audit.logs',
   },
-  system_audit_insert: {
+  SYSTEM_AUDIT_INSERT: {
     guc: 'app.system_audit_insert',
     opensTransaction: true,
     workerContextKind: 'system_table',
     appliesWorkerStatementTimeout: false,
     grants: 'tenantless INSERT into audit.logs (organization_id IS NULL only)',
   },
-  audit_outbox_drain: {
+  AUDIT_OUTBOX_DRAIN: {
     guc: 'app.audit_outbox_drain',
     opensTransaction: true,
     workerContextKind: 'audit_outbox_drain',
     appliesWorkerStatementTimeout: true,
     grants: 'exclusive SELECT/UPDATE/DELETE on audit.outbox',
   },
-  system_table_retention: {
+  SYSTEM_TABLE_RETENTION: {
     guc: null,
     opensTransaction: true,
     workerContextKind: 'system_table',
     appliesWorkerStatementTimeout: true,
     grants: 'pure-DB bulk retention on non-RLS tables (e.g. billing.stripe_webhook_events)',
   },
-  system_table_worker: {
+  SYSTEM_TABLE_WORKER: {
     guc: null,
     opensTransaction: false,
     workerContextKind: 'system_table',

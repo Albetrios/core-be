@@ -23,7 +23,7 @@ describe('withMaintenanceDatabaseContext', () => {
     );
 
     const result = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       callback,
     );
 

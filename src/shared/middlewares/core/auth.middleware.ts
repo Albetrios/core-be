@@ -134,12 +134,12 @@ const authMiddleware: FastifyPluginAsync = async (app) => {
   // authority semantics are identical to calling the minters directly.
   app.decorateRequest('principalScope', {
     getter(this: FastifyRequest) {
-      return REQUEST_SCOPE.organization(this);
+      return REQUEST_SCOPE.ORGANIZATION(this);
     },
   });
   app.decorateRequest('userPrincipalScope', {
     getter(this: FastifyRequest) {
-      return REQUEST_SCOPE.user(this);
+      return REQUEST_SCOPE.USER(this);
     },
   });
   app.decorate('authenticate', authenticate);

@@ -17,8 +17,8 @@ The single most failure-prone, security-critical surface in core-be: a missed `F
 - **HTTP path:** the tenant middleware (`src/shared/middlewares/tenant/tenant.middleware.ts`) only maps `X-Organization-Id → request.organizationId`; it is **not** the RLS authority. The active org is the signed `org` JWT claim. The GUC is set per service unit-of-work by `withAppDatabaseContext(scope, cb)` (`src/infrastructure/database/contexts/database-context.ts`) — controllers relay the lazy `request.principalScope` / `request.userPrincipalScope` getters (auth middleware, over the confined request minters); job/verified paths use `resolveJobPrincipalScope` / `resolveVerifiedPrincipalScope`.
 - **Worker path:** `src/worker.ts` sets `CORE_BE_RUNTIME=worker`. Context wrappers open a txn, set their GUC, pin the handle in AsyncLocalStorage, and pass a branded `WorkerContextDatabaseHandle`:
   - `withAppDatabaseContext` (job-minted org/user scope) → `app.current_organization_public_id` / `app.current_user_public_id`
-  - `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup)` → `app.global_retention_cleanup = 'true'`
-  - `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.session_retention_cleanup)` → `app.session_retention_cleanup = 'true'`
+  - `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP)` → `app.global_retention_cleanup = 'true'`
+  - `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP)` → `app.session_retention_cleanup = 'true'`
   - Every bypass kind lives in the `MAINTENANCE_CONTEXTS` registry (`database-context.ts`); usage is per-path allowlisted by `maintenance-context-confinement.policy.unit.test.ts`.
   - Job runners wrap these: `runTenantScopedWorkerJob` (reads `organizationPublicId`), `runUserScopedWorkerJob` (reads `userPublicId`), `runGlobalRetentionWorkerJob` — in `src/infrastructure/queue/worker-runtime/worker-processor.util.ts`.
 - **Fail-closed guards:** `getRequestDatabase()` (`database-context-runtime.ts`) **throws `WorkerDatabaseContextError`** in worker runtime if no handle is pinned (instead of silently returning the GUC-less pool). `assertWorkerRlsGucSet` verifies the live `current_setting` matches the expected context. `assert-database-rls-safety.ts` (boot, hosted) throws if `DATABASE_URL` connects as a superuser / `BYPASSRLS` role — Postgres skips even FORCE RLS for those. Intended role: `core_be_app`.
@@ -80,7 +80,7 @@ A `with*DatabaseContext` wrapper sets **one** GUC and grants access only on tabl
 | `withAppDatabaseContext` (org scope) | `app.current_organization_public_id` | tenant-scoped tables (`*_tenant_isolation`) |
 | `withAppDatabaseContext` (user scope) | `app.current_user_public_id` | user-owned rows (`auth.*`, uploads, notifications) **and** the tenancy discovery policies (`organizations_user_discovery`, `memberships_user_self_discovery`) |
 | `withGlobalAdminDatabaseContext` | `app.global_admin` | **`auth.*` and `audit.logs` ONLY** |
-| `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup)` | `app.global_retention_cleanup` | retention-sweep tables |
+| `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP)` | `app.global_retention_cleanup` | retention-sweep tables |
 
 **`app.global_admin` is NOT a tenancy bypass.** No `tenancy.*` policy carries that arm, so the admin context reads zero rows from `tenancy.organizations` / `tenancy.memberships` and fails their `WITH CHECK` on write. (The `WITH CHECK` checklist item above warns about a `global_admin` arm leaking from `USING` — that concerns tables where such an arm exists, e.g. `audit.logs`; on tenancy tables there is none to leak.) This shipped to production three times — organization provisioning (42501), active-org resolution at login (zero rows → no `org` claim, empty permissions), and the `OrganizationRepository` user-id resolvers (`null` → permission-cache purge skipped, attribution nulled).
 

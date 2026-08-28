@@ -32,7 +32,7 @@ describe('Global: tenancy code never uses the global-admin RLS escape hatch', ()
 
   /**
    * Matches an actual use of the global-admin maintenance scope, not prose: the
-   * `MAINTENANCE_SCOPE.global_admin` singleton is the only way to enter the hatch
+   * `MAINTENANCE_SCOPE.GLOBAL_ADMIN` singleton is the only way to enter the hatch
    * since the family unification, so referencing it outside a comment IS the use.
    */
   const GLOBAL_ADMIN_USE = /^(?!\s*(?:\/\/|\*|\/\*)).*MAINTENANCE_SCOPE\.global_admin/gm;
@@ -53,7 +53,7 @@ describe('Global: tenancy code never uses the global-admin RLS escape hatch', ()
     }
   }
 
-  it('no file under src/domains/tenancy uses MAINTENANCE_SCOPE.global_admin', async () => {
+  it('no file under src/domains/tenancy uses MAINTENANCE_SCOPE.GLOBAL_ADMIN', async () => {
     const repositoryRoot = process.cwd();
     const tenancyRoot = join(repositoryRoot, 'src', 'domains', 'tenancy');
 

@@ -64,7 +64,7 @@ describe('Security: audit.logs INSERT system-audit arm (sec-r5-async-queue-1)', 
     let caught: unknown;
     try {
       await withMaintenanceDatabaseContext(
-        MAINTENANCE_SCOPE.system_audit_insert,
+        MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT,
         async (databaseHandle) => {
           await databaseHandle.execute(
             drizzleSql`INSERT INTO audit.logs (organization_id, actor_user_id, action, resource_type, metadata, severity)
@@ -97,7 +97,7 @@ describe('Security: audit.logs INSERT system-audit arm (sec-r5-async-queue-1)', 
     let caught: unknown;
     try {
       await withMaintenanceDatabaseContext(
-        MAINTENANCE_SCOPE.system_audit_insert,
+        MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT,
         async (databaseHandle) => {
           // Attempt to pin a real tenant on the row while only the
           // system-audit-insert GUC is active. The new arm requires

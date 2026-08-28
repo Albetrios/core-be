@@ -131,7 +131,7 @@ describe('Security: audit.outbox INSERT RLS (audit R10)', () => {
     let caught: unknown;
     try {
       await withMaintenanceDatabaseContext(
-        MAINTENANCE_SCOPE.system_audit_insert,
+        MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT,
         (databaseHandle) => databaseHandle.execute(outboxInsertSql(null)),
         { useApplicationDatabaseRole: true },
       );

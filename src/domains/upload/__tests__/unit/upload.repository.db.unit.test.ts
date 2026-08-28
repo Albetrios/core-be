@@ -20,7 +20,7 @@ describe('UploadRepository (database)', () => {
 
   /** Run the worker-scoped confirm the way the pending-sweep worker does (global retention context). */
   const confirm = (id: number, finalKey: string) =>
-    withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (handle) =>
+    withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, (handle) =>
       markConfirmedByInternalId(handle, id, finalKey),
     );
 

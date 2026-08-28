@@ -49,7 +49,7 @@ describe('runStripeWebhookEventRetentionJob (database)', () => {
 
   async function runRetention() {
     return withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.system_table_retention,
+      MAINTENANCE_SCOPE.SYSTEM_TABLE_RETENTION,
       (databaseHandle) => runStripeWebhookEventRetentionJob(databaseHandle),
     );
   }

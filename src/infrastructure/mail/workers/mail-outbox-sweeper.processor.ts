@@ -57,7 +57,7 @@ export type MailOutboxSweeperJobResult = {
  *   run concurrently with the mail worker because the claim transition is atomic.
  */
 export async function runMailOutboxSweeperJob(): Promise<MailOutboxSweeperJobResult> {
-  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, () =>
+  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, () =>
     runMailOutboxSweeperJobInner(),
   );
 }

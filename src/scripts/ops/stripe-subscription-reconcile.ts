@@ -75,7 +75,7 @@ async function listStripeActiveSubscriptions(): Promise<StripeSubscriptionRecord
 
 async function listLocalStripeSubscriptions(): Promise<LocalSubscriptionRecord[]> {
   return withMaintenanceDatabaseContext(
-    MAINTENANCE_SCOPE.global_retention_cleanup,
+    MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
     async (databaseHandle) => {
       const rows = await databaseHandle
         .select({

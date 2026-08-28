@@ -11,7 +11,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
     // global-admin call-count assertions.
     withMaintenanceDatabaseContext: vi.fn(
       (scope: { kind: string }, callback: (handle: unknown) => Promise<unknown>) =>
-        scope.kind === 'global_admin'
+        scope.kind === 'GLOBAL_ADMIN'
           ? (globalAdminMaintenanceContextMock as unknown as (...parameters: unknown[]) => unknown)(
               callback,
             )

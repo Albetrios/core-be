@@ -61,7 +61,7 @@ export async function runGlobalRetentionWorkerJob<TResult>(
   processor: (databaseHandle: WorkerDatabaseHandle) => Promise<TResult>,
 ): Promise<TResult> {
   return withMaintenanceDatabaseContext(
-    MAINTENANCE_SCOPE.global_retention_cleanup,
+    MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
     (databaseHandle) => processor(brandWorkerContextDatabaseHandle(databaseHandle)),
   );
 }

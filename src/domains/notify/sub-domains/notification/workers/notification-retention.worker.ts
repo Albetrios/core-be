@@ -32,7 +32,7 @@ export function createNotificationRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     NOTIFICATION_RETENTION_QUEUE_NAME,
     async () =>
-      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.global_retention_cleanup, (databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, (databaseHandle) =>
         runNotificationRetentionJob(databaseHandle),
       ),
     {

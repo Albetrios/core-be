@@ -77,7 +77,7 @@ describe('Security: tenant-isolation WITH CHECK propagation confines cross-org w
       let caught: unknown;
       try {
         await withMaintenanceDatabaseContext(
-          MAINTENANCE_SCOPE.global_retention_cleanup,
+          MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
           async (databaseHandle) =>
             databaseHandle.execute(
               drizzleSql.raw(
@@ -128,7 +128,7 @@ describe('Security: tenant-isolation WITH CHECK propagation confines cross-org w
     const rowIds = fixture.rowIdsByTable.get(tableKey('tenancy', 'api_keys'))!;
 
     const deletedCount = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       async (databaseHandle) => {
         const result = await databaseHandle.execute(
           drizzleSql.raw(

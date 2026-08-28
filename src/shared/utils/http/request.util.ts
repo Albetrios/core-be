@@ -119,7 +119,7 @@ export function resolveActiveOrganizationId(request: FastifyRequest): string {
  *   organization (users hold a personal-or-team `org` claim from login/switch;
  *   API keys are pinned to one). A token without one is stale/malformed, not a
  *   different scope, so this single common minter rejects it rather than
- *   modelling an org-less variant. Use {@link REQUEST_SCOPE}.user
+ *   modelling an org-less variant. Use {@link REQUEST_SCOPE}.USER
  *   when the route additionally requires a real end user (rejects API keys).
  */
 function mintOrganizationRequestScope(request: FastifyRequest): OrganizationPrincipalDatabaseScope {
@@ -172,15 +172,15 @@ function mintUserRequestScope(request: FastifyRequest): UserPrincipalDatabaseSco
  * verified request principal and stamp `source: 'request'`; the KIND selects the
  * boundary rule (the two rules genuinely differ, so they are kinds, not one
  * function):
- * - `REQUEST_SCOPE.organization(request)` — org REQUIRED (403 without one;
+ * - `REQUEST_SCOPE.ORGANIZATION(request)` — org REQUIRED (403 without one;
  *   API-key principals allowed — org identity without a human).
- * - `REQUEST_SCOPE.user(request)` — real end user REQUIRED (API keys rejected);
+ * - `REQUEST_SCOPE.USER(request)` — real end user REQUIRED (API keys rejected);
  *   org optional (the /users/me self-heal transitional state).
  * Controllers normally use the `request.principalScope` /
  * `request.userPrincipalScope` getters, which delegate here.
  */
 export const REQUEST_SCOPE = Object.freeze({
-  organization: (request: FastifyRequest): OrganizationPrincipalDatabaseScope =>
+  ORGANIZATION: (request: FastifyRequest): OrganizationPrincipalDatabaseScope =>
     mintOrganizationRequestScope(request),
-  user: (request: FastifyRequest): UserPrincipalDatabaseScope => mintUserRequestScope(request),
+  USER: (request: FastifyRequest): UserPrincipalDatabaseScope => mintUserRequestScope(request),
 });

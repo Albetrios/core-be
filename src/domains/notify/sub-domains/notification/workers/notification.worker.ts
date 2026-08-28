@@ -93,7 +93,7 @@ async function dispatchNotificationEmail(options: {
   // back the existing id), closing the duplicate-email window the Redis marker alone left
   // open. The Redis marker below is now just a fast-path to skip the DB insert on retry.
   let mailOutboxId: number | undefined;
-  await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker, async () => {
+  await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, async () => {
     mailOutboxId = await recordOutboxEmail({
       to: email,
       subject,
@@ -141,7 +141,7 @@ async function dispatchNotificationEmail(options: {
  *   scope when `organizationPublicId` is set, global retention scope otherwise), then iterate
  *   `data.channels ?? ['in_app']`; for each channel, look up the recipient and send. The email
  *   channel renders the shared transactional template and persists/dispatches via the mail
- *   outbox under `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.system_table_worker)`, guarded by a one-time Redis dispatch marker
+ *   outbox under `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)`, guarded by a one-time Redis dispatch marker
  *   so retries of the same notification job never enqueue a duplicate email.
  * - **Failure modes:** missing notification row → throws `notification.not_found:<id>`; absent
  *   mail configuration or recipient logs `notification.worker.channel_skipped` and continues;
@@ -176,7 +176,7 @@ export async function processNotificationDispatchJob(
   const loadNotificationForScope = async () => {
     if (organizationPublicId === null || organizationPublicId === undefined) {
       const userPublicId = await withMaintenanceDatabaseContext(
-        MAINTENANCE_SCOPE.global_admin,
+        MAINTENANCE_SCOPE.GLOBAL_ADMIN,
         async (databaseHandle) => {
           const repository =
             notificationRepository ?? createWorkerNotificationRepository(databaseHandle);

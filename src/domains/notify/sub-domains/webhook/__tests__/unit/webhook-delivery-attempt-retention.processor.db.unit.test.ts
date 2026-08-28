@@ -63,7 +63,7 @@ describe('runWebhookDeliveryAttemptRetentionJob (database, audit-#3)', () => {
       .where(eq(webhook_delivery_attempts.id, old.id));
 
     const result = await withMaintenanceDatabaseContext(
-      MAINTENANCE_SCOPE.global_retention_cleanup,
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       (databaseHandle) => runWebhookDeliveryAttemptRetentionJob(databaseHandle),
     );
 
