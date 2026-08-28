@@ -167,7 +167,7 @@ describe('withAppDatabaseContext', () => {
     });
     const userOnly = createPrincipalDatabaseScope({
       userPublicId: 'usr_a',
-      source: 'provisioning',
+      source: 'verified',
     });
 
     await withAppDatabaseContext(orgScope, async (outerHandle) => {

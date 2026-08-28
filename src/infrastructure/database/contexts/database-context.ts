@@ -65,7 +65,7 @@ declare const PRINCIPAL_SCOPE_BRAND: unique symbol;
  * BullMQ job payload, `provisioning` = a row the current flow just created (e.g. a
  * personal organization during signup, before any claim can exist for it).
  */
-export type PrincipalScopeSource = 'request' | 'job' | 'provisioning';
+export type PrincipalScopeSource = 'request' | 'job' | 'verified';
 
 /**
  * Unforgeable identity scope for one unit of database work: the verified user and/or

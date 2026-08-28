@@ -258,7 +258,7 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 | Maintenance | `MaintenanceDatabaseScope` — 7 frozen singletons: `global_retention_cleanup`, `session_retention_cleanup`, `global_admin`, `system_audit_insert`, `audit_outbox_drain`, `system_table_retention`, `system_table_worker` | nothing to mint — `MAINTENANCE_SCOPE.<kind>` | `withMaintenanceDatabaseContext` |
 
 Provenance (`scope.source`): `request` = authenticated HTTP request (JWT or API key) · `job` = validated
-BullMQ payload · `provisioning` = the caller itself verified the id (invite flow,
+BullMQ payload · `verified` = the caller itself verified the id (invite flow,
 Stripe event mapping, admin, signup provisioning) — ledgered per importer by
 `verified-scope-usage.policy.unit.test.ts`.
 

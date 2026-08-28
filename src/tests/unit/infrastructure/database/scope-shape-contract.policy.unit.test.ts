@@ -78,7 +78,7 @@ describe('scope shape contract (fixed key/value pairs from every doorway)', () =
     const scope = resolveVerifiedPrincipalScope({ organizationPublicId: ORGANIZATION_PUBLIC_ID });
     expect(sortedRuntimeKeys(scope)).toEqual(PRINCIPAL_KEYS);
     expect(scope.organizationPublicId).toBe(ORGANIZATION_PUBLIC_ID);
-    expect(scope.source).toBe('provisioning');
+    expect(scope.source).toBe('verified');
   });
 
   it('SESSION_SCOPE factories emit exactly { kind, value }', () => {

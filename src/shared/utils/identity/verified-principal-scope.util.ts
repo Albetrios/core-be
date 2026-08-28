@@ -16,13 +16,13 @@ export function resolveVerifiedPrincipalScope(input: {
   organizationPublicId?: undefined;
 }): UserPrincipalDatabaseScope;
 /**
- * THE common verified/port-family minter (`source: 'provisioning'`): pass what the
+ * THE common verified/port-family minter (`source: 'verified'`): pass what the
  * calling flow has itself verified — the other identity stays empty, and the wrapper
  * later sets only the GUCs the scope carries. Overloads narrow the return type from
  * the shape you pass, so org-required / user-required signatures still typecheck.
  *
  * @remarks
- * - **Algorithm:** wraps the verified id(s) in a principal scope with provisioning
+ * - **Algorithm:** wraps the verified id(s) in a principal scope with verified
  *   provenance; the factory's empty-scope guard is the only failure mode.
  * - **Notes:** authority comes from a record the caller owns or just authorized (an
  *   invitation row, an API key row, a just-provisioned organization, a Stripe
@@ -37,6 +37,6 @@ export function resolveVerifiedPrincipalScope(input: {
   return createPrincipalDatabaseScope({
     organizationPublicId: input.organizationPublicId,
     userPublicId: input.userPublicId,
-    source: 'provisioning',
+    source: 'verified',
   });
 }
