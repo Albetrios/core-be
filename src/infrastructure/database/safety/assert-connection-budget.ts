@@ -165,7 +165,7 @@ function buildDeploymentBudgetErrorMessage(parameters: {
     : `no pool size fits ${parameters.processCount} processes`;
 
   return (
-    'Server cannot start: DATABASE_POOL_MAX is too high for this database.\n' +
+    'Postgres connection budget exceeded — DATABASE_POOL_MAX is too high for this database.\n' +
     '\n' +
     MESSAGE_INDENT +
     'The rule'.padEnd(labelColumn) +

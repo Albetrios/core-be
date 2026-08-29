@@ -30,6 +30,14 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-connection-budget.js', () 
     computeWorkerPostgresPoolDemandMock(...arguments_),
 }));
 
+/**
+ * The message's opening line, asserted verbatim so a reword cannot land unnoticed. Passed as a
+ * string rather than a regex: vitest substring-matches it, and the em dash and full stop would
+ * otherwise need escaping.
+ */
+const BUDGET_EXCEEDED_HEADLINE =
+  'Postgres connection budget exceeded — DATABASE_POOL_MAX is too high for this database.';
+
 describe('assertPostgresConnectionBudget', () => {
   beforeEach(() => {
     sqlMock.mockReset();
@@ -59,7 +67,7 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/Server cannot start/);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(BUDGET_EXCEEDED_HEADLINE);
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
@@ -214,7 +222,7 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/Server cannot start/);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(BUDGET_EXCEEDED_HEADLINE);
   });
 
   it('names the largest fitting pool and the cluster size the current pool needs', async () => {
@@ -304,7 +312,7 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/Server cannot start/);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(BUDGET_EXCEEDED_HEADLINE);
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
