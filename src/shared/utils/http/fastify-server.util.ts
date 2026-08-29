@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { LogController, type FastifyServerOptions } from 'fastify';
+
+/** fastify's trust-proxy predicate form (the type itself is not re-exported by fastify@5.12). */
+type TrustProxyFunction = Extract<
+  NonNullable<FastifyServerOptions['trustProxy']>,
+  (address: string, hop: number) => boolean
+>;
 import type { IncomingMessage } from 'node:http';
 import { env } from '@/shared/config/env.config.js';
 import { DEFAULT_BODY_LIMIT_BYTES } from '@/shared/constants/limits.constants.js';
@@ -43,10 +49,15 @@ export const PINO_REDACT_PATHS = [...SENSITIVE_KEY_FRAGMENTS, ...PINO_REDACT_NES
  * by the schema into `false | number` (a hop count); this normalizes to the shape Fastify
  * accepts and never trusts a bare boolean `true`.
  */
-export function resolveTrustProxy(): boolean | number {
+export function resolveTrustProxy(): boolean | TrustProxyFunction {
   const trustProxy = env.TRUST_PROXY;
-  if (trustProxy === false) return false;
-  if (typeof trustProxy === 'number') return trustProxy;
+  if (typeof trustProxy === 'number') {
+    // fastify@5.12 removed `number` from the trustProxy TYPE; the runtime hop
+    // semantics ("trust the first n hops") are preserved by compiling the env
+    // number to the equivalent predicate fastify used internally.
+    const trustedHops = trustProxy;
+    return (_address: string, hopIndex: number) => hopIndex < trustedHops;
+  }
   return false;
 }
 
