@@ -20,6 +20,12 @@
 -- role: local `core` (superuser, exempt) / hosted provider owner (BYPASSRLS via the
 -- provider's elevated grant). Verify resolver behavior after hosted provisioning —
 -- the rls-offboarding-regressions db.unit suite asserts it as core_be_app.
+-- PG16+ (hosted 42501 fix): make creator self-grants SET-capable for roles created
+-- in this session — `ALTER ... OWNER TO core_be_owner` requires membership WITH SET,
+-- and a non-superuser executor cannot self-elevate SET afterwards (self-administration
+-- was removed in PG16). Session-scoped USERSET GUC; superusers are unaffected.
+SET createrole_self_grant = 'inherit, set';
+--> statement-breakpoint
 DO $$
 BEGIN
 	CREATE ROLE core_be_owner NOLOGIN;
@@ -83,11 +89,55 @@ END $$;
 --> statement-breakpoint
 -- The role executing this migration keeps full DDL power over the reassigned objects
 -- (future migrations run as the same role, or as core_be_migrator once dedicated).
+--
+-- Hosted 42501/0LP01 fix — the ownership sweep below needs membership WITH SET in
+-- core_be_owner, and PG16+ removed self-administration (an executor can NEVER grant
+-- itself the missing SET; a pg_has_role 'member' guard is satisfied by an
+-- inherit-only createrole_self_grant, which is exactly how the first Neon deploy
+-- failed while local superusers sailed through). Layered ensure:
+--   1. superuser → nothing needed;
+--   2. SET-capable membership already present → done;
+--   3. try a normal grant (works when the executor holds independent ADMIN);
+--   4. half-provisioned state (role exists, owns nothing, no SET path): recreate it —
+--      the createrole_self_grant session setting above makes the creator's implicit
+--      membership SET-capable;
+--   5. role already owns objects and no path to SET → fail LOUDLY with the manual fix.
 DO $$
+DECLARE
+  has_set_membership BOOLEAN;
 BEGIN
-  IF NOT pg_has_role(current_user, 'core_be_owner', 'member') THEN
-    EXECUTE format('GRANT core_be_owner TO %I WITH ADMIN OPTION', current_user);
+  IF (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) THEN
+    RETURN;
   END IF;
+  SELECT COALESCE(bool_or(membership.set_option), FALSE)
+    INTO has_set_membership
+    FROM pg_auth_members membership
+   WHERE membership.roleid = 'core_be_owner'::regrole
+     AND membership.member = current_user::regrole;
+  IF has_set_membership THEN
+    RETURN;
+  END IF;
+  BEGIN
+    EXECUTE format('GRANT core_be_owner TO %I WITH ADMIN TRUE, SET TRUE, INHERIT TRUE', current_user);
+    RETURN;
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+  IF EXISTS (
+    SELECT 1 FROM pg_shdepend dependency
+    WHERE dependency.refobjid = 'core_be_owner'::regrole AND dependency.deptype = 'o'
+  ) THEN
+    RAISE EXCEPTION USING MESSAGE = format(
+      'core_be_owner already owns objects but %s has no SET-capable membership; run as a role with independent ADMIN: GRANT core_be_owner TO %s WITH ADMIN TRUE, SET TRUE, INHERIT TRUE',
+      current_user, current_user);
+  END IF;
+  -- The role owns no objects (checked above) but may hold ACL grants (e.g. the
+  -- database CONNECT granted earlier in this file) which block DROP ROLE (2BP01);
+  -- DROP OWNED clears them and needs only membership, not SET.
+  EXECUTE 'DROP OWNED BY core_be_owner';
+  EXECUTE 'DROP ROLE core_be_owner';
+  EXECUTE 'CREATE ROLE core_be_owner NOLOGIN';
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO core_be_owner', current_database());
 END $$;
 --> statement-breakpoint
 -- Ownership sweep: schemas, tables, sequences → core_be_owner. Policies, indexes,

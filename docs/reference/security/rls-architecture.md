@@ -358,7 +358,7 @@ authority then requires the dedicated **connection**, not just a GUC, so a compr
 
 ## 8. Bug ledger — what RLS-subject execution caught before first deployment
 
-All eight were pre-existing, invisible on a superuser connection, and each is pinned by
+All nine were pre-existing, invisible on a superuser connection, and each is pinned by
 an as-`core_be_app` (or maintenance-role) regression:
 
 | # | Bug (production impact) | Fix |
@@ -371,6 +371,7 @@ an as-`core_be_app` (or maintenance-role) regression:
 | 6 | Audit drain permanently discarded organization / API-key-actor rows — `global_admin` grants nothing on `tenancy.*` | `SECURITY DEFINER` resolvers `audit.resolve_*_ids_for_public_ids` |
 | 7 | User tombstone purge + offboarding reconciler were silent no-ops — users policy had no retention arm | USING-only retention arm on `users_self_or_admin_access` |
 | 8 | Manual DLQ replay always failed its actor pre-condition — lookup ran with no RLS context | wrapped in `MAINTENANCE_SCOPE.GLOBAL_ADMIN` |
+| 9 | **First hosted deploy: taxonomy migration 42501** — `ALTER SCHEMA … OWNER TO core_be_owner` failed on Neon: PG16+ `createrole_self_grant` gave the executor inherit-only membership (no SET), the `pg_has_role('member')` guard skipped the grant, and PG16's self-administration removal means an executor can NEVER self-add SET (0LP01). Superuser local/CI masked it end to end. | migration `20260827050000`: session `createrole_self_grant='inherit, set'` before role creation + layered ensure-SET (superuser skip → set_option check → independent-ADMIN grant → recreate-if-unowned with `DROP OWNED` → loud manual-fix error). Proven on a fresh PG17 cluster as a Neon-like non-superuser, both fresh and half-provisioned states |
 
 The recurring root causes worth remembering: superuser masking (local + fixtures),
 `RETURNING`/NEW-row SELECT-visibility, and bypass arms present in USING but missing in
