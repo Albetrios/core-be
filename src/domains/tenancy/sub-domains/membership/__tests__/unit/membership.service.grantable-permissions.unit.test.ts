@@ -37,7 +37,7 @@ import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permiss
 import type { UserService } from '@/domains/user/user.service.js';
 import type { MemberInvitationService } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.service.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -51,9 +51,8 @@ import {
  * BEFORE the membership row is persisted.
  */
 const asScope = (organizationPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     organizationPublicId,
-    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MembershipService.create — grantable-permissions guard (sec-T1)', () => {

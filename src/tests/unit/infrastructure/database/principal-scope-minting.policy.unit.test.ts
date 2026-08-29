@@ -2,84 +2,79 @@ import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Policy: `createPrincipalDatabaseScope` is the minting primitive for the branded
- * {@link PrincipalDatabaseScope} — provenance is edge-only, so only the confined
- * minters may import it. A service or repository importing the factory would be
- * able to fabricate identity scope from raw strings, collapsing the brand's
- * guarantee. Extend the allowlist deliberately (new legitimate "top" = new minter),
- * never casually.
+ * Policy: principal scopes are minted ONLY through the `PRINCIPAL_SCOPE` family
+ * namespace, and each member is confined to its trust boundary. A service or
+ * repository minting from raw strings would collapse the brand's guarantee, so:
+ *
+ * - `createPrincipalDatabaseScope` (the private factory) never leaves
+ *   `database-context.ts`.
+ * - `PRINCIPAL_SCOPE.REQUEST` is called only where the verified request ids
+ *   live: the auth middleware attachment (and its test mirror helper).
+ * - `PRINCIPAL_SCOPE.JOB` is called only from worker paths — an HTTP handler
+ *   reaching for a job scope would bypass the request attachment.
+ * - `PRINCIPAL_SCOPE.VERIFIED` callers are ledgered in
+ *   `verified-scope-usage.policy.unit.test.ts`.
+ *
+ * Extend an allowlist deliberately (new legitimate "top"), never casually.
  */
-const ALLOWED_IMPORTER_SUFFIXES = [
-  'src/infrastructure/database/contexts/database-context.ts',
-  'src/shared/utils/http/request.util.ts',
-  'src/infrastructure/queue/worker-runtime/job-principal-scope.util.ts',
-  'src/shared/utils/identity/verified-principal-scope.util.ts',
-];
+function grepFiles(pattern: string): string[] {
+  let output = '';
+  try {
+    output = execFileSync('grep', ['-rl', pattern, 'src', '--include=*.ts'], {
+      encoding: 'utf8',
+    });
+  } catch {
+    // grep exits non-zero when nothing matches — that is also a pass.
+  }
+  return output
+    .split('\n')
+    .filter(Boolean)
+    .filter((filePath) => !/\.test\.ts$/.test(filePath));
+}
 
 describe('principal-scope minting confinement', () => {
-  it('createPrincipalDatabaseScope is imported only by the allowlisted minters (and tests)', () => {
-    let output = '';
-    try {
-      output = execFileSync(
-        'grep',
-        ['-rl', 'createPrincipalDatabaseScope', 'src', '--include=*.ts'],
-        { encoding: 'utf8' },
-      );
-    } catch {
-      // grep exits non-zero when nothing matches — that would also be a pass.
-    }
-
-    const offenders = output
-      .split('\n')
-      .filter(Boolean)
-      .filter((filePath) => !/\.test\.ts$/.test(filePath))
-      .filter(
-        (filePath) => !ALLOWED_IMPORTER_SUFFIXES.some((allowed) => filePath.endsWith(allowed)),
-      );
-
+  it('createPrincipalDatabaseScope never leaves database-context.ts', () => {
+    const offenders = grepFiles('createPrincipalDatabaseScope').filter(
+      (filePath) => !filePath.endsWith('src/infrastructure/database/contexts/database-context.ts'),
+    );
     expect(
       offenders,
-      `createPrincipalDatabaseScope referenced outside the confined minters: ${offenders.join(', ')}. ` +
-        'Scopes must be minted at a legitimate top (request minters, worker-payload minter, provisioning) — add a new minter and extend the allowlist deliberately.',
+      `createPrincipalDatabaseScope referenced outside the context module: ${offenders.join(', ')}. ` +
+        'The factory is file-private — mint through a PRINCIPAL_SCOPE member instead.',
     ).toEqual([]);
   });
-});
 
-/**
- * Job-source minters may only be used from worker paths — an HTTP handler
- * reaching for a job scope would bypass the token minter's claim precedence.
- */
-const JOB_MINTER_ALLOWED_FRAGMENTS = [
-  'queue/worker-runtime/',
-  '/workers/',
-  'stripe-webhook/stripe-webhook-organization.util.ts', // worker-side org resolution for Stripe events
-];
-
-describe('job-scope minting confinement', () => {
-  it('resolve*JobScope is referenced only from worker paths (and tests)', () => {
-    let output = '';
-    try {
-      output = execFileSync(
-        'grep',
-        [
-          '-rlE',
-          'resolve(Organization|User)?JobP?r?i?n?c?i?p?a?l?S?c?o?p?e?\\b|resolveJobPrincipalScope|resolveJobPrincipalScope|resolveJobPrincipalScope',
-          'src',
-          '--include=*.ts',
-        ],
-        { encoding: 'utf8' },
-      );
-    } catch {
-      // no matches
-    }
-    const offenders = output
-      .split('\n')
-      .filter(Boolean)
-      .filter((filePath) => !/\.test\.ts$/.test(filePath))
-      .filter((filePath) => !JOB_MINTER_ALLOWED_FRAGMENTS.some((f) => filePath.includes(f)));
+  it('PRINCIPAL_SCOPE.REQUEST is called only by the auth middleware attachment (and its test helper)', () => {
+    const allowed = [
+      'src/shared/middlewares/core/auth.middleware.ts',
+      'src/infrastructure/database/contexts/database-context.ts',
+      // Test mirror of the middleware attachment (doc reference only).
+      'src/tests/helpers/principal-scope-getters.helper.ts',
+    ];
+    const offenders = grepFiles('PRINCIPAL_SCOPE.REQUEST').filter(
+      (filePath) => !allowed.some((suffix) => filePath.endsWith(suffix)),
+    );
     expect(
       offenders,
-      `job-scope minters referenced outside worker paths: ${offenders.join(', ')}.`,
+      `PRINCIPAL_SCOPE.REQUEST referenced outside the auth middleware: ${offenders.join(', ')}. ` +
+        'Request scopes are attached once per request by attachRequestPrincipalScope — read request.principalScope (or the requireOrganizationScope / requireUserScope accessors) instead.',
+    ).toEqual([]);
+  });
+
+  it('PRINCIPAL_SCOPE.JOB is referenced only from worker paths', () => {
+    const allowedFragments = [
+      'queue/worker-runtime/',
+      '/workers/',
+      'infrastructure/database/contexts/database-context.ts',
+      'stripe-webhook/stripe-webhook-organization.util.ts', // worker-side org resolution for Stripe events
+    ];
+    const offenders = grepFiles('PRINCIPAL_SCOPE.JOB').filter(
+      (filePath) => !allowedFragments.some((fragment) => filePath.includes(fragment)),
+    );
+    expect(
+      offenders,
+      `PRINCIPAL_SCOPE.JOB referenced outside worker paths: ${offenders.join(', ')}. ` +
+        'Job scopes carry enqueue-time provenance — HTTP code must use request.principalScope; self-verified flows use PRINCIPAL_SCOPE.VERIFIED (ledgered).',
     ).toEqual([]);
   });
 });

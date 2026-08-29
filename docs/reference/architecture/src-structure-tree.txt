@@ -1309,7 +1309,6 @@ src/
     │   │   │   │   ├── worker-connection-budget.unit.test.ts
     │   │   │   │   ├── worker-queue-family.util.unit.test.ts
     │   │   │   │   └── worker-registration.registry.unit.test.ts
-    │   │   ├── job-principal-scope.util.ts
     │   │   ├── scheduler-registry-audit.ts
     │   │   ├── shutdown-timing.util.ts
     │   │   ├── worker-close.util.ts
@@ -1576,8 +1575,7 @@ src/
     │   ├── identity/
     │   │   ├── public-id-param.util.ts
     │   │   ├── public-id.util.ts
-    │   │   ├── uuid.util.ts
-    │   │   └── verified-principal-scope.util.ts
+    │   │   └── uuid.util.ts
     │   ├── infrastructure/
     │   │   ├── application-lifecycle.util.ts
     │   │   ├── audit-record.util.ts

@@ -1,5 +1,6 @@
 import { UnauthorizedError } from '@/shared/errors/index.js';
 import {
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
@@ -8,7 +9,6 @@ import { PAGINATION } from '@/shared/constants/pagination.constants.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import type { NotificationRepository } from './notification.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Options forwarded from controllers/event handlers into {@link NotificationService.listForUser}.
@@ -80,7 +80,7 @@ export class NotificationService {
   async listForUserDataExport(options: { userPublicId: string; limit: number }) {
     const userId = await this.resolveUserId(options.userPublicId);
     return withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: options.userPublicId }),
       () => this.repository.listForUserDataExport(userId, options.limit),
     );
   }

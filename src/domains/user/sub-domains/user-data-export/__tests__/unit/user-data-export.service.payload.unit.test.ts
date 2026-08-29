@@ -4,7 +4,7 @@ import { GDPR_EXPORT_MAX_ROWS_PER_TABLE } from '@/shared/constants/query-limits.
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import { USER_DATA_EXPORT_STATUSES } from '@/domains/user/sub-domains/user-data-export/user-data-export.types.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -63,10 +63,9 @@ function userRecord(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 const asUserScope = (userPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     userPublicId,
     organizationPublicId: 'org_scope_test',
-    source: 'request',
   }) as UserPrincipalDatabaseScope;
 
 describe('UserDataExportService — payload shape and download URL', () => {

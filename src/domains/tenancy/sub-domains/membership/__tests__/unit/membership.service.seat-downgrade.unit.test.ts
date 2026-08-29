@@ -24,7 +24,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
 
 import { MembershipService } from '@/domains/tenancy/sub-domains/membership/membership.service.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -36,9 +36,8 @@ import {
  * were entirely unasserted, so a bug could silently over/under-suspend or lock the owner out.
  */
 const _asScope = (organizationPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     organizationPublicId,
-    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MembershipService.suspendExcessActiveMembersToFitCeiling (F2 downgrade enforcement)', () => {

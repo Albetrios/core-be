@@ -27,7 +27,7 @@ describe('createMemberInvitationController — invitationId path-param validatio
         kind: 'user',
         userId: generatePublicId('user'),
         role: 'USER',
-        organizationPublicId: generatePublicId('organization'),
+        organizationPublicId,
       },
       params,
       body: {},

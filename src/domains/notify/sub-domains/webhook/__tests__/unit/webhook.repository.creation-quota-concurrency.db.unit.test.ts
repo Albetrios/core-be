@@ -3,8 +3,10 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { WebhookRepository } from '@/domains/notify/sub-domains/webhook/webhook.repository.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
@@ -30,7 +32,7 @@ describe('WebhookRepository creation-quota concurrency (database — audit-#8)',
 
     const attempt = (index: number) =>
       withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ organizationPublicId: organization.public_id }),
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization.public_id }),
         async () => {
           // Mirror the service: lock → count → conditional insert, all in this one transaction.
           await repository.acquireCreationQuotaLock(organization.id);
@@ -57,7 +59,7 @@ describe('WebhookRepository creation-quota concurrency (database — audit-#8)',
     expect(fulfilled).toHaveLength(CAP);
 
     const finalCount = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: organization.public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization.public_id }),
       () => repository.countActiveByOrganization(organization.id),
     );
     expect(finalCount).toBe(CAP);

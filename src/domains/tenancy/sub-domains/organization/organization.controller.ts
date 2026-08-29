@@ -4,6 +4,7 @@ import {
   getActingUserPublicId,
   getRequestIdentifier,
   requireAuth,
+  requireOrganizationScope,
   requirePrincipal,
 } from '@/shared/utils/http/request.util.js';
 import type { OrganizationService } from './organization.service.js';
@@ -35,7 +36,7 @@ export function createOrganizationController(
     },
     getOrganization: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requireAuth(request);
-      const id = request.principalScope.organizationPublicId;
+      const id = requireOrganizationScope(request).organizationPublicId;
       const data = await service.getByPublicId(id, auth.userId, auth.role);
       return successResponse(data, getRequestIdentifier(request));
     },
@@ -52,31 +53,31 @@ export function createOrganizationController(
     },
     updateOrganization: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const id = request.principalScope;
+      const id = requireOrganizationScope(request);
       const data = await service.update(id, request.body, getActingUserPublicId(auth));
       return successResponse(data, getRequestIdentifier(request));
     },
     deleteOrganization: async (request: FastifyRequest, reply: FastifyReply) => {
       requirePrincipal(request);
-      const id = request.principalScope;
+      const id = requireOrganizationScope(request);
       await service.delete(id);
       return reply.code(204).send();
     },
     uploadLogo: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const id = request.principalScope;
+      const id = requireOrganizationScope(request);
       const data = await service.uploadLogo(id, request.body, getActingUserPublicId(auth));
       return successResponse(data, getRequestIdentifier(request));
     },
     deleteLogo: async (request: FastifyRequest, reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const id = request.principalScope;
+      const id = requireOrganizationScope(request);
       await service.deleteLogo(id, getActingUserPublicId(auth));
       return reply.code(204).send();
     },
     listOrganizationAuditLogs: async (request: FastifyRequest, _reply: FastifyReply) => {
       if (!auditService) throw new Error('Audit service not configured');
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const organizationId = scope.organizationPublicId;
       const query = {
         ...(request.query as Record<string, unknown>),

@@ -1,5 +1,6 @@
 import type { AuditRepository } from './audit.repository.js';
 import {
+  PRINCIPAL_SCOPE,
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
@@ -10,7 +11,6 @@ import type { OrganizationService } from '@/domains/tenancy/sub-domains/organiza
 import type { UserService } from '@/domains/user/user.service.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 
 /**
@@ -118,7 +118,7 @@ export class AuditService {
     // and the row is silently dropped by `recordAuditEvent`. Open the right context per row.
     if (input.organization_public_id) {
       await withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ organizationPublicId: input.organization_public_id }),
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: input.organization_public_id }),
         insert,
       );
     } else {
@@ -150,7 +150,7 @@ export class AuditService {
    */
   async listForOrganization(organization_public_id: string, query: Record<string, unknown>) {
     return withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
       () => this.list(query),
     );
   }
@@ -257,7 +257,7 @@ export class AuditService {
   async listActivityForUserDataExport(options: { userPublicId: string; limit: number }) {
     const user = await this.userService.requireUserRecordByPublicId(options.userPublicId);
     return withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: options.userPublicId }),
       (_databaseHandle) => this.repository.listActivityForUserDataExport(user.id, options.limit),
     );
   }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ValidationError } from '@/shared/errors/index.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
@@ -63,10 +63,9 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
  *   = false` toggle, and the upcoming webhook reconciles the actual status (which may be
  *   PAST_DUE / INCOMPLETE / etc.).
  */
-const scope = createPrincipalDatabaseScope({
+const scope = PRINCIPAL_SCOPE.REQUEST({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public',
-  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 describe('SubscriptionService — Stripe reconciliation (sec-B1+B2+B3+B4)', () => {

@@ -32,8 +32,10 @@ import { decryptFieldSecret } from '@/shared/utils/security/field-secret-encrypt
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { MILLISECONDS_PER_HOUR, TEN_SECONDS_MS } from '@/shared/constants/ttl.constants.js';
 import { env } from '@/shared/config/env.config.js';
 
@@ -180,7 +182,7 @@ async function claimWebhookDeliveryAttempt(options: {
   const { deliveryAttemptId, organizationPublicId, attemptNumber, deliveryAttemptRepository } =
     options;
   return withAppDatabaseContext(
-    resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
+    PRINCIPAL_SCOPE.JOB({ organizationPublicId: organizationPublicId }),
     async (databaseHandle) => {
       const attemptRepository =
         deliveryAttemptRepository ?? createWorkerWebhookDeliveryAttemptRepository(databaseHandle);
@@ -232,7 +234,7 @@ async function recordWebhookDeliveryOutcome(options: {
 }): Promise<void> {
   const { deliveryAttemptId, organizationPublicId, outcome, deliveryAttemptRepository } = options;
   await withAppDatabaseContext(
-    resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
+    PRINCIPAL_SCOPE.JOB({ organizationPublicId: organizationPublicId }),
     async (databaseHandle) => {
       const attemptRepository =
         deliveryAttemptRepository ?? createWorkerWebhookDeliveryAttemptRepository(databaseHandle);

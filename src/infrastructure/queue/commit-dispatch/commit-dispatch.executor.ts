@@ -6,8 +6,10 @@ import { createWorkerUserDataExportRepository } from '@/domains/user/sub-domains
 import { USER_DATA_EXPORT_STATUSES } from '@/domains/user/sub-domains/user-data-export/user-data-export.types.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import type { CommitDispatchTask } from '@/infrastructure/queue/commit-dispatch/commit-dispatch.types.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import {
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
@@ -63,7 +65,7 @@ export async function executeCommitDispatchTask(task: CommitDispatchTask): Promi
           'commit-dispatch.user_data_export.enqueue_failed',
         );
         await withAppDatabaseContext(
-          resolveVerifiedPrincipalScope({ userPublicId: task.userPublicId }),
+          PRINCIPAL_SCOPE.VERIFIED({ userPublicId: task.userPublicId }),
           async (databaseHandle) => {
             const exportRepository = createWorkerUserDataExportRepository(databaseHandle);
             await exportRepository.updateStatus(task.exportPublicId, task.userInternalId, {

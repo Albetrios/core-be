@@ -5,7 +5,7 @@ import {
 } from '@/infrastructure/database/contexts/database-context.js';
 import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/database-context-runtime.js';
@@ -57,9 +57,8 @@ describe('worker database context', () => {
 
   it('withAppDatabaseContext sets organization worker context kind', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
-    const scope = createPrincipalDatabaseScope({
+    const scope = PRINCIPAL_SCOPE.JOB({
       organizationPublicId: 'org_public_test',
-      source: 'job',
     });
     await withAppDatabaseContext(scope, async () => {
       expect(getWorkerDatabaseContext()?.kind).toBe('organization');
@@ -93,9 +92,8 @@ describe('worker database context', () => {
 
   it('assertWorkerForceRlsTableAccess allows organization context for tenant tables', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
-    const scope = createPrincipalDatabaseScope({
+    const scope = PRINCIPAL_SCOPE.JOB({
       organizationPublicId: 'org_public_test',
-      source: 'job',
     });
     await withAppDatabaseContext(scope, async () => {
       expect(() =>

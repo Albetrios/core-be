@@ -5,8 +5,10 @@ import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/d
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 describe('Security: worker RLS database context', () => {
   const originalRuntime = process.env.CORE_BE_RUNTIME;
@@ -33,7 +35,7 @@ describe('Security: worker RLS database context', () => {
     const organization = await createTestOrganization({ ownerUserId: owner.id });
 
     await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: organization.public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization.public_id }),
       async (databaseHandle) => {
         const repository = createWorkerSubscriptionRepository(databaseHandle);
         const rows = await repository.listByOrganization(organization.id);

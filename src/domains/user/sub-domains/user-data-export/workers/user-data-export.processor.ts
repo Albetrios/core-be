@@ -1,8 +1,10 @@
 import type { UserDataExportService } from '@/domains/user/sub-domains/user-data-export/user-data-export.service.js';
 import type { UserDataExportJobData } from '@/domains/user/sub-domains/user-data-export/queues/user-data-export.job.schema.js';
 import { UserDataExportCancelledError } from '@/domains/user/sub-domains/user-data-export/user-data-export.types.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { gzipBufferAsync } from '@/shared/utils/infrastructure/gzip.util.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 
@@ -30,7 +32,7 @@ export async function runUserDataExportJob(
 
   try {
     const shouldContinue = await withAppDatabaseContext(
-      resolveJobPrincipalScope({ userPublicId: userPublicId }),
+      PRINCIPAL_SCOPE.JOB({ userPublicId: userPublicId }),
       async (databaseHandle) => {
         const cancelledBeforeStart = await userDataExportService.isExportJobCancelled({
           exportPublicId,
@@ -89,7 +91,7 @@ export async function runUserDataExportJob(
     }
     logger.error({ error, exportPublicId, userPublicId }, 'user-data-export.worker.failed');
     await withAppDatabaseContext(
-      resolveJobPrincipalScope({ userPublicId: userPublicId }),
+      PRINCIPAL_SCOPE.JOB({ userPublicId: userPublicId }),
       (databaseHandle) =>
         userDataExportService.failExportJob(
           exportPublicId,

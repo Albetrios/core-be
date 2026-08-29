@@ -53,7 +53,7 @@ import type { MemberInvitationService } from '@/domains/tenancy/sub-domains/memb
 import { invalidatePermissions } from '@/domains/tenancy/sub-domains/permission/permission-cache.service.js';
 import { isDisposableEmailBlocked } from '@/shared/utils/text/email.util.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -72,9 +72,8 @@ const membershipRow = {
 };
 
 const asScope = (organizationPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     organizationPublicId,
-    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MembershipService', () => {

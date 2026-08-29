@@ -32,7 +32,7 @@ import type { MemberRolePermissionRepository } from '@/domains/tenancy/sub-domai
 import type { MembershipRepository } from '@/domains/tenancy/sub-domains/membership/membership.repository.js';
 import { invalidateOrganizationPermissions } from '@/domains/tenancy/sub-domains/permission/permission-cache.service.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -47,9 +47,8 @@ import {
  * matches the target role, refuse with 403.
  */
 const asScope = (organizationPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     organizationPublicId,
-    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MemberRolePermissionService.put — owner-role protection (sec-T2)', () => {

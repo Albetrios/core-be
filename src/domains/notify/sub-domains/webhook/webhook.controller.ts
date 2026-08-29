@@ -3,6 +3,7 @@ import { paginatedResponse, successResponse } from '@/shared/utils/http/response
 import {
   getActingUserPublicId,
   getRequestIdentifier,
+  requireOrganizationScope,
   requirePrincipal,
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
@@ -32,7 +33,7 @@ function buildCursorPaginationMetadata(result: CursorPaginationResult) {
 
 function createListWebhooksHandler(service: WebhookService) {
   return async (request: FastifyRequest, _reply: FastifyReply) => {
-    const scope = request.principalScope;
+    const scope = requireOrganizationScope(request);
     const parsed = validateListWebhooksQuery(request.query);
     const result = await service.list(
       omitUndefined({
@@ -55,7 +56,7 @@ function createListDeliveryAttemptsHandler(service: WebhookService) {
     request: FastifyRequest<{ Params: { webhook_id: string } }>,
     _reply: FastifyReply,
   ) => {
-    const scope = request.principalScope;
+    const scope = requireOrganizationScope(request);
     const parsed = validateListWebhookDeliveryAttemptsQuery(request.query);
     const result = await service.listDeliveryAttempts(
       omitUndefined({
@@ -89,7 +90,7 @@ export function createWebhookController(service: WebhookService) {
     ) => {
       // sec-new-N1: reject malformed webhookId before reaching the service layer.
       const data = await service.get(
-        request.principalScope,
+        requireOrganizationScope(request),
         validatePublicIdParam(request.params.webhook_id, 'webhook_id'),
       );
       // sec-T #17: service already returns the serialized public shape (id, url,
@@ -100,7 +101,7 @@ export function createWebhookController(service: WebhookService) {
     createWebhook: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
       const data = await service.create(
-        request.principalScope,
+        requireOrganizationScope(request),
         request.body,
         getActingUserPublicId(auth),
       );
@@ -113,7 +114,7 @@ export function createWebhookController(service: WebhookService) {
       const auth = requirePrincipal(request);
       // sec-new-N1: reject malformed webhookId before reaching the service layer.
       const data = await service.update(
-        request.principalScope,
+        requireOrganizationScope(request),
         validatePublicIdParam(request.params.webhook_id, 'webhook_id'),
         request.body,
         getActingUserPublicId(auth),
@@ -126,7 +127,7 @@ export function createWebhookController(service: WebhookService) {
     ) => {
       // sec-new-N1: reject malformed webhookId before reaching the service layer.
       await service.delete(
-        request.principalScope,
+        requireOrganizationScope(request),
         validatePublicIdParam(request.params.webhook_id, 'webhook_id'),
       );
       return reply.code(204).send();
@@ -138,7 +139,7 @@ export function createWebhookController(service: WebhookService) {
     ) => {
       // sec-new-N1: reject malformed webhookId before reaching the service layer.
       const data = await service.testWebhook({
-        scope: request.principalScope,
+        scope: requireOrganizationScope(request),
         webhook_public_id: validatePublicIdParam(request.params.webhook_id, 'webhook_id'),
         requestId: getRequestIdentifier(request),
       });

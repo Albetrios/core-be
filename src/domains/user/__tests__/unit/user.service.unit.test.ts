@@ -13,7 +13,7 @@ import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock
 import { env } from '@/shared/config/env.config.js';
 import { ensurePersonalOrganizationPublicId } from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -79,10 +79,9 @@ const userRow = {
 };
 
 const asUserScope = (userPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     userPublicId,
     organizationPublicId: 'org_scope_test',
-    source: 'request',
   }) as UserPrincipalDatabaseScope;
 
 describe('UserService', () => {

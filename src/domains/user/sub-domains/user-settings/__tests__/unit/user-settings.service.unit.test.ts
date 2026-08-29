@@ -4,7 +4,7 @@ import { UserSettingsService } from '@/domains/user/sub-domains/user-settings/us
 import type { UserService } from '@/domains/user/user.service.js';
 import type { UserSettingsRepository } from '@/domains/user/sub-domains/user-settings/user-settings.repository.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -37,10 +37,9 @@ const settingsRow = {
 };
 
 const asUserScope = (userPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     userPublicId,
     organizationPublicId: 'org_scope_test',
-    source: 'request',
   }) as UserPrincipalDatabaseScope;
 
 describe('UserSettingsService', () => {

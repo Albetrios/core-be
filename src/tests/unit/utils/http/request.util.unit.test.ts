@@ -9,7 +9,8 @@ import {
   requireAuth,
   requirePrincipal,
   resolveActiveOrganizationId,
-  REQUEST_SCOPE,
+  requireOrganizationScope,
+  requireUserScope,
 } from '@/shared/utils/http/request.util.js';
 import type { ApiKeyAuthContext, UserAuthContext } from '@/shared/types/index.js';
 import type { FastifyRequest } from 'fastify';
@@ -142,74 +143,53 @@ describe('request.util', () => {
   });
 });
 
-describe('principal database scope minters', () => {
-  const pathOrg = 'org_a1b2c3d4e5f6g7h8i9j0k';
+describe('principal scope narrowing accessors (over the middleware-attached scope)', () => {
   const claimOrg = 'org_z9y8x7w6v5u4t3s2r1q0p';
 
-  describe('REQUEST_SCOPE.ORGANIZATION', () => {
-    it('mints user + organization scope from a user principal with an org claim', () => {
+  describe('requireOrganizationScope', () => {
+    it('narrows to the org-bearing scope for a user principal with an org claim', () => {
       const request = mockRequest({ auth: { ...userPrincipal, organizationPublicId: claimOrg } });
-      const scope = REQUEST_SCOPE.ORGANIZATION(request);
-      expect(scope.userPublicId).toBe(userPrincipal.userId);
+      const scope = requireOrganizationScope(request);
       expect(scope.organizationPublicId).toBe(claimOrg);
+      expect(scope.userPublicId).toBe(userPrincipal.userId);
       expect(scope.source).toBe('request');
     });
 
-    it('throws ForbiddenError for a stale/malformed token with no org claim (personal/team invariant)', () => {
+    it('throws ForbiddenError for a stale token with no org claim (personal/team invariant)', () => {
       const request = mockRequest({ auth: userPrincipal });
-      expect(() => REQUEST_SCOPE.ORGANIZATION(request)).toThrow(ForbiddenError);
+      expect(() => requireOrganizationScope(request)).toThrow(ForbiddenError);
     });
 
-    it('prefers the {organization_id} path param over the claim (permission-check precedence)', () => {
-      const request = mockRequest({
-        params: { organization_id: pathOrg } as Record<string, string>,
-        auth: { ...userPrincipal, organizationPublicId: claimOrg },
-      });
-      expect(REQUEST_SCOPE.ORGANIZATION(request).organizationPublicId).toBe(pathOrg);
-    });
-
-    it('mints an organization-only scope for an API-key principal (no user identity)', () => {
-      const request = mockRequest({
-        auth: { ...apiKeyPrincipal, organizationPublicId: claimOrg },
-      });
-      const scope = REQUEST_SCOPE.ORGANIZATION(request);
+    it('narrows an API-key principal to its key-pinned organization (no user identity)', () => {
+      const request = mockRequest({ auth: { ...apiKeyPrincipal, organizationPublicId: claimOrg } });
+      const scope = requireOrganizationScope(request);
       expect(scope.userPublicId).toBeUndefined();
       expect(scope.organizationPublicId).toBe(claimOrg);
     });
 
-    it('throws UnauthorizedError when unauthenticated', () => {
-      expect(() => REQUEST_SCOPE.ORGANIZATION(mockRequest())).toThrow(UnauthorizedError);
-    });
-
-    it('throws ValidationError for a malformed path organization id', () => {
-      const request = mockRequest({
-        params: { organization_id: 'not-a-public-id' } as Record<string, string>,
-        auth: { ...userPrincipal, organizationPublicId: claimOrg },
-      });
-      expect(() => REQUEST_SCOPE.ORGANIZATION(request)).toThrow(ValidationError);
+    it('throws UnauthorizedError when unauthenticated (no scope attached)', () => {
+      expect(() => requireOrganizationScope(mockRequest())).toThrow(UnauthorizedError);
     });
   });
 
-  describe('REQUEST_SCOPE.USER', () => {
-    it('returns the common scope with the user guaranteed for a user principal', () => {
+  describe('requireUserScope', () => {
+    it('narrows to the user-bearing scope for a user principal', () => {
       const request = mockRequest({ auth: { ...userPrincipal, organizationPublicId: claimOrg } });
-      const scope = REQUEST_SCOPE.USER(request);
+      const scope = requireUserScope(request);
       expect(scope.userPublicId).toBe(userPrincipal.userId);
       expect(scope.organizationPublicId).toBe(claimOrg);
     });
 
-    it('mints a user-only scope for an org-less token (the /users/me self-heal state)', () => {
+    it('keeps the org optional for an org-less token (the /users/me self-heal state)', () => {
       const request = mockRequest({ auth: userPrincipal });
-      const scope = REQUEST_SCOPE.USER(request);
+      const scope = requireUserScope(request);
       expect(scope.userPublicId).toBe(userPrincipal.userId);
       expect(scope.organizationPublicId).toBeUndefined();
     });
 
     it('rejects an API-key principal (user-owned resources need a real end user)', () => {
-      const request = mockRequest({
-        auth: { ...apiKeyPrincipal, organizationPublicId: claimOrg },
-      });
-      expect(() => REQUEST_SCOPE.USER(request)).toThrow(UnauthorizedError);
+      const request = mockRequest({ auth: { ...apiKeyPrincipal, organizationPublicId: claimOrg } });
+      expect(() => requireUserScope(request)).toThrow(UnauthorizedError);
     });
   });
 });

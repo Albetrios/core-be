@@ -26,7 +26,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
 
 import { NotFoundError, UnprocessableEntityError } from '@/shared/errors/index.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
@@ -111,10 +111,9 @@ function buildService() {
   return { service, organizationService, planService, repository, paymentProvider };
 }
 
-const scope = createPrincipalDatabaseScope({
+const scope = PRINCIPAL_SCOPE.REQUEST({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public',
-  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 describe('SubscriptionService cancel / resume / changePlan guards', () => {

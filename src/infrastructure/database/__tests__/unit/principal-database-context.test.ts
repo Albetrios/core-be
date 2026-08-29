@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 import {
@@ -38,10 +38,9 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('sets BOTH identity GUCs in one statement for a user+organization scope', async () => {
-    const scope = createPrincipalDatabaseScope({
+    const scope = PRINCIPAL_SCOPE.REQUEST({
       userPublicId: 'usr_a',
       organizationPublicId: 'org_x',
-      source: 'request',
     });
 
     await withAppDatabaseContext(scope, async () => undefined);
@@ -53,9 +52,8 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('sets only the organization GUC for an org-only (API-key) scope', async () => {
-    const scope = createPrincipalDatabaseScope({
+    const scope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
-      source: 'request',
     });
 
     await withAppDatabaseContext(scope, async () => undefined);
@@ -66,7 +64,7 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('sets only the user GUC for a user-only scope', async () => {
-    const scope = createPrincipalDatabaseScope({ userPublicId: 'usr_a', source: 'request' });
+    const scope = PRINCIPAL_SCOPE.REQUEST({ userPublicId: 'usr_a' });
 
     await withAppDatabaseContext(scope, async () => undefined);
 
@@ -76,10 +74,9 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('never emits any GUC key beyond the two identity keys (bypass ceiling)', async () => {
-    const scope = createPrincipalDatabaseScope({
+    const scope = PRINCIPAL_SCOPE.REQUEST({
       userPublicId: 'usr_a',
       organizationPublicId: 'org_x',
-      source: 'request',
     });
 
     await withAppDatabaseContext(scope, async (handle) => {
@@ -96,9 +93,8 @@ describe('withAppDatabaseContext', () => {
 
   it('does not lift statement/lock timeouts outside worker runtime (HTTP caps stay)', async () => {
     delete process.env.CORE_BE_RUNTIME;
-    const scope = createPrincipalDatabaseScope({
+    const scope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
-      source: 'request',
     });
 
     await withAppDatabaseContext(scope, async () => undefined);
@@ -111,7 +107,7 @@ describe('withAppDatabaseContext', () => {
   it('lifts statement/lock timeouts to the worker budget in worker runtime (job scopes)', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
     try {
-      const scope = createPrincipalDatabaseScope({ organizationPublicId: 'org_x', source: 'job' });
+      const scope = PRINCIPAL_SCOPE.JOB({ organizationPublicId: 'org_x' });
       await withAppDatabaseContext(scope, async () => undefined);
       const combined = executedSqlTexts().join(' ');
       expect(combined).toMatch(/statement_timeout/);
@@ -122,9 +118,8 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('pins ALS so getRequestDatabase resolves to the same handle inside the callback', async () => {
-    const scope = createPrincipalDatabaseScope({
+    const scope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
-      source: 'request',
     });
 
     await withAppDatabaseContext(scope, async (databaseHandle) => {
@@ -133,15 +128,13 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('reuses an already-pinned organization transaction and layers the user GUC onto it', async () => {
-    const scope = createPrincipalDatabaseScope({
+    const scope = PRINCIPAL_SCOPE.REQUEST({
       userPublicId: 'usr_a',
       organizationPublicId: 'org_x',
-      source: 'request',
     });
 
-    const outerScope = createPrincipalDatabaseScope({
+    const outerScope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
-      source: 'request',
     });
     await withAppDatabaseContext(outerScope, async (outerHandle) => {
       mockExecute.mockClear();
@@ -161,13 +154,11 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('user-only scopes reuse ANY pinned handle and layer only the user GUC (FK atomicity)', async () => {
-    const orgScope = createPrincipalDatabaseScope({
+    const orgScope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
-      source: 'request',
     });
-    const userOnly = createPrincipalDatabaseScope({
+    const userOnly = PRINCIPAL_SCOPE.VERIFIED({
       userPublicId: 'usr_a',
-      source: 'verified',
     });
 
     await withAppDatabaseContext(orgScope, async (outerHandle) => {
@@ -185,13 +176,11 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('an org-bearing scope for a DIFFERENT org opens its own transaction (second checkout)', async () => {
-    const orgScope = createPrincipalDatabaseScope({
+    const orgScope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
-      source: 'request',
     });
-    const otherOrg = createPrincipalDatabaseScope({
+    const otherOrg = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_y',
-      source: 'request',
     });
 
     await withAppDatabaseContext(orgScope, async () => {
@@ -205,9 +194,8 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('counts one organization checkout for a fresh org-bearing scope and releases it', async () => {
-    const scope = createPrincipalDatabaseScope({
+    const scope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
-      source: 'request',
     });
 
     await withAppDatabaseContext(scope, async () => {
@@ -217,9 +205,8 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('propagates callback errors (transaction rollback path) and still releases the checkout', async () => {
-    const scope = createPrincipalDatabaseScope({
+    const scope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
-      source: 'request',
     });
 
     await expect(
@@ -233,6 +220,6 @@ describe('withAppDatabaseContext', () => {
 
 describe('createPrincipalDatabaseScope', () => {
   it('throws ConfigurationError for an empty scope', () => {
-    expect(() => createPrincipalDatabaseScope({ source: 'request' })).toThrow(ConfigurationError);
+    expect(() => PRINCIPAL_SCOPE.REQUEST({})).toThrow(ConfigurationError);
   });
 });

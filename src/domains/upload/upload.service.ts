@@ -36,8 +36,10 @@ import type { CreateUploadInput, UploadCreateOutput, UploadDetailOutput } from '
 import type { UploadRepository, UploadRow } from './upload.repository.js';
 import { serializeUploadCreate, serializeUploadDetail } from './upload.serializer.js';
 import { validateUploadPublicIdParam } from './upload.validator.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /** Inputs for {@link UploadService}'s private atomic PENDING-slot reservation. */
 interface ReservePendingUploadSlotParams {
@@ -296,12 +298,12 @@ export class UploadService {
 
     if (organizationInternalId !== null && organizationPublicId !== null) {
       return withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ organizationPublicId: organizationPublicId }),
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId }),
         runReservation,
       );
     }
     return withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
       runReservation,
     );
   }
@@ -325,7 +327,7 @@ export class UploadService {
        * policy. The latter is appropriate here because we have just authorized the user.
        */
       const organization = await withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
         () => this.organizationService.requireOrganizationByPublicId(input.organization_id!),
       );
       return organization.id;
@@ -399,7 +401,7 @@ export class UploadService {
     }
 
     const organization = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
       () => this.organizationService.findOrganizationByInternalId(row.organization_id!),
     );
     if (!organization) {
@@ -422,7 +424,7 @@ export class UploadService {
   }): Promise<UploadRow> {
     const { public_id, userPublicId, userInternalId } = input;
     const row = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
       () => this.repository.findByPublicId(public_id),
     );
     if (!row) throw new NotFoundError('Upload');
@@ -541,7 +543,7 @@ export class UploadService {
     // a fresh pending key.
     if (!pendingKeyed) {
       const failedRow = await withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
         () => this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
       );
       if (!failedRow) throw new NotFoundError('Upload');
@@ -564,7 +566,7 @@ export class UploadService {
 
     if (!verified) {
       const failedRow = await withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
         () => this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
       );
       if (!failedRow) throw new NotFoundError('Upload');
@@ -576,7 +578,7 @@ export class UploadService {
     // Repoint the row at the immutable final key in the same update that marks it UPLOADED, so a
     // servable row never references the overwritable pending key.
     const updated = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
       () => this.repository.markConfirmedByPublicId(validatedPublicId, finalKey),
     );
     if (!updated) throw new NotFoundError('Upload');
@@ -675,7 +677,7 @@ export class UploadService {
       const organization =
         userPublicId !== undefined && userPublicId.length > 0
           ? await withAppDatabaseContext(
-              resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+              PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
               () => this.organizationService.findOrganizationByInternalId(row.organization_id!),
             )
           : await this.organizationService.findOrganizationByInternalId(row.organization_id);
@@ -703,7 +705,7 @@ export class UploadService {
     }
 
     const deleted = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
       () => this.repository.softDeleteByPublicId(validatedPublicId),
     );
     if (!deleted) throw new NotFoundError('Upload');

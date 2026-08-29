@@ -3,6 +3,7 @@ import { env } from '@/shared/config/env.config.js';
 import { ConflictError, NotFoundError } from '@/shared/errors/index.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import {
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
@@ -26,7 +27,6 @@ import {
   ORGANIZATION_API_KEY_PREFIX_DISPLAY_LENGTH,
   ORGANIZATION_API_KEY_RAW_SECRET_BYTE_LENGTH,
 } from '@/shared/constants/limits.constants.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 function generateApiKey(): string {
   return `ak_${randomBytes(ORGANIZATION_API_KEY_RAW_SECRET_BYTE_LENGTH).toString('hex')}`;
@@ -219,7 +219,7 @@ export class OrganizationApiKeyService {
       // tenancy.organizations means we cannot read it here without an org context). Establish that
       // context so the last_used_at touch passes the api_keys tenant-isolation policy.
       await withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ organizationPublicId: candidate.organization_public_id }),
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: candidate.organization_public_id }),
         () => this.apiKeyRepository.touchLastUsedAt(candidate.public_id),
       );
       return {

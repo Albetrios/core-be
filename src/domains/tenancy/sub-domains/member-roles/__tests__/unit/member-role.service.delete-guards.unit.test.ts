@@ -29,7 +29,7 @@ import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permiss
 import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permission/permission.repository.js';
 import { invalidateOrganizationPermissions } from '@/domains/tenancy/sub-domains/permission/permission-cache.service.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -56,9 +56,8 @@ const stubPermissionRepository = {} as unknown as PermissionRepository;
  * active members remain → `ConflictError`.
  */
 const asScope = (organizationPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     organizationPublicId,
-    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MemberRoleService.delete — sec-T3 guards (route-audit C2 atomic)', () => {

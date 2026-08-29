@@ -3,7 +3,7 @@ import type { FastifyReply } from 'fastify';
 import { createSubscriptionController } from '@/domains/billing/sub-domains/subscription/subscription.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
-import { UnauthorizedError, ValidationError } from '@/shared/errors/index.js';
+import { UnauthorizedError } from '@/shared/errors/index.js';
 import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
 
 const organizationPublicId = generatePublicId('organization');
@@ -93,31 +93,16 @@ describe('createSubscriptionController auth matrix', () => {
     expect(service.changePlan).not.toHaveBeenCalled();
   });
 
-  it('mutating handlers throw ValidationError when organization public id param is invalid', async () => {
-    const invalidParamRequest = () =>
-      buildRequest({
-        params: { organization_id: 'not-a-public-id', subscription_id: subscriptionPublicId },
-      });
-
-    await expect(
-      controller.createSubscription(invalidParamRequest(), buildReply()),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.updateSubscription(invalidParamRequest(), buildReply()),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.cancelSubscription(invalidParamRequest(), buildReply()),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.resumeSubscription(invalidParamRequest(), buildReply()),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(controller.changePlan(invalidParamRequest(), buildReply())).rejects.toBeInstanceOf(
-      ValidationError,
+  it('ignores an invalid org path param on mutating handlers — the signed claim decides', async () => {
+    const request = buildRequest({
+      auth: { userId: generatePublicId('user'), role: 'user', organizationPublicId },
+      params: { organization_id: 'not-a-public-id', subscription_id: subscriptionPublicId },
+    });
+    await controller.cancelSubscription(request, buildReply());
+    expect(service.cancel).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId }),
+      subscriptionPublicId,
+      undefined,
     );
-    expect(service.create).not.toHaveBeenCalled();
-    expect(service.update).not.toHaveBeenCalled();
-    expect(service.cancel).not.toHaveBeenCalled();
-    expect(service.resume).not.toHaveBeenCalled();
-    expect(service.changePlan).not.toHaveBeenCalled();
   });
 });

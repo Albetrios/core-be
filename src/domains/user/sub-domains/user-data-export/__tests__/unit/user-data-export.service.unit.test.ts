@@ -13,7 +13,7 @@ import {
 } from '@/domains/user/sub-domains/user-data-export/user-data-export.types.js';
 import { USER_DATA_EXPORT_PRESIGNED_DOWNLOAD_EXPIRY_SECONDS } from '@/shared/constants/ttl.constants.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -58,10 +58,9 @@ const userRecord = {
 };
 
 const asUserScope = (userPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     userPublicId,
     organizationPublicId: 'org_scope_test',
-    source: 'request',
   }) as UserPrincipalDatabaseScope;
 
 describe('UserDataExportService', () => {

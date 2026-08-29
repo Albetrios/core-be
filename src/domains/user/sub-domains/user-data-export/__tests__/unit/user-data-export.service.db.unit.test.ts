@@ -16,8 +16,10 @@ import { database } from '@/infrastructure/database/connection.js';
 import { sessions } from '@/domains/auth/sub-domains/auth-session/auth-session.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { createDomainContainers } from '@/worker-containers.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 describe('UserDataExportService (database)', () => {
   const service = createDomainContainers(createObjectStoragePortMock()).userDomain
@@ -67,7 +69,7 @@ describe('UserDataExportService (database)', () => {
     });
 
     const exported = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
       () => service.buildExportPayload(user.public_id),
     );
 
@@ -86,9 +88,8 @@ describe('UserDataExportService (database)', () => {
 
   it('buildExportPayload throws when user is missing', async () => {
     await expect(
-      withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ userPublicId: 'missing_public_id' }),
-        () => service.buildExportPayload('missing_public_id'),
+      withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ userPublicId: 'missing_public_id' }), () =>
+        service.buildExportPayload('missing_public_id'),
       ),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
@@ -104,7 +105,7 @@ describe('UserDataExportService (database)', () => {
     });
 
     const exported = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
       () => service.buildExportPayload(user.public_id),
     );
 
@@ -120,7 +121,7 @@ describe('UserDataExportService (database)', () => {
     });
 
     const exported = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
       () => service.buildExportPayload(user.public_id),
     );
 

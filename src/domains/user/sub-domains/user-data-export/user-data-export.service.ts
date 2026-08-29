@@ -29,10 +29,10 @@ import type { MembershipService } from '@/domains/tenancy/sub-domains/membership
 import type { NotificationService } from '@/domains/notify/sub-domains/notification/notification.service.js';
 import type { AuditService } from '@/domains/audit/audit.service.js';
 import {
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 function buildExportS3Key(userPublicId: string, exportPublicId: string): string {
   return `${USER_DATA_EXPORT_S3_PREFIX}/${userPublicId}/${exportPublicId}.json.gz`;
@@ -285,7 +285,7 @@ export class UserDataExportService {
     body: Buffer;
   }): Promise<void> {
     const s3Key = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: options.userPublicId }),
       async (scopedDatabaseHandle) =>
         this.resolveExportArtifactS3Key(
           {
@@ -309,7 +309,7 @@ export class UserDataExportService {
 
     try {
       await withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: options.userPublicId }),
         async (scopedDatabaseHandle) => {
           await this.finalizeExportAfterUpload(
             {
@@ -433,7 +433,7 @@ export class UserDataExportService {
     let afterId = 0;
     for (;;) {
       const rows = await withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
         () =>
           this.exportRepository.findS3KeysByUserIdAfter(
             userInternalId,
@@ -454,7 +454,7 @@ export class UserDataExportService {
       }
     }
     const deletedCount = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
       () => this.exportRepository.deleteAllByUserId(userInternalId),
     );
     if (deletedCount > 0) {

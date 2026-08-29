@@ -1,12 +1,12 @@
 import { Worker, type Job, type WorkerOptions } from 'bullmq';
 import {
+  PRINCIPAL_SCOPE,
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { WorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
 import { brandWorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
 import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
 
@@ -48,7 +48,7 @@ export async function runTenantScopedWorkerJob<TJob, TResult>(
 ): Promise<TResult> {
   const { organizationPublicId, ...jobPayload } = job;
   return withAppDatabaseContext(
-    resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
+    PRINCIPAL_SCOPE.JOB({ organizationPublicId: organizationPublicId }),
     (databaseHandle) =>
       processor(brandWorkerContextDatabaseHandle(databaseHandle), jobPayload as TJob),
   );
@@ -75,7 +75,7 @@ export async function runUserScopedWorkerJob<TJob, TResult>(
 ): Promise<TResult> {
   const { userPublicId, ...jobPayload } = job;
   return withAppDatabaseContext(
-    resolveJobPrincipalScope({ userPublicId: userPublicId }),
+    PRINCIPAL_SCOPE.JOB({ userPublicId: userPublicId }),
     (databaseHandle) =>
       processor(brandWorkerContextDatabaseHandle(databaseHandle), jobPayload as TJob),
   );

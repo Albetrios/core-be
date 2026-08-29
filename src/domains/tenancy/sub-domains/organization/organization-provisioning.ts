@@ -6,8 +6,10 @@ import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/mem
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import type { Organization } from '@/domains/tenancy/sub-domains/organization/organization.types.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /** Name of the auto-provisioned, undeletable owner role created with every organization. */
 export const OWNER_ROLE_NAME = 'Owner';
@@ -111,7 +113,7 @@ export interface ProvisionOrganizationResult {
  *
  * @remarks
  * - **Algorithm:** pre-generates the org `public_id` and runs every insert inside one
- *   `withAppDatabaseContext(resolveVerifiedPrincipalScope({ organizationPublicId: publicId }), …)` transaction, so `app.current_organization_public_id`
+ *   `withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: publicId }), …)` transaction, so `app.current_organization_public_id`
  *   equals the org being created. The org row then satisfies its tenant-isolation WITH CHECK
  *   (`public_id = app.current_organization_public_id`) and the child rows (roles, role_permissions,
  *   memberships) satisfy theirs (`organization_id` → the just-inserted org) — all under the
@@ -171,7 +173,7 @@ async function provisionOrganization(
   // non-superuser `core_be_app` role in deployed environments.
   const organizationPublicId = generatePublicId('organization');
   return withAppDatabaseContext(
-    resolveVerifiedPrincipalScope({ organizationPublicId: organizationPublicId }),
+    PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId }),
     async (databaseHandle) => {
       const [organization] = await databaseHandle
         .insert(organizations)

@@ -6,10 +6,10 @@ import { serializeUserSettings } from './user-settings.serializer.js';
 import type { UserSettingsOutput } from './user-settings.types.js';
 import { validateUpdateUserSettings } from './user-settings.validator.js';
 import {
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Read or merge the authenticated user's personalization toggles and locale preferences.
@@ -64,7 +64,7 @@ export class UserSettingsService {
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
     const settings = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: user_public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
       () => this.repository.getByUserId(user.id),
     );
     return serializeUserSettings(settings);
@@ -80,7 +80,7 @@ export class UserSettingsService {
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
     const result = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: user_public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
       () => this.repository.upsert(user.id, omitUndefined(parsed)),
     );
     return serializeUserSettings(result);

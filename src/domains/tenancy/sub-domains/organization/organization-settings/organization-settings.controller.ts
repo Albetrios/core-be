@@ -3,6 +3,7 @@ import { successResponse } from '@/shared/utils/http/response.util.js';
 import {
   getActingUserPublicId,
   getRequestIdentifier,
+  requireOrganizationScope,
   requirePrincipal,
 } from '@/shared/utils/http/request.util.js';
 import type { OrganizationSettingsService } from './organization-settings.service.js';
@@ -15,13 +16,13 @@ import type { OrganizationSettingsService } from './organization-settings.servic
 export function createOrganizationSettingsController(service: OrganizationSettingsService) {
   return {
     getSettings: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const data = await service.get(scope);
       return successResponse(data, getRequestIdentifier(request));
     },
     updateSettings: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const data = await service.update(scope, request.body, getActingUserPublicId(auth));
       return successResponse(data, getRequestIdentifier(request));
     },

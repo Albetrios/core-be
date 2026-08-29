@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
  * a new import is a new claim of "I verified this identity myself" and must be
  * added to this ledger deliberately, with the verification path understood.
  */
-const VERIFIED_MINTER_MODULE = 'shared/utils/identity/verified-principal-scope.util';
+const VERIFIED_MINTER_MODULE = 'PRINCIPAL_SCOPE.VERIFIED';
 
 /** Importers of the shared verified-minter module (ledger — additions are deliberate). */
 const ALLOWED_IMPORTERS = [
@@ -46,6 +46,8 @@ const ALLOWED_IMPORTERS = [
   'src/domains/user/user.service.ts',
   // Post-commit dispatch recovery replays rows staged under a verified identity.
   'src/infrastructure/queue/commit-dispatch/commit-dispatch.executor.ts',
+  // The namespace's own definition module.
+  'src/infrastructure/database/contexts/database-context.ts',
 ] as const;
 
 function productionImportersOf(moduleFragment: string): string[] {
@@ -65,7 +67,7 @@ function productionImportersOf(moduleFragment: string): string[] {
 }
 
 describe('verified-principal-scope usage ledger', () => {
-  it('the shared verified minters are imported only by ledgered files', () => {
+  it('PRINCIPAL_SCOPE.VERIFIED is referenced only by ledgered files', () => {
     const actual = productionImportersOf(VERIFIED_MINTER_MODULE);
     expect(actual).toEqual([...ALLOWED_IMPORTERS].sort());
   });

@@ -35,7 +35,7 @@ vi.mock(
 
 import { NotFoundError } from '@/shared/errors/index.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { OrganizationSettingsService } from '@/domains/tenancy/sub-domains/organization/organization-settings/organization-settings.service.js';
@@ -44,10 +44,9 @@ import type { OrganizationSettingsRepository } from '@/domains/tenancy/sub-domai
 
 const now = new Date('2026-01-01T00:00:00.000Z');
 const organization = { id: 1, public_id: 'org_public_abc', name: 'Test Org' };
-const scope = createPrincipalDatabaseScope({
+const scope = PRINCIPAL_SCOPE.REQUEST({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public_abc',
-  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 const settingsRow = {
   is_email_notifications_enabled: true,

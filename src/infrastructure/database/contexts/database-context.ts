@@ -61,9 +61,9 @@ declare const PRINCIPAL_SCOPE_BRAND: unique symbol;
 
 /**
  * Where a {@link PrincipalDatabaseScope} was minted — the legitimate "tops" of a call
- * chain. `request` = authenticated HTTP request (JWT or API key) (JWT or API key), `job` = validated
- * BullMQ job payload, `provisioning` = a row the current flow just created (e.g. a
- * personal organization during signup, before any claim can exist for it).
+ * chain. `request` = authenticated HTTP request (JWT or API key), `job` = validated
+ * BullMQ job payload, `verified` = an id the calling flow proved itself (invitation
+ * match, Stripe-signed event, a row the flow just created).
  */
 export type PrincipalScopeSource = 'request' | 'job' | 'verified';
 
@@ -74,10 +74,8 @@ export type PrincipalScopeSource = 'request' | 'job' | 'verified';
  *
  * @remarks
  * The brand is compile-time only — services and repositories can relay a scope but
- * cannot construct one from raw strings. Only the confined minters build it:
- * `REQUEST_SCOPE.ORGANIZATION` / `REQUEST_SCOPE.USER`
- * (request layer, claim-precedence) and, in later phases, the worker-payload and
- * provisioning minters. Enforced by
+ * cannot construct one from raw strings. Only the {@link PRINCIPAL_SCOPE}
+ * members build it, each confined to its boundary. Enforced by
  * `src/tests/unit/infrastructure/database/principal-scope-minting.policy.unit.test.ts`.
  */
 export interface PrincipalDatabaseScope {
@@ -90,8 +88,8 @@ export interface PrincipalDatabaseScope {
 /**
  * A {@link PrincipalDatabaseScope} guaranteed to carry an organization — what
  * org-scoped service methods accept. Under the personal/team organization model
- * every authenticated principal has an active organization, so this is what the
- * single request minter `REQUEST_SCOPE.ORGANIZATION` returns.
+ * every authenticated principal has an active organization; controllers narrow
+ * to this via `requireOrganizationScope(request)`.
  */
 export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
   readonly organizationPublicId: string;
@@ -99,35 +97,23 @@ export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
 
 /**
  * The common token scope narrowed to a real end user: `userPublicId` guaranteed,
- * organization OPTIONAL — produced by `REQUEST_SCOPE.USER` for
- * user-owned resources (API keys rejected).
+ * organization OPTIONAL — controllers narrow to this via
+ * `requireUserScope(request)` for user-owned resources (API keys rejected).
  *
  * @remarks
  * The organization stays optional here because user-scoped routes are the
  * self-heal surface of the personal/team-organization invariant: `GET /users/me`
  * provisions a missing personal organization on demand, so an org-less token is
  * a legitimate TRANSITIONAL state on this family (and only this family — the
- * org-scoped minter still rejects it).
+ * org-scoped accessor still 403s it).
  */
 export type UserPrincipalDatabaseScope = PrincipalDatabaseScope & {
   readonly userPublicId: string;
 };
 
-/**
- * Minting primitive for {@link PrincipalDatabaseScope} — do NOT import outside the
- * confined minters (`request.util.ts`, worker-runtime, provisioning) and tests.
- *
- * @remarks
- * - **Algorithm:** validates that at least one identity is present and stamps the
- *   provenance; the brand exists only at the type level.
- * - **Failure modes:** throws {@link ConfigurationError} for an empty scope — an
- *   empty scope would open a transaction whose queries all fail closed, which is
- *   always a programming error at the minting site.
- * - **Side effects:** none.
- * - **Notes:** confinement is enforced by the principal-scope-minting policy test;
- *   adding a new importer requires extending that test's allowlist deliberately.
- */
-export function createPrincipalDatabaseScope(input: {
+// Minting primitive — file-private: the ONLY constructor of the branded scope.
+// Reachable exclusively through the PRINCIPAL_SCOPE members below.
+function createPrincipalDatabaseScope(input: {
   userPublicId?: string | undefined;
   organizationPublicId?: string | undefined;
   source: PrincipalScopeSource;
@@ -143,6 +129,65 @@ export function createPrincipalDatabaseScope(input: {
     source: input.source,
   } as PrincipalDatabaseScope;
 }
+
+/**
+ * Raw pre-proven identity ids accepted by every {@link PRINCIPAL_SCOPE} member —
+ * always an object, whichever ids are present get armed by the app wrapper.
+ */
+export interface PrincipalScopeIdentityInput {
+  readonly userPublicId?: string | undefined;
+  readonly organizationPublicId?: string | undefined;
+}
+
+/**
+ * One {@link PRINCIPAL_SCOPE} member — overloads narrow the returned scope from
+ * the identity shape passed (org-bearing → organization scope, user-only → user
+ * scope), matching the service signatures that demand one or the other.
+ */
+export interface PrincipalScopeMinter {
+  (identity: {
+    organizationPublicId: string;
+    userPublicId?: string;
+  }): OrganizationPrincipalDatabaseScope;
+  (identity: {
+    userPublicId: string;
+    organizationPublicId?: undefined;
+  }): UserPrincipalDatabaseScope;
+  (identity: PrincipalScopeIdentityInput): PrincipalDatabaseScope;
+}
+
+/**
+ * THE principal-scope family namespace — one member per legitimate source of
+ * pre-proven raw ids, each stamping its own provenance:
+ *
+ * - `PRINCIPAL_SCOPE.REQUEST` — ids read off the verified JWT / API key by the
+ *   auth middleware, which attaches the minted scope as `request.principalScope`.
+ *   Mintable ONLY from the auth middleware (and the test request helper).
+ * - `PRINCIPAL_SCOPE.JOB` — ids from a zod-validated BullMQ job payload, written
+ *   at enqueue time by already-scoped code. Mintable ONLY from worker-runtime.
+ * - `PRINCIPAL_SCOPE.VERIFIED` — ids the calling flow proved itself (invitation
+ *   match, Stripe-signed event, row the flow just created). Every caller is
+ *   enumerated in the verified-usage ledger test.
+ *
+ * @remarks
+ * Per-member usage allowlists are pinned by
+ * `principal-scope-minting.policy.unit.test.ts` and
+ * `verified-scope-usage.policy.unit.test.ts`. Members verify nothing — proof
+ * happens once, upstream, per boundary; an empty identity throws
+ * {@link ConfigurationError} via the private factory.
+ */
+export const PRINCIPAL_SCOPE: {
+  readonly REQUEST: PrincipalScopeMinter;
+  readonly JOB: PrincipalScopeMinter;
+  readonly VERIFIED: PrincipalScopeMinter;
+} = Object.freeze({
+  REQUEST: ((identity: PrincipalScopeIdentityInput) =>
+    createPrincipalDatabaseScope({ ...identity, source: 'request' })) as PrincipalScopeMinter,
+  JOB: ((identity: PrincipalScopeIdentityInput) =>
+    createPrincipalDatabaseScope({ ...identity, source: 'job' })) as PrincipalScopeMinter,
+  VERIFIED: ((identity: PrincipalScopeIdentityInput) =>
+    createPrincipalDatabaseScope({ ...identity, source: 'verified' })) as PrincipalScopeMinter,
+});
 
 // The principal branch of withAppDatabaseContext: same-org reuse, user-GUC
 // layering, and a fresh transaction with both identity GUCs in one round trip
@@ -271,81 +316,80 @@ function buildIdentityGucStatement(identity: {
  *   real minting call site (or drop the arm in a migration).
  */
 export const SESSION_CONTEXTS = {
-  SESSION_PUBLIC_ID: { guc: 'app.current_session_public_id' },
-  SESSION_TOKEN_HASH: { guc: 'app.current_session_token_hash' },
+  sessionPublicId: { guc: 'app.current_session_public_id' },
+  sessionTokenHash: { guc: 'app.current_session_token_hash' },
 } as const satisfies Record<string, { readonly guc: string }>;
 
-/** Derived — the closed set of session-context kinds. */
+/** Derived — the closed set of session-artifact field names (each names its GUC). */
 export type SessionContextKind = keyof typeof SESSION_CONTEXTS;
 
 declare const SESSION_SCOPE_BRAND: unique symbol;
 
 /**
- * Unforgeable pre-auth session scope: which artifact kind identifies the
- * session, and the artifact value itself.
+ * Unforgeable pre-auth session scope — named artifact fields, exactly one
+ * present, mirroring the principal grammar (`sessionPublicId` →
+ * `app.current_session_public_id`, `sessionTokenHash` →
+ * `app.current_session_token_hash`).
  *
  * @remarks
- * Minted only by {@link createSessionDatabaseScope}, whose importers are
- * confined to the auth domain by the session-context confinement policy test.
+ * Minted only by {@link SESSION_SCOPE}.ARTIFACT, whose usage is confined to the
+ * auth domain by the session-context confinement policy test.
  */
-export interface SessionDatabaseScope<K extends SessionContextKind = SessionContextKind> {
-  readonly kind: K;
-  readonly value: string;
+export interface SessionDatabaseScope {
+  readonly sessionPublicId?: string;
+  readonly sessionTokenHash?: string;
   readonly [SESSION_SCOPE_BRAND]: true;
 }
 
 /**
- * Mints a {@link SessionDatabaseScope} from a session artifact — do NOT import
- * outside the auth domain (pinned by the confinement policy test).
- *
- * @remarks
- * - **Failure modes:** throws {@link ConfigurationError} for an empty artifact
- *   value — an empty GUC would silently match no session row.
- * - **Side effects:** none.
+ * The session-artifact input — exactly one named field, the artifact the
+ * pre-auth flow holds. The field name selects the GUC; the value fills it.
  */
-function createSessionDatabaseScope<K extends SessionContextKind>(
-  kind: K,
-  value: string,
-): SessionDatabaseScope<K> {
-  if (value.length === 0) {
-    throw new ConfigurationError('SessionDatabaseScope requires a non-empty artifact value.');
-  }
-  return { kind, value } as SessionDatabaseScope<K>;
-}
+export type SessionArtifactInput =
+  | { readonly sessionPublicId: string; readonly sessionTokenHash?: undefined }
+  | { readonly sessionTokenHash: string; readonly sessionPublicId?: undefined };
 
 /**
- * The session-scope factories — the SESSION_CONTEXTS mirror of
- * {@link MAINTENANCE_SCOPE}. Session authority carries a per-request artifact
- * value, so each kind is a FACTORY rather than a frozen singleton:
- * `SESSION_SCOPE.SESSION_PUBLIC_ID(value)` / `SESSION_SCOPE.SESSION_TOKEN_HASH(value)`.
- * These are the ONLY way to obtain a {@link SessionDatabaseScope}; usage is
- * confined to the auth domain by `session-context-confinement.policy.unit.test.ts`.
+ * The session-scope family namespace — one member, because session scopes have
+ * one source: the artifact itself (`SESSION_SCOPE.ARTIFACT({ sessionPublicId })`
+ * or `({ sessionTokenHash })`; the field passed decides which GUC is armed).
+ * The ONLY way to obtain a {@link SessionDatabaseScope}; usage is confined to
+ * the auth domain by `session-context-confinement.policy.unit.test.ts`.
  */
 export const SESSION_SCOPE: {
-  readonly [K in SessionContextKind]: (value: string) => SessionDatabaseScope<K>;
-} = Object.freeze(
-  Object.fromEntries(
-    (Object.keys(SESSION_CONTEXTS) as SessionContextKind[]).map((kind) => [
-      kind,
-      (value: string) => createSessionDatabaseScope(kind, value),
-    ]),
-  ),
-) as never;
+  readonly ARTIFACT: (artifact: SessionArtifactInput) => SessionDatabaseScope;
+} = Object.freeze({
+  ARTIFACT: (artifact: SessionArtifactInput): SessionDatabaseScope => {
+    const { sessionPublicId, sessionTokenHash } = artifact;
+    if ((sessionPublicId === undefined) === (sessionTokenHash === undefined)) {
+      throw new ConfigurationError(
+        'SessionDatabaseScope requires exactly one of sessionPublicId / sessionTokenHash.',
+      );
+    }
+    if ((sessionPublicId ?? sessionTokenHash ?? '').length === 0) {
+      throw new ConfigurationError('SessionDatabaseScope requires a non-empty artifact value.');
+    }
+    return { sessionPublicId, sessionTokenHash } as SessionDatabaseScope;
+  },
+});
 
 // The session branch of withAppDatabaseContext: exactly one session-artifact
-// GUC, always a fresh transaction (pre-auth flows never nest), HTTP timeouts
-// kept. Only reachable through the exported app wrapper.
+// GUC (the field present names it), always a fresh transaction (pre-auth flows
+// never nest), HTTP timeouts kept. Only reachable through the exported app wrapper.
 async function runSessionDatabaseContext<T>(
   scope: SessionDatabaseScope,
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
 ): Promise<T> {
-  const definition = SESSION_CONTEXTS[scope.kind];
+  const armed =
+    scope.sessionPublicId !== undefined
+      ? { guc: SESSION_CONTEXTS.sessionPublicId.guc, value: scope.sessionPublicId }
+      : { guc: SESSION_CONTEXTS.sessionTokenHash.guc, value: scope.sessionTokenHash as string };
   incrementOrganizationRlsCheckoutCount();
   const checkoutStartedAtNanoseconds = process.hrtime.bigint();
   try {
     return await database.transaction(async (transaction) => {
       const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-      await setLocalDatabaseConfig(databaseHandle, definition.guc, scope.value);
+      await setLocalDatabaseConfig(databaseHandle, armed.guc, armed.value);
       return runWithPinnedDatabaseHandle(databaseHandle, () =>
         callback(brandWorkerContextDatabaseHandle(databaseHandle)),
       );
@@ -400,9 +444,9 @@ export async function withAppDatabaseContext<T>(
   scope: AppDatabaseScope,
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
 ): Promise<T> {
-  return 'kind' in scope
-    ? runSessionDatabaseContext(scope, callback)
-    : runPrincipalDatabaseContext(scope, callback);
+  return 'source' in scope
+    ? runPrincipalDatabaseContext(scope, callback)
+    : runSessionDatabaseContext(scope, callback);
 }
 
 /** One row of the maintenance-context registry — the GUC it arms and how its transaction is tuned. */

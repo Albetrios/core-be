@@ -100,11 +100,11 @@ import {
 } from './subscription.validator.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import {
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { enqueueSubscriptionSeatSyncBestEffort } from './queues/subscription-seat-sync.queue.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Namespaces a client-supplied `X-Idempotency-Key` by organization (and operation) before it is
@@ -335,7 +335,7 @@ export class SubscriptionService {
       return;
     }
     const { organization, subscription } = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
       async () => {
         const organization =
           await this.organizationService.requireOrganizationByPublicId(organization_public_id);
@@ -370,7 +370,7 @@ export class SubscriptionService {
     }
 
     await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
       async () =>
         this.repository.update(subscription.public_id, organization.id, {
           seats: quantity,
@@ -975,7 +975,7 @@ export class SubscriptionService {
    */
   async cancelActiveForOrganizationOffboarding(organization_public_id: string): Promise<void> {
     const { organization, subscription } = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
       async () => {
         const organization =
           await this.organizationService.requireOrganizationByPublicId(organization_public_id);
@@ -1001,7 +1001,7 @@ export class SubscriptionService {
       );
     }
     await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: organization_public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
       async () =>
         this.repository.update(subscription.public_id, organization.id, {
           status: 'CANCELED',

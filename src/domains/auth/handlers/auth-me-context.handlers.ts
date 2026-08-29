@@ -1,6 +1,10 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { successResponse } from '@/shared/utils/http/response.util.js';
-import { getRequestIdentifier, requireAuth } from '@/shared/utils/http/request.util.js';
+import {
+  getRequestIdentifier,
+  requireAuth,
+  requireUserScope,
+} from '@/shared/utils/http/request.util.js';
 import { serializeAuthMeContext } from '@/domains/auth/auth-me-context.serializer.js';
 import type { AuthContainer } from '@/domains/auth/auth.container.js';
 
@@ -14,7 +18,7 @@ export function createAuthMeContextHandlers({
     getMeContext: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requireAuth(request);
       const data = await authMeContextService.getContext({
-        scope: request.userPrincipalScope,
+        scope: requireUserScope(request),
         globalRole: auth.role,
       });
       return successResponse(serializeAuthMeContext(data), getRequestIdentifier(request));

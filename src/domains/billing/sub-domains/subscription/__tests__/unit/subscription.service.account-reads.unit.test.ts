@@ -37,7 +37,7 @@ vi.mock('@/infrastructure/payment/stripe.client.js', () => stripeMocks);
 
 import { NotFoundError, UnprocessableEntityError } from '@/shared/errors/index.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
@@ -94,10 +94,9 @@ beforeEach(() => {
   stripeMocks.retrieveStripeSubscriptionPaymentClientSecret.mockResolvedValue('pi_secret_456');
 });
 
-const scope = createPrincipalDatabaseScope({
+const scope = PRINCIPAL_SCOPE.REQUEST({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public',
-  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 describe('SubscriptionService.listInvoices — fail-open read', () => {

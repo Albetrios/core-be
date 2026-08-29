@@ -1,6 +1,7 @@
 import { NotFoundError } from '@/shared/errors/index.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import {
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
@@ -17,7 +18,6 @@ import {
   invalidateCachedOrganizationDefaultLocale,
   setCachedOrganizationDefaultLocale,
 } from './i18n-locale.cache.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Read/write service for the per-organization settings row plus two
@@ -111,7 +111,7 @@ export class OrganizationSettingsService {
       return cached as OrganizationDefaultLocale;
     }
     const locale = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: organizationPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId }),
       async () => {
         const found =
           await this.settingsRepository.findDefaultLocaleByOrganizationPublicId(

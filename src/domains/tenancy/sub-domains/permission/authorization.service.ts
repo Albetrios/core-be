@@ -1,5 +1,7 @@
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { ConfigurationError } from '@/shared/errors/index.js';
 import {
@@ -60,7 +62,7 @@ async function resolvePermissionsFromDatabase(
   organizationPublicId: string,
 ): Promise<string[]> {
   return withAppDatabaseContext(
-    resolveVerifiedPrincipalScope({ organizationPublicId: organizationPublicId }),
+    PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId }),
     async (databaseHandle) =>
       repository.findPermissionCodesForUserInOrganization(
         userPublicId,

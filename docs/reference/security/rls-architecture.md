@@ -40,8 +40,8 @@ row. Elevated access exists only as the named fixture role `core_be_operator`
 
 | Old call | New call |
 | -------- | -------- |
-| `withOrganizationContext(orgId, cb)` / `withOrganizationDatabaseContext(orgId, cb)` | `withAppDatabaseContext(scope, cb)` — scope minted by `REQUEST_SCOPE.ORGANIZATION(request)` (HTTP), `resolveJobPrincipalScope({ organizationPublicId })` (worker), or `resolveVerifiedPrincipalScope({ organizationPublicId })` (verified/port flows) |
-| `withUserDatabaseContext(userId, cb)` | `withAppDatabaseContext(scope, cb)` — `REQUEST_SCOPE.USER(request)`, `resolveJobPrincipalScope({ userPublicId })`, or `resolveVerifiedPrincipalScope({ userPublicId })` |
+| `withOrganizationContext(orgId, cb)` / `withOrganizationDatabaseContext(orgId, cb)` | `withAppDatabaseContext(scope, cb)` — scope minted by `PRINCIPAL_SCOPE.REQUEST` (attached by the auth middleware as `request.principalScope`), `PRINCIPAL_SCOPE.JOB({ organizationPublicId })` (worker), or `PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId })` (ledgered flows) |
+| `withUserDatabaseContext(userId, cb)` | `withAppDatabaseContext(scope, cb)` — `request.principalScope` narrowed by `requireUserScope(request)`, `PRINCIPAL_SCOPE.JOB({ userPublicId })`, or `PRINCIPAL_SCOPE.VERIFIED({ userPublicId })` |
 | `withGlobalRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, cb)` |
 | `withSessionRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP, cb)` |
 | `withGlobalAdminDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, cb)` |
@@ -67,6 +67,7 @@ tests. Holding a scope IS the authority.
 | implicit superuser fixtures | `core_be_operator` (BYPASSRLS, local/CI only) | fixture power is a named, auditable role instead of a superuser side effect |
 | "provider superuser" mental model | `core_be_owner` NOLOGIN group + `core_be_migrator` | ownership and DDL authority are named roles; managed Postgres has no true superusers anyway |
 | `withPrincipalDatabaseContext` / `withSessionDatabaseContext` | `withAppDatabaseContext` | one wrapper per connection role: the name states the pool (`core_be_app` vs `core_be_maintenance`), the scope states the GUCs — principal and session stay distinct as SCOPE types (branded, separately confined), not as wrappers |
+| `REQUEST_SCOPE.ORGANIZATION/.USER` + `resolveJob/VerifiedPrincipalScope` (5 minter names) | `PRINCIPAL_SCOPE.REQUEST/.JOB/.VERIFIED` + `SESSION_SCOPE.ARTIFACT` | one family namespace per scope family, members = sources, raw pre-proven ids always in objects; the auth middleware eagerly attaches `request.principalScope`, controllers narrow via `requireOrganizationScope` / `requireUserScope` |
 
 **Naming symmetry (end-to-end, no translation anywhere):** scope field
 `organizationPublicId` → GUC `app.current_organization_public_id` → policy compares
@@ -80,11 +81,11 @@ public→internal inside the arm where an FK column needs it).
 ┌────────────────────────────── TRUST BOUNDARIES (scopes are MINTED here) ─────────────────────────────┐
 │                                                                                                      │
 │  HTTP request (JWT verified)          Worker job (payload)             Verified/port flows           │
-│  ─ REQUEST_SCOPE.ORGANIZATION      ─ resolveJobPrincipalScope    ─ resolveVerified*Principal-  │
+│  ─ PRINCIPAL_SCOPE.REQUEST         ─ PRINCIPAL_SCOPE.JOB         ─ PRINCIPAL_SCOPE.VERIFIED    │
 │    (org REQUIRED, from `org` claim)     (organizationPublicId in         Scope (caller already       │
-│  ─ REQUEST_SCOPE.USER    the job payload)                 authenticated the id:       │
-│    (user REQUIRED, org optional —     ─ resolveJobPrincipalScope              invite flow, Stripe event,  │
-│    self-heal transitional state)        (userPublicId in payload)        provisioning, admin)        │
+│    (middleware attaches it as           the job payload)              (caller already proved   │
+│    request.principalScope; narrowed   ─ PRINCIPAL_SCOPE.JOB          the id: invite flow,     │
+│    by requireOrganization/UserScope)    (userPublicId in payload)     Stripe event, admin)     │
 │                                                                                                      │
 │  Pre-auth session artifact:           Static bypass authority:                                       │
 │  ─ SESSION_SCOPE.<kind>(value)        ─ MAINTENANCE_SCOPE.<kind>  (frozen singletons — nothing to    │
@@ -163,9 +164,9 @@ Rules the layers enforce:
   ```text
   LEGAL — values dynamic, keys fixed per family
     request.principalScope              → { organizationPublicId, userPublicId } → both identity GUCs
-    request.userPrincipalScope          → { userPublicId }                       → user GUC only
-    resolveJobPrincipalScope({ organizationPublicId }) → org GUC (worker parity with HTTP)
-    SESSION_SCOPE.SESSION_TOKEN_HASH(h) → { kind, value }                        → that one artifact GUC
+    requireUserScope(request)           → { userPublicId }                       → user GUC only
+    PRINCIPAL_SCOPE.JOB({ organizationPublicId })      → org GUC (worker parity with HTTP)
+    SESSION_SCOPE.ARTIFACT({ sessionTokenHash }) → named-field scope             → that one artifact GUC
 
   ILLEGAL — unrepresentable, so the context never needs a runtime check
     { organizationPublicId, session_token_hash }   no factory mixes trust stages
@@ -252,8 +253,8 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 
 | Pattern | Scope type | Minted by (per-file confined) | Context call |
 | --- | --- | --- | --- |
-| Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `REQUEST_SCOPE.ORGANIZATION(request)` · `resolveJobPrincipalScope({ organizationPublicId })` · `resolveVerifiedPrincipalScope({ organizationPublicId })` | `withAppDatabaseContext` |
-| Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `REQUEST_SCOPE.USER(request)` · `resolveJobPrincipalScope({ userPublicId })` · `resolveVerifiedPrincipalScope({ userPublicId })` | `withAppDatabaseContext` |
+| Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `PRINCIPAL_SCOPE.REQUEST` (middleware) · `PRINCIPAL_SCOPE.JOB({ organizationPublicId })` · `PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId })` | `withAppDatabaseContext` |
+| Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `requireUserScope(request)` · `PRINCIPAL_SCOPE.JOB({ userPublicId })` · `PRINCIPAL_SCOPE.VERIFIED({ userPublicId })` | `withAppDatabaseContext` |
 | Session | `SessionDatabaseScope` — kinds `session_public_id` \| `session_token_hash` | `SESSION_SCOPE.<kind>(value)` factories (auth domain only; token values are pre-hashed) | `withAppDatabaseContext` |
 | Maintenance | `MaintenanceDatabaseScope` — 7 frozen singletons: `global_retention_cleanup`, `session_retention_cleanup`, `global_admin`, `system_audit_insert`, `audit_outbox_drain`, `system_table_retention`, `system_table_worker` | nothing to mint — `MAINTENANCE_SCOPE.<kind>` | `withMaintenanceDatabaseContext` |
 
@@ -262,11 +263,11 @@ BullMQ payload · `verified` = the caller itself verified the id (invite flow,
 Stripe event mapping, admin, signup provisioning) — ledgered per importer by
 `verified-scope-usage.policy.unit.test.ts`.
 
-Controller ergonomics: the auth middleware decorates lazy getters
-`request.principalScope` (org-required) and `request.userPrincipalScope`
-(user-required) over the two HTTP minters — controllers relay
-`request.principalScope` into services; authority semantics are identical to
-calling the minters directly.
+Controller ergonomics: the auth middleware eagerly attaches
+`request.principalScope` the moment authentication succeeds (JWT or API key);
+controllers narrow it with `requireOrganizationScope(request)` (org required,
+403) or `requireUserScope(request)` (real user required, 401 for API keys) and
+relay the scope into services — no minting call ever appears in HTTP code.
 
 ## 6. Postgres semantics that shaped the design (learned the hard way)
 

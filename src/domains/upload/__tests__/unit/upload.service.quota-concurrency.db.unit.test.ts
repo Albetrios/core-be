@@ -8,8 +8,10 @@ import { UploadService } from '@/domains/upload/upload.service.js';
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const PENDING_CAP = 3;
 const CONCURRENT_REQUESTS = 8;
@@ -89,7 +91,7 @@ describe('UploadService pending-quota concurrency (database)', () => {
 
     // Exactly `PENDING_CAP` rows were persisted, and presigned URLs were minted only for them.
     const pendingCount = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
       () => repository.countPendingByUserId(user.id),
     );
     expect(pendingCount).toBe(PENDING_CAP);

@@ -3,6 +3,7 @@ import { successResponse } from '@/shared/utils/http/response.util.js';
 import {
   getActingUserPublicId,
   getRequestIdentifier,
+  requireOrganizationScope,
   requirePrincipal,
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
@@ -30,7 +31,7 @@ export function createOrganizationNotificationPolicyController(
 ) {
   return {
     listPolicies: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const data = await service.list(scope);
       return successResponse(data, getRequestIdentifier(request));
@@ -39,7 +40,7 @@ export function createOrganizationNotificationPolicyController(
       const { notification_policy_id: policyId } = (request.params as {
         notification_policy_id: string;
       }) ?? { notification_policy_id: '' };
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const data = await service.getByPublicId(
         scope,
@@ -49,7 +50,7 @@ export function createOrganizationNotificationPolicyController(
     },
     createPolicy: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const data = await service.create(scope, request.body, getActingUserPublicId(auth));
       return successResponse(data, getRequestIdentifier(request));
@@ -59,7 +60,7 @@ export function createOrganizationNotificationPolicyController(
       const { notification_policy_id: policyId } = (request.params as {
         notification_policy_id: string;
       }) ?? { notification_policy_id: '' };
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const data = await service.update(
         scope,
@@ -74,7 +75,7 @@ export function createOrganizationNotificationPolicyController(
       const { notification_policy_id: policyId } = (request.params as {
         notification_policy_id: string;
       }) ?? { notification_policy_id: '' };
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       await service.delete(scope, validatePublicIdParam(policyId, 'notification_policy_id'));
       return reply.code(204).send();

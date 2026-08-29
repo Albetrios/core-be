@@ -4,7 +4,7 @@ import { UserNotificationPreferencesService } from '@/domains/user/sub-domains/u
 import type { UserService } from '@/domains/user/user.service.js';
 import type { UserNotificationPreferencesRepository } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.repository.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -51,10 +51,9 @@ const preferenceRow = {
 };
 
 const asUserScope = (userPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     userPublicId,
     organizationPublicId: 'org_scope_test',
-    source: 'request',
   }) as UserPrincipalDatabaseScope;
 
 describe('UserNotificationPreferencesService', () => {

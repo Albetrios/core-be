@@ -24,7 +24,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
 });
 
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
@@ -58,10 +58,9 @@ function baseRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-const scope = createPrincipalDatabaseScope({
+const scope = PRINCIPAL_SCOPE.REQUEST({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public',
-  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 describe('SubscriptionService seat counters (REQ-4)', () => {

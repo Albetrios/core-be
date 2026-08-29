@@ -3,6 +3,7 @@ import { paginatedResponse, successResponse } from '@/shared/utils/http/response
 import {
   getActingUserPublicId,
   getRequestIdentifier,
+  requireOrganizationScope,
   requirePrincipal,
 } from '@/shared/utils/http/request.util.js';
 import type { MemberRolePermissionService } from './member-role-permission.service.js';
@@ -18,7 +19,7 @@ import { serializeMemberRolePermission } from './member-role-permission.serializ
 export function createMemberRolePermissionController(service: MemberRolePermissionService) {
   return {
     listRolePermissions: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const { role_id: roleId } = request.params as { role_id: string };
       const rows = await service.list(scope, roleId);
@@ -32,7 +33,7 @@ export function createMemberRolePermissionController(service: MemberRolePermissi
     },
     putRolePermissions: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const { role_id: roleId } = request.params as { role_id: string };
       const rows = await service.put(scope, roleId, request.body, getActingUserPublicId(auth));

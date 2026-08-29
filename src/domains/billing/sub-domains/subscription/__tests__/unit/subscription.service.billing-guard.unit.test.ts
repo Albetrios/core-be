@@ -31,7 +31,7 @@ vi.mock('@/infrastructure/cache/redis-lock.util.js', () => ({
 }));
 
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
@@ -88,10 +88,9 @@ const BILLING_REJECTION = {
   messageKey: 'errors:personalOrganizationNoBilling',
 };
 
-const personalScope = createPrincipalDatabaseScope({
+const personalScope = PRINCIPAL_SCOPE.REQUEST({
   userPublicId: 'user_public',
   organizationPublicId: 'org_personal',
-  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 describe('SubscriptionService — personal-org billing guard', () => {

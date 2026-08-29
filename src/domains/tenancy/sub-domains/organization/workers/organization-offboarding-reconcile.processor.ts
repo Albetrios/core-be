@@ -1,7 +1,7 @@
 import { and, isNotNull, isNull, lt, ne } from 'drizzle-orm';
 import type { OrganizationPrincipalDatabaseScope } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import {
+  PRINCIPAL_SCOPE,
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
@@ -84,9 +84,7 @@ export async function runOrganizationOffboardingReconcileJob(
   let failed = 0;
   for (const { public_id } of stuck) {
     try {
-      await service.resumeOffboarding(
-        resolveJobPrincipalScope({ organizationPublicId: public_id }),
-      );
+      await service.resumeOffboarding(PRINCIPAL_SCOPE.JOB({ organizationPublicId: public_id }));
       resumed += 1;
     } catch (error) {
       failed += 1;

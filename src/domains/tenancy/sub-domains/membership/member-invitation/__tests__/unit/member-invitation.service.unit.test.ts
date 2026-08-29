@@ -49,7 +49,7 @@ import type { MembershipRepository } from '@/domains/tenancy/sub-domains/members
 import type { MemberInvitationRepository } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -75,9 +75,8 @@ function makeInvitationRow(overrides: Record<string, unknown> = {}) {
 }
 
 const asScope = (organizationPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     organizationPublicId,
-    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
 describe('MemberInvitationService', () => {

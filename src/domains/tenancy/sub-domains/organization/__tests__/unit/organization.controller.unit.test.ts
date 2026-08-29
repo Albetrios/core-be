@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { ForbiddenError, ValidationError } from '@/shared/errors/index.js';
+import { ForbiddenError } from '@/shared/errors/index.js';
 import { createOrganizationController } from '@/domains/tenancy/sub-domains/organization/organization.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
@@ -173,41 +173,22 @@ describe('createOrganizationController', () => {
     });
   });
 
-  it('rejects a malformed organization id with ValidationError on each validated handler', async () => {
-    const invalidId = 'not-a-public-id';
-    await expect(
-      controller.getOrganization(
-        mockRequest({ params: { organization_id: invalidId } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.updateOrganization(
-        mockRequest({ params: { organization_id: invalidId }, body: { name: 'X' } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.deleteOrganization(
-        mockRequest({ params: { organization_id: invalidId } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.uploadLogo(
-        mockRequest({ params: { organization_id: invalidId }, body: { key: 'k' } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.deleteLogo(mockRequest({ params: { organization_id: invalidId } }), mockReply()),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.listOrganizationAuditLogs(
-        mockRequest({ params: { organization_id: invalidId } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
+  it('ignores a malformed org path param — the signed claim decides', async () => {
+    const organizationPublicId = generatePublicId('organization');
+    vi.mocked(service.getByPublicId).mockClear();
+    await controller.getOrganization(
+      mockRequest({
+        auth: {
+          kind: 'user' as const,
+          userId: userPublicId,
+          role: 'user',
+          organizationPublicId,
+        },
+        params: { organization_id: 'not-a-public-id' },
+      }),
+      mockReply(),
+    );
+    expect(service.getByPublicId).toHaveBeenCalledWith(organizationPublicId, userPublicId, 'user');
   });
 
   it('rejects a missing organization context with ForbiddenError on each validated handler', async () => {

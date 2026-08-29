@@ -4,6 +4,7 @@ import {
   getActingUserPublicId,
   getRequestIdentifier,
   requireAuth,
+  requireOrganizationScope,
   requirePrincipal,
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
@@ -23,7 +24,7 @@ import type { OrganizationApiKeyService } from './organization-api-key.service.j
 export function createOrganizationApiKeyController(service: OrganizationApiKeyService) {
   return {
     listApiKeys: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const result = await service.list(scope, request.query);
       return paginatedResponse(result.items, getRequestIdentifier(request), {
@@ -40,7 +41,7 @@ export function createOrganizationApiKeyController(service: OrganizationApiKeySe
       // sec-re-18 (sec-B10 class): bind path params at the boundary so an
       // attacker-supplied string never flows into Sentry breadcrumbs, log
       // payloads, or metric labels with unbounded cardinality.
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const apiKeyId = validatePublicIdParam(rawParams.api_key_id ?? '', 'api_key_id');
       const data = await service.getByPublicId(scope, apiKeyId);
@@ -48,7 +49,7 @@ export function createOrganizationApiKeyController(service: OrganizationApiKeySe
     },
     createApiKey: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requireAuth(request);
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const result = await service.create(scope, request.body, auth.userId);
       // Long-lived org bearer credentials: audit minting at WARNING so creation is never silent.
@@ -72,7 +73,7 @@ export function createOrganizationApiKeyController(service: OrganizationApiKeySe
       // sec-re-18 (sec-B10 class): bind path params at the boundary so an
       // attacker-supplied string never flows into Sentry breadcrumbs, log
       // payloads, or metric labels with unbounded cardinality.
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const apiKeyId = validatePublicIdParam(rawParams.api_key_id ?? '', 'api_key_id');
       const data = await service.update(scope, apiKeyId, request.body, getActingUserPublicId(auth));
@@ -92,7 +93,7 @@ export function createOrganizationApiKeyController(service: OrganizationApiKeySe
       // sec-re-18 (sec-B10 class): bind path params at the boundary so an
       // attacker-supplied string never flows into Sentry breadcrumbs, log
       // payloads, or metric labels with unbounded cardinality.
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const apiKeyId = validatePublicIdParam(rawParams.api_key_id ?? '', 'api_key_id');
       await service.delete(scope, apiKeyId);
@@ -114,7 +115,7 @@ export function createOrganizationApiKeyController(service: OrganizationApiKeySe
       // sec-re-18 (sec-B10 class): bind path params at the boundary so an
       // attacker-supplied string never flows into Sentry breadcrumbs, log
       // payloads, or metric labels with unbounded cardinality.
-      const scope = request.principalScope;
+      const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const apiKeyId = validatePublicIdParam(rawParams.api_key_id ?? '', 'api_key_id');
       const result = await service.rotate(scope, apiKeyId, auth.userId);

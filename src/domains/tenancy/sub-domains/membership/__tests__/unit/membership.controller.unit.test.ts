@@ -167,26 +167,24 @@ describe('createMembershipController', () => {
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('rejects malformed organization id on validated handlers with ValidationError', async () => {
-    const invalidId = 'not-a-public-id';
-    await expect(
-      controller.listMemberships(
-        mockRequest({ params: { organization_id: invalidId } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.leaveOrganization(
-        mockRequest({ params: { organization_id: invalidId } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.transferOwnership(
-        mockRequest({ params: { organization_id: 'bad' }, body: {} }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
+  it('ignores org path params on validated handlers — the signed claim decides', async () => {
+    vi.mocked(service.list).mockClear();
+    await controller.listMemberships(
+      mockRequest({
+        auth: {
+          kind: 'user' as const,
+          userId: generatePublicId('user'),
+          role: 'user',
+          organizationPublicId,
+        },
+        params: { organization_id: 'not-a-public-id' },
+      }),
+      mockReply(),
+    );
+    expect(service.list).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId }),
+      expect.anything(),
+    );
   });
 
   it('getMembershipPermissions delegates to service with valid params', async () => {

@@ -8,10 +8,7 @@ import type { TenancyContainer } from '@/domains/tenancy/tenancy.container.js';
 import type { UploadContainer } from '@/domains/upload/upload.container.js';
 import type { UserContainer } from '@/domains/user/user.container.js';
 import type { AuthContext } from '@/shared/types/index.js';
-import type {
-  OrganizationPrincipalDatabaseScope,
-  UserPrincipalDatabaseScope,
-} from '@/infrastructure/database/contexts/database-context.js';
+import type { PrincipalDatabaseScope } from '@/infrastructure/database/contexts/database-context.js';
 import type { FastifyReply } from 'fastify';
 import type Stripe from 'stripe';
 
@@ -30,10 +27,13 @@ declare module 'fastify' {
 
   interface FastifyRequest {
     auth: AuthContext | null;
-    /** Token-minted org-required principal scope (lazy getter; 403 without an org). */
-    readonly principalScope: OrganizationPrincipalDatabaseScope;
-    /** Token-minted user-required principal scope (lazy getter; org optional — self-heal family). */
-    readonly userPrincipalScope: UserPrincipalDatabaseScope;
+    /**
+     * The request-minted principal scope — eagerly assigned by the auth
+     * middleware after authentication (JWT or API key), carrying whatever
+     * verified ids the token holds. Undefined at runtime only on
+     * public/unauthenticated routes, which must not read it.
+     */
+    principalScope: PrincipalDatabaseScope;
     organizationId: string | null;
     rawBody: Buffer | undefined;
     /** Set by stripe webhook ingress plugin after signature verification. */

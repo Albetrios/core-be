@@ -23,14 +23,13 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
 });
 import { AuthMeContextService } from '@/domains/auth/auth-me-context.service.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
-const meScope = createPrincipalDatabaseScope({
+const meScope = PRINCIPAL_SCOPE.REQUEST({
   userPublicId: 'usr_1',
   organizationPublicId: 'org_active',
-  source: 'request',
 }) as UserPrincipalDatabaseScope;
 
 describe('AuthMeContextService.getContext', () => {
@@ -148,9 +147,8 @@ describe('AuthMeContextService.getContext', () => {
 
     // Org-less token = the /users/me self-heal transitional state: the active-org
     // slice is skipped rather than erroring.
-    const orgLessScope = createPrincipalDatabaseScope({
+    const orgLessScope = PRINCIPAL_SCOPE.REQUEST({
       userPublicId: 'usr_1',
-      source: 'request',
     }) as UserPrincipalDatabaseScope;
     const data = await service.getContext({
       scope: orgLessScope,

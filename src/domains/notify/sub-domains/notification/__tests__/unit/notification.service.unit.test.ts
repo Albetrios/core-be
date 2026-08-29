@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UnauthorizedError } from '@/shared/errors/index.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { NotificationService } from '@/domains/notify/sub-domains/notification/notification.service.js';
@@ -29,15 +29,13 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
 });
 
 const user = { id: 1, public_id: 'user_public' };
-const scope = createPrincipalDatabaseScope({
+const scope = PRINCIPAL_SCOPE.REQUEST({
   userPublicId: 'user_public',
   organizationPublicId: 'org_public',
-  source: 'request',
 }) as UserPrincipalDatabaseScope;
-const missingUserScope = createPrincipalDatabaseScope({
+const missingUserScope = PRINCIPAL_SCOPE.REQUEST({
   userPublicId: 'missing',
   organizationPublicId: 'org_public',
-  source: 'request',
 }) as UserPrincipalDatabaseScope;
 const notification = {
   id: 2,

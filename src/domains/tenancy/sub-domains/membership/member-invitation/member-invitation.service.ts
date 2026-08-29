@@ -6,6 +6,7 @@ import {
 } from '@/shared/errors/index.js';
 import { env } from '@/shared/config/env.config.js';
 import {
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
@@ -33,7 +34,6 @@ import {
   type MemberInvitationEmailPayload,
   type MemberInvitationAcceptedPayload,
 } from '@/domains/tenancy/sub-domains/membership/member-invitation/events/member-invitation.events.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 const MEMBER_INVITATION_RESOURCE = 'Member invitation';
 
@@ -229,7 +229,7 @@ export class MemberInvitationService {
     if (!lookup) throw new NotFoundError(MEMBER_INVITATION_RESOURCE);
     let acceptedMemberPublicId: string | null = null;
     const result = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: lookup.organization_public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: lookup.organization_public_id }),
       async () => {
         const row = await this.invitationRepository.findByPublicId(invitation_public_id);
         if (!row) throw new NotFoundError(MEMBER_INVITATION_RESOURCE);

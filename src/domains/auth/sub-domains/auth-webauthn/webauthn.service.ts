@@ -47,8 +47,10 @@ import {
   validateWebauthnAuthenticateVerify,
   validateWebauthnRegisterVerify,
 } from './webauthn.validator.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Result envelope returned by {@link WebauthnService.generateRegistrationOptions}.
@@ -129,7 +131,7 @@ export class WebauthnService {
     assertEmailVerifiedForCredentialEnrollment(user);
 
     const existingCredentials = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
       () => this.credentialRepository.listActiveByUserId(user.id),
     );
     const relyingPartyId = resolveWebauthnRelyingPartyId();
@@ -203,7 +205,7 @@ export class WebauthnService {
     let created: Awaited<ReturnType<WebauthnCredentialRepository['createCredential']>>;
     try {
       created = await withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
         async () => {
           // Serialize the count + insert under a per-user advisory lock so concurrent registrations
           // cannot both pass the cap check and overshoot MAX_WEBAUTHN_CREDENTIALS_PER_USER. The xact
@@ -256,7 +258,7 @@ export class WebauthnService {
     const lookupUserPublicId = user?.public_id ?? `decoy:${generatePublicId('authMethod')}`;
     const lookupUserId = user?.id ?? 0;
     const credentials = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: lookupUserPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: lookupUserPublicId }),
       () => this.credentialRepository.listActiveByUserId(lookupUserId),
     );
 
@@ -362,7 +364,7 @@ export class WebauthnService {
     // The challenge binds this assertion to a user; auth.webauthn_credentials is FORCE RLS keyed on
     // app.current_user_public_id, so look the credential up inside that user's context.
     const storedCredential = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: challenge.user_public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: challenge.user_public_id }),
       () => this.credentialRepository.findActiveByCredentialId(response.id),
     );
     if (storedCredential?.user_id === undefined) {
@@ -396,9 +398,8 @@ export class WebauthnService {
     }
 
     const { newCounter } = verification.authenticationInfo;
-    await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
-      () => this.credentialRepository.updateCounter(storedCredential.credential_id, newCounter),
+    await withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }), () =>
+      this.credentialRepository.updateCounter(storedCredential.credential_id, newCounter),
     );
 
     return completeFirstFactorAuth({
@@ -437,7 +438,7 @@ export class WebauthnService {
       throw new UnauthorizedError('errors:userNotFound');
     }
     const rows = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
       () => this.credentialRepository.listActiveByUserId(user.id),
     );
     return serializeWebauthnCredentialList(rows);
@@ -468,7 +469,7 @@ export class WebauthnService {
       throw new UnauthorizedError('errors:userNotFound');
     }
     await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: user.public_id }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
       async () => {
         // Serialize concurrent credential mutations for this user so the "is this the last
         // login credential?" check + revoke cannot interleave with a sibling passkey/MFA delete.

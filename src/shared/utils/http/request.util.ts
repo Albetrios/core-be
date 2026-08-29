@@ -2,10 +2,10 @@ import type { FastifyRequest } from 'fastify';
 import { ForbiddenError, UnauthorizedError } from '@/shared/errors/index.js';
 import type { ApiKeyAuthContext, AuthContext, UserAuthContext } from '@/shared/types/index.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
-import {
-  createPrincipalDatabaseScope,
-  type OrganizationPrincipalDatabaseScope,
-  type UserPrincipalDatabaseScope,
+import type {
+  OrganizationPrincipalDatabaseScope,
+  PrincipalDatabaseScope,
+  UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
 /** Returns the per-request id Fastify generates (used for log correlation, audit fields, idempotency). */
@@ -100,98 +100,43 @@ export function resolveActiveOrganizationId(request: FastifyRequest): string {
 }
 
 /**
- * Mints the {@link PrincipalDatabaseScope} for the authenticated request — the single
- * token-derived identity object services relay into `withAppDatabaseContext`.
+ * Narrows the middleware-attached `request.principalScope` to an
+ * organization-bearing scope — the `requireAuth`-family accessor for org-scoped
+ * routes. Mints nothing: the scope was already attached by the auth middleware;
+ * this only enforces the route contract and narrows the type.
  *
  * @remarks
- * - **Algorithm:** requires an authenticated principal. A user principal yields
- *   `userPublicId` plus `organizationPublicId` resolved with the SAME
- *   path-param-else-claim precedence as {@link resolveActiveOrganizationId};
- *   only the caller-supplied path param is format-validated — the claim is a
- *   value this server signed (verification happens once per boundary). An API-key principal yields only the
- *   organization pinned to the key — API keys have no user identity.
- * - **Failure modes:** {@link UnauthorizedError} when unauthenticated;
- *   {@link ForbiddenError} (`errors:organizationContextRequired`) when no
- *   organization resolves; `ValidationError` when a supplied organization id is
- *   malformed.
+ * - **Failure modes:** {@link UnauthorizedError} when unauthenticated (no scope
+ *   attached); {@link ForbiddenError} (`errors:organizationContextRequired`)
+ *   when the token carries no active organization — under the personal/team
+ *   organization model that is a stale/malformed token, not a different scope.
  * - **Side effects:** none.
- * - **Notes:** the organization is ALWAYS present — under the personal/team
- *   organization model every authenticated principal carries an active
- *   organization (users hold a personal-or-team `org` claim from login/switch;
- *   API keys are pinned to one). A token without one is stale/malformed, not a
- *   different scope, so this single common minter rejects it rather than
- *   modelling an org-less variant. Use {@link REQUEST_SCOPE}.USER
- *   when the route additionally requires a real end user (rejects API keys).
  */
-function mintOrganizationRequestScope(request: FastifyRequest): OrganizationPrincipalDatabaseScope {
-  const auth = requirePrincipal(request);
-  if (auth.kind === 'apiKey') {
-    // Key-pinned org id — server-issued, no format re-validation (S2).
-    return createPrincipalDatabaseScope({
-      organizationPublicId: auth.organizationPublicId,
-      source: 'request',
-    }) as OrganizationPrincipalDatabaseScope;
-  }
-  const params = request.params as Record<string, string> | undefined;
-  const pathOrganizationId = params?.organization_id;
-  // Only a caller-supplied path param needs format validation; the claim is a
-  // value this server signed (S2 — verification happens once per boundary).
-  // Parity with resolveActiveOrganizationId: an empty-string path value is "no
-  // organization in scope" (403, never a claim fallback), not a malformed id (400).
-  const organizationId =
-    pathOrganizationId === undefined
-      ? auth.organizationPublicId
-      : pathOrganizationId === ''
-        ? undefined
-        : validatePublicIdParam(pathOrganizationId, 'organization_id');
-  if (!organizationId) {
+export function requireOrganizationScope(
+  request: FastifyRequest,
+): OrganizationPrincipalDatabaseScope {
+  const scope = request.principalScope as PrincipalDatabaseScope | undefined;
+  if (!scope) throw new UnauthorizedError();
+  if (scope.organizationPublicId === undefined) {
     throw new ForbiddenError('errors:organizationContextRequired');
   }
-  return createPrincipalDatabaseScope({
-    userPublicId: auth.userId,
-    organizationPublicId: organizationId,
-    source: 'request',
-  }) as OrganizationPrincipalDatabaseScope;
+  return scope as OrganizationPrincipalDatabaseScope;
 }
 
 /**
- * Mints a {@link UserPrincipalDatabaseScope} — the common scope narrowed to routes
- * that require a real end user: rejects API-key principals with
- * {@link UnauthorizedError} (matching {@link requireAuth} semantics), so
- * `userPublicId` is guaranteed; the organization is included when present (org-less tokens are the /users/me self-heal transitional state).
+ * Narrows the middleware-attached `request.principalScope` to a user-bearing
+ * scope — the `requireAuth`-family accessor for user-owned resources (rejects
+ * API-key principals, matching {@link requireAuth} semantics; the organization
+ * stays optional — org-less tokens are the /users/me self-heal transitional
+ * state). Mints nothing.
+ *
+ * @remarks
+ * - **Failure modes:** {@link UnauthorizedError} when unauthenticated or when
+ *   the principal is an API key (no user identity).
+ * - **Side effects:** none.
  */
-function mintUserRequestScope(request: FastifyRequest): UserPrincipalDatabaseScope {
-  const auth = requireAuth(request);
-  const params = request.params as Record<string, string> | undefined;
-  const pathOrganizationId = params?.organization_id;
-  // Org-less is legitimate on the user family (the /users/me self-heal
-  // provisions the personal organization on demand). Only a caller-supplied
-  // path param needs format validation; the claim is server-signed (S2).
-  const organizationId = pathOrganizationId
-    ? validatePublicIdParam(pathOrganizationId, 'organization_id')
-    : (auth.organizationPublicId ?? undefined);
-  return createPrincipalDatabaseScope({
-    userPublicId: auth.userId,
-    organizationPublicId: organizationId || undefined,
-    source: 'request',
-  }) as UserPrincipalDatabaseScope;
+export function requireUserScope(request: FastifyRequest): UserPrincipalDatabaseScope {
+  const scope = request.principalScope as PrincipalDatabaseScope | undefined;
+  if (!scope || scope.userPublicId === undefined) throw new UnauthorizedError();
+  return scope as UserPrincipalDatabaseScope;
 }
-
-/**
- * The request-scope factories — the HTTP member of the scope-namespace family
- * (session/maintenance namespaces in `database-context.ts`): one namespace, kind-differentiated. Both kinds read the
- * verified request principal and stamp `source: 'request'`; the KIND selects the
- * boundary rule (the two rules genuinely differ, so they are kinds, not one
- * function):
- * - `REQUEST_SCOPE.ORGANIZATION(request)` — org REQUIRED (403 without one;
- *   API-key principals allowed — org identity without a human).
- * - `REQUEST_SCOPE.USER(request)` — real end user REQUIRED (API keys rejected);
- *   org optional (the /users/me self-heal transitional state).
- * Controllers normally use the `request.principalScope` /
- * `request.userPrincipalScope` getters, which delegate here.
- */
-export const REQUEST_SCOPE = Object.freeze({
-  ORGANIZATION: (request: FastifyRequest): OrganizationPrincipalDatabaseScope =>
-    mintOrganizationRequestScope(request),
-  USER: (request: FastifyRequest): UserPrincipalDatabaseScope => mintUserRequestScope(request),
-});

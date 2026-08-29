@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { NotFoundError } from '@/shared/errors/index.js';
 import { paginatedResponse, successResponse } from '@/shared/utils/http/response.util.js';
-import { getRequestIdentifier } from '@/shared/utils/http/request.util.js';
+import { getRequestIdentifier, requireUserScope } from '@/shared/utils/http/request.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import type { NotificationService } from './notification.service.js';
 import { NotificationSerializer } from './notification.serializer.js';
@@ -14,7 +14,7 @@ import { validateListNotificationsQuery } from './notification.validator.js';
 export function createNotificationController(service: NotificationService) {
   return {
     listNotifications: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const scope = request.userPrincipalScope;
+      const scope = requireUserScope(request);
       const parsed = validateListNotificationsQuery(request.query);
       const result = await service.listForUser(
         scope,
@@ -36,7 +36,7 @@ export function createNotificationController(service: NotificationService) {
       request: FastifyRequest<{ Params: { notification_id: string } }>,
       _reply: FastifyReply,
     ) => {
-      const scope = request.userPrincipalScope;
+      const scope = requireUserScope(request);
       const notification = await service.get(request.params.notification_id, scope);
       if (!notification) throw new NotFoundError('Notification');
       return successResponse(
@@ -48,7 +48,7 @@ export function createNotificationController(service: NotificationService) {
       request: FastifyRequest<{ Params: { notification_id: string } }>,
       _reply: FastifyReply,
     ) => {
-      const scope = request.userPrincipalScope;
+      const scope = requireUserScope(request);
       const notification = await service.markRead(request.params.notification_id, scope);
       if (!notification) throw new NotFoundError('Notification');
       return successResponse(
@@ -57,12 +57,12 @@ export function createNotificationController(service: NotificationService) {
       );
     },
     markAllRead: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const scope = request.userPrincipalScope;
+      const scope = requireUserScope(request);
       const updatedCount = await service.markAllRead(scope);
       return successResponse({ updated_count: updatedCount }, getRequestIdentifier(request));
     },
     getUnreadCount: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const scope = request.userPrincipalScope;
+      const scope = requireUserScope(request);
       const count = await service.getUnreadCount(scope);
       return successResponse({ count }, getRequestIdentifier(request));
     },
@@ -70,7 +70,7 @@ export function createNotificationController(service: NotificationService) {
       request: FastifyRequest<{ Params: { notification_id: string } }>,
       reply: FastifyReply,
     ) => {
-      const scope = request.userPrincipalScope;
+      const scope = requireUserScope(request);
       const deleted = await service.deleteNotification(request.params.notification_id, scope);
       if (!deleted) throw new NotFoundError('Notification');
       return reply.code(204).send();

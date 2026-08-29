@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 
 const asOrgScope = (organizationPublicId: string) =>
-  createPrincipalDatabaseScope({ organizationPublicId, source: 'request' });
+  PRINCIPAL_SCOPE.REQUEST({ organizationPublicId });
 import {
   getActiveOrganizationRlsCheckoutCount,
   type OrganizationRlsCheckoutHoldSample,

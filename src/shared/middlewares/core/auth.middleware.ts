@@ -7,7 +7,7 @@ import type { AuthContext } from '@/shared/types/index.js';
 import { GLOBAL_ROLES, type GlobalRole } from '@/shared/constants/roles.constants.js';
 import { resolveGlobalRoleForEmail } from '@/shared/utils/auth/global-admin-role.util.js';
 import { applyApiKeyAuthentication } from '@/shared/middlewares/security/api-key-auth.middleware.js';
-import { REQUEST_SCOPE } from '@/shared/utils/http/request.util.js';
+import { PRINCIPAL_SCOPE } from '@/infrastructure/database/contexts/database-context.js';
 
 function getBearerToken(request: FastifyRequest): string {
   const authorizationHeader = request.headers.authorization;
@@ -69,11 +69,13 @@ async function rederiveSuperAdminRole(
 
 async function authenticate(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
   if (request.auth) {
+    attachRequestPrincipalScope(request);
     return;
   }
 
   const apiKeyAuthenticated = await applyApiKeyAuthentication(request);
   if (apiKeyAuthenticated) {
+    attachRequestPrincipalScope(request);
     return;
   }
 
@@ -117,6 +119,7 @@ async function authenticate(request: FastifyRequest, _reply: FastifyReply): Prom
       // still re-checked per request — the claim is scope, not authority.
       organizationPublicId: payload.organizationPublicId,
     }) as AuthContext;
+    attachRequestPrincipalScope(request);
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       throw error;
@@ -125,23 +128,39 @@ async function authenticate(request: FastifyRequest, _reply: FastifyReply): Prom
   }
 }
 
+/**
+ * Attaches the request-minted {@link PrincipalDatabaseScope} as
+ * `request.principalScope` — called by BOTH authentication paths (JWT here,
+ * API key in `api-key-auth.middleware.ts`) immediately after `request.auth`
+ * is set.
+ *
+ * @remarks
+ * - **Algorithm:** the single common mint — whatever verified ids `request.auth`
+ *   carries go into `PRINCIPAL_SCOPE.REQUEST` (API keys: org only; users: user +
+ *   org claim when present). No route-contract decisions here: org-permission
+ *   403s come from the authorization layer, real-user 401s from `requireAuth`
+ *   in controllers, and RLS fails closed regardless.
+ * - **Failure modes:** none — unauthenticated requests never reach it.
+ * - **Side effects:** sets `request.principalScope`.
+ */
+export function attachRequestPrincipalScope(request: FastifyRequest): void {
+  const auth = request.auth;
+  if (!auth) return;
+  request.principalScope =
+    auth.kind === 'apiKey'
+      ? PRINCIPAL_SCOPE.REQUEST({ organizationPublicId: auth.organizationPublicId })
+      : PRINCIPAL_SCOPE.REQUEST({
+          userPublicId: auth.userId,
+          organizationPublicId: auth.organizationPublicId,
+        });
+}
+
 const authMiddleware: FastifyPluginAsync = async (app) => {
   app.decorateRequest('auth', null);
-  // Ergonomic access to the token-minted principal scopes: `request.principalScope`
-  // (org REQUIRED — 403 without one) and `request.userPrincipalScope` (user REQUIRED,
-  // org optional — the /users/me self-heal family). Lazy getters over the confined
-  // request minters, so controllers relay a scope without repeating the minting call;
-  // authority semantics are identical to calling the minters directly.
-  app.decorateRequest('principalScope', {
-    getter(this: FastifyRequest) {
-      return REQUEST_SCOPE.ORGANIZATION(this);
-    },
-  });
-  app.decorateRequest('userPrincipalScope', {
-    getter(this: FastifyRequest) {
-      return REQUEST_SCOPE.USER(this);
-    },
-  });
+  // The principal scope is a plain per-request property, eagerly assigned by
+  // attachRequestPrincipalScope the moment authentication succeeds (both JWT
+  // and API-key paths) — undefined on public/unauthenticated routes.
+  app.decorateRequest('principalScope', null as never);
   app.decorate('authenticate', authenticate);
 };
 

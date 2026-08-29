@@ -9,6 +9,7 @@ import { isPostgresUniqueViolation } from '@/shared/utils/infrastructure/postgre
 import { isDisposableEmailBlocked } from '@/shared/utils/text/email.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import {
+  PRINCIPAL_SCOPE,
   withAppDatabaseContext,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
@@ -50,7 +51,6 @@ import type { MemberInvitationService } from './member-invitation/member-invitat
 import { invalidatePermissions } from '@/domains/tenancy/sub-domains/permission/permission-cache.service.js';
 import type { OrganizationApiKeyRepository } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.repository.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 /**
  * Cross-domain port for REQ-4 seat enforcement and Stripe seat reconciliation, satisfied by
@@ -722,7 +722,7 @@ export class MembershipService {
    */
   async countActiveMembers(options: { organizationPublicId: string }): Promise<number> {
     return withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: options.organizationPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: options.organizationPublicId }),
       async () => {
         const organization = await this.organizationService.requireOrganizationByPublicId(
           options.organizationPublicId,
@@ -754,7 +754,7 @@ export class MembershipService {
     ceiling: number;
   }): Promise<number> {
     const suspendedUserIds = await withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ organizationPublicId: options.organizationPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: options.organizationPublicId }),
       async () => {
         const organization = await this.organizationService.requireOrganizationRecordByPublicId(
           options.organizationPublicId,
@@ -790,7 +790,7 @@ export class MembershipService {
     limit: number;
   }) {
     return withAppDatabaseContext(
-      resolveVerifiedPrincipalScope({ userPublicId: options.userPublicId }),
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: options.userPublicId }),
       (_databaseHandle) =>
         this.membershipRepository.listOrganizationsForUserDataExport(
           options.userInternalId,

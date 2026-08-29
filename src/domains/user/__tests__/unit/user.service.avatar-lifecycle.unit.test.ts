@@ -6,7 +6,7 @@ import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock
 import { buildUserAvatarKeyPrefix } from '@/domains/upload/upload.constants.js';
 import { ValidationError, NotFoundError } from '@/shared/errors/index.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type UserPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
@@ -80,10 +80,9 @@ function userRow(overrides: Record<string, unknown> = {}) {
 }
 
 const asUserScope = (userPublicId: string) =>
-  createPrincipalDatabaseScope({
+  PRINCIPAL_SCOPE.REQUEST({
     userPublicId,
     organizationPublicId: 'org_scope_test',
-    source: 'request',
   }) as UserPrincipalDatabaseScope;
 
 describe('UserService — avatar lifecycle', () => {

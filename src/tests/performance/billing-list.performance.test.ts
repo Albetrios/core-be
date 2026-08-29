@@ -18,7 +18,7 @@ import {
 } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
 import { createTestSubscription } from '@/domains/billing/__tests__/factories/subscription.factory.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
@@ -47,10 +47,9 @@ const BILLING_PERMISSIONS = ['subscription:read', 'subscription:manage'] as cons
 /** Rows in the "large" list. Big enough that an N+1 is unmistakable, small enough to seed fast. */
 const LARGE_LIST_ROW_COUNT = 25;
 
-const budgetScope = createPrincipalDatabaseScope({
+const budgetScope = PRINCIPAL_SCOPE.REQUEST({
   userPublicId: 'user_public',
   organizationPublicId: 'org_budget',
-  source: 'request',
 }) as OrganizationPrincipalDatabaseScope;
 
 describe('Performance: billing list routes stay O(1) in cross-domain work', () => {

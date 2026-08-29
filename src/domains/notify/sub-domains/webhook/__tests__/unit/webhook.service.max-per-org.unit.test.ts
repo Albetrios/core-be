@@ -37,7 +37,7 @@ vi.mock('@/shared/utils/security/field-secret-encryption.util.js', async () => (
 import { ConflictError } from '@/shared/errors/index.js';
 import { WebhookService } from '@/domains/notify/sub-domains/webhook/webhook.service.js';
 import {
-  createPrincipalDatabaseScope,
+  PRINCIPAL_SCOPE,
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
@@ -60,10 +60,9 @@ import type { WebhookDeliveryAttemptRepository } from '@/domains/notify/sub-doma
  */
 describe('WebhookService.create — per-organization cap (sec-N4)', () => {
   const organization = { id: 1, public_id: 'org_public' };
-  const scope = createPrincipalDatabaseScope({
+  const scope = PRINCIPAL_SCOPE.REQUEST({
     userPublicId: 'user_public',
     organizationPublicId: 'org_public',
-    source: 'request',
   }) as OrganizationPrincipalDatabaseScope;
 
   const webhook = {

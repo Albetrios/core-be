@@ -1,5 +1,6 @@
 import { Worker, type Job } from 'bullmq';
 import {
+  PRINCIPAL_SCOPE,
   MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
@@ -30,9 +31,7 @@ import {
 } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { resolveJobPrincipalScope } from '@/infrastructure/queue/worker-runtime/job-principal-scope.util.js';
 import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
-import { resolveVerifiedPrincipalScope } from '@/shared/utils/identity/verified-principal-scope.util.js';
 
 type NotificationDispatchData = {
   channels?: ('email' | 'in_app')[];
@@ -187,12 +186,12 @@ export async function processNotificationDispatchJob(
         throw new Error(`notification.user_unknown:${String(notificationId)}`);
       }
       return withAppDatabaseContext(
-        resolveVerifiedPrincipalScope({ userPublicId: userPublicId }),
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
         loadNotification,
       );
     }
     return withAppDatabaseContext(
-      resolveJobPrincipalScope({ organizationPublicId: organizationPublicId }),
+      PRINCIPAL_SCOPE.JOB({ organizationPublicId: organizationPublicId }),
       loadNotification,
     );
   };
