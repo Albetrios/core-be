@@ -56,6 +56,7 @@ import {
   type WorkerContextDatabaseHandle,
 } from '@/infrastructure/database/utils/database-handle.types.js';
 import { ConfigurationError } from '@/shared/errors/index.js';
+import { trace } from '@opentelemetry/api';
 
 declare const PRINCIPAL_SCOPE_BRAND: unique symbol;
 
@@ -65,7 +66,11 @@ declare const PRINCIPAL_SCOPE_BRAND: unique symbol;
  * BullMQ job payload, `verified` = an id the calling flow proved itself (invitation
  * match, Stripe-signed event, a row the flow just created).
  */
-export type PrincipalScopeSource = 'request' | 'job' | 'verified';
+export type PrincipalScopeSource = 'request' | 'job' | 'verified' | 'support';
+// 'support' is RESERVED for a future support/impersonation doorway: no minter emits it
+// today. Adding one means a new PRINCIPAL_SCOPE member with its own confinement lock
+// and audit trail — never widening an existing member. The source stays observability
+// metadata either way (never branched on).
 
 /**
  * Unforgeable identity scope for one unit of database work: the verified user and/or
@@ -440,10 +445,63 @@ export type AppDatabaseScope = PrincipalDatabaseScope | SessionDatabaseScope;
  *   forget, commit-vs-rollback is automatic, and nesting reuses the transaction
  *   (see rls-architecture.md).
  */
+/**
+ * One-line human-readable rendering of any scope for logs and error context —
+ * describes, never decides: public ids are shown (they are public), session
+ * artifact VALUES are redacted to their field name.
+ */
+export function describeScope(
+  scope: PrincipalDatabaseScope | SessionDatabaseScope | MaintenanceDatabaseScope,
+): string {
+  if ('source' in scope) {
+    const parts = [
+      scope.organizationPublicId ? `organization=${scope.organizationPublicId}` : undefined,
+      scope.userPublicId ? `user=${scope.userPublicId}` : undefined,
+    ].filter(Boolean);
+    return `principal(${scope.source} ${parts.join(' ')})`;
+  }
+  if ('kind' in scope) {
+    return `maintenance(${scope.kind})`;
+  }
+  const artifact = scope.sessionPublicId !== undefined ? 'sessionPublicId' : 'sessionTokenHash';
+  return `session(${artifact} set)`;
+}
+
+// Observability only: stamp the active OTel span (when tracing is on) with what
+// this unit of work is scoped to. Describes the scope — arms nothing, so it can
+// never change row visibility. Public ids are safe span attributes.
+function recordScopeOnActiveSpan(
+  scope: PrincipalDatabaseScope | SessionDatabaseScope | MaintenanceDatabaseScope,
+): void {
+  try {
+    const span = trace.getActiveSpan?.();
+    if (!span) return;
+    if ('source' in scope) {
+      span.setAttribute('rls.scope.family', 'principal');
+      span.setAttribute('rls.scope.source', scope.source);
+      if (scope.organizationPublicId)
+        span.setAttribute('rls.scope.organization_public_id', scope.organizationPublicId);
+      if (scope.userPublicId) span.setAttribute('rls.scope.user_public_id', scope.userPublicId);
+    } else if ('kind' in scope) {
+      span.setAttribute('rls.scope.family', 'maintenance');
+      span.setAttribute('rls.scope.kind', scope.kind);
+    } else {
+      span.setAttribute('rls.scope.family', 'session');
+      span.setAttribute(
+        'rls.scope.artifact',
+        scope.sessionPublicId !== undefined ? 'sessionPublicId' : 'sessionTokenHash',
+      );
+    }
+  } catch {
+    // Tracing must never affect the data path.
+  }
+}
+
 export async function withAppDatabaseContext<T>(
   scope: AppDatabaseScope,
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
 ): Promise<T> {
+  recordScopeOnActiveSpan(scope);
   return 'source' in scope
     ? runPrincipalDatabaseContext(scope, callback)
     : runSessionDatabaseContext(scope, callback);
@@ -597,6 +655,7 @@ export async function withMaintenanceDatabaseContext<T>(
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
   options?: MaintenanceDatabaseContextOptions,
 ): Promise<T> {
+  recordScopeOnActiveSpan(scope);
   const definition = MAINTENANCE_CONTEXTS[scope.kind];
   if (!definition.opensTransaction) {
     // Non-transactional kinds pin the shared pool handle so getRequestDatabase()

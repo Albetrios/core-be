@@ -99,6 +99,7 @@ mistaken for the current one:
 | 15 | brief `requireTenantScope` / `requireUserAuth` detour | reverted to `requireOrganizationScope` / `requireAuth` | "tenant" stays boundary vocabulary (middleware/pattern/policy names), "organization" is the accessor vocabulary — recorded so the tenant rename is not re-proposed |
 | 16 | `runTenantScopedWorkerJob` + `TenantScopedJobData` | `runOrganizationScopedWorkerJob` + `OrganizationScopedJobData` | worker runner aligned with the accessor vocabulary |
 | 17 | `X-Organization-Id` header + pre-auth tenant middleware | header REMOVED; `request.organizationId` is claim-derived in the auth middleware; organization default-locale moved behind the claim | the header was attacker-controllable pre-auth (documented amplification vector) and dead in authorization; single source of organization truth = the signed claim |
+| 18 | enrichments deferred | SHIPPED: `describeScope()` (one-line log rendering, session values redacted) + OTel span attributes (`rls.scope.*`) on both wrappers; `'support'` source RESERVED in the union (no minter — a future doorway needs its own member + lock) | safe because every one only DESCRIBES a scope — none changes what gets armed, so none can change what rows are visible |
 
 Locked decisions that bound future changes (do NOT revisit casually): the callback shape
 (§3), the wrapper-per-pool split, the scope-family type split (values dynamic, GUC keys
