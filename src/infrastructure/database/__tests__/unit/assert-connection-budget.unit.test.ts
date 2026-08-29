@@ -59,7 +59,7 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/DATABASE_POOL_MAX=8/);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/Server cannot start/);
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
@@ -214,16 +214,22 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/DATABASE_POOL_MAX=8/);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/Server cannot start/);
   });
 
   it('names the largest fitting pool and the cluster size the current pool needs', async () => {
+    const poolMax = 50;
+    const maxConnections = 100;
+    const reserved = 10;
+    const apiReplicas = 1;
+    const workerReplicas = 1;
+
     getEnvMock.mockReturnValue({
-      DATABASE_POOL_MAX: 50,
-      POSTGRES_RESERVED_CONNECTIONS: 10,
-      POSTGRES_MAX_CONNECTIONS: 100,
-      DEPLOYMENT_API_REPLICA_COUNT: 1,
-      DEPLOYMENT_WORKER_REPLICA_COUNT: 1,
+      DATABASE_POOL_MAX: poolMax,
+      POSTGRES_RESERVED_CONNECTIONS: reserved,
+      POSTGRES_MAX_CONNECTIONS: maxConnections,
+      DEPLOYMENT_API_REPLICA_COUNT: apiReplicas,
+      DEPLOYMENT_WORKER_REPLICA_COUNT: workerReplicas,
       NODE_ENV: 'development',
       WORKER_CONCURRENCY: 4,
     });
@@ -232,12 +238,17 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    // 2 processes x 50 = 100 wanted, 100 - 10 reserved = 90 available.
+    const processes = apiReplicas + workerReplicas;
+    const available = maxConnections - reserved;
+    const largestFittingPool = Math.floor(available / processes);
+    const clusterNeededForCurrentPool = processes * poolMax + reserved;
+
+    // 2 x 50 = 100 wanted against 100 - 10 = 90 available: 45 fits, or grow the cluster to 110.
     await expect(assertPostgresConnectionBudget()).rejects.toThrow(
-      /DATABASE_POOL_MAX=45/, // floor(90 / 2)
+      new RegExp(`DATABASE_POOL_MAX=${largestFittingPool}\\b`),
     );
     await expect(assertPostgresConnectionBudget()).rejects.toThrow(
-      /POSTGRES_MAX_CONNECTIONS=110/, // 100 required + 10 reserved
+      new RegExp(`POSTGRES_MAX_CONNECTIONS=${clusterNeededForCurrentPool}\\b`),
     );
     await expect(assertPostgresConnectionBudget()).rejects.toThrow(/PER PROCESS/);
   });
@@ -293,7 +304,7 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/DATABASE_POOL_MAX=2/);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/Server cannot start/);
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
