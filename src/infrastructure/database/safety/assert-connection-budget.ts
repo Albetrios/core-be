@@ -94,45 +94,125 @@ function resolveDeploymentCounts(): ResolvedDeploymentCounts | undefined {
   };
 }
 
+function resolveProcessCount(counts: ResolvedDeploymentCounts): number {
+  if (counts.kind === 'total') {
+    return counts.totalProcessCount;
+  }
+
+  return counts.apiProcessCount + counts.workerProcessCount;
+}
+
 function computeRequiredPoolConnections(
   counts: ResolvedDeploymentCounts,
   poolMaxConnections: number,
 ): number {
-  if (counts.kind === 'total') {
-    return counts.totalProcessCount * poolMaxConnections;
-  }
-
-  return (counts.apiProcessCount + counts.workerProcessCount) * poolMaxConnections;
+  return resolveProcessCount(counts) * poolMaxConnections;
 }
 
+/** Blank space between one column and the next — the only fixed measurement in the layout. */
+const MESSAGE_COLUMN_GAP = 2;
+
+/** Left margin shared by every indented line of the message. */
+const MESSAGE_INDENT = '  ';
+
+/**
+ * Width of a column: its widest cell plus the gap to the next column. Derived per call so a
+ * three-digit pool or a longer variable name cannot silently break the alignment.
+ */
+function columnWidth(cells: readonly string[]): number {
+  return Math.max(...cells.map((cell) => cell.length)) + MESSAGE_COLUMN_GAP;
+}
+
+/**
+ * Boot-fatal, so it is written to be actioned straight from the deploy log: the rule that was
+ * broken, the same rule with real numbers, then the exact variable and value that fixes it.
+ * States that DATABASE_POOL_MAX is per process, which is the misreading that causes this.
+ */
 function buildDeploymentBudgetErrorMessage(parameters: {
   poolMaxConnections: number;
   postgresMaxConnections: number;
   reservedConnections: number;
   allowedApplicationConnections: number;
   requiredConnections: number;
+  processCount: number;
   deploymentSummary: string;
 }): string {
+  const fittingPoolMax = Math.floor(
+    parameters.allowedApplicationConnections / parameters.processCount,
+  );
+  const neededMaxConnections = parameters.requiredConnections + parameters.reservedConnections;
+
+  const ruleCell = 'processes × DATABASE_POOL_MAX';
+  const wanted = `${parameters.processCount} × ${parameters.poolMaxConnections} = ${parameters.requiredConnections}`;
+  const available = `${parameters.postgresMaxConnections} − ${parameters.reservedConnections} = ${parameters.allowedApplicationConnections}`;
+
+  const poolOption = `DATABASE_POOL_MAX=${fittingPoolMax}`;
+  const clusterOption = `POSTGRES_MAX_CONNECTIONS=${neededMaxConnections}`;
+  const noFitOption = 'Raise the database';
+
+  const keyColumn = columnWidth(['Fix', 'Or', 'Docs']);
+  const labelColumn = columnWidth(['The rule', 'Your numbers']);
+  const ruleColumn = columnWidth([ruleCell, wanted]);
+  const compareColumn = columnWidth(['must be ≤', 'is more than']);
+  const optionColumn = columnWidth([poolOption, clusterOption, noFitOption]);
+  const continuation = ' '.repeat(MESSAGE_INDENT.length + keyColumn + optionColumn);
+
+  // A pool of 0 is not usable advice; when nothing fits, raising the server is the only fix.
+  const fits = fittingPoolMax >= 1;
+  const fixOption = fits ? poolOption : noFitOption;
+  const fixNote = fits
+    ? 'fits now, no database change needed'
+    : `no pool size fits ${parameters.processCount} processes`;
+
   return (
-    `Postgres connection budget exceeded: ${parameters.deploymentSummary} requires ` +
-    `${parameters.requiredConnections} pool connections at DATABASE_POOL_MAX ${parameters.poolMaxConnections}, ` +
-    `but only ${parameters.allowedApplicationConnections} are available ` +
-    `(max_connections ${parameters.postgresMaxConnections} − reserved ${parameters.reservedConnections}). ` +
-    'Set DEPLOYMENT_TOTAL_REPLICA_COUNT or DEPLOYMENT_API_REPLICA_COUNT / DEPLOYMENT_WORKER_REPLICA_COUNT, DATABASE_POOL_MAX, ' +
-    'POSTGRES_MAX_CONNECTIONS, or POSTGRES_RESERVED_CONNECTIONS. ' +
-    'See docs/deployment/runbooks/resource-limits.md'
+    'Postgres connection budget exceeded — DATABASE_POOL_MAX is too high for this database.\n' +
+    '\n' +
+    MESSAGE_INDENT +
+    'The rule'.padEnd(labelColumn) +
+    ruleCell.padEnd(ruleColumn) +
+    'must be ≤'.padEnd(compareColumn) +
+    'max_connections − reserved\n' +
+    MESSAGE_INDENT +
+    'Your numbers'.padEnd(labelColumn) +
+    wanted.padEnd(ruleColumn) +
+    'is more than'.padEnd(compareColumn) +
+    available +
+    '\n\n' +
+    `${MESSAGE_INDENT}DATABASE_POOL_MAX ${parameters.poolMaxConnections} is PER PROCESS, not a total. ` +
+    `You run ${parameters.deploymentSummary},\n` +
+    `${MESSAGE_INDENT}so the app asks for ${parameters.requiredConnections} connections but only ` +
+    `${parameters.allowedApplicationConnections} are free.\n` +
+    '\n' +
+    MESSAGE_INDENT +
+    'Fix'.padEnd(keyColumn) +
+    fixOption.padEnd(optionColumn) +
+    fixNote +
+    '\n' +
+    MESSAGE_INDENT +
+    'Or'.padEnd(keyColumn) +
+    clusterOption.padEnd(optionColumn) +
+    `ONLY after raising max_connections to ${neededMaxConnections}\n` +
+    continuation +
+    'on the Postgres server itself. This variable\n' +
+    continuation +
+    'does not change the server, it only tells\n' +
+    continuation +
+    'the app what the server already allows.\n' +
+    '\n' +
+    MESSAGE_INDENT +
+    'Docs'.padEnd(keyColumn) +
+    'docs/deployment/runbooks/resource-limits.md'
   );
 }
 
-function formatDeploymentSummary(
-  counts: ResolvedDeploymentCounts,
-  poolMaxConnections: number,
-): string {
+function formatDeploymentSummary(counts: ResolvedDeploymentCounts): string {
+  const processCount = resolveProcessCount(counts);
+
   if (counts.kind === 'total') {
-    return `${counts.totalProcessCount} processes × DATABASE_POOL_MAX ${poolMaxConnections}`;
+    return `${processCount} processes`;
   }
 
-  return `${counts.apiProcessCount} API + ${counts.workerProcessCount} worker processes × DATABASE_POOL_MAX ${poolMaxConnections}`;
+  return `${processCount} processes (${counts.apiProcessCount} API + ${counts.workerProcessCount} worker)`;
 }
 
 /** Application connection headroom: max_connections minus reserved admin/migration slots. */
@@ -174,7 +254,8 @@ export async function assertPostgresConnectionBudget(
           reservedConnections,
           allowedApplicationConnections,
           requiredConnections,
-          deploymentSummary: formatDeploymentSummary(deploymentCounts, poolMaxConnections),
+          processCount: resolveProcessCount(deploymentCounts),
+          deploymentSummary: formatDeploymentSummary(deploymentCounts),
         }),
       );
     }

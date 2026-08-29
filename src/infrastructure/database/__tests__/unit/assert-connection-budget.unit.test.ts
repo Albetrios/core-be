@@ -30,6 +30,14 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-connection-budget.js', () 
     computeWorkerPostgresPoolDemandMock(...arguments_),
 }));
 
+/**
+ * The message's opening line, asserted verbatim so a reword cannot land unnoticed. Passed as a
+ * string rather than a regex: vitest substring-matches it, and the em dash and full stop would
+ * otherwise need escaping.
+ */
+const BUDGET_EXCEEDED_HEADLINE =
+  'Postgres connection budget exceeded — DATABASE_POOL_MAX is too high for this database.';
+
 describe('assertPostgresConnectionBudget', () => {
   beforeEach(() => {
     sqlMock.mockReset();
@@ -59,7 +67,7 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/connection budget exceeded/i);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(BUDGET_EXCEEDED_HEADLINE);
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
@@ -214,7 +222,64 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/connection budget exceeded/i);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(BUDGET_EXCEEDED_HEADLINE);
+  });
+
+  it('names the largest fitting pool and the cluster size the current pool needs', async () => {
+    const poolMax = 50;
+    const maxConnections = 100;
+    const reserved = 10;
+    const apiReplicas = 1;
+    const workerReplicas = 1;
+
+    getEnvMock.mockReturnValue({
+      DATABASE_POOL_MAX: poolMax,
+      POSTGRES_RESERVED_CONNECTIONS: reserved,
+      POSTGRES_MAX_CONNECTIONS: maxConnections,
+      DEPLOYMENT_API_REPLICA_COUNT: apiReplicas,
+      DEPLOYMENT_WORKER_REPLICA_COUNT: workerReplicas,
+      NODE_ENV: 'development',
+      WORKER_CONCURRENCY: 4,
+    });
+
+    const { assertPostgresConnectionBudget } = await import(
+      '@/infrastructure/database/safety/assert-connection-budget.js'
+    );
+
+    const processes = apiReplicas + workerReplicas;
+    const available = maxConnections - reserved;
+    const largestFittingPool = Math.floor(available / processes);
+    const clusterNeededForCurrentPool = processes * poolMax + reserved;
+
+    // 2 x 50 = 100 wanted against 100 - 10 = 90 available: 45 fits, or grow the cluster to 110.
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(
+      new RegExp(`DATABASE_POOL_MAX=${largestFittingPool}\\b`),
+    );
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(
+      new RegExp(`POSTGRES_MAX_CONNECTIONS=${clusterNeededForCurrentPool}\\b`),
+    );
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/PER PROCESS/);
+  });
+
+  it('omits the pool suggestion when no pool size fits the process count', async () => {
+    getEnvMock.mockReturnValue({
+      DATABASE_POOL_MAX: 10,
+      POSTGRES_RESERVED_CONNECTIONS: 10,
+      POSTGRES_MAX_CONNECTIONS: 15,
+      DEPLOYMENT_TOTAL_REPLICA_COUNT: 10,
+      NODE_ENV: 'development',
+      WORKER_CONCURRENCY: 4,
+    });
+
+    const { assertPostgresConnectionBudget } = await import(
+      '@/infrastructure/database/safety/assert-connection-budget.js'
+    );
+
+    // floor(5 available / 10 processes) is 0, which is not usable advice.
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/Raise the database/);
+
+    const caught = await assertPostgresConnectionBudget().catch((error: unknown) => error);
+    expect(String(caught)).not.toContain('DATABASE_POOL_MAX=0');
   });
 
   it('requires both split counts when using either one', async () => {
@@ -247,7 +312,7 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/connection budget exceeded/i);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(BUDGET_EXCEEDED_HEADLINE);
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
