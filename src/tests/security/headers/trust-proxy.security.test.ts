@@ -33,7 +33,9 @@ describe('Security: trust proxy', () => {
   });
 
   it('with trustProxy=1 respects X-Forwarded-For at one hop', async () => {
-    application = Fastify({ trustProxy: 1 });
+    // fastify@5.12 removed `number` from the trustProxy type — the equivalent
+    // one-hop predicate (what resolveTrustProxy now compiles env numbers to).
+    application = Fastify({ trustProxy: (_address, hopIndex) => hopIndex < 1 });
     application.get('/ip', async (request) => ({ ip: request.ip }));
     await application.ready();
 
