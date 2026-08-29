@@ -59,7 +59,7 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/connection budget exceeded/i);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/DATABASE_POOL_MAX=8/);
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
@@ -214,7 +214,53 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/connection budget exceeded/i);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/DATABASE_POOL_MAX=8/);
+  });
+
+  it('names the largest fitting pool and the cluster size the current pool needs', async () => {
+    getEnvMock.mockReturnValue({
+      DATABASE_POOL_MAX: 50,
+      POSTGRES_RESERVED_CONNECTIONS: 10,
+      POSTGRES_MAX_CONNECTIONS: 100,
+      DEPLOYMENT_API_REPLICA_COUNT: 1,
+      DEPLOYMENT_WORKER_REPLICA_COUNT: 1,
+      NODE_ENV: 'development',
+      WORKER_CONCURRENCY: 4,
+    });
+
+    const { assertPostgresConnectionBudget } = await import(
+      '@/infrastructure/database/safety/assert-connection-budget.js'
+    );
+
+    // 2 processes x 50 = 100 wanted, 100 - 10 reserved = 90 available.
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(
+      /DATABASE_POOL_MAX=45/, // floor(90 / 2)
+    );
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(
+      /POSTGRES_MAX_CONNECTIONS=110/, // 100 required + 10 reserved
+    );
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/PER PROCESS/);
+  });
+
+  it('omits the pool suggestion when no pool size fits the process count', async () => {
+    getEnvMock.mockReturnValue({
+      DATABASE_POOL_MAX: 10,
+      POSTGRES_RESERVED_CONNECTIONS: 10,
+      POSTGRES_MAX_CONNECTIONS: 15,
+      DEPLOYMENT_TOTAL_REPLICA_COUNT: 10,
+      NODE_ENV: 'development',
+      WORKER_CONCURRENCY: 4,
+    });
+
+    const { assertPostgresConnectionBudget } = await import(
+      '@/infrastructure/database/safety/assert-connection-budget.js'
+    );
+
+    // floor(5 available / 10 processes) is 0, which is not usable advice.
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/Raise the database/);
+
+    const caught = await assertPostgresConnectionBudget().catch((error: unknown) => error);
+    expect(String(caught)).not.toContain('DATABASE_POOL_MAX=0');
   });
 
   it('requires both split counts when using either one', async () => {
@@ -247,7 +293,7 @@ describe('assertPostgresConnectionBudget', () => {
       '@/infrastructure/database/safety/assert-connection-budget.js'
     );
 
-    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/connection budget exceeded/i);
+    await expect(assertPostgresConnectionBudget()).rejects.toThrow(/DATABASE_POOL_MAX=2/);
     expect(sqlMock).not.toHaveBeenCalled();
   });
 

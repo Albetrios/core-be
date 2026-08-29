@@ -497,6 +497,16 @@ function recordScopeOnActiveSpan(
   }
 }
 
+/**
+ * THE entry point for application (RLS-enforcing) database work: picks the context that can
+ * satisfy the scope and runs `callback` inside it.
+ *
+ * @remarks
+ * The `source` discriminant selects the arm — a {@link PrincipalDatabaseScope} carries where the
+ * identity came from and runs under the principal context; a {@link SessionDatabaseScope} has no
+ * source and runs under the session context. The scope is recorded on the active span before
+ * either arm runs, so a query's tenancy stays visible in the trace even when the callback throws.
+ */
 export async function withAppDatabaseContext<T>(
   scope: AppDatabaseScope,
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
