@@ -47,7 +47,7 @@ function getSubscriptionSeatSyncQueue(): Queue<SubscriptionSeatSyncJobData> {
  * - **Failure modes:** propagates BullMQ enqueue errors; callers in the request path swallow them
  *   so a Redis blip never fails member management (the change already committed locally).
  * - **Side effects:** writes one job to the seat-sync queue.
- * - **Notes:** a STABLE per-org jobId would be silently no-op'd by BullMQ whenever a prior job with
+ * - **Notes:** a STABLE per-organization jobId would be silently no-op'd by BullMQ whenever a prior job with
  *   that id is still RETAINED (completed or failed) — the exact duplicate-jobId trap the Stripe
  *   webhook reclaim path documents as sec-re-02 — leaving Stripe billing a stale seat count until the
  *   retained job aged out. Retries of one job still reuse that job's stored idempotency token, so a

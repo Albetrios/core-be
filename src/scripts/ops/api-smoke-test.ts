@@ -172,8 +172,8 @@ async function setupOrganization(): Promise<void> {
 
   // Post-flatten, the ACTIVE organization rides the signed `org` JWT claim — the
   // X-Organization-Id header is ignored on flat routes. Login mints a token scoped to the
-  // demo user's PERSONAL org, where the org-permission probes (subscription:read,
-  // webhook:read, audit-log:read) legitimately 403. Switch to the demo TEAM org and adopt
+  // demo user's PERSONAL organization, where the organization-permission probes (subscription:read,
+  // webhook:read, audit-log:read) legitimately 403. Switch to the demo TEAM organization and adopt
   // the re-scoped token, exactly as a real client does.
   const switchResponse = await requestJson(`${API_PREFIX}/auth/switch-to-organization`, {
     method: 'POST',

@@ -99,7 +99,7 @@ describe('UserNotificationPreferencesService', () => {
 
   it('put rejects organization-scoped preferences (org_id is unsettable on this user-scoped endpoint)', async () => {
     // This user-scoped endpoint has no tenant context, so a non-null organization_id can never
-    // satisfy the org RLS branch (would surface as 42501 -> 500). It must be rejected with a 400
+    // satisfy the organization RLS branch (would surface as 42501 -> 500). It must be rejected with a 400
     // before reaching the repository.
     await expect(
       service.put(asUserScope('user_public'), {

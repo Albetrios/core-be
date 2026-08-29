@@ -5,7 +5,7 @@
  * `ORGANIZATION_API_KEY_RAW_SECRET_BYTE_LENGTH` bytes, persisted only as its SHA-256 `key_hash`
  * plus a non-secret `key_prefix` (first `ORGANIZATION_API_KEY_PREFIX_DISPLAY_LENGTH` chars). The
  * raw secret is discarded — seeded keys cannot be used to authenticate, matching production where
- * the secret is shown once. When `counts.edgeCases` is set, the highest-index key per org is
+ * the secret is shown once. When `counts.edgeCases` is set, the highest-index key per organization is
  * created `REVOKED` + soft-deleted.
  *
  * Idempotency: count-and-resume per organization keyed by a deterministic `name`

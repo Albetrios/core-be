@@ -121,7 +121,7 @@ An authenticated organization administrator can submit a `security_policy` paylo
 3. Exhaust Postgres JSONB parse budget on writes with pathological nesting depth.
 
 **Exploit/Failure Scenario:**
-An org admin POSTs a `security_policy` with 5,000 keys each containing a 200-character value (under 1 MB). The row grows to > 1 MB on disk, and every subsequent `GET /organizations/:id/settings` returns this payload, amplifying downstream JSON parse cost.
+An organization admin POSTs a `security_policy` with 5,000 keys each containing a 200-character value (under 1 MB). The row grows to > 1 MB on disk, and every subsequent `GET /organizations/:id/settings` returns this payload, amplifying downstream JSON parse cost.
 
 **Recommended Fix:**
 Replace `z.record(z.string(), z.unknown())` with a strict typed schema that enumerates permitted policy keys. If the schema must remain extensible, add at minimum:

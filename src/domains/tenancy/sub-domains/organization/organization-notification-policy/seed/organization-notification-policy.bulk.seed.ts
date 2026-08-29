@@ -13,7 +13,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';
 import { generateBulkNotificationPolicy } from './organization-notification-policy.faker.js';
 
-/** Fixed `(type, channel)` pair seeded per org so the natural-key unique index gates re-runs. */
+/** Fixed `(type, channel)` pair seeded per organization so the natural-key unique index gates re-runs. */
 const SEED_NOTIFICATION_TYPE = 'security.alert';
 const SEED_CHANNEL = 'EMAIL';
 
@@ -23,7 +23,7 @@ const SEED_CHANNEL = 'EMAIL';
  * @remarks
  * Algorithm: for each organization, insert a faker-built policy for the fixed `(type, channel)`
  * pair with `.onConflictDoNothing()` against the natural-key unique index, attributing
- * `created_by_user_id` to the org owner. Side effects: inserts into
+ * `created_by_user_id` to the organization owner. Side effects: inserts into
  * `tenancy.organization_notification_policies`. Failure modes: warns and returns early when no
  * organizations exist; otherwise propagates DB errors.
  */

@@ -10,7 +10,7 @@ import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.u
 import type { MemberInvitationService } from './member-invitation.service.js';
 
 /**
- * Builds the HTTP handler map for the invitation routes that remain after REQ-1: the org-scoped
+ * Builds the HTTP handler map for the invitation routes that remain after REQ-1: the organization-scoped
  * `revoke` / `resend` under `/organization/invitations/:invitation_id` and the invitee-facing
  * `/invitations/:invitation_id/accept`. Adding a member now issues the invitation via
  * `POST /organization/memberships`, so the standalone create/list, the invitee pending-list, and

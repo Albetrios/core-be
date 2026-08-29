@@ -59,7 +59,7 @@ describe('createOrganizationNotificationPolicyController', () => {
     expect(response).toMatchObject({ data: [policyRow] });
   });
 
-  it('listPolicies propagates NotFoundError when org is missing', async () => {
+  it('listPolicies propagates NotFoundError when organization is missing', async () => {
     vi.mocked(service.list).mockRejectedValueOnce(new NotFoundError('Organization'));
     await expect(
       controller.listPolicies(

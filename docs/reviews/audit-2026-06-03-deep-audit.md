@@ -371,14 +371,14 @@ The following areas were inspected thoroughly and found to have no open findings
 | CSRF double-submit cookie | `cookie-session-origin.pre-handler.ts` | Correct `timingSafeEqual`; Referer fallback non-production only |
 | CORS origin enforcement | `cors.middleware.ts` | Non-empty allowlist enforced; wildcard `*` disallowed in production |
 | Error handler (no stack leakage) | `error-handler.middleware.ts` | Stack traces never sent to clients; 500+ errors → Sentry |
-| Global + per-route rate limiting | `rate-limit.middleware.ts`, `rate-limit-presets.constants.ts` | IP-keyed global; org+actor-keyed per route; per-email keyed on auth routes; Redis fallback to in-process, not fail-open |
+| Global + per-route rate limiting | `rate-limit.middleware.ts`, `rate-limit-presets.constants.ts` | IP-keyed global; organization+actor-keyed per route; per-email keyed on auth routes; Redis fallback to in-process, not fail-open |
 | Idempotency middleware | `idempotency.middleware.ts` | SETNX fingerprint; fails closed (503) on Redis error; never caches secrets |
 | SSRF protection for outbound webhooks | `webhook-url.util.ts`, `webhook-outbound-fetch.util.ts` | DNS pinning; all private/link-local/multicast ranges blocked; IPv4-mapped IPv6 normalized; 64 KB response cap |
 | SVG sanitization | `upload-svg.util.ts` | DOMPurify with `{ USE_PROFILES: { svg: true, svgFilters: true } }` |
 | Magic-byte verification for uploads | `upload.service.ts` | Enforced on confirm, not just MIME type; matched against purpose config |
 | CAPTCHA enforcement | `captcha.middleware.ts`, `env-schema.ts` | Bypass header blocked in production; env schema refine requires `turnstile` in production |
 | Sensitive data redaction | `sensitive-redaction.util.ts` | Recursive, depth-capped, URL/query-string-aware; covers `email`, `token`, `cookie`, `jwt` fragments |
-| Permission cache (Redis versioned INCR) | `permission-cache.service.ts` | O(1) org-wide invalidation; stampede lock with compare-and-set commit; lock released in `finally` |
+| Permission cache (Redis versioned INCR) | `permission-cache.service.ts` | O(1) organization-wide invalidation; stampede lock with compare-and-set commit; lock released in `finally` |
 | Health endpoints | `health.middleware.ts` | No version leakage; short-TTL cached probes; no DB connection per request |
 | Cursor-based pagination | `pagination.util.ts` | Opaque base64url cursor; microsecond tie-breaking; strict schema |
 | Trust-proxy startup assertion | `trust-proxy.util.ts` | Throws at startup in hosted environments when `TRUST_PROXY` is false |

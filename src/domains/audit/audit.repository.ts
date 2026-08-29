@@ -193,7 +193,7 @@ export class AuditRepository {
 
   /**
    * Batch-resolves the internal organization ids carried on a page of audit rows to their
-   * public ids. `tenancy.organizations` is not FORCE RLS for the admin / org-audit contexts
+   * public ids. `tenancy.organizations` is not FORCE RLS for the admin / organization-audit contexts
    * the audit list runs under, so a plain SELECT works (no resolver needed).
    *
    * sec-r4-D2: filter on `deleted_at IS NULL` so soft-deleted organization public ids do

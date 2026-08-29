@@ -64,7 +64,7 @@ describe('Security: Upload RLS', () => {
     await cleanupDatabase();
   });
 
-  it('should hide other tenants org-scoped uploads when app.current_organization_public_id is set', async () => {
+  it('should hide other tenants organization-scoped uploads when app.current_organization_public_id is set', async () => {
     const rlsRows = await sql<{ relrowsecurity: boolean }[]>`
       SELECT c.relrowsecurity
       FROM pg_class c
@@ -89,7 +89,7 @@ describe('Security: Upload RLS', () => {
       user_id: ownerA.id,
       organization_id: organizationA.id,
       file_name: 'logo-a.png',
-      file_key: 'organization-logos/org-a/logo.png',
+      file_key: 'organization-logos/organization-a/logo.png',
       mime_type: 'image/png',
       file_size: 1024,
       storage_provider: 's3',
@@ -101,7 +101,7 @@ describe('Security: Upload RLS', () => {
       user_id: ownerB.id,
       organization_id: organizationB.id,
       file_name: 'logo-b.png',
-      file_key: 'organization-logos/org-b/logo.png',
+      file_key: 'organization-logos/organization-b/logo.png',
       mime_type: 'image/png',
       file_size: 1024,
       storage_provider: 's3',
@@ -137,12 +137,12 @@ describe('Security: Upload RLS', () => {
     expect(crossTenantAttempt).toHaveLength(0);
   });
 
-  it('sec-r7/M4: REJECTS an org-scoped upload INSERT under USER context (the production bug)', async () => {
+  it('sec-r7/M4: REJECTS an organization-scoped upload INSERT under USER context (the production bug)', async () => {
     // As core_be_app (FORCE RLS, like production) with ONLY app.current_user_public_id set — exactly what
     // withAppDatabaseContext (user scope) does — inserting an ORG-scoped upload row is rejected: the
     // uploads_tenant_isolation WITH CHECK needs app.current_organization_public_id, and uploads_owner_access
-    // only covers organization_id IS NULL. The upload service used to reserve org slots under user
-    // context, so every org-logo / org-file upload 500'd in production (tests as superuser hid it).
+    // only covers organization_id IS NULL. The upload service used to reserve organization slots under user
+    // context, so every organization-logo / organization-file upload 500'd in production (tests as superuser hid it).
     const owner = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: owner.id });
 
@@ -165,8 +165,8 @@ describe('Security: Upload RLS', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('sec-r7/M4: ACCEPTS the same org-scoped upload INSERT under ORGANIZATION context (the fix)', async () => {
-    // The fix reserves org slots under withAppDatabaseContext, which sets
+  it('sec-r7/M4: ACCEPTS the same organization-scoped upload INSERT under ORGANIZATION context (the fix)', async () => {
+    // The fix reserves organization slots under withAppDatabaseContext, which sets
     // app.current_organization_public_id — so the tenant-isolation WITH CHECK is satisfied.
     const owner = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: owner.id });
@@ -182,7 +182,7 @@ describe('Security: Upload RLS', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('sec-r7/M4: still ACCEPTS a user-scoped (NULL-org) upload INSERT under USER context', async () => {
+  it('sec-r7/M4: still ACCEPTS a user-scoped (NULL-organization) upload INSERT under USER context', async () => {
     // Regression guard: avatars and other personal uploads keep working under user context via
     // the owner-access policy — the fix only reroutes ORG-scoped uploads.
     const owner = await createTestUser();

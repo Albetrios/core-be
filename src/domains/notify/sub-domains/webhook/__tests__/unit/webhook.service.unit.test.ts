@@ -100,7 +100,7 @@ describe('WebhookService', () => {
     // sec-N4: service consults this before insert; default to 0 so existing
     // happy-path tests stay below the cap.
     countActiveByOrganization: vi.fn().mockResolvedValue(0),
-    // audit-#8: per-org creation quota advisory lock (no-op in unit tests).
+    // audit-#8: per-organization creation quota advisory lock (no-op in unit tests).
     acquireCreationQuotaLock: vi.fn().mockResolvedValue(undefined),
   } as unknown as WebhookRepository;
 

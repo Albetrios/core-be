@@ -50,7 +50,7 @@ vi.mock('@/domains/tenancy/sub-domains/organization/resolve-active-organization.
   resolveDefaultActiveOrganizationPublicId: vi.fn().mockResolvedValue(undefined),
   findUserActiveOrganizationPublicId: vi.fn().mockResolvedValue(undefined),
   // getMe now self-heals via ensurePersonalOrganizationPublicId (provisions on demand when
-  // personal is enabled and the org is missing); stub it so the pure unit test stays DB-free.
+  // personal is enabled and the organization is missing); stub it so the pure unit test stays DB-free.
   ensurePersonalOrganizationPublicId: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -158,7 +158,7 @@ describe('UserService', () => {
     });
 
     it('mints a FRESH passwordless account when the email belongs to a soft-deleted (offboarded) user', async () => {
-      // A tombstoned account must NOT be resurrected into an active org membership with its old
+      // A tombstoned account must NOT be resurrected into an active organization membership with its old
       // public_id — that would re-attach an offboarded identity. The guard is `&& !existing.deleted_at`;
       // if it ever regressed to `if (existing) return existing`, the deleted row would be reused.
       vi.mocked(repository.findByEmail).mockResolvedValueOnce({
@@ -210,9 +210,9 @@ describe('UserService', () => {
     expect(repository.update).toHaveBeenCalled();
   });
 
-  it('getMe reports a null personal_organization_id and skips provisioning when personal orgs are disabled', async () => {
+  it('getMe reports a null personal_organization_id and skips provisioning when personal organizations are disabled', async () => {
     // The disabled branch must short-circuit — no on-demand provisioning — and report null, so a
-    // deployment with personal orgs off never dead-ends on a self-heal that cannot run.
+    // deployment with personal organizations off never dead-ends on a self-heal that cannot run.
     const original = env.PERSONAL_ORGANIZATION_ENABLED;
     env.PERSONAL_ORGANIZATION_ENABLED = false;
     try {
@@ -224,7 +224,7 @@ describe('UserService', () => {
     }
   });
 
-  it('getMe surfaces the on-demand provisioned personal_organization_id when personal orgs are enabled', async () => {
+  it('getMe surfaces the on-demand provisioned personal_organization_id when personal organizations are enabled', async () => {
     const original = env.PERSONAL_ORGANIZATION_ENABLED;
     env.PERSONAL_ORGANIZATION_ENABLED = true;
     try {

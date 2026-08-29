@@ -91,7 +91,7 @@ describe('runStripeWebhookHandlerWithOrganizationContext', () => {
   // audit #2: metadata is the binding of last resort ONLY for a genuinely
   // first-contact subscription whose customer is also unknown locally (the
   // Dashboard-origin fallback-INSERT path). It is guarded downstream by the
-  // subscriptions WITH CHECK (audit #41) against a non-existent org.
+  // subscriptions WITH CHECK (audit #41) against a non-existent organization.
   it('falls back to metadata only when no subscription or customer mapping exists', async () => {
     const repository = buildStripeWebhookEventRepositoryStub({
       bySubscription: undefined,

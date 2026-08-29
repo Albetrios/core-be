@@ -5,7 +5,7 @@
  * Invalidating inside the callback (pre-commit) opens a race: a concurrent permission recompute for
  * the affected user reads the OLD committed permission set and re-caches it before the writer
  * commits, so a downgraded/removed member keeps access (or a newly-granted one is delayed) until the
- * cache TTL (~5 min). `AuditService`-style emitters and the org-delete path already invalidate after
+ * cache TTL (~5 min). `AuditService`-style emitters and the organization-delete path already invalidate after
  * the context block; this guard keeps every tenancy mutation consistent and prevents regressions.
  *
  * The scan strips comments and string/template literals, then asserts no `invalidatePermissions(`,

@@ -46,7 +46,7 @@ export class UserNotificationPreferencesService {
     const user_public_id = scope.userPublicId;
     const parsed = validatePutUserNotificationPreferences(body);
     // This is the user-scoped endpoint (/users/me/*) with no tenant context, so a non-null
-    // organization_id can never satisfy the org branch of the RLS WITH CHECK policy and would
+    // organization_id can never satisfy the organization branch of the RLS WITH CHECK policy and would
     // surface as a raw 42501 -> 500. Reject it as a 400 instead. Organization-scoped notification
     // policy is a separate tenancy feature (organization-notification-policy); user-level prefs
     // here are global.

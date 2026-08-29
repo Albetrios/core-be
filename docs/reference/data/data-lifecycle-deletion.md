@@ -10,7 +10,7 @@ How core-be treats **removal** of persisted rows: tombstones (`deleted_at`), **r
 2. **Financial and subscription state** remains an **immutable operational ledger**: lifecycle is **`status`** and provider fields (subscriptions, Stripe webhook ledger) — not `deleted_at` as a hide switch.
 3. **Secrets and sessions** favor **hard delete** after expiry/revocation to shrink attack surface; optional **retention** is time-boxed and documented.
 4. Every **read** path for tombstoned entities must filter **`deleted_at IS NULL`** (Drizzle: `isNull(table.deleted_at)`) unless the handler is **admin**, **restore**, or **compliance export**.
-5. **`INSERT`** on tenant-managed entities with a stable natural key uses **`onConflictDoUpdate`**: set **`deleted_at` to `NULL`** and refresh columns so **recreate becomes reactivation** (webhook URL per org, notification-policy triple — see **Upserts** below).
+5. **`INSERT`** on tenant-managed entities with a stable natural key uses **`onConflictDoUpdate`**: set **`deleted_at` to `NULL`** and refresh columns so **recreate becomes reactivation** (webhook URL per organization, notification-policy triple — see **Upserts** below).
 6. Tombstones older than **`TOMBSTONE_RETENTION_DAYS`** (default **90**) are **hard-deleted** by dedicated BullMQ retention workers (distinct from audit/session jobs).
 7. Introducing `deleted_at` on tables with **multiple natural keys** may require **composite unique indexes** for upsert + deduplication — see [sql-design-guard](../../../.cursor/skills/sql-design-guard/SKILL.md).
 
@@ -33,12 +33,12 @@ How core-be treats **removal** of persisted rows: tombstones (`deleted_at`), **r
 
 Each area must be **documented and implemented** (correct queries, migrations, workers, or explicit guardrails). Work may ship in **multiple PRs**; ordering is for blast radius, not deferring scope.
 
-- **Tenant-config delete** — webhooks, API keys, roles, org notification policies, etc.
+- **Tenant-config delete** — webhooks, API keys, roles, organization notification policies, etc.
 - **Membership / RBAC teardown** — memberships, role-permission links.
 - **Offboarding identity** — users, settings, notification preferences, uploads, linked rows.
 - **Immutable operational ledger** — subscriptions and `billing.stripe_webhook_events`: **no** naive `deleted_at`; enforce **no stray SQL delete** and provider-aligned `status`.
 - **Ephemeral secrets / credentials** — sessions, verification tokens; retention and hard delete.
-- **Notification hygiene** — user notifications vs org-level webhooks.
+- **Notification hygiene** — user notifications vs organization-level webhooks.
 - **Compliance retention** — audit logs and other TTL tables.
 
 For each **table × use-case** cell, classify **`implement_now`** vs **`not_applicable_to_table`** (e.g. `sessions` is not applicable to “immutable ledger”). **`not_applicable_to_table`** must be explicit — never blank.
@@ -89,10 +89,10 @@ See migrations **`20260516000002_*` … `*_04_*`** for `deleted_at` columns and 
 | `uploads`              | `DELETE` removes S3 object + sets `deleted_at`; user offboarding tombstones all user uploads (+ S3 per row) | Hard-delete row + S3 (`upload-tombstone-retention`)                                          |
 | `users`                | Revoke all sessions + auth methods; clear avatar S3 key; tombstone uploads; **delete all GDPR export S3 keys + `auth.user_data_exports` rows** | Hard-delete row (`user-tombstone-retention`; blocked if still `organizations.owner_user_id`) |
 | `user_data_exports`    | Removed on user offboarding (`deleteAllExportsForUser`)                                                     | Daily `user-data-export-retention` when `expires_at` passed; S3 lifecycle on prefix `user-data-export/` (7 days) |
-| `organizations`        | Clear logo S3 key; tombstone org-scoped uploads (DB only); **no** child membership/role/API tombstone       | Hard-delete org (`organization-tombstone-retention`; CASCADE children)                       |
+| `organizations`        | Clear logo S3 key; tombstone organization-scoped uploads (DB only); **no** child membership/role/API tombstone       | Hard-delete organization (`organization-tombstone-retention`; CASCADE children)                       |
 | Other tombstone tables | API `DELETE` sets `deleted_at` only                                                                         | Matching `*-tombstone-retention` worker                                                      |
 
-**Org tombstone window:** Child rows (memberships, webhooks, roles, etc.) may remain `deleted_at IS NULL` while the org is tombstoned. Normal API access is blocked via `requireOrganizationByPublicId` / org repository filters — not via cascading soft-delete.
+**Org tombstone window:** Child rows (memberships, webhooks, roles, etc.) may remain `deleted_at IS NULL` while the organization is tombstoned. Normal API access is blocked via `requireOrganizationByPublicId` / organization repository filters — not via cascading soft-delete.
 
 ### Tombstone purge cron order (FK-safe)
 
@@ -100,7 +100,7 @@ Registered in `src/infrastructure/queue/scheduler.ts` (default stagger 05:44–0
 
 1. `user-data-export-retention` — expired GDPR export artifacts (S3 + `auth.user_data_exports`)
 2. `upload-tombstone-retention` — `uploads.user_id` blocks user hard-delete
-3. `organization-tombstone-retention` — releases `owner_user_id` when org purged
+3. `organization-tombstone-retention` — releases `owner_user_id` when organization purged
 4. Child tombstones (webhooks, policies, memberships, roles, API keys)
 5. `user-tombstone-retention` — last
 
@@ -122,18 +122,18 @@ Batch deletes use `deleteInBatchesByCondition` with per-row FK fallback (`blocke
 | `auth_methods`                       | auth    | Revocation              | `revoked_at`                              | Not `deleted_at` by design                                                      |
 | `mfa_methods`                        | auth    | Revocation              | `revoked_at`                              | Same                                                                            |
 | `verification_tokens`                | auth    | Ephemeral               | TTL implicit                              | Hard delete acceptable                                                          |
-| `organizations`                      | tenancy | Tombstone               | `deleted_at`, `status`                    | Logo S3 + org upload tombstone; no child cascade on soft-delete                 |
+| `organizations`                      | tenancy | Tombstone               | `deleted_at`, `status`                    | Logo S3 + organization upload tombstone; no child cascade on soft-delete                 |
 | `memberships`                        | tenancy | Tombstone               | `deleted_at`                              |                                                                                 |
 | `member_invitations`                 | tenancy | Revocation + TTL        | `revoked_at`, `expires_at`, `accepted_at` |                                                                                 |
 | `roles`                              | tenancy | Tombstone               | `deleted_at`                              |                                                                                 |
 | `role_permissions`                   | tenancy | Junction                | none                                      | Drops when role hard-removed — align with tombstone role                        |
 | `permissions`                        | tenancy | Reference               | none                                      | Seeds only                                                                      |
-| `organization_settings`              | tenancy | Tombstone chain         | FK org                                    | Visibility from org                                                             |
+| `organization_settings`              | tenancy | Tombstone chain         | FK organization                                    | Visibility from organization                                                             |
 | `organization_notification_policies` | tenancy | Tenant-config           | `deleted_at`                              | Upsert + API soft-delete                                                        |
 | `api_keys`                           | tenancy | Tombstone               | `deleted_at`                              |                                                                                 |
 | `webhooks`                           | notify  | Tenant-config           | `deleted_at`                              | Unique `(organization_id, url)`; purge worker after `TOMBSTONE_RETENTION_DAYS`  |
 | `webhook_delivery_attempts`          | notify  | Append / child          | FK `webhook_id`                           | Retain for audit; parent soft-deleted                                           |
-| `notifications`                      | notify  | Notification hygiene    | Hard delete / read flags                  | User dismiss — not org integration                                              |
+| `notifications`                      | notify  | Notification hygiene    | Hard delete / read flags                  | User dismiss — not organization integration                                              |
 | `logs`                               | audit   | Append-only             | Retention worker                          |                                                                                 |
 | `plans`                              | billing | Reference / catalog     | `is_active`                               | Not user-deleted per row                                                        |
 | `subscriptions`                      | billing | Immutable ledger        | `status`, `canceled_at`, provider ids     |                                                                                 |

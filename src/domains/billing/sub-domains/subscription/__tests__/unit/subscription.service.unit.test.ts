@@ -167,7 +167,7 @@ describe('SubscriptionService', () => {
     expect(result).toHaveProperty('seats_used');
   });
 
-  it('audit-#B4: create wraps the critical section in a per-org Redis lock', async () => {
+  it('audit-#B4: create wraps the critical section in a per-organization Redis lock', async () => {
     await service.create(
       scope,
       { plan_id: 'plan_public', billing_cycle: 'monthly' },
@@ -342,12 +342,12 @@ describe('SubscriptionService', () => {
       'idem-create-key',
     );
 
-    // audit #3: the client key is namespaced by operation + org before reaching Stripe's
+    // audit #3: the client key is namespaced by operation + organization before reaching Stripe's
     // account-global idempotency space (no cross-tenant key collision).
     expect(stripeMocks.createStripeSubscription).toHaveBeenCalledWith(
       expect.objectContaining({ idempotencyKey: 'sub-create:org_public:idem-create-key' }),
     );
-    // The customer-create uses a deterministic per-org key (`customer-create:<org>`) so a
+    // The customer-create uses a deterministic per-organization key (`customer-create:<organization>`) so a
     // retried create after a crash returns the same Stripe customer instead of minting a
     // duplicate (organization has no stripe_customer_id in this fixture).
     expect(stripeMocks.createStripeCustomer).toHaveBeenCalledWith(
@@ -371,7 +371,7 @@ describe('SubscriptionService', () => {
 
     await service.changePlan(scope, 'sub_public', { plan_id: 'plan_public' }, 'idem-change-key');
 
-    // audit #3: namespaced by operation + org before reaching Stripe's account-global key space.
+    // audit #3: namespaced by operation + organization before reaching Stripe's account-global key space.
     expect(stripeMocks.updateStripeSubscription).toHaveBeenCalledWith(
       'sub_stripe',
       expect.objectContaining({ idempotencyKey: 'sub-change-plan:org_public:idem-change-key' }),

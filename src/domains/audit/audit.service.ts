@@ -41,7 +41,7 @@ function collectReferencedInternalIds(
  * @remarks
  * P0-#2 (audit outbox): {@link AuditService.record} now stages every audit row in
  * `audit.outbox` inside the caller's business transaction instead of opening a
- * fresh org-scoped transaction per row. The audit drain worker
+ * fresh organization-scoped transaction per row. The audit drain worker
  * ({@link auditOutboxDrainProcessor}) reads PENDING rows out-of-band, resolves
  * actor / target / organization public ids to internal ids, and inserts them into
  * `audit.logs`. Effects:
@@ -111,8 +111,8 @@ export class AuditService {
       });
 
     // sec-R10: the `audit.outbox` INSERT is gated by RLS (audit_outbox_tenant_isolation_insert:
-    // org rows need `app.current_organization_public_id`, tenantless rows need `app.system_audit_insert`).
-    // Post-sec-M4 the per-request org RLS transaction is a no-op and controllers emit audit AFTER
+    // organization rows need `app.current_organization_public_id`, tenantless rows need `app.system_audit_insert`).
+    // Post-sec-M4 the per-request organization RLS transaction is a no-op and controllers emit audit AFTER
     // the service's withAppDatabaseContext block has closed — so without establishing the
     // matching context here the bare-pool INSERT is rejected under the production core_be_app role
     // and the row is silently dropped by `recordAuditEvent`. Open the right context per row.

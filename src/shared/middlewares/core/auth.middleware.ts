@@ -136,8 +136,8 @@ async function authenticate(request: FastifyRequest, _reply: FastifyReply): Prom
  *
  * @remarks
  * - **Algorithm:** the single common mint — whatever verified ids `request.auth`
- *   carries go into `PRINCIPAL_SCOPE.REQUEST` (API keys: org only; users: user +
- *   org claim when present). No route-contract decisions here: org-permission
+ *   carries go into `PRINCIPAL_SCOPE.REQUEST` (API keys: organization only; users: user +
+ *   organization claim when present). No route-contract decisions here: organization-permission
  *   403s come from the authorization layer, real-user 401s from `requireAuth`
  *   in controllers, and RLS fails closed regardless.
  * - **Failure modes:** none — unauthenticated requests never reach it.

@@ -123,7 +123,7 @@ export function buildReplayJobPayload(data: DeadLetterJobData): Record<string, u
     case NOTIFICATION_QUEUE_NAME: {
       const notificationId = summary.notification_id;
       if (typeof notificationId !== 'number') return null;
-      // Notification jobs carry a nullable org scope; preserve null (global notifications)
+      // Notification jobs carry a nullable organization scope; preserve null (global notifications)
       // and only forward a concrete public id when present.
       const organizationPublicId = summary.organization_public_id;
       basePayload = {

@@ -11,7 +11,7 @@ What it owns:
 - The `auth_*` tables (auth methods, sessions, MFA secrets, WebAuthn credentials, verification tokens).
 - All credential verification logic and the failed-attempt + lockout counters.
 - JWT issuance + verification (via [src/shared/utils/security/jwt.util.ts](src/shared/utils/security/jwt.util.ts)).
-- Origin-checked session cookies (`session_id`) and the refresh path; CSRF model in [docs/reference/security/csrf-and-session-cookies.md](docs/reference/security/csrf-and-session-cookies.md). Frontend client integration — SPA login across every entry flow, reactive refresh, org switching, and how many calls each flow takes to reach the dashboard — in [docs/reference/api/frontend-auth-guide.md](docs/reference/api/frontend-auth-guide.md).
+- Origin-checked session cookies (`session_id`) and the refresh path; CSRF model in [docs/reference/security/csrf-and-session-cookies.md](docs/reference/security/csrf-and-session-cookies.md). Frontend client integration — SPA login across every entry flow, reactive refresh, organization switching, and how many calls each flow takes to reach the dashboard — in [docs/reference/api/frontend-auth-guide.md](docs/reference/api/frontend-auth-guide.md).
 
 What it does not own: user profile (lives in [user](src/domains/user/)), organization permissions (lives in [tenancy/permission](src/domains/tenancy/sub-domains/permission/)), audit (lives in [audit](src/domains/audit/) — auth calls into it).
 

@@ -44,9 +44,9 @@ export interface MemberInvitationListPagination {
 /**
  * Drizzle data access for `tenancy.member_invitations`. Org-scoped reads
  * (listing, find-by-public-id, accept/revoke/resend updates) run under the
- * caller's RLS context; cross-org lookups by email or by invitation public id
+ * caller's RLS context; cross-organization lookups by email or by invitation public id
  * use SECURITY DEFINER SQL functions so the public accept flow can
- * resolve the owning organization without an org GUC set up front.
+ * resolve the owning organization without an organization GUC set up front.
  */
 export class MemberInvitationRepository {
   async findByOrganizationId(organization_id: number, pagination: MemberInvitationListPagination) {
@@ -135,7 +135,7 @@ export class MemberInvitationRepository {
   }
 
   /**
-   * audit-#8: transaction-scoped advisory lock serializing the per-org pending-invitation quota
+   * audit-#8: transaction-scoped advisory lock serializing the per-organization pending-invitation quota
    * check + insert so concurrent invites cannot both pass the same count and overshoot
    * `INVITATION_MAX_PENDING_PER_ORG`. Call inside the create transaction before
    * {@link MemberInvitationRepository.countPendingByOrganization}.

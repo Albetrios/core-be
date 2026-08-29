@@ -268,7 +268,7 @@ async function processTenantScopedNotificationJob(
  *
  * @remarks
  * - **Algorithm:** for each job, branch on `organizationPublicId`: tenant-scoped jobs run inside
- *   `runTenantScopedWorkerJob` (`withAppDatabaseContext`) so RLS pins reads to the org;
+ *   `runTenantScopedWorkerJob` (`withAppDatabaseContext`) so RLS pins reads to the organization;
  *   tenant-less notifications delegate directly to {@link processNotificationDispatchJob}
  *   which then enters its own `loadNotificationForScope` flow — resolving the recipient
  *   public id under `withMaintenanceDatabaseContext` and pinning `withAppDatabaseContext (user scope)`

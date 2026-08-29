@@ -208,7 +208,7 @@ describe('audit-export.worker — S3 NDJSON export', () => {
     );
   });
 
-  it('skips upload when manifest.json already exists for org+date', async () => {
+  it('skips upload when manifest.json already exists for organization+date', async () => {
     const { runAuditExportJob } = await import('@/domains/audit/workers/audit-export.processor.js');
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });

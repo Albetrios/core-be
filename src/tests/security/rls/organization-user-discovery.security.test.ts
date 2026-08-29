@@ -149,7 +149,7 @@ describe('Security: organization user-discovery RLS + invitation SECURITY DEFINE
     expect(rows).toHaveLength(1);
   });
 
-  it('resolve_member_invitation_lookup_by_public_id returns owning organization without org context', async () => {
+  it('resolve_member_invitation_lookup_by_public_id returns owning organization without organization context', async () => {
     const owner = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: owner.id });
     const role = await createRoleWithPermissions({
@@ -263,8 +263,8 @@ describe('Security: organization user-discovery RLS + invitation SECURITY DEFINE
       FROM tenancy.list_pending_member_invitations_for_email(${invitationEmail}, 100)
     `;
     expect(rows).toHaveLength(2);
-    const orgIds = new Set(rows.map((row) => row.organization_public_id));
-    expect(orgIds.has(organizationA.public_id)).toBe(true);
-    expect(orgIds.has(organizationB.public_id)).toBe(true);
+    const organizationIds = new Set(rows.map((row) => row.organization_public_id));
+    expect(organizationIds.has(organizationA.public_id)).toBe(true);
+    expect(organizationIds.has(organizationB.public_id)).toBe(true);
   });
 });

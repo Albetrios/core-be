@@ -44,7 +44,7 @@ describe('GET /api/v1/auth/me/context — Integration', () => {
 
   beforeEach(async () => {
     await cleanupDatabase();
-    // /auth/me/context → getMe self-heals a missing personal org; provisioning needs the full
+    // /auth/me/context → getMe self-heals a missing personal organization; provisioning needs the full
     // owner-permission catalog present (role_permissions → permissions FK). Seed all codes so
     // the self-heal succeeds. This does NOT change my_permissions — those come from the role
     // built with seedPermissions(PERMISSIONS)/createRoleWithPermissions below.
@@ -79,7 +79,7 @@ describe('GET /api/v1/auth/me/context — Integration', () => {
     expect(response.statusCode).toBe(401);
   });
 
-  it('returns the caller context: identity, active org, permissions, and switcher list', async () => {
+  it('returns the caller context: identity, active organization, permissions, and switcher list', async () => {
     const { user, organization, token } = await setupAuthorizedUser();
 
     const response = await injectAuthenticated(app, {

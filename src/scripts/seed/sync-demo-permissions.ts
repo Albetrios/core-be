@@ -1,5 +1,5 @@
 /**
- * Sync demo org admin role with current SYSTEM_PERMISSIONS (idempotent).
+ * Sync demo organization admin role with current SYSTEM_PERMISSIONS (idempotent).
  * Use after permission seed changes or when routes return 403 for demo user.
  *
  * Usage: pnpm db:seed:sync-demo

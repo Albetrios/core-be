@@ -416,7 +416,7 @@ export class WebauthnService {
       organizationSettingsService: this.organizationSettingsService,
       mfaService: this.mfaService,
       authSessionService: this.authSessionService,
-      // Non-pinned path: self-heal a missing personal org into the token (item #5).
+      // Non-pinned path: self-heal a missing personal organization into the token (item #5).
       ensurePersonalOrganizationOnMiss: true,
     });
   }

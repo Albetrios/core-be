@@ -24,7 +24,7 @@ Resolved in `SubscriptionService.reserveSeatCeilingForMemberAdd`
 (`src/domains/billing/sub-domains/subscription/subscription.service.ts`), under the active-subscription
 `FOR UPDATE` row lock so it serializes against concurrent member adds. On the **free-tier / no-subscription
 branch there is no subscription row to lock**, so `MembershipService.assertSeatAvailableForMemberAdd`
-additionally takes a per-org advisory xact lock (`RESOURCE_QUOTA_LOCK_NAMESPACE.MEMBERSHIP_SEAT`) before the
+additionally takes a per-organization advisory xact lock (`RESOURCE_QUOTA_LOCK_NAMESPACE.MEMBERSHIP_SEAT`) before the
 count+insert — audit-#M1. This closes a TOCTOU where two concurrent adds could both pass `used < ceiling`
 and overshoot a free/entry plan with `included_seats > 1`; the cap no longer relies on the free ceiling
 happening to be 1.
@@ -37,9 +37,9 @@ Seat-ceiling table by billing state:
 | **No subscription** (never subscribed, or `CANCELED` / `INCOMPLETE_EXPIRED`) | **Free-tier ceiling** — the `included_seats` of the cheapest active plan (the "Free" plan) |
 | **Dunning past grace** — `PAST_DUE` / `UNPAID` / `INCOMPLETE` and `now > current_period_end + BILLING_DUNNING_GRACE_DAYS` | **Free-tier ceiling** (entitlement lapses to free) |
 
-- **F3 — unsubscribed orgs are capped at the Free tier** (decision: *cap at Free-tier seats*). Previously
-  an org with no active subscription resolved to `null` (unlimited), so a brand-new team org or a
-  canceled org could add members without bound. It now resolves to the cheapest active plan's
+- **F3 — unsubscribed organizations are capped at the Free tier** (decision: *cap at Free-tier seats*). Previously
+  an organization with no active subscription resolved to `null` (unlimited), so a brand-new team organization or a
+  canceled organization could add members without bound. It now resolves to the cheapest active plan's
   `included_seats`. Resolving "cheapest active plan" (rather than hard-coding a name/flag) means the
   floor entitlement tracks whatever the catalog's entry tier is.
 - **F4 — dunning grace window** (decision: *grace window, then restrict*). A subscription in a dunning
@@ -52,22 +52,22 @@ Seat-ceiling table by billing state:
 
 ### 1.2 Over-cap on downgrade — auto-suspend (decision: *auto-suspend excess members*)
 
-When `changePlan` moves an org to a plan whose `included_seats` is **below** its current active member
+When `changePlan` moves an organization to a plan whose `included_seats` is **below** its current active member
 count, the **excess members are auto-suspended to fit the new ceiling** rather than the downgrade being
 rejected (the previous F2 behavior was a `409 seat_limit_exceeded_for_plan` block).
 
 - **Selection:** `ACTIVE`, non-owner memberships, ordered by `joined_at` **descending** (most-recently
   joined are suspended first; longest-tenured members are kept), limited to `activeCount - ceiling`.
-- **Owner is never suspended** (`organizations.owner_user_id` is always excluded), so an org can never
+- **Owner is never suspended** (`organizations.owner_user_id` is always excluded), so an organization can never
   lock itself out by downgrading.
 - Suspension sets membership `status = 'SUSPENDED'`. A suspended seat is **not** counted toward the cap
-  (consistent with the existing admin suspend/reactivate flow), so the org immediately fits its new
+  (consistent with the existing admin suspend/reactivate flow), so the organization immediately fits its new
   ceiling. Re-activating a suspended member re-consumes a seat and is re-checked against the ceiling
   (the F1 reactivation guard), so members can be restored after an upgrade.
 - **Cross-domain wiring:** billing owns the plan change; the suspend is a `tenancy` write. To avoid a
   hard import cycle (tenancy's `MembershipService` already depends on billing for the seat check),
   billing calls it through the structural `MembershipSeatUsagePort` (the same port that exposes
-  `countActiveMembers`), implemented by `MembershipService`. The suspend runs in the org DB context +
+  `countActiveMembers`), implemented by `MembershipService`. The suspend runs in the organization DB context +
   transaction so RLS and atomicity hold.
 
 > **Why auto-suspend over block:** the product owner chose to let the downgrade always succeed and
@@ -85,13 +85,13 @@ consistent; the serializer's `seats_total` is derived from the same resolution.
 **Status: shipped.** F3 (Free-tier cap) and F4 (dunning grace) landed in PR #773; F2 (over-cap-downgrade
 auto-suspend) in PR #774. The two considerations flagged before implementation were resolved as follows:
 
-1. **Free plan stays at 1 seat (solo) — confirmed.** "Cap unsubscribed orgs at the Free tier" therefore
-   means a subscription-less team org holds **only its owner** — i.e. no members until it subscribes.
+1. **Free plan stays at 1 seat (solo) — confirmed.** "Cap unsubscribed organizations at the Free tier" therefore
+   means a subscription-less team organization holds **only its owner** — i.e. no members until it subscribes.
    This is the deliberate product decision (the alternative — raising the Free plan's `included_seats`
    to allow a few free collaborators — was considered and declined). The ceiling is still derived from
    the cheapest active plan, so bumping the Free tier later changes the allowance with no code change.
 2. **Test ripple was smaller than feared.** F3 enforcement only bites when a plan catalog exists; the
-   integration tests that add members to subscription-less orgs don't seed one, so the Free-tier ceiling
+   integration tests that add members to subscription-less organizations don't seed one, so the Free-tier ceiling
    resolves to `null` (unlimited) there and the suite stayed green. A dedicated F3 integration case was
    added that *does* seed a catalog (plan + no subscription → `409 seat_limit_reached`), distinct from
    the no-catalog-unlimited case.
@@ -104,8 +104,8 @@ auto-suspend) in PR #774. The two considerations flagged before implementation w
 - `SubscriptionService.reserveSeatCeilingForMemberAdd` applies §1.1; `changePlan` replaced the F2
   409-block (`assertDowngradeWithinSeatAllowance`) with the §1.2 auto-suspend (best-effort, post-commit).
 - `MembershipSeatUsagePort` gained `suspendExcessActiveMembersToFitCeiling({ organizationPublicId, ceiling })`,
-  implemented by `MembershipService` (owner-excluded, `joined_at DESC`, in the org tx; permission-cache
-  invalidation runs **post-commit**, outside the org context, per the audit-R11 policy).
+  implemented by `MembershipService` (owner-excluded, `joined_at DESC`, in the organization tx; permission-cache
+  invalidation runs **post-commit**, outside the organization context, per the audit-R11 policy).
 
 ---
 

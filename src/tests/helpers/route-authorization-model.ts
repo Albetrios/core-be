@@ -8,12 +8,18 @@ import type { RouteEntry } from '@/tests/helpers/route-catalog-registry.js';
  * @remarks
  * - `user` — user-owned resource; a different user must get 404 (BOLA).
  * - `email` — invitation addressed to an email; a different caller must get 403.
- * - `org` — organization-owned; a member of another org must get 403/404 (cross-tenant BOLA).
+ * - `organization` — organization-owned; a member of another organization must get 403/404 (cross-tenant BOLA).
  * - `tier:owner` — owner-tier protected; a non-owner / lower tier acting on the owner must get 403.
  * - `grant` — grant-grantability; granting a permission the caller lacks must get 403.
  * - `global-role` — global admin surface; a regular user must get 401/403 (BFLA).
  */
-export type AuthorizationModel = 'user' | 'email' | 'org' | 'tier:owner' | 'grant' | 'global-role';
+export type AuthorizationModel =
+  | 'user'
+  | 'email'
+  | 'organization'
+  | 'tier:owner'
+  | 'grant'
+  | 'global-role';
 
 /** Per-route authorization declaration recorded in `route-authorization-model.json`. */
 export type RouteAuthorizationEntry = {
@@ -29,7 +35,7 @@ export type RouteAuthorizationModel = Record<string, RouteAuthorizationEntry>;
 export const AUTHORIZATION_MODELS = [
   'user',
   'email',
-  'org',
+  'organization',
   'tier:owner',
   'grant',
   'global-role',
@@ -39,7 +45,7 @@ export const AUTHORIZATION_MODELS = [
 export const MODEL_EXPECTED_ATTACKER_STATUS: Record<AuthorizationModel, readonly number[]> = {
   user: [404],
   email: [403],
-  org: [403, 404],
+  organization: [403, 404],
   'tier:owner': [403],
   grant: [403],
   'global-role': [401, 403],
@@ -70,7 +76,7 @@ export function routeModelKey(route: Pick<RouteEntry, 'method' | 'path'>): strin
 export function requiresAuthorizationModel(route: RouteEntry): boolean {
   const isProtected =
     route.access === 'authenticated' ||
-    route.access === 'org-permission' ||
+    route.access === 'organization-permission' ||
     route.access === 'global-role';
   return isProtected && route.path.includes(':');
 }

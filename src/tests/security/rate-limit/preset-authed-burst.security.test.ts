@@ -88,7 +88,7 @@ describe('Security: STRICT/EXPENSIVE/MODERATE/ORG-SCOPED authed rate-limit prese
     expect(typeof MODERATE_AUTHED_RATE_LIMIT.config.rateLimit.keyGenerator).toBe('function');
   });
 
-  it('ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT keys per (org, actor) — cross-tenant cannot share bucket', async () => {
+  it('ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT keys per (organization, actor) — cross-tenant cannot share bucket', async () => {
     // Reuse the actual preset's keyGenerator so a regression that quietly
     // switches it back to user-only (cross-tenant exhaustion vector) fails
     // here. We pass `max:2` so the burst boundary is reproducible without
@@ -101,7 +101,7 @@ describe('Security: STRICT/EXPENSIVE/MODERATE/ORG-SCOPED authed rate-limit prese
     });
 
     // Two requests from organization A / actor a → both pass.
-    const orgAFirst = await app.inject({
+    const organizationAFirst = await app.inject({
       method: 'GET',
       url: '/burst',
       remoteAddress: '127.0.0.1',
@@ -111,13 +111,13 @@ describe('Security: STRICT/EXPENSIVE/MODERATE/ORG-SCOPED authed rate-limit prese
       url: '/burst',
       remoteAddress: '127.0.0.1',
     };
-    // Without auth + org headers the key falls back to ip — emulate org+actor
+    // Without auth + organization headers the key falls back to ip — emulate organization+actor
     // by attaching the props the keyGenerator reads via decoration. Fastify's
     // `inject` doesn't run app.authenticate so we directly inject the props
     // by wrapping the keyGenerator above. Instead of decorating, hit the
     // preset's keyGenerator with a constructed `request` object and assert
     // the burst boundary by running ad-hoc.
-    const aOne = orgAFirst;
+    const aOne = organizationAFirst;
     const aTwo = await app.inject(requestWithAuthA);
     const aThree = await app.inject(requestWithAuthA);
 

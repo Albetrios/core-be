@@ -66,7 +66,7 @@ describe('principal-scope minting confinement', () => {
       'queue/worker-runtime/',
       '/workers/',
       'infrastructure/database/contexts/database-context.ts',
-      'stripe-webhook/stripe-webhook-organization.util.ts', // worker-side org resolution for Stripe events
+      'stripe-webhook/stripe-webhook-organization.util.ts', // worker-side organization resolution for Stripe events
     ];
     const offenders = grepFiles('PRINCIPAL_SCOPE.JOB').filter(
       (filePath) => !allowedFragments.some((fragment) => filePath.includes(fragment)),

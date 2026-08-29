@@ -173,7 +173,7 @@ describe('createOrganizationController', () => {
     });
   });
 
-  it('ignores a malformed org path param — the signed claim decides', async () => {
+  it('ignores a malformed organization path param — the signed claim decides', async () => {
     const organizationPublicId = generatePublicId('organization');
     vi.mocked(service.getByPublicId).mockClear();
     await controller.getOrganization(
@@ -193,7 +193,7 @@ describe('createOrganizationController', () => {
 
   it('rejects a missing organization context with ForbiddenError on each validated handler', async () => {
     // No path param and no `org` token claim → "organization context required" (403), matching
-    // requireOrganizationPermission. On real flattened routes the active org arrives via the signed
+    // requireOrganizationPermission. On real flattened routes the active organization arrives via the signed
     // claim; the mock principal here carries none, and an empty path segment cannot reach a handler.
     await expect(
       controller.getOrganization(mockRequest({ params: {} }), mockReply()),

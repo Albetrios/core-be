@@ -12,7 +12,7 @@ export type ProtectedRouteFromCatalog = {
 const ROUTE_CATALOG_PATH = join(process.cwd(), 'docs', 'routes.txt');
 
 // Path, then the optional columnar S/I/O block (success status · idempotency ·
-// org scope), then the access token. The middle block is optional so this
+// organization scope), then the access token. The middle block is optional so this
 // matches both the legacy `PATH ACCESS` and the columnar `PATH S I O ACCESS`
 // catalog formats.
 const ROUTE_LINE_PATTERN =

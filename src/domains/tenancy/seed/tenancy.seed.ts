@@ -47,7 +47,7 @@ export async function seedOrganization(payload: SeedOrganizationPayload) {
   return row ?? null;
 }
 
-/** Input for {@link seedRole}; `is_system` defaults to `false` (custom org role). */
+/** Input for {@link seedRole}; `is_system` defaults to `false` (custom organization role). */
 export interface SeedRolePayload {
   organization_id: number;
   name: string;

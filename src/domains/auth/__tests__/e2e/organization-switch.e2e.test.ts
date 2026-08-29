@@ -32,11 +32,11 @@ describe('Auth e2e: organization switch', () => {
 
   beforeEach(async () => {
     await cleanupDatabase();
-    // Full catalog: provisionOrganizationWithOwner grants billing codes for TEAM orgs.
+    // Full catalog: provisionOrganizationWithOwner grants billing codes for TEAM organizations.
     await seedAllPermissions();
   });
 
-  it('switch-to-personal re-mints the token and returns the active-org delta (200)', async () => {
+  it('switch-to-personal re-mints the token and returns the active-organization delta (200)', async () => {
     const user = await createTestUser();
     const { organization } = await provisionPersonalOrganization(user.id);
     const { token } = await generateTestTokenAndSession({
@@ -61,7 +61,7 @@ describe('Auth e2e: organization switch', () => {
         global_role: string | null;
       };
     };
-    // Inline active-org delta — the client repaints the dashboard without a second GET /me/context.
+    // Inline active-organization delta — the client repaints the dashboard without a second GET /me/context.
     expect(body.data.access_token).toBeDefined();
     expect(body.data.active_organization.id).toBe(organization.public_id);
     expect(body.data.active_organization.type).toBe('PERSONAL');
@@ -69,8 +69,8 @@ describe('Auth e2e: organization switch', () => {
     expect(body.data).toHaveProperty('global_role');
   });
 
-  it('switch-to-personal self-heals a missing personal org (200) when personal is enabled', async () => {
-    // A personal-enabled deployment must never leave a user without a personal org: the
+  it('switch-to-personal self-heals a missing personal organization (200) when personal is enabled', async () => {
+    // A personal-enabled deployment must never leave a user without a personal organization: the
     // signup-time provision may have failed/been skipped, so switch-to-personal provisions
     // one on demand instead of dead-ending at a 404. (Default env has personal enabled.)
     const user = await createTestUser();
@@ -113,7 +113,7 @@ describe('Auth e2e: organization switch', () => {
     }
   });
 
-  it('switch-to-organization re-mints for an org the caller is a member of (200)', async () => {
+  it('switch-to-organization re-mints for an organization the caller is a member of (200)', async () => {
     const user = await createTestUser();
     const { organization } = await provisionPersonalOrganization(user.id);
     const { token } = await generateTestTokenAndSession({
@@ -135,13 +135,13 @@ describe('Auth e2e: organization switch', () => {
         my_permissions: string[];
       };
     };
-    // Inline active-org delta (gate reduction: no follow-up GET /me/context needed).
+    // Inline active-organization delta (gate reduction: no follow-up GET /me/context needed).
     expect(body.data.access_token).toBeDefined();
     expect(body.data.active_organization.id).toBe(organization.public_id);
     expect(Array.isArray(body.data.my_permissions)).toBe(true);
   });
 
-  it('switch-to-organization returns 403 for an org the caller does not belong to', async () => {
+  it('switch-to-organization returns 403 for an organization the caller does not belong to', async () => {
     const member = await createTestUser();
     const stranger = await createTestUser();
     const { organization } = await provisionPersonalOrganization(member.id);
@@ -182,24 +182,24 @@ describe('Auth e2e: organization switch', () => {
   // `auth.sessionPublicId` to rebind.
   describe('M1: the pre-switch token is invalidated by the rebind', () => {
     it('rejects the OLD token (401) after switch-to-organization, while the NEW token works (200)', async () => {
-      // A user who is an ACTIVE owner-member of both org A (token scope) and org B.
+      // A user who is an ACTIVE owner-member of both organization A (token scope) and organization B.
       const user = await createTestUser();
-      const orgA = await provisionOrganizationWithOwner({
+      const organizationA = await provisionOrganizationWithOwner({
         name: 'M1 Org A',
-        slug: `m1-org-a-${generatePublicId('organization').slice(4, 14)}`,
+        slug: `m1-organization-a-${generatePublicId('organization').slice(4, 14)}`,
         type: 'TEAM',
         ownerUserId: user.id,
       });
-      const orgB = await provisionOrganizationWithOwner({
+      const organizationB = await provisionOrganizationWithOwner({
         name: 'M1 Org B',
-        slug: `m1-org-b-${generatePublicId('organization').slice(4, 14)}`,
+        slug: `m1-organization-b-${generatePublicId('organization').slice(4, 14)}`,
         type: 'TEAM',
         ownerUserId: user.id,
       });
 
       const { token: oldToken } = await generateTestTokenAndSession({
         userId: user.public_id,
-        organizationPublicId: orgA.organization.public_id,
+        organizationPublicId: organizationA.organization.public_id,
       });
 
       // Sanity: the original token works against an authenticated route before the switch.
@@ -215,7 +215,7 @@ describe('Auth e2e: organization switch', () => {
         method: 'POST',
         url: testApiPath('/auth/switch-to-organization'),
         token: oldToken,
-        payload: { organization_id: orgB.organization.public_id },
+        payload: { organization_id: organizationB.organization.public_id },
       });
       expect(switchResponse.statusCode).toBe(200);
       const newToken = (switchResponse.json() as { data: { access_token: string } }).data
@@ -232,7 +232,7 @@ describe('Auth e2e: organization switch', () => {
       });
       expect(replayOld.statusCode).toBe(401);
 
-      // The OLD token is equally dead against an org-scoped route.
+      // The OLD token is equally dead against an organization-scoped route.
       const replayOldOrg = await injectAuthenticated(app, {
         method: 'GET',
         url: testApiPath('/tenancy/organization'),
@@ -251,14 +251,14 @@ describe('Auth e2e: organization switch', () => {
   });
 
   // M2 — TRUST GUARANTEE: switch-to-organization mints a new `org` claim ONLY after
-  // verifying an ACTIVE membership in an ACTIVE, non-deleted org. It must reject every
+  // verifying an ACTIVE membership in an ACTIVE, non-deleted organization. It must reject every
   // path that would otherwise let a caller mint a claim they are not entitled to.
   // (The plain non-member 403 is covered above; these add the SUSPENDED-member and
-  // deleted-org cases the audit flagged.)
+  // deleted-organization cases the audit flagged.)
   describe('M2: switch-to-organization rejects what it should', () => {
     it('returns 403 when the caller is a member but their membership is SUSPENDED', async () => {
-      // The user owns a personal org (so the account resolves), and holds a SUSPENDED
-      // membership in a separate TEAM org they must not be able to switch into.
+      // The user owns a personal organization (so the account resolves), and holds a SUSPENDED
+      // membership in a separate TEAM organization they must not be able to switch into.
       const user = await createTestUser();
       await provisionPersonalOrganization(user.id);
 
@@ -295,8 +295,8 @@ describe('Auth e2e: organization switch', () => {
     });
 
     it('returns 403/404 when the target organization is soft-deleted', async () => {
-      // The user is an ACTIVE owner-member, but the org has been soft-deleted: the
-      // membership gate requires a non-deleted org, so the switch must be refused even
+      // The user is an ACTIVE owner-member, but the organization has been soft-deleted: the
+      // membership gate requires a non-deleted organization, so the switch must be refused even
       // though an ACTIVE membership row still exists.
       const user = await createTestUser();
       await provisionPersonalOrganization(user.id);

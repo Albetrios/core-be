@@ -77,7 +77,7 @@ describe('PlanRepository (database)', () => {
     expect(await repository.findByStripePriceId('price_unknown')).toBeNull();
   });
 
-  // findFreePlanSeatCeiling drives the entitlement floor for orgs with no active subscription:
+  // findFreePlanSeatCeiling drives the entitlement floor for organizations with no active subscription:
   // the cheapest ACTIVE plan's included_seats (served by idx_plans_active_price). A cheaper
   // INACTIVE plan must be ignored, and an unlimited (null) cheapest plan means "no ceiling".
   it('findFreePlanSeatCeiling returns the cheapest ACTIVE plan seat ceiling, ignoring cheaper inactive plans', async () => {

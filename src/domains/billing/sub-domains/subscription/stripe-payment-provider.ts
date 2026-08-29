@@ -32,7 +32,7 @@ import { env } from '@/shared/config/env.config.js';
  * The domain is derived from `EMAIL_FROM_ADDRESS` (the same address auth /
  * notification mail comes from), so an operator that sets up Stripe MUST
  * already have a verified outbound sender — no new env variable is required.
- * The org public id is embedded so admin tooling can map a stuck Stripe email
+ * The organization public id is embedded so admin tooling can map a stuck Stripe email
  * back to a local organization at a glance.
  *
  * sec-B finding #19: the prior fallback to a `*@invalid` literal silently
@@ -102,8 +102,8 @@ export class StripePaymentProvider implements PaymentProvider {
           email: buildStripeCustomerEmail(input.organization.public_id),
           name: input.organization.name,
           metadata: { organization_id: input.organization.public_id },
-          // One customer per organization: keying on the org public id makes a retried create
-          // (after a crash between the Stripe call and the local org-row commit) return the same
+          // One customer per organization: keying on the organization public id makes a retried create
+          // (after a crash between the Stripe call and the local organization-row commit) return the same
           // customer instead of minting a duplicate.
           idempotencyKey: `customer-create:${input.organization.public_id}`,
         });

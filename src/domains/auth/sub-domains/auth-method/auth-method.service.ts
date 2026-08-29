@@ -204,7 +204,7 @@ export class AuthMethodService {
    * types are `PASSWORD`, `OAUTH`, and `EMAIL_CODE` (server-issued auth methods of those
    * kinds) — MFA factors (`MFA_TOTP`, `MFA_SMS`, `MFA_EMAIL`) are second factors and
    * never grant a session on their own, so revoking the last MFA method is permitted
-   * here (the org-policy guard on `MfaService.deleteMfa` covers the MFA-required-by-org
+   * here (the organization-policy guard on `MfaService.deleteMfa` covers the MFA-required-by-organization
    * case — sec-A4). Without this guard, a user could revoke their only PASSWORD/OAUTH
    * and lock themselves out of every login surface — recovery requires admin intervention.
    */
@@ -477,7 +477,7 @@ export class AuthMethodService {
         await this.userService.updatePassword(user.public_id, passwordHash);
         // Completing a reset proves control of the email (the token was delivered there), so verify
         // it — parity with email-code / OAuth, and it unblocks an invited user from accepting their
-        // org invitation after recovering access.
+        // organization invitation after recovering access.
         await this.userService.updateEmailVerified(user.public_id);
         // The password just changed, so any prior failed-login lockout is moot — clear the counter +
         // lock window (mirrors a successful login) so the owner is not held out of the next sign-in.

@@ -83,9 +83,9 @@ export class OrganizationSettingsService {
       );
       return serializeOrganizationSettings(organization.public_id, updated);
     });
-    // sec-M1: drop the i18n locale cache for the org so a dashboard switch
+    // sec-M1: drop the i18n locale cache for the organization so a dashboard switch
     // is reflected in the next request rather than waiting for the TTL.
-    // Outside the DB context (cache write must not roll back with the org tx).
+    // Outside the DB context (cache write must not roll back with the organization tx).
     if (parsed.default_locale !== undefined) {
       await invalidateCachedOrganizationDefaultLocale(scope.organizationPublicId);
     }

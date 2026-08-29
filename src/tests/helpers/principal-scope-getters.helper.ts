@@ -8,9 +8,9 @@ import { attachRequestPrincipalScope } from '@/shared/middlewares/core/auth.midd
  * production middleware does. Implemented as a lazy getter because test
  * factories often set `request.auth` AFTER building the request object.
  *
- * Fixture bridge: many controller factories predate the personal/team-org
+ * Fixture bridge: many controller factories predate the personal/team-organization
  * claim model and carry the organization as a `params.organization_id` value
- * with a kind-less user auth stub. Production routes carry no org path param —
+ * with a kind-less user auth stub. Production routes carry no organization path param —
  * the claim is the only source — so the helper folds that legacy fixture shape
  * into the claim (`auth.organizationPublicId ?? params.organization_id`,
  * `kind` defaulting to `'user'`) before running the real attachment.

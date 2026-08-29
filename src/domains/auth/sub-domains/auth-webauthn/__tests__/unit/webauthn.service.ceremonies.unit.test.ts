@@ -173,7 +173,7 @@ describe('WebauthnService.verifyAuthentication', () => {
     // Clone-detection depends on the persisted counter advancing to the verifier's value.
     expect(credentialRepository.updateCounter).toHaveBeenCalledWith('cred-abc', 42);
 
-    // The session is minted for the challenged user with the personal-org self-heal arm on.
+    // The session is minted for the challenged user with the personal-organization self-heal arm on.
     const completion = completeFirstFactorAuthMock.mock.calls[0]?.[0] as {
       user: { public_id: string; email: string };
       ensurePersonalOrganizationOnMiss: boolean;

@@ -42,7 +42,7 @@ import type { PaymentProvider } from '@/domains/billing/sub-domains/subscription
 
 // A PERSONAL organization cannot manage billing; the subscription mutations must reject it
 // with 422 via `assertTeamOrganization(organization, 'BILLING')` BEFORE any plan lookup, subscription
-// lookup, or Stripe call (defense-in-depth for what the frontend already hides via the org `type`).
+// lookup, or Stripe call (defense-in-depth for what the frontend already hides via the organization `type`).
 const personalOrganization = {
   id: 1,
   public_id: 'org_personal',
@@ -93,7 +93,7 @@ const personalScope = PRINCIPAL_SCOPE.REQUEST({
   organizationPublicId: 'org_personal',
 }) as OrganizationPrincipalDatabaseScope;
 
-describe('SubscriptionService — personal-org billing guard', () => {
+describe('SubscriptionService — personal-organization billing guard', () => {
   it('create rejects a PERSONAL organization with 422 before any plan lookup or Stripe call', async () => {
     const { service, planService, paymentProvider, repository } = buildService();
     await expect(

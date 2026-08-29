@@ -298,10 +298,10 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
     // withAppDatabaseContext, which sets app.current_organization_public_id but NOT
     // app.current_user_public_id. Under the non-superuser core_be_app role with FORCE RLS,
     // a direct auth.users join returned zero rows → empty permission set → 403 on all
-    // org PERM-gated routes in production (CI runs as a superuser and never saw it).
+    // organization PERM-gated routes in production (CI runs as a superuser and never saw it).
     // The repository now resolves the user via a SECURITY DEFINER function, so this
-    // must return the member's permissions with ONLY org context set.
-    it("returns a member's permissions with org context only (auth.users not joined)", async () => {
+    // must return the member's permissions with ONLY organization context set.
+    it("returns a member's permissions with organization context only (auth.users not joined)", async () => {
       await seedPermissions(['organization:read', 'webhook:manage']);
       const member = await createTestUser();
       const organization = await createTestOrganization({ ownerUserId: member.id });
@@ -328,7 +328,7 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
       expect([...codes].sort()).toEqual(['organization:read', 'webhook:manage']);
     });
 
-    it('returns an empty set for a soft-deleted member even with org context', async () => {
+    it('returns an empty set for a soft-deleted member even with organization context', async () => {
       await seedPermissions(['organization:read']);
       const member = await createTestUser();
       const organization = await createTestOrganization({ ownerUserId: member.id });
@@ -362,7 +362,7 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
   });
 
   describe('audit.logs user-export SELECT policy under FORCE RLS (audit #7)', () => {
-    it('lets a user read only their own actor audit logs with no org context (cross-user denial)', async () => {
+    it('lets a user read only their own actor audit logs with no organization context (cross-user denial)', async () => {
       const userA = await createTestUser();
       const userB = await createTestUser();
       const organizationA = await createTestOrganization({ ownerUserId: userA.id });
@@ -383,7 +383,7 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
         })
         .returning();
 
-      // The GDPR export worker reads audit.logs under app.current_user_public_id with NO org context.
+      // The GDPR export worker reads audit.logs under app.current_user_public_id with NO organization context.
       // The audit_logs_user_export_select policy must expose only the actor's own rows.
       await executeAsCoreBeAppUser(userA.public_id, async (transaction) => {
         const ownRows = await transaction.execute(
@@ -398,7 +398,7 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
       });
     });
 
-    it('returns zero audit.logs rows when neither user nor org context is set', async () => {
+    it('returns zero audit.logs rows when neither user nor organization context is set', async () => {
       const user = await createTestUser();
       const organization = await createTestOrganization({ ownerUserId: user.id });
       await database.insert(logs).values({
@@ -454,19 +454,19 @@ describe('Security: RLS matrix (all FORCE RLS tables)', () => {
   });
 
   describe('API-key authentication under FORCE RLS (audit #3)', () => {
-    it('plain SELECT on tenancy.api_keys returns 0 rows with no org context (demonstrates the bug)', async () => {
+    it('plain SELECT on tenancy.api_keys returns 0 rows with no organization context (demonstrates the bug)', async () => {
       const fixture = await seedRlsMatrixFixtures();
       void fixture;
       // No app.current_organization_public_id → tenant-isolation policy resolves to NULL → 0 rows. This is
-      // why the auth phase (which has no org context yet) cannot look a key up directly.
+      // why the auth phase (which has no organization context yet) cannot look a key up directly.
       const count = await countRowsAsTenant('tenancy', 'api_keys', null);
       expect(count).toBe(0);
     });
 
-    it('resolver returns the candidate key + owning org with no org context (non-superuser)', async () => {
+    it('resolver returns the candidate key + owning organization with no organization context (non-superuser)', async () => {
       const fixture = await seedRlsMatrixFixtures();
 
-      // core_be_app (non-superuser) with NO org context — exactly the auth-phase connection state.
+      // core_be_app (non-superuser) with NO organization context — exactly the auth-phase connection state.
       const resolved = await executeAsCoreBeAppTenant(null, async (transaction) => {
         const result = await transaction.execute(
           drizzleSql`SELECT * FROM tenancy.resolve_api_key_for_authentication('prefix-a')`,

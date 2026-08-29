@@ -22,22 +22,22 @@ const ALLOWED_IMPORTERS = [
   'src/domains/auth/sub-domains/auth-webauthn/webauthn.service.ts',
   // Admin/system flows resolving actors outside a token scope.
   'src/domains/audit/audit.service.ts',
-  // Stripe-webhook–driven billing mutations (org resolved from the Stripe event).
+  // Stripe-webhook–driven billing mutations (organization resolved from the Stripe event).
   'src/domains/billing/sub-domains/subscription/subscription.service.ts',
   // Event-handler + worker recipient resolution (ids come from trusted job payloads).
   'src/domains/notify/sub-domains/notification/notification.service.ts',
   'src/domains/notify/sub-domains/notification/workers/notification.worker.ts',
-  // Invite flow: inviter's request acts on the invited user / target org.
+  // Invite flow: inviter's request acts on the invited user / target organization.
   'src/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.service.ts',
   'src/domains/tenancy/sub-domains/membership/membership.service.ts',
-  // API-key authentication resolves the org from the verified key itself.
+  // API-key authentication resolves the organization from the verified key itself.
   'src/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.service.ts',
-  // Provisioning / pre-token org bootstrap and active-org resolution at login.
+  // Provisioning / pre-token organization bootstrap and active-organization resolution at login.
   'src/domains/tenancy/sub-domains/organization/organization-provisioning.ts',
   'src/domains/tenancy/sub-domains/organization/organization-settings/organization-settings.service.ts',
   'src/domains/tenancy/sub-domains/organization/organization.service.ts',
   'src/domains/tenancy/sub-domains/organization/resolve-active-organization.ts',
-  // Permission resolution for an org the middleware already validated.
+  // Permission resolution for an organization the middleware already validated.
   'src/domains/tenancy/sub-domains/permission/authorization.service.ts',
   // Post-verification uploads + user lifecycle flows keyed on resolved ids.
   'src/domains/upload/upload.service.ts',

@@ -15,7 +15,7 @@ import { generateBulkOrganizationSettings } from './organization-settings.faker.
  *
  * @remarks
  * Algorithm: for each organization, insert a faker-built settings row keyed by `organization_id`
- * with `.onConflictDoNothing()`, attributing `created_by_user_id` to the org owner. Side effects:
+ * with `.onConflictDoNothing()`, attributing `created_by_user_id` to the organization owner. Side effects:
  * inserts into `tenancy.organization_settings`. Failure modes: warns and returns early when no
  * organizations exist; otherwise propagates DB errors.
  */

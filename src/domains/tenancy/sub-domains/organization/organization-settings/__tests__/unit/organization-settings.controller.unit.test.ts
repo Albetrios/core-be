@@ -52,7 +52,7 @@ describe('createOrganizationSettingsController', () => {
     expect(response).toMatchObject({ data: settingsRow });
   });
 
-  it('getSettings propagates NotFoundError when org is missing', async () => {
+  it('getSettings propagates NotFoundError when organization is missing', async () => {
     vi.mocked(service.get).mockRejectedValueOnce(new NotFoundError('Organization'));
     await expect(
       controller.getSettings(

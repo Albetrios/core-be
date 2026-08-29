@@ -54,7 +54,7 @@ const API_KEY_PREFIX_RESOLVER_CAP = 16;
 /**
  * Drizzle data-access for `tenancy.api_keys`. Stores hashed keys (never raw
  * secrets), normalises the `scopes` jsonb column to `string[]`, supports
- * cursor-paginated org-scoped listings, soft-delete, prefix lookup for
+ * cursor-paginated organization-scoped listings, soft-delete, prefix lookup for
  * authentication, and `last_used_at` touches.
  */
 export class OrganizationApiKeyRepository extends BaseRepository {
@@ -78,7 +78,7 @@ export class OrganizationApiKeyRepository extends BaseRepository {
   }
 
   /**
-   * audit-#8: transaction-scoped advisory lock that serializes the per-org API-key creation
+   * audit-#8: transaction-scoped advisory lock that serializes the per-organization API-key creation
    * quota check + insert, so concurrent creates cannot both pass the count and overshoot
    * `ORGANIZATION_API_KEY_MAX_PER_ORG`. Must be called inside the create transaction before
    * {@link countActiveByOrganization}.

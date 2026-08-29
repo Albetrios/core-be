@@ -223,7 +223,7 @@ export function createMcpServer(options: CreateMcpServerOptions, sdk: McpSdk): M
         // able to impersonate a different principal or pivot tenant context via caller-supplied
         // header overrides. route-#8: x-organization-id is the tenant selector (→ RLS GUC), so a
         // caller must not be able to set it on the proxied sub-request; the sub-request derives
-        // its org the same way every other request does.
+        // its organization the same way every other request does.
         const BLOCKED_HEADERS = new Set([
           'authorization',
           'cookie',

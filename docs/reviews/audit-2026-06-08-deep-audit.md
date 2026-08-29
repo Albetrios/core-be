@@ -17,7 +17,7 @@
 | sec-r4-C2 | Medium | Config / Session Security | `COOKIE_SECURE` enforcement excludes staging |
 | sec-r4-C3 | Medium | Secrets Management | `SECRETS_ENCRYPTION_KEY` low-entropy guard excludes staging — all-zero key accepted |
 | sec-r4-A1 | Low | Session Management | `revokeAllSessions` clears session cookie despite current session being intentionally preserved |
-| sec-r4-T1 | Low | Authorization / RLS | `organizations_user_discovery` RLS reintroduces soft-deleted org exposure |
+| sec-r4-T1 | Low | Authorization / RLS | `organizations_user_discovery` RLS reintroduces soft-deleted organization exposure |
 | sec-r4-T2 | Low | Authorization / Information Disclosure | `resolve_member_invitation_lookup_by_public_id` returns data for revoked/accepted invitations |
 | sec-r4-I1 | Low | Rate Limiting | No per-route rate limit on self-service profile mutation endpoints |
 | sec-r4-I2 | Low | Rate Limiting | No per-route rate limit on organization mutation endpoints |
@@ -67,9 +67,9 @@ pgPolicy('audit_logs_tenant_isolation_insert', {
 
 The code comment at lines 97–98 explicitly states: *"admin is intentionally NOT on DELETE — it is a read escape hatch, never a delete one."* The DELETE policy (line 128) correctly restricts to `global_retention_cleanup` only. However the INSERT policy includes `OR current_setting('app.global_admin', true) = 'true'`, allowing any `global_admin` DB session context to insert audit rows scoped to any organization without going through `withOrganizationDatabaseContext`. No application code currently uses `global_admin` context for audit inserts — all writes flow through `withOrganizationDatabaseContext` — but the policy creates a structural surface inconsistent with the documented invariant.
 
-**Impact:** A future developer adding a `withGlobalAdminDatabaseContext` call inside any service could bypass normal org-scoping for new audit rows, injecting fabricated entries attributed to any organization. This undermines the forensic integrity of the audit trail. The `global_retention_cleanup` arm is also unnecessary for INSERT since retention workers only delete rows, never insert them.
+**Impact:** A future developer adding a `withGlobalAdminDatabaseContext` call inside any service could bypass normal organization-scoping for new audit rows, injecting fabricated entries attributed to any organization. This undermines the forensic integrity of the audit trail. The `global_retention_cleanup` arm is also unnecessary for INSERT since retention workers only delete rows, never insert them.
 
-**Recommendation:** Remove both `OR current_setting('app.global_retention_cleanup', true) = 'true'` and `OR current_setting('app.global_admin', true) = 'true'` from the `audit_logs_tenant_isolation_insert` policy `withCheck` clause. The org-scoped arm is sufficient for all legitimate audit inserts. Apply via a `DROP POLICY / CREATE POLICY` pair in a new migration.
+**Recommendation:** Remove both `OR current_setting('app.global_retention_cleanup', true) = 'true'` and `OR current_setting('app.global_admin', true) = 'true'` from the `audit_logs_tenant_isolation_insert` policy `withCheck` clause. The organization-scoped arm is sufficient for all legitimate audit inserts. Apply via a `DROP POLICY / CREATE POLICY` pair in a new migration.
 
 ---
 
@@ -160,7 +160,7 @@ The service call correctly excludes the current session from revocation (the sec
 
 ---
 
-### sec-r4-T1 — Low: `organizations_user_discovery` RLS reintroduces soft-deleted org exposure
+### sec-r4-T1 — Low: `organizations_user_discovery` RLS reintroduces soft-deleted organization exposure
 
 **Severity:** Low
 **Category:** Authorization / RLS
@@ -169,9 +169,9 @@ The service call correctly excludes the current session from revocation (the sec
 **Evidence:**
 The `organizations_user_discovery` permissive policy (lines 53–70) and its supporting `SECURITY DEFINER` function `tenancy.user_has_active_membership_for_organization` (lines 31–50) contain no `organizations.deleted_at IS NULL` guard. The function correctly filters `member_row.deleted_at IS NULL` and `user_row.deleted_at IS NULL` but does not filter the organization row's `deleted_at`. Because permissive policies are OR'd, a request under `withUserDatabaseContext` where `app.current_user_id` belongs to a user with an active membership (`memberships.deleted_at IS NULL`) in a soft-deleted organization can satisfy `organizations_user_discovery` and read that org's row from `tenancy.organizations`.
 
-**Impact:** Currently mitigated end-to-end: every service path calling `findByPublicId` adds `isNull(organizations.deleted_at)` in the Drizzle WHERE clause. This is a defense-in-depth gap rather than a directly exploitable cross-tenant read — no authenticated HTTP request can currently surface soft-deleted org data via the API. Rating is Low; the gap is real at the DB layer and leaves a single service-layer guard as the only barrier.
+**Impact:** Currently mitigated end-to-end: every service path calling `findByPublicId` adds `isNull(organizations.deleted_at)` in the Drizzle WHERE clause. This is a defense-in-depth gap rather than a directly exploitable cross-tenant read — no authenticated HTTP request can currently surface soft-deleted organization data via the API. Rating is Low; the gap is real at the DB layer and leaves a single service-layer guard as the only barrier.
 
-**Recommendation:** Add `AND tenancy.organizations.deleted_at IS NULL` to the USING clause of `organizations_user_discovery`. Also add `AND organization_row.deleted_at IS NULL` to the JOIN inside `tenancy.user_has_active_membership_for_organization` so that active memberships in deleted orgs do not grant discovery access.
+**Recommendation:** Add `AND tenancy.organizations.deleted_at IS NULL` to the USING clause of `organizations_user_discovery`. Also add `AND organization_row.deleted_at IS NULL` to the JOIN inside `tenancy.user_has_active_membership_for_organization` so that active memberships in deleted organizations do not grant discovery access.
 
 ---
 
@@ -190,9 +190,9 @@ WHERE invitation_row.public_id = invitation_public_id_param
 LIMIT 1;
 ```
 
-Contrast with `list_pending_member_invitations_for_email` (lines 150–155) which correctly filters all four conditions. The `SECURITY DEFINER` function is called in `member-invitation.repository.ts:183–209` at the start of `accept()` and `decline()` flows before any org context is established.
+Contrast with `list_pending_member_invitations_for_email` (lines 150–155) which correctly filters all four conditions. The `SECURITY DEFINER` function is called in `member-invitation.repository.ts:183–209` at the start of `accept()` and `decline()` flows before any organization context is established.
 
-**Impact:** A caller who knows the `public_id` of a previously accepted, revoked, or expired invitation can call the accept/decline endpoint with that ID. The lookup resolves and discloses the owning organization's `public_id`. The service then correctly rejects the attempt (`assertInvitationAcceptable` throws for non-pending state). Risk is limited to org-ID enumeration via invitation history — no membership mutation occurs.
+**Impact:** A caller who knows the `public_id` of a previously accepted, revoked, or expired invitation can call the accept/decline endpoint with that ID. The lookup resolves and discloses the owning organization's `public_id`. The service then correctly rejects the attempt (`assertInvitationAcceptable` throws for non-pending state). Risk is limited to organization-ID enumeration via invitation history — no membership mutation occurs.
 
 **Recommendation:** Add `AND invitation_row.accepted_at IS NULL AND invitation_row.revoked_at IS NULL AND membership_row.deleted_at IS NULL AND organization_row.deleted_at IS NULL` to `resolve_member_invitation_lookup_by_public_id`, mirroring the guards already present in the companion `list_pending_member_invitations_for_email` function.
 
@@ -220,9 +220,9 @@ Contrast with `list_pending_member_invitations_for_email` (lines 150–155) whic
 **File:** `src/domains/tenancy/sub-domains/organization/organization.routes.ts` lines 131–241
 
 **Evidence:**
-`PATCH /organizations/:id` (line 131), `DELETE /organizations/:id` (line 147), `PUT /organizations/:id/logo` (line 164), `DELETE /organizations/:id/logo` (line 180), `PATCH /organizations/:id/settings` (line 228) — none spread a rate-limit preset. `POST /organizations/:id/api-keys/rotate` (line 321) explicitly applies `STRICT_AUTHED_RATE_LIMIT`, confirming the pattern is intentionally applied on sensitive org actions but was omitted for the mutation endpoints.
+`PATCH /organizations/:id` (line 131), `DELETE /organizations/:id` (line 147), `PUT /organizations/:id/logo` (line 164), `DELETE /organizations/:id/logo` (line 180), `PATCH /organizations/:id/settings` (line 228) — none spread a rate-limit preset. `POST /organizations/:id/api-keys/rotate` (line 321) explicitly applies `STRICT_AUTHED_RATE_LIMIT`, confirming the pattern is intentionally applied on sensitive organization actions but was omitted for the mutation endpoints.
 
-**Impact:** A stolen JWT with `ORGANIZATION_UPDATE` or `ORGANIZATION_DELETE` permission can repeatedly invoke destructive org mutations without any per-org or per-actor cap. The permission gate is not a substitute for rate limiting — the threat model is a compromised admin credential.
+**Impact:** A stolen JWT with `ORGANIZATION_UPDATE` or `ORGANIZATION_DELETE` permission can repeatedly invoke destructive organization mutations without any per-organization or per-actor cap. The permission gate is not a substitute for rate limiting — the threat model is a compromised admin credential.
 
 **Recommendation:** Apply `ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT` (already defined in `rate-limit-presets.constants.ts`) to `PATCH /organizations/:id`, `PUT /organizations/:id/logo`, `DELETE /organizations/:id/logo`, and `PATCH /organizations/:id/settings`. Apply `STRICT_AUTHED_RATE_LIMIT` to `DELETE /organizations/:id` (irreversible).
 
@@ -237,7 +237,7 @@ Contrast with `list_pending_member_invitations_for_email` (lines 150–155) whic
 **Evidence:**
 `POST /organizations/:id/leave` (line 123) — `onRequest: authenticate` only, no preset. `POST /organizations/:id/transfer-ownership` (line 136) — `config: { idempotencyRequired: true }` only, no rate-limit. `POST /invitations/:invitationId/decline` (line 243) — authenticate only. `DELETE /organizations/:id/invitations/:invitationId` (line 202) — permission check only. By contrast, `POST .../invitations/:invitationId/resend` (line 215) explicitly applies `STRICT_AUTHED_RATE_LIMIT`.
 
-**Impact:** A stolen JWT can drive repeated leave-org, transfer-ownership, or invitation-cancel operations without any per-actor cap. `transfer-ownership` is the highest-severity action: it irrevocably reassigns org ownership. The idempotency key prevents duplicate execution of a single key but does not prevent an attacker issuing many calls with distinct idempotency keys.
+**Impact:** A stolen JWT can drive repeated leave-organization, transfer-ownership, or invitation-cancel operations without any per-actor cap. `transfer-ownership` is the highest-severity action: it irrevocably reassigns organization ownership. The idempotency key prevents duplicate execution of a single key but does not prevent an attacker issuing many calls with distinct idempotency keys.
 
 **Recommendation:** Apply `STRICT_AUTHED_RATE_LIMIT` to `POST /organizations/:id/leave` and `POST /invitations/:invitationId/decline`. Apply `EXPENSIVE_AUTHED_RATE_LIMIT` to `POST /organizations/:id/transfer-ownership` given its irreversible ownership-change semantics. Apply `MODERATE_AUTHED_RATE_LIMIT` to `DELETE /organizations/:id/invitations/:invitationId` and `GET /invitations/pending`.
 
@@ -306,7 +306,7 @@ async findByRoleId(role_id: number) {
 
 The `replace()` method (lines 19–35) also calls DELETE then bulk INSERT without a per-call size cap.
 
-**Impact:** A privileged user (org admin) who can call the replace-role-permissions route could insert an unbounded number of permissions for a single role in one transaction. Current permission code set (~20–50 codes) makes this low-risk, but no schema-level or application-level constraint bounds the number of permissions per role.
+**Impact:** A privileged user (organization admin) who can call the replace-role-permissions route could insert an unbounded number of permissions for a single role in one transaction. Current permission code set (~20–50 codes) makes this low-risk, but no schema-level or application-level constraint bounds the number of permissions per role.
 
 **Recommendation:** Add a maximum permissions-per-role guard in the service layer (e.g. `if (permission_codes.length > MAX_PERMISSIONS_PER_ROLE) throw ValidationError(...)`) before calling `replace()`, and add `.limit(MAX_PERMISSIONS_PER_ROLE + 1)` to `findByRoleId` to make over-limit rows detectable.
 
@@ -504,7 +504,7 @@ this.db().select().from(webhook_delivery_attempts).where(where)...
 // no column projection — returns response_body (text) and payload (jsonb)
 ```
 
-**Impact:** Webhook delivery history responses expose the full outbound event payload and the full inbound HTTP response body from the webhook endpoint to any org member with permission to view webhook delivery history. If event payloads contain PII or sensitive business data, this broadens the disclosure surface unnecessarily. No cross-tenant leak — RLS correctly scopes to the current org.
+**Impact:** Webhook delivery history responses expose the full outbound event payload and the full inbound HTTP response body from the webhook endpoint to any organization member with permission to view webhook delivery history. If event payloads contain PII or sensitive business data, this broadens the disclosure surface unnecessarily. No cross-tenant leak — RLS correctly scopes to the current organization.
 
 **Recommendation:** Add an explicit column projection to `listByWebhook` omitting or truncating `response_body` and `payload`, returning only fields needed for the delivery history UI (`public_id`, `status`, `http_status_code`, `created_at`, `next_retry_at`, `attempt_number`). Full payload and response body should be available only on a dedicated single-attempt detail endpoint.
 

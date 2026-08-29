@@ -13,7 +13,7 @@ import {
  *
  * Every other RLS security test means something ONLY if `core_be_app` is genuinely a non-superuser,
  * non-BYPASSRLS role: otherwise `SET LOCAL ROLE core_be_app` is a no-op, the whole lane passes, and
- * production — which runs as this role — is exposed. The org-mandated-MFA bypass was this class of
+ * production — which runs as this role — is exposed. The organization-mandated-MFA bypass was this class of
  * failure (a FORCE-RLS table resolving to zero rows under the app role, read as "no MFA required").
  *
  * The baseline created the role with a bare `CREATE ROLE core_be_app NOLOGIN;`, relying on Postgres

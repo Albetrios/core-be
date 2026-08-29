@@ -45,7 +45,7 @@ export interface OrganizationOffboardingReconcileResult {
  *   selects up to `ORGANIZATION_OFFBOARDING_RECONCILE_BATCH` non-PERSONAL rows where
  *   `deletion_started_at` is older than `ORGANIZATION_OFFBOARDING_STUCK_AFTER_MINUTES`
  *   and `deleted_at IS NULL`, then calls `resumeOffboarding` per row OUTSIDE that scan
- *   context (the service opens its own org transactions + does Stripe/S3 I/O). The
+ *   context (the service opens its own organization transactions + does Stripe/S3 I/O). The
  *   offboarding is idempotent, so a partial run resumes and completes (sets
  *   `deleted_at`), dropping out of the next scan.
  * - **Failure modes:** a per-row failure is counted, warn-logged, and reported to

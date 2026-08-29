@@ -26,7 +26,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
  * `auth.users` is FORCE-RLS protected by an owner policy keyed on
  * `app.current_user_public_id`. A direct join would therefore return zero rows under
  * the non-superuser `core_be_app` role and silently strip every permission
- * (403 on all org PERM-gated routes). The resolver also filters
+ * (403 on all organization PERM-gated routes). The resolver also filters
  * `deleted_at IS NULL`, so a soft-deleted user resolves to `null` → empty set.
  */
 export class PermissionRepository {

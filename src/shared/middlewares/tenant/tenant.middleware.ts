@@ -18,7 +18,7 @@ import { PUBLIC_ID_REGEX } from '@/shared/utils/identity/public-id.util.js';
  *
  * Row-Level Security for Postgres uses `SET LOCAL app.current_organization_public_id`
  * inside the short-lived `withAppDatabaseContext` transaction opened at
- * each org-scoped call site, keyed by the claim-resolved organization id.
+ * each organization-scoped call site, keyed by the claim-resolved organization id.
  *
  * **sec-M7 foot-gun**: `request.organizationId` is set on the **`onRequest`**
  * hook — BEFORE authentication runs. The value comes from an

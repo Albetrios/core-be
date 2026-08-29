@@ -111,7 +111,7 @@ export class AuthSessionRepository {
 
   /**
    * Rotate the session's access-token hash AND persist the active organization
-   * (audit-#3) so `/auth/refresh` can preserve the org the caller switched to
+   * (audit-#3) so `/auth/refresh` can preserve the organization the caller switched to
    * instead of recomputing the default. Used by the organization-switch path.
    */
   async rotateTokenHashAndOrganization(

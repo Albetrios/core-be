@@ -16,7 +16,7 @@ import { ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT } from '@/shared/middlewares/rate
  *     actor gets its own `organization:<id>:actor:<actorId>` bucket, so one actor cannot
  *     drain another member's quota within the same organization.
  */
-describe('Security: cross-tenant org rate-limit isolation (audit #14)', () => {
+describe('Security: cross-tenant organization rate-limit isolation (audit #14)', () => {
   const apps: Array<{ close: () => Promise<void> }> = [];
 
   afterEach(async () => {
@@ -28,7 +28,7 @@ describe('Security: cross-tenant org rate-limit isolation (audit #14)', () => {
 
   /**
    * Mirrors the production route wiring: a `requireOrganizationPermission`-style preHandler
-   * (403 for non-members) plus the real org-scoped rate-limit preset (lowered `max`). The
+   * (403 for non-members) plus the real organization-scoped rate-limit preset (lowered `max`). The
    * limiter hook is appended to the route `preHandler` array exactly as `@fastify/rate-limit`
    * does in production.
    */
@@ -44,7 +44,7 @@ describe('Security: cross-tenant org rate-limit isolation (audit #14)', () => {
         organizationId?: string | null;
       };
       // Post-flatten the active organization rides the signed `org` token claim
-      // (`auth.organizationPublicId`), not the header — set it there so the per-(org, actor)
+      // (`auth.organizationPublicId`), not the header — set it there so the per-(organization, actor)
       // rate-limit key is exercised the way real requests resolve it.
       mutableRequest.auth =
         typeof actorId === 'string'
@@ -87,11 +87,11 @@ describe('Security: cross-tenant org rate-limit isolation (audit #14)', () => {
     return app;
   }
 
-  it('an unauthorized actor (403) never decrements the victim org bucket', async () => {
+  it('an unauthorized actor (403) never decrements the victim organization bucket', async () => {
     const max = 2;
     const app = await createOrganizationScopedApp(max);
 
-    // Attacker is authenticated but NOT a member of the victim org: spam the route.
+    // Attacker is authenticated but NOT a member of the victim organization: spam the route.
     for (let attempt = 0; attempt < max + 3; attempt += 1) {
       const attacker = await app.inject({
         method: 'POST',
@@ -101,7 +101,7 @@ describe('Security: cross-tenant org rate-limit isolation (audit #14)', () => {
       expect(attacker.statusCode).toBe(403);
     }
 
-    // A real member of the victim org can still consume their full quota — unharmed.
+    // A real member of the victim organization can still consume their full quota — unharmed.
     for (let attempt = 0; attempt < max; attempt += 1) {
       const member = await app.inject({
         method: 'POST',
@@ -147,7 +147,7 @@ describe('Security: cross-tenant org rate-limit isolation (audit #14)', () => {
     expect(secondA.statusCode).toBe(200);
     expect(thirdA.statusCode).toBe(429);
 
-    // Member B in the SAME org is unaffected — separate per-actor bucket.
+    // Member B in the SAME organization is unaffected — separate per-actor bucket.
     const firstB = await app.inject({
       method: 'POST',
       url: '/tenancy/organization/resource',

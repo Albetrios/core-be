@@ -42,7 +42,7 @@ describe('Performance: N+1 Detection', () => {
       await createTestOrganization({
         ownerUserId: user.id,
         name: `Perf Org ${index}`,
-        slug: `perf-org-${index}-${uniqueSuffix}-${index}`,
+        slug: `perf-organization-${index}-${uniqueSuffix}-${index}`,
       });
     }
 

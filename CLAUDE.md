@@ -27,7 +27,7 @@ Claude Code reads `agent-os/` directly via `.claude/` symlinks (`agents`, `skill
 
 See **`agent-os/skills/api-contract-guard/SKILL.md`** (rule: `agent-os/rules/api-contract.mdc`):
 
-- Route params: snake_case + semantic (`{plan_id}`, `{subscription_id}`, never `{id}`); entity-id params registered in `PARAM_NAME_TO_ENTITY` (non-entity params — `{provider}`, `{slug}` — are the only exemptions). The active organization is the signed `org` JWT claim — routes carry NO `{organization_id}` path segment; the active-org resource is singular `/tenancy/organization` (sub-resources nest under it); switch active org via `/auth/switch-to-personal` / `/auth/switch-to-organization`
+- Route params: snake_case + semantic (`{plan_id}`, `{subscription_id}`, never `{id}`); entity-id params registered in `PARAM_NAME_TO_ENTITY` (non-entity params — `{provider}`, `{slug}` — are the only exemptions). The active organization is the signed `org` JWT claim — routes carry NO `{organization_id}` path segment; the active-organization resource is singular `/tenancy/organization` (sub-resources nest under it); switch active organization via `/auth/switch-to-personal` / `/auth/switch-to-organization`
 - Public ids: Paddle-style `<prefix>_<21 [a-z0-9]>` via `generatePublicId(entity)`; external field is always `id`
 - Body field casing: request body (`*.dto.ts`) and response body (`*.serializer.ts`) property keys are **snake_case** (`file_name`, `created_at`); the external id stays `id`; validation `errors[].field` values are snake_case too. Internal TS identifiers may stay camelCase. Exceptions passed through verbatim: third-party/browser-native payloads (Stripe webhooks, OAuth, WebAuthn W3C JSON) and JWT claims. Enforced by `src/tests/unit/api/snake-case-body-keys.policy.unit.test.ts`
 - Method→status policy: success is **200** for every method except DELETE (**204**) — no exemptions (Stripe-shaped uniform model; 200 stays true for idempotent replays and upserts where 201 would lie). POST is middleware-enforced (`method-status-policy.middleware.ts` rewrites POST 201/202/204 → 200); the other methods are enforced by the `validate:route-success-coverage` gate
@@ -47,7 +47,7 @@ See **`agent-os/skills/api-contract-guard/SKILL.md`** (rule: `agent-os/rules/api
 
 Detail and examples live in scoped Cursor rules (auto-attach when editing `src/**/*.ts`):
 
-- **[full-names-only.mdc](.cursor/rules/full-names-only.mdc)** — no abbreviations in identifiers (`organization` not `org`; Fastify `req`/`reply` exempt)
+- **[full-names-only.mdc](.cursor/rules/full-names-only.mdc)** — no abbreviations in identifiers OR prose (`organization` not `org`, incl. plurals/compounds); intentional compact WIRE literals are the only survivors — the `org_` public-id prefix, the JWT claim keys `org`/`sv`, third-party payloads; Fastify `req`/`reply` exempt
 - **[object-params.mdc](.cursor/rules/object-params.mdc)** — options objects for 2+ params; repos and framework callbacks exempt
 - Sub-domain folders **must** prefix with domain/resource name (`organization-settings`, `webhook-event`, …)
 
@@ -89,7 +89,7 @@ src/domains/<domain>/
         <sub-domain>.faker.ts
       __tests__/              # Sub-domain unit, nested e2e (see Testing)
         unit/                 # incl. events/ — leaf event-handler suites (never events/__tests__/)
-        <sub-domain>.test.ts  # Optional: dedicated route suite (tenancy org children)
+        <sub-domain>.test.ts  # Optional: dedicated route suite (tenancy organization children)
       events/                 # Optional: types, handlers, *-emit.ts
       queues/                 # Optional: BullMQ enqueue helpers
       workers/                # Optional: BullMQ processors
@@ -283,7 +283,7 @@ Typical flow: `service` → `eventBus.emit` → handler → `recordOutboxEmail()
 - **DI flow**: Container (repos → services) → Routes (controllers) → `src/routes.ts` (domain containers + route registration)
 - **API versioning**: Major versions use `/api/v1`, …; additive/non-breaking changes ship on the same major, a breaking change gets a new major prefix — see **`docs/reference/api/api-versioning.md`** and `src/shared/utils/http/api-versioning.util.ts`.
 - **Data lifecycle**: Soft-delete (`deleted_at`), revocation vs immutable billing ledgers, session/audit retention — see **`docs/reference/data/data-lifecycle-deletion.md`**.
-- **Controllers**: Thin layer; export `create<Resource>Controller(service)` or `create<Resource>Controller(container)` returning handler map. Use `getRequestIdentifier()` and `requireAuth()` from `@/shared/utils/http/request.util.js`; the auth middleware eagerly attaches `request.principalScope`; controllers narrow it via `requireOrganizationScope(request)` (org-required, 403) or `requireUserScope(request)` (real user required) and relay the scope into services.
+- **Controllers**: Thin layer; export `create<Resource>Controller(service)` or `create<Resource>Controller(container)` returning handler map. Use `getRequestIdentifier()` and `requireAuth()` from `@/shared/utils/http/request.util.js`; the auth middleware eagerly attaches `request.principalScope`; controllers narrow it via `requireOrganizationScope(request)` (organization-required, 403) or `requireUserScope(request)` (real user required) and relay the scope into services.
 - **Validation**: DTO (Zod schemas in `.dto.ts`), Validator (function-based, calls `.safeParse()`, throws `ValidationError`)
 - **Serializer**: Function-based response shaping in `.serializer.ts` (e.g. `serializeOrganization(row)`)
 - **Containers**: `<domain>.container.ts` handles DI; export services for routes/controllers. Multi-sub-domain domains (auth, user, billing, tenancy) wire sub-domain services via the container — controllers call the appropriate service directly.
@@ -320,7 +320,7 @@ See **[import-paths.mdc](.cursor/rules/import-paths.mdc)** — `@/` in `src/`, `
 ## Seeding
 
 - **Per-domain `seed/` dir**: Every folder that owns tables (domain, sub-domain, nested sub-domain) gets a co-located `seed/` directory holding `<name>.reference.seed.ts` (idempotent reference data), `<name>.bulk.seed.ts` (scaled rows for that level's tables), `<name>.faker.ts` (level-specific generators), and `index.ts`. Each domain still seeds **only its own tables** — no cross-domain insert logic inside domains.
-- **Seed contract** (`src/scripts/seed/seed-contract.ts`): Each `seed/index.ts` exports a `SeedContribution` (`seedReference?` / `seedBulk?` hooks) **except** a top-level domain's, which exports a `DomainSeedModule` (`SeedContribution` plus `name` + `dependsOn`). Parents fold their children up with `composeContributions(...)` (nested sub-domain → sub-domain → domain). Cross-domain parent ids (orgs/users) flow through a `SeedRegistry` on the `SeedContext`: the user/tenancy seeders append created parents; downstream domains read them. This preserves "no cross-domain insert logic inside domains" — cross-domain wiring lives only in the orchestrator/context.
+- **Seed contract** (`src/scripts/seed/seed-contract.ts`): Each `seed/index.ts` exports a `SeedContribution` (`seedReference?` / `seedBulk?` hooks) **except** a top-level domain's, which exports a `DomainSeedModule` (`SeedContribution` plus `name` + `dependsOn`). Parents fold their children up with `composeContributions(...)` (nested sub-domain → sub-domain → domain). Cross-domain parent ids (organizations/users) flow through a `SeedRegistry` on the `SeedContext`: the user/tenancy seeders append created parents; downstream domains read them. This preserves "no cross-domain insert logic inside domains" — cross-domain wiring lives only in the orchestrator/context.
 - **Orchestrator** (`src/scripts/seed/bulk.ts` + `bulk-config.ts`): Registers one `DomainSeedModule` per domain (`SEED_MODULES` in `src/scripts/seed/modules.ts`), topologically orders them by `dependsOn` (`orderModules` in `seed-contract.ts`), runs every `seedReference` first, then every `seedBulk`. Behind a production guard (`production-guard.ts`, `assertBulkSeedAllowed`); reproducible via `SEED`; idempotent (count-and-resume or `onConflictDoNothing`).
 - **Three tiers** (all share the contract/seeders): `pnpm db:seed` (minimal/reference only), `pnpm db:seed:full` (fixed demo data), `pnpm db:seed:bulk` (scaled volume via profiles). Profiles `demo` / `edge` / `load` set base counts; `SCALE` multiplies volume-bearing counts (bounded by `HARD_CAP`); per-knob env overrides `BULK_ORGS`, `BULK_USERS_PER_ORG`, `BULK_AUDIT_MONTHS`, `BULK_AUDIT_PER_ORG_PER_MONTH`. Example: `BULK_PROFILE=load SCALE=5 pnpm db:seed:bulk`.
 - **Route alignment**: Seed data should support what the API exposes. When routes are added, removed, or updated, run **route-catalog** skill (`pnpm routes:catalog`) and **seed-maintainer** so seeds stay aligned with routes.
@@ -456,7 +456,7 @@ Local SonarQube quality gate (pre-commit): `pnpm sonar:up` / `sonar:scan` / `son
 - `pnpm routes:catalog` / `pnpm routes:catalog:check` — regenerate or verify `docs/routes.txt`
 - `pnpm validate:route-success-statuses` — verify `tooling/openapi/route-catalog/route-success-statuses.json` (declared happy-path status per route) stays in sync with `docs/routes.txt`
 - `pnpm validate:route-schema-docs` — verify every route registration (incl. `health.middleware.ts`, `mcp-server.ts`) declares `schema.summary`/`description`/`tags` (drives OpenAPI operation docs)
-- `pnpm validate:route-org-scope` — verify `tooling/openapi/route-catalog/route-org-scope.json` (the catalog `O` column: `both` or team-only `team`) stays in sync with `docs/routes.txt`
+- `pnpm validate:route-organization-scope` — verify `tooling/openapi/route-catalog/route-organization-scope.json` (the catalog `O` column: `both` or team-only `team`) stays in sync with `docs/routes.txt`
 - `pnpm validate:route-success-coverage` — observed-status gate after a full `pnpm test`: fails on declared-vs-observed drift; uncovered-routes count ratchets via `tooling/route-coverage/route-success-coverage-budget.json`; also verifies every observed sub-500 status is documented in the generated OpenAPI spec
 - `pnpm routes:examples` — refresh `tooling/openapi/route-examples/route-examples.json` (sanitized request/response samples per route+status, embedded in OpenAPI as `captured` examples) from a capture run: `ROUTE_EXAMPLE_CAPTURE=1 pnpm test && pnpm routes:examples`
 - `pnpm ci:local` — PR gate: validate + domain + routes + migrate lint + env example + full test

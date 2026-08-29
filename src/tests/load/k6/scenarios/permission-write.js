@@ -31,7 +31,7 @@ export function permissionWriteOps() {
     return;
   }
 
-  // The active org rides the token's `org` claim — scope the token to TEST_ORG_ID
+  // The active organization rides the token's `org` claim — scope the token to TEST_ORG_ID
   // so the flat route resolves the right organization.
   token = switchToOrganization(token, organizationPublicId) || token;
 

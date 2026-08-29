@@ -6,7 +6,7 @@ import fp from 'fastify-plugin';
  *
  * @remarks
  * - **Algorithm:** legacy request-pinned transactions were removed; settlement always reports
- *   `no_transaction` because org-scoped work runs in `withAppDatabaseContext`.
+ *   `no_transaction` because organization-scoped work runs in `withAppDatabaseContext`.
  * - **Failure modes:** none — this is a compatibility stub for the lifecycle coordinator.
  * - **Side effects:** none.
  * - **Notes:** idempotency cache writes and on-commit dispatch proceed whenever settlement is

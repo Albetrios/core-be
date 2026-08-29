@@ -88,12 +88,12 @@ export const subscriptions = billingSchema
       check('chk_subs_period', sql`${table.current_period_end} > ${table.current_period_start}`),
       check('chk_subs_updated', sql`${table.updated_at} >= ${table.created_at}`),
       // audit #41: the USING arm keeps the retention-cleanup bypass so the
-      // global retention worker can SELECT/DELETE org rows it must purge, but
+      // global retention worker can SELECT/DELETE organization rows it must purge, but
       // the explicit WITH CHECK omits it. Without an explicit WITH CHECK,
       // Postgres reuses USING for the write-side check, which would let any
       // context with `app.global_retention_cleanup='true'` INSERT/UPDATE a
       // subscription row under an arbitrary `organization_id`. Pinning WITH
-      // CHECK to the current-org GUC forces every write to land in the active
+      // CHECK to the current-organization GUC forces every write to land in the active
       // tenant (HTTP request context or the Stripe-webhook
       // `withAppDatabaseContext`), closing the cross-tenant write hole. No
       // legitimate writer ever inserts/updates subscriptions under the

@@ -72,11 +72,11 @@ describe('User Notification Preferences Sub-Domain — Integration', () => {
       expect(response.statusCode).toBe(400);
     });
 
-    it('returns 400 (not 500) when organization_id is set — org-scoped prefs unsupported here', async () => {
+    it('returns 400 (not 500) when organization_id is set — organization-scoped prefs unsupported here', async () => {
       const user = await createTestUser();
       const token = await generateTestToken({ userId: user.public_id });
       // This user-scoped route has no tenant context, so a non-null organization_id can never
-      // satisfy the RLS org branch and must be rejected, not surface as a raw 42501 -> 500.
+      // satisfy the RLS organization branch and must be rejected, not surface as a raw 42501 -> 500.
       const response = await injectAuthenticated(app, {
         method: 'PUT',
         url: testApiPath('/users/me/notification-preferences'),

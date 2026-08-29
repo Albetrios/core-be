@@ -27,8 +27,8 @@ export interface AuditOutboxInsertInput {
 /**
  * Inserts a PENDING row into `audit.outbox` using the currently-pinned request
  * database handle. The handle is pinned by `AuditService.record`, which wraps this
- * call in the RLS context that matches the row (audit R10): an org context for
- * org-scoped rows, the system-audit-insert context for tenantless rows.
+ * call in the RLS context that matches the row (audit R10): an organization context for
+ * organization-scoped rows, the system-audit-insert context for tenantless rows.
  *
  * @remarks
  * - **Algorithm:** single `INSERT` (no `RETURNING` — Postgres applies SELECT-policy
@@ -36,7 +36,7 @@ export interface AuditOutboxInsertInput {
  *   drain-exclusive, so a `RETURNING` here is rejected under the RLS-subject
  *   application roles) against the request-scoped handle resolved from ALS. The
  *   affected-row count is the loud-failure guard instead of the returned id.
- *   Never opens its own transaction — the wrapping context (org /
+ *   Never opens its own transaction — the wrapping context (organization /
  *   system-audit-insert) owns the transaction boundary.
  * - **Failure modes:** RLS rejects the INSERT when `app.current_organization_public_id`
  *   does not match the supplied `organizationPublicId` (or, for tenantless

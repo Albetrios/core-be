@@ -178,8 +178,8 @@ export class UploadRepository {
    * across ALL members of one organization (audit-#7). Must be acquired in the same
    * transaction as {@link UploadRepository.countPendingByOrganizationId} + the subsequent
    * {@link UploadRepository.create}, and BEFORE {@link acquirePendingUploadQuotaLock} (a
-   * globally consistent org-then-user order) so distinct users in the same org cannot each
-   * pass the org count check before any row is inserted and burst past the org cap.
+   * globally consistent organization-then-user order) so distinct users in the same organization cannot each
+   * pass the organization count check before any row is inserted and burst past the organization cap.
    */
   async acquirePendingOrganizationQuotaLock(organization_id: number): Promise<void> {
     await getRequestDatabase().execute(
@@ -205,7 +205,7 @@ export class UploadRepository {
   /**
    * Number of in-flight PENDING uploads aggregated across all members of an
    * organization (sec-UP4). Used by the service to enforce the
-   * `UPLOAD_MAX_PENDING_PER_ORGANIZATION` cap so a single org cannot
+   * `UPLOAD_MAX_PENDING_PER_ORGANIZATION` cap so a single organization cannot
    * exhaust storage by piling per-user-cap-compliant PENDING rows across
    * many member accounts.
    */
@@ -259,7 +259,7 @@ export class UploadRepository {
    * @remarks
    * sec-D12: the unbounded sibling (`findActiveByOrganizationId` without a
    * keyset cursor) was deleted in PR-G35. The audit flagged it as a
-   * future-trap — a caller that ran on a small org today would silently
+   * future-trap — a caller that ran on a small organization today would silently
    * become an O(N) load once tenants grew. Re-adding the unbounded shape
    * requires re-arguing the size bound.
    */

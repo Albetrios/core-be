@@ -17,9 +17,9 @@ vi.mock('@/shared/utils/security/jwt.util.js', () => ({
   signAccessToken: vi.fn().mockReturnValue('access-token'),
 }));
 
-// H1: the MFA login path now bakes the active-org `org` claim into the token (mirroring the
+// H1: the MFA login path now bakes the active-organization `org` claim into the token (mirroring the
 // first-factor path). Mock the resolver — without this the unit lane (no Postgres) would hit a
-// real DB call. The verifyLoginMfa test below asserts the resolved org reaches signAccessToken.
+// real DB call. The verifyLoginMfa test below asserts the resolved organization reaches signAccessToken.
 vi.mock('@/domains/tenancy/sub-domains/organization/resolve-active-organization.js', () => ({
   resolveDefaultActiveOrganizationPublicId: vi.fn().mockResolvedValue('org_mfaactive0000000000'),
 }));
@@ -146,9 +146,9 @@ describe('MfaService', () => {
     // The handler audits recovery-code use distinctly, so the factor must be surfaced.
     expect(result.factor).toBe('totp');
     expect(authSessionService.createSessionForUser).toHaveBeenCalled();
-    // H1 regression guard: the MFA-login token MUST carry the active-org `org` claim, exactly like
-    // the first-factor path. Without it an MFA user gets an org-less token and is locked out of
-    // every org-scoped route (which resolve the active org from the claim post-flatten).
+    // H1 regression guard: the MFA-login token MUST carry the active-organization `org` claim, exactly like
+    // the first-factor path. Without it an MFA user gets an organization-less token and is locked out of
+    // every organization-scoped route (which resolve the active organization from the claim post-flatten).
     expect(vi.mocked(signAccessToken)).toHaveBeenCalledWith(
       expect.objectContaining({ organizationPublicId: 'org_mfaactive0000000000' }),
     );

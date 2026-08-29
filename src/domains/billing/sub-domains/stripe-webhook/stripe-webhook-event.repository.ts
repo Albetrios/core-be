@@ -362,9 +362,9 @@ export class StripeWebhookEventRepository {
    * @remarks
    * Mirrors {@link resolveOrganizationPublicIdByProviderSubscriptionId}: the
    * lookup lives on the repository because the util layer is forbidden from
-   * importing the raw `sql` template (architecture rule). Each org gets its own
+   * importing the raw `sql` template (architecture rule). Each organization gets its own
    * Stripe customer, so the mapping is unambiguous; `LIMIT 1` in the resolver
-   * tolerates an org holding several subscription rows for the same customer
+   * tolerates an organization holding several subscription rows for the same customer
    * (e.g. a canceled row plus a re-subscribed row). Returns `undefined` when no
    * row maps the customer, letting the caller fail closed rather than trust
    * attacker-influencable Stripe metadata.

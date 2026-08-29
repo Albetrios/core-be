@@ -17,11 +17,11 @@ What it does not own: identity proof (lives in [auth](src/domains/auth/)), user 
 
 ## Key invariants
 
-- **Header + path agreement**: `X-Organization-Id` header and `/organizations/:id/` path segment must agree when both are present (mismatch = 400). Otherwise the platform could permission-check one org while RLS GUC is set to another.
+- **Header + path agreement**: `X-Organization-Id` header and `/organizations/:id/` path segment must agree when both are present (mismatch = 400). Otherwise the platform could permission-check one organization while RLS GUC is set to another.
 - **Permission cache invalidation on every write**: any change to a user's role / permissions / membership invalidates the per-`(user, organization)` cache key in Redis before the response is returned.
 - **Public-id only at the API boundary**: every URL and JSON payload uses the URL-safe public id. The internal numeric id never leaves the database layer.
 - **Invitation tokens are one-shot**: atomic `UPDATE ... RETURNING` consumes the invitation on accept; second attempt sees `status=accepted`.
-- **No cross-org membership reads from the wrong context**: workers must use `runTenantScopedWorkerJob` (with `organizationPublicId` in the job payload) and the proper RLS context; HTTP code goes through `tenant.middleware`.
+- **No cross-organization membership reads from the wrong context**: workers must use `runTenantScopedWorkerJob` (with `organizationPublicId` in the job payload) and the proper RLS context; HTTP code goes through `tenant.middleware`.
 
 ## Sub-domains
 
@@ -36,7 +36,7 @@ What it does not own: identity proof (lives in [auth](src/domains/auth/)), user 
 
 This domain is the **owner** of `tenant-isolation` and `rls-context`; every other domain uses it. See [src/PATTERNS.md](src/PATTERNS.md):
 
-- `tenant-isolation` — the defining domain. Every read/write either runs through HTTP `tenant.middleware` or worker `withAppDatabaseContext` (job-minted org scope).
+- `tenant-isolation` — the defining domain. Every read/write either runs through HTTP `tenant.middleware` or worker `withAppDatabaseContext` (job-minted organization scope).
 - `rls-context` — same; this domain emits the GUC that RLS policies on every other table consume.
 - `audit-emission` — every membership change, role change, and invitation event records an audit row.
 - `idempotency` — invitation create + organization API key issuance accept `X-Idempotency-Key`.

@@ -180,7 +180,7 @@ export async function waitForOrganizationRlsTransactionCommit(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 50));
 }
 
-/** POST/PATCH/DELETE on org-scoped routes commit in onResponse after inject() resolves. */
+/** POST/PATCH/DELETE on organization-scoped routes commit in onResponse after inject() resolves. */
 export async function injectAuthenticatedOrganizationMutation(
   application: FastifyInstance,
   options: InjectAuthenticatedOptions,

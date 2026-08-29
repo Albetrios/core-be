@@ -35,7 +35,7 @@ What it does not own: outbound email — that belongs to the [src/infrastructure
 This domain implements the contracts documented in [src/PATTERNS.md](src/PATTERNS.md):
 
 - `transactional-outbox` — the PENDING `webhook_delivery_attempts` row is the outbox; the delivery worker is the dispatcher.
-- `tenant-isolation` / `rls-context` — every read and write scoped to the active organization (or the worker's pinned org context).
+- `tenant-isolation` / `rls-context` — every read and write scoped to the active organization (or the worker's pinned organization context).
 - `idempotency` — webhook configuration writes accept `X-Idempotency-Key`.
 - `soft-delete` — webhook configurations tombstone with `deleted_at` (subject to retention windows).
 

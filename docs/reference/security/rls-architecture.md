@@ -40,7 +40,7 @@ row. Elevated access exists only as the named fixture role `core_be_operator`
 
 | Old call | New call |
 | -------- | -------- |
-| `withOrganizationContext(orgId, cb)` / `withOrganizationDatabaseContext(orgId, cb)` | `withAppDatabaseContext(scope, cb)` — scope minted by `PRINCIPAL_SCOPE.REQUEST` (attached by the auth middleware as `request.principalScope`), `PRINCIPAL_SCOPE.JOB({ organizationPublicId })` (worker), or `PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId })` (ledgered flows) |
+| `withOrganizationContext(organizationId, cb)` / `withOrganizationDatabaseContext(organizationId, cb)` | `withAppDatabaseContext(scope, cb)` — scope minted by `PRINCIPAL_SCOPE.REQUEST` (attached by the auth middleware as `request.principalScope`), `PRINCIPAL_SCOPE.JOB({ organizationPublicId })` (worker), or `PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId })` (ledgered flows) |
 | `withUserDatabaseContext(userId, cb)` | `withAppDatabaseContext(scope, cb)` — `request.principalScope` narrowed by `requireUserScope(request)`, `PRINCIPAL_SCOPE.JOB({ userPublicId })`, or `PRINCIPAL_SCOPE.VERIFIED({ userPublicId })` |
 | `withGlobalRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, cb)` |
 | `withSessionRetentionCleanupDatabaseContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP, cb)` |
@@ -87,19 +87,19 @@ mistaken for the current one:
 | 3 | superuser local runtime + fixtures | 5-role taxonomy (`core_be_app/maintenance/operator/migrator/owner`), local mirrors live | superuser masking hid 8 production bugs |
 | 4 | 3 wrappers (principal / session / maintenance) | 2 wrappers — `withAppDatabaseContext` + `withMaintenanceDatabaseContext` | name = pool/role, scope = GUCs (one axis each) |
 | 5 | lowercase kind keys | CONSTANT_CASE members (`GLOBAL_ADMIN`, `ARTIFACT`, …) | matches the event-constant grammar; GUC strings and ALS kinds stay snake_case (runtime data) |
-| 6 | minters re-validated the org claim | only caller-supplied path params validated (S2) | verification happens once per boundary; the claim is server-signed |
+| 6 | minters re-validated the organization claim | only caller-supplied path params validated (S2) | verification happens once per boundary; the claim is server-signed |
 | 7 | source `'provisioning'` | source `'verified'` | full name↔source symmetry across the three doorways |
 | 8 | scope shapes implicit | shape contract locked (fixed keys per family) | no doorway can grow/drop/rename a field silently |
 | 9 | 5 minter names, 3 call styles (`REQUEST_SCOPE.*`, `resolveJobPrincipalScope`, `resolveVerifiedPrincipalScope`) | one family namespace `PRINCIPAL_SCOPE.REQUEST/.JOB/.VERIFIED` — members = sources, raw pre-proven ids always in objects | one grammar; per-member textual allowlists carry the same confinement |
-| 10 | two lazy getters (`request.principalScope` org-required / `request.userPrincipalScope`) | ONE eager property — the auth middleware attaches `request.principalScope` via `attachRequestPrincipalScope` on both auth paths | scope attaches the moment proof exists, like jobs; getters deleted |
+| 10 | two lazy getters (`request.principalScope` organization-required / `request.userPrincipalScope`) | ONE eager property — the auth middleware attaches `request.principalScope` via `attachRequestPrincipalScope` on both auth paths | scope attaches the moment proof exists, like jobs; getters deleted |
 | 11 | route contracts inside the getters | `requireAuth`-family narrowing accessors: `requireOrganizationScope(request)` (403) / `requireUserScope(request)` (401 for API keys) | 102 narrow-typed field reads keep compile-time guarantees; the contract is the accessor the route calls |
-| 12 | org path-param precedence (param ?? claim, param validated) | **path params ignored — the signed claim decides** | routes carry no `{organization_id}` segment; param handling was a vestigial IDOR surface |
+| 12 | organization path-param precedence (param ?? claim, param validated) | **path params ignored — the signed claim decides** | routes carry no `{organization_id}` segment; param handling was a vestigial IDOR surface |
 | 13 | session scope `{ kind, value }` | `SESSION_SCOPE.ARTIFACT({ sessionPublicId \| sessionTokenHash })` — named fields | field name = GUC name, mirroring the principal grammar |
 
 Locked decisions that bound future changes (do NOT revisit casually): the callback shape
 (§3), the wrapper-per-pool split, the scope-family type split (values dynamic, GUC keys
 static per family), and the accessor pair (a single common accessor either locks API keys
-out of org routes or un-types 102 field reads).
+out of organization routes or un-types 102 field reads).
 
 ## 3. Layers — text diagram
 
@@ -108,7 +108,7 @@ out of org routes or un-types 102 field reads).
 │                                                                                                      │
 │  HTTP request (JWT verified)          Worker job (payload)             Verified/port flows           │
 │  ─ PRINCIPAL_SCOPE.REQUEST         ─ PRINCIPAL_SCOPE.JOB         ─ PRINCIPAL_SCOPE.VERIFIED    │
-│    (org REQUIRED, from `org` claim)     (organizationPublicId in         Scope (caller already       │
+│    (organization REQUIRED, from `org` claim)     (organizationPublicId in         Scope (caller already       │
 │    (middleware attaches it as           the job payload)              (caller already proved   │
 │    request.principalScope; narrowed   ─ PRINCIPAL_SCOPE.JOB          the id: invite flow,     │
 │    by requireOrganization/UserScope)    (userPublicId in payload)     Stripe event, admin)     │
@@ -121,7 +121,7 @@ out of org routes or un-types 102 field reads).
                                                 ▼
 ┌──────────────────────────── PATTERN LAYER  (contexts/database-context.ts) ───────────────────────────┐
 │                                                                                                      │
-│   withAppDatabaseContext(scope, cb)           principal scope → identity GUCs (org and/or user)     │
+│   withAppDatabaseContext(scope, cb)           principal scope → identity GUCs (organization and/or user)     │
 │                                               session scope   → one artifact GUC (kind-dispatched)  │
 │   withMaintenanceDatabaseContext(scope, cb)   one bypass GUC = 'true' (registry-dispatched)         │
 │                                                                                                      │
@@ -191,7 +191,7 @@ Rules the layers enforce:
   LEGAL — values dynamic, keys fixed per family
     request.principalScope              → { organizationPublicId, userPublicId } → both identity GUCs
     requireUserScope(request)           → { userPublicId }                       → user GUC only
-    PRINCIPAL_SCOPE.JOB({ organizationPublicId })      → org GUC (worker parity with HTTP)
+    PRINCIPAL_SCOPE.JOB({ organizationPublicId })      → organization GUC (worker parity with HTTP)
     SESSION_SCOPE.ARTIFACT({ sessionTokenHash }) → named-field scope             → that one artifact GUC
 
   ILLEGAL — unrepresentable, so the context never needs a runtime check
@@ -210,11 +210,11 @@ switches** whose authority is the frozen scope singleton + per-file allowlist.
 
 | GUC | Pattern / setter | Value | Set when |
 | --- | ---------------- | ----- | -------- |
-| `app.current_organization_public_id` | Principal | org **public id** (dynamic, from the JWT `org` claim / job payload / verified id) | scope carries `organizationPublicId` |
+| `app.current_organization_public_id` | Principal | organization **public id** (dynamic, from the JWT `org` claim / job payload / verified id) | scope carries `organizationPublicId` |
 | `app.current_user_public_id` | Principal | user **public id** (dynamic) | scope carries `userPublicId` |
 | `app.current_session_public_id` | Session (`kind: session_public_id`) | session public id (dynamic) | pre-auth session lookup by public id |
 | `app.current_session_token_hash` | Session (`kind: session_token_hash`) | token hash (dynamic) | pre-auth session lookup by token hash |
-| `app.global_retention_cleanup` | Maintenance | `'true'` | retention/tombstone workers, offboarding reconcilers, the org tombstoning step |
+| `app.global_retention_cleanup` | Maintenance | `'true'` | retention/tombstone workers, offboarding reconcilers, the organization tombstoning step |
 | `app.session_retention_cleanup` | Maintenance | `'true'` | session-cleanup worker |
 | `app.global_admin` | Maintenance | `'true'` | admin user reads/suspend/soft-delete, admin audit listing, drain user resolution, DLQ-replay actor lookup |
 | `app.system_audit_insert` | Maintenance | `'true'` | tenantless `audit.outbox`/`audit.logs` INSERTs |
@@ -234,12 +234,12 @@ job → worker-runtime mints scope ─┘        │
                                            ▼
                      one SELECT set_config(...), set_config(...)   ← ONE round trip,
                      exactly the GUCs the scope carries:              never more
-                       org-only scope  → app.current_organization_public_id
+                       organization-only scope  → app.current_organization_public_id
                        user-only scope → app.current_user_public_id
                        both            → both
                                            │
                      reuse branches (no second checkout):
-                       same-org nested call        → reuse pinned handle as-is
+                       same-organization nested call        → reuse pinned handle as-is
                        user-only inside pinned tx  → layer ONLY app.current_user_public_id
                                                      onto the outer handle (FK atomicity
                                                      for OAuth find-or-create)
@@ -262,11 +262,11 @@ Authoritative, live-verified map: `rls-table-scope-map.db.unit.test.ts` (asserts
 
 | Table group | GUC arms on its policies |
 | ----------- | ------------------------ |
-| Tenant-scoped (`tenancy.*` children, `billing.subscriptions`, `notify.*`, org-scoped `upload.uploads`, org-scoped `audit.logs`/`outbox` arms) | `app.current_organization_public_id` + `app.global_retention_cleanup` |
+| Tenant-scoped (`tenancy.*` children, `billing.subscriptions`, `notify.*`, organization-scoped `upload.uploads`, organization-scoped `audit.logs`/`outbox` arms) | `app.current_organization_public_id` + `app.global_retention_cleanup` |
 | User-owned (`auth.users`†, `auth.auth_methods`†, MFA/WebAuthn/settings/preferences/exports, personal uploads, user notifications) | `app.current_user_public_id` (+ `app.global_admin`†, + `app.global_retention_cleanup` where retention prunes) |
 | `auth.sessions` | `app.current_user_public_id`, `app.current_session_public_id`, `app.current_session_token_hash`, `app.session_retention_cleanup` |
-| `audit.logs` | org arm, `app.current_user_public_id` (own-actions export), `app.global_admin`, `app.global_retention_cleanup`, `app.system_audit_insert` |
-| `audit.outbox` | org arm + `app.system_audit_insert` (INSERT); `app.audit_outbox_drain` (SELECT/UPDATE/DELETE — drain-exclusive) |
+| `audit.logs` | organization arm, `app.current_user_public_id` (own-actions export), `app.global_admin`, `app.global_retention_cleanup`, `app.system_audit_insert` |
+| `audit.outbox` | organization arm + `app.system_audit_insert` (INSERT); `app.audit_outbox_drain` (SELECT/UPDATE/DELETE — drain-exclusive) |
 | System tables (`auth.mail_outbox`, `billing.stripe_webhook_events`, `billing.plans`, tombstones, `audit.dead_letter_jobs`, `tenancy.permissions`, `auth.verification_tokens`) | no GUC — role-scoped `*_app_access` policies (`core_be_app`, `core_be_maintenance`) or `USING (true)` |
 
 † `tenancy.organizations` / `tenancy.api_keys` deliberately have **no** `global_admin`
@@ -279,8 +279,8 @@ functions (`audit.resolve_*_ids_for_public_ids`) instead of widening the bypass.
 
 | Pattern | Scope type | Minted by (per-file confined) | Context call |
 | --- | --- | --- | --- |
-| Principal | `OrganizationPrincipalDatabaseScope` (org required, user optional) | `PRINCIPAL_SCOPE.REQUEST` (middleware) · `PRINCIPAL_SCOPE.JOB({ organizationPublicId })` · `PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId })` | `withAppDatabaseContext` |
-| Principal | `UserPrincipalDatabaseScope` (user required, org optional — self-heal surface) | `requireUserScope(request)` · `PRINCIPAL_SCOPE.JOB({ userPublicId })` · `PRINCIPAL_SCOPE.VERIFIED({ userPublicId })` | `withAppDatabaseContext` |
+| Principal | `OrganizationPrincipalDatabaseScope` (organization required, user optional) | `PRINCIPAL_SCOPE.REQUEST` (middleware) · `PRINCIPAL_SCOPE.JOB({ organizationPublicId })` · `PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId })` | `withAppDatabaseContext` |
+| Principal | `UserPrincipalDatabaseScope` (user required, organization optional — self-heal surface) | `requireUserScope(request)` · `PRINCIPAL_SCOPE.JOB({ userPublicId })` · `PRINCIPAL_SCOPE.VERIFIED({ userPublicId })` | `withAppDatabaseContext` |
 | Session | `SessionDatabaseScope` — kinds `session_public_id` \| `session_token_hash` | `SESSION_SCOPE.<kind>(value)` factories (auth domain only; token values are pre-hashed) | `withAppDatabaseContext` |
 | Maintenance | `MaintenanceDatabaseScope` — 7 frozen singletons: `global_retention_cleanup`, `session_retention_cleanup`, `global_admin`, `system_audit_insert`, `audit_outbox_drain`, `system_table_retention`, `system_table_worker` | nothing to mint — `MAINTENANCE_SCOPE.<kind>` | `withMaintenanceDatabaseContext` |
 
@@ -291,7 +291,7 @@ Stripe event mapping, admin, signup provisioning) — ledgered per importer by
 
 Controller ergonomics: the auth middleware eagerly attaches
 `request.principalScope` the moment authentication succeeds (JWT or API key);
-controllers narrow it with `requireOrganizationScope(request)` (org required,
+controllers narrow it with `requireOrganizationScope(request)` (organization required,
 403) or `requireUserScope(request)` (real user required, 401 for API keys) and
 relay the scope into services — no minting call ever appears in HTTP code.
 
@@ -300,9 +300,9 @@ relay the scope into services — no minting call ever appears in HTTP code.
 1. **An UPDATE's NEW row must stay SELECT-visible** whenever the statement reads the
    table (a column-referencing WHERE is enough). Consequence: a soft-delete cannot run
    under a scope whose SELECT arm hides deleted rows — user tombstoning runs under
-   `global_admin`, org tombstoning under `global_retention_cleanup` (whose arm is in the
-   org policy's WITH CHECK too). The sec-new-D3 gate (stale org claims cannot read
-   deleted orgs) stays intact.
+   `global_admin`, organization tombstoning under `global_retention_cleanup` (whose arm is in the
+   organization policy's WITH CHECK too). The sec-new-D3 gate (stale organization claims cannot read
+   deleted organizations) stays intact.
 2. **`INSERT … RETURNING` applies SELECT-policy visibility to the returned row.**
    `audit.outbox` staging therefore uses a plain INSERT with an affected-count guard —
    its SELECT is drain-exclusive by design.
@@ -362,8 +362,8 @@ an as-`core_be_app` (or maintenance-role) regression:
 | 2 | Outbox claim escalated past its LIMIT — nested-loop rescans of the `FOR UPDATE SKIP LOCKED` FROM-subquery | `WITH claimable AS MATERIALIZED` |
 | 3 | Upload pending-sweep confirm/fail UPDATEs rejected — retention bypass was USING-only on `uploads_tenant_isolation` | retention arm added to WITH CHECK |
 | 4 | `DELETE /users/me` failed at the final step (half-offboarded accounts) — tombstoned NEW row loses self-arm SELECT visibility | final softDelete under `MAINTENANCE_SCOPE.GLOBAL_ADMIN` |
-| 5 | `DELETE /tenancy/organization` always 500'd after Stripe cancellation — same NEW-row rule vs the sec-new-D3 gate (which is kept) | tombstone under retention scope + retention arm in org WITH CHECK |
-| 6 | Audit drain permanently discarded org / API-key-actor rows — `global_admin` grants nothing on `tenancy.*` | `SECURITY DEFINER` resolvers `audit.resolve_*_ids_for_public_ids` |
+| 5 | `DELETE /tenancy/organization` always 500'd after Stripe cancellation — same NEW-row rule vs the sec-new-D3 gate (which is kept) | tombstone under retention scope + retention arm in organization WITH CHECK |
+| 6 | Audit drain permanently discarded organization / API-key-actor rows — `global_admin` grants nothing on `tenancy.*` | `SECURITY DEFINER` resolvers `audit.resolve_*_ids_for_public_ids` |
 | 7 | User tombstone purge + offboarding reconciler were silent no-ops — users policy had no retention arm | USING-only retention arm on `users_self_or_admin_access` |
 | 8 | Manual DLQ replay always failed its actor pre-condition — lookup ran with no RLS context | wrapped in `MAINTENANCE_SCOPE.GLOBAL_ADMIN` |
 
@@ -392,7 +392,7 @@ route preHandler: [app.authenticate, requireOrganizationPermission(…)]
  │
  ├─ authenticate()                    shared/middlewares/core/auth.middleware.ts
  │    applyApiKeyAuthentication() | verifyAccessToken() + verifyActiveAccessToken()
- │    request.auth = { kind, userId?, organizationPublicId (org claim) }
+ │    request.auth = { kind, userId?, organizationPublicId (organization claim) }
  │    attachRequestPrincipalScope(request)
  │      → request.principalScope = PRINCIPAL_SCOPE.REQUEST({ userPublicId?, organizationPublicId? })
  │        (ids leave request.auth ONLY here; path params are ignored)
@@ -407,8 +407,8 @@ route preHandler: [app.authenticate, requireOrganizationPermission(…)]
  │    await withAppDatabaseContext(scope, async (db) => repository.…)
  │
  ├─ withAppDatabaseContext            contexts/database-context.ts
- │    'source' in scope → principal branch: same-org ALS reuse, else
- │    checkout (core_be_app) → BEGIN → ONE set_config round trip (org and/or user GUC)
+ │    'source' in scope → principal branch: same-organization ALS reuse, else
+ │    checkout (core_be_app) → BEGIN → ONE set_config round trip (organization and/or user GUC)
  │    → pin handle in ALS → callback → COMMIT|ROLLBACK → release + checkout metrics
  │
  └─ Postgres: FORCE-RLS policies read the GUCs (USING + WITH CHECK) — no GUC/arm = zero rows
@@ -438,7 +438,7 @@ auth-session.service.ts (only consumer)
 ```text
 member-invitation.service.ts (ledgered): invitation token matched (the caller's own proof)
   → PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: invitation.organization_public_id })
-  → withAppDatabaseContext → normal org GUC → normal policies
+  → withAppDatabaseContext → normal organization GUC → normal policies
 ```
 
 ### 9.6 Maintenance (example: retention)

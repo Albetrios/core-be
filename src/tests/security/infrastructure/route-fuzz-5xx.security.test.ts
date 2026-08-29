@@ -26,7 +26,7 @@ const allPermissionCodes = [
 
 /**
  * Routes that revoke or destroy the shared fixture identity when they succeed
- * (logout, session revocation, self/org deletion). They run LAST, in this
+ * (logout, session revocation, self/organization deletion). They run LAST, in this
  * order, so a successful destructive call cannot turn the remaining sweep
  * into a meaningless 401 parade. The never-5xx assertion still applies.
  */

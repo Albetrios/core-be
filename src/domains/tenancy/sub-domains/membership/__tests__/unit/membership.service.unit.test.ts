@@ -13,7 +13,7 @@ vi.mock('@/shared/utils/text/email.util.js', () => ({
   isDisposableEmailBlocked: vi.fn().mockReturnValue(false),
 }));
 
-// The seat-availability check acquires a per-org advisory lock (real DB in production). Mock only
+// The seat-availability check acquires a per-organization advisory lock (real DB in production). Mock only
 // the lock (keep RESOURCE_QUOTA_LOCK_NAMESPACE) so the seat logic runs without a live connection.
 vi.mock('@/infrastructure/database/resource-quota-lock.util.js', async (importOriginal) => ({
   ...(await importOriginal<
@@ -301,7 +301,7 @@ describe('MembershipService', () => {
   });
 
   // sec-new-T1: owner membership cannot be modified (would enable Admin lockout of owner)
-  it('update rejects any status change targeting the org owner membership (sec-new-T1)', async () => {
+  it('update rejects any status change targeting the organization owner membership (sec-new-T1)', async () => {
     // membership.user_id matches organization.owner_user_id (99)
     vi.mocked(membershipRepository.findByPublicId).mockResolvedValue({
       ...membershipRow,
@@ -314,7 +314,7 @@ describe('MembershipService', () => {
     expect(membershipRepository.update).not.toHaveBeenCalled();
   });
 
-  it('update rejects ACTIVE status targeting the org owner membership (sec-new-T1)', async () => {
+  it('update rejects ACTIVE status targeting the organization owner membership (sec-new-T1)', async () => {
     // Even a benign reactivation attempt on the owner is blocked — use transferOwnership.
     vi.mocked(membershipRepository.findByPublicId).mockResolvedValue({
       ...membershipRow,
@@ -391,7 +391,7 @@ describe('MembershipService', () => {
       enqueueSeatQuantitySync,
     });
 
-    it('create blocks a new member when the org is already at its plan seat ceiling', async () => {
+    it('create blocks a new member when the organization is already at its plan seat ceiling', async () => {
       reserveSeatCeilingForMemberAdd.mockResolvedValue(3); // plan ceiling = 3
       vi.mocked(membershipRepository.countActiveByOrganization).mockResolvedValue(3); // already full
 
@@ -405,7 +405,7 @@ describe('MembershipService', () => {
       expect(membershipRepository.create).not.toHaveBeenCalled();
     });
 
-    it('create consults the seat check and proceeds when the org is under the ceiling', async () => {
+    it('create consults the seat check and proceeds when the organization is under the ceiling', async () => {
       reserveSeatCeilingForMemberAdd.mockResolvedValue(5);
       vi.mocked(membershipRepository.countActiveByOrganization).mockResolvedValue(2);
 

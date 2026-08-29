@@ -19,7 +19,7 @@ import { assertCallerCanGrantPermissionCodes } from '@/domains/tenancy/sub-domai
  *
  * @remarks
  * - **Algorithm:** every public method runs under `withAppDatabaseContext`
- *   so Postgres RLS sees `app.current_organization_public_id`; the org and role are
+ *   so Postgres RLS sees `app.current_organization_public_id`; the organization and role are
  *   resolved by public id, then the repository is invoked.
  * - **Failure modes:** `NotFoundError` when the organization or role does not
  *   exist (or has been soft-deleted); Zod `ValidationError` from
@@ -28,10 +28,10 @@ import { assertCallerCanGrantPermissionCodes } from '@/domains/tenancy/sub-domai
  *   (DELETE then INSERT) in a single repository call, then calls
  *   {@link invalidateOrganizationPermissions} so every member holding the role
  *   re-resolves their permissions on the next request (a role's permission set
- *   change can affect many users, so the whole org namespace is bumped).
+ *   change can affect many users, so the whole organization namespace is bumped).
  * - **Notes:** `listPermissionCodesForRole` is the read path consumed by
  *   {@link MembershipService.getPermissions}; it returns only `permission_code`
- *   strings and does not enforce org context (callers must already be inside
+ *   strings and does not enforce organization context (callers must already be inside
  *   one).
  */
 export class MemberRolePermissionService {

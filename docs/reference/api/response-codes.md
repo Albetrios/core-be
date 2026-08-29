@@ -45,7 +45,7 @@ When to set which HTTP status — the single contract every route, test, and doc
 
 **Decision guide for a new failure path:** is the request unreadable → 400/413/415; unauthenticated → 401; authenticated but not allowed → 403; thing doesn't exist → 404; valid request colliding with current state → 409; valid request breaking a business rule → 422; too fast → 429. If none fit, you are probably about to invent a status — don't; map it to the closest above.
 
-**400 vs 422:** 400 = the request itself is malformed (shape). 422 = the request parses fine but the system rejects its meaning (semantics). **409 vs 422:** 409 = conflict with existing state (try again may succeed after state changes). 422 = the payload's logic is wrong, or the target resource **type** makes the capability permanently unavailable — retrying an identical payload always fails (e.g. a personal organization can never have members/roles/ownership-transfer/deletion because the org `type` is immutable; the centralized guard is `assertTeamOrganization(...)`).
+**400 vs 422:** 400 = the request itself is malformed (shape). 422 = the request parses fine but the system rejects its meaning (semantics). **409 vs 422:** 409 = conflict with existing state (try again may succeed after state changes). 422 = the payload's logic is wrong, or the target resource **type** makes the capability permanently unavailable — retrying an identical payload always fails (e.g. a personal organization can never have members/roles/ownership-transfer/deletion because the organization `type` is immutable; the centralized guard is `assertTeamOrganization(...)`).
 
 ## Error body shape
 

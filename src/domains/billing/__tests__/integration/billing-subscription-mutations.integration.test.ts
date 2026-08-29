@@ -235,9 +235,9 @@ describe('Billing Subscription Mutations — Integration', () => {
       expect(await statusOf(owner.id)).toBe('ACTIVE');
     });
 
-    it('downgrade of an owner-only org to a 0-seat plan succeeds without suspending the owner (F2)', async () => {
+    it('downgrade of an owner-only organization to a 0-seat plan succeeds without suspending the owner (F2)', async () => {
       // Only the owner holds a seat; the owner is never suspended, so an over-cap downgrade still
-      // succeeds (the org simply remains at its owner-only floor).
+      // succeeds (the organization simply remains at its owner-only floor).
       const {
         user: owner,
         organization,
@@ -750,9 +750,9 @@ describe('Billing Subscription Mutations — Integration', () => {
 
   // ─── Team-only 422 at the HTTP boundary ────────────────────────────────────
   //
-  // One case per `team`-scoped route in `route-org-scope.json`. Proven at the service layer
+  // One case per `team`-scoped route in `route-organization-scope.json`. Proven at the service layer
   // only until now; these confirm the guard survives the trip through routing, auth, permission
-  // resolution, and the org RLS context.
+  // resolution, and the organization RLS context.
   describe('PERSONAL organization is refused on every team-scoped billing mutation', () => {
     it('POST /billing/subscriptions returns 422', async () => {
       const { organization, plan, token } = await createPersonalOrganizationContext();
@@ -815,9 +815,9 @@ describe('Billing Subscription Mutations — Integration', () => {
 
     it('the same PERSONAL organization is NOT refused on a subscription READ', async () => {
       // Makes the four cases above non-vacuous: they must fail on the billing guard, not on
-      // something incidental to how the personal-org fixture is built (a missing membership, an
+      // something incidental to how the personal-organization fixture is built (a missing membership, an
       // unresolvable permission, a bad token claim). `GET /billing/subscriptions` is declared
-      // `both` in route-org-scope.json and carries no team guard, so it must still be 200.
+      // `both` in route-organization-scope.json and carries no team guard, so it must still be 200.
       const { organization, token } = await createPersonalOrganizationContext();
 
       const response = await injectAuthenticated(app, {

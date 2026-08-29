@@ -39,11 +39,11 @@ async function hasSoftDeletedFilterInPolicy(): Promise<boolean> {
  *
  * A request with `X-Organization-Id` set to a deleted org's `public_id` could
  * still read the organizations row directly. The fix adds `AND deleted_at IS NULL`
- * to the tenant-scoped arm so soft-deleted orgs are invisible to HTTP requests.
+ * to the tenant-scoped arm so soft-deleted organizations are invisible to HTTP requests.
  * The `global_retention_cleanup` bypass arm is unchanged — retention workers must
  * be able to see deleted rows for tombstone / hard-delete jobs.
  */
-describe('Security: organizations RLS — soft-deleted orgs excluded (sec-new-D3)', () => {
+describe('Security: organizations RLS — soft-deleted organizations excluded (sec-new-D3)', () => {
   let migrationApplied = false;
 
   beforeAll(async () => {
@@ -55,13 +55,13 @@ describe('Security: organizations RLS — soft-deleted orgs excluded (sec-new-D3
     await cleanupDatabase();
   });
 
-  it('sec-new-D3: hides soft-deleted org from a tenant-scoped query', async () => {
+  it('sec-new-D3: hides soft-deleted organization from a tenant-scoped query', async () => {
     // Fail closed: this tenant-isolation guarantee must never be silently skipped. If the
     // migration is missing the suite fails loudly (with the fix instruction) rather than passing
     // with zero coverage — exactly the gap a "skip when absent" guard would leave on a fresh DB.
     expect(
       migrationApplied,
-      'Required RLS migration 20260608010000_rls_organizations_exclude_soft_deleted.sql is not applied — apply it (pnpm db:migrate) so soft-deleted-org isolation is actually verified.',
+      'Required RLS migration 20260608010000_rls_organizations_exclude_soft_deleted.sql is not applied — apply it (pnpm db:migrate) so soft-deleted-organization isolation is actually verified.',
     ).toBe(true);
 
     const owner = await createTestUser();
@@ -80,7 +80,7 @@ describe('Security: organizations RLS — soft-deleted orgs excluded (sec-new-D3
         drizzleSql`SELECT set_config('app.current_organization_public_id', ${organization.public_id}, true)`,
       );
 
-      // The soft-deleted org must NOT appear when queried by its own public_id.
+      // The soft-deleted organization must NOT appear when queried by its own public_id.
       const rows = await transaction
         .select({ public_id: organizations.public_id })
         .from(organizations)
@@ -90,7 +90,7 @@ describe('Security: organizations RLS — soft-deleted orgs excluded (sec-new-D3
     });
   });
 
-  it('sec-new-D3: active org remains visible to a tenant-scoped query', async () => {
+  it('sec-new-D3: active organization remains visible to a tenant-scoped query', async () => {
     expect(
       migrationApplied,
       'Required RLS migration 20260608010000_rls_organizations_exclude_soft_deleted.sql is not applied.',
@@ -115,7 +115,7 @@ describe('Security: organizations RLS — soft-deleted orgs excluded (sec-new-D3
     });
   });
 
-  it('sec-new-D3: global_retention_cleanup bypass still shows soft-deleted orgs to retention workers', async () => {
+  it('sec-new-D3: global_retention_cleanup bypass still shows soft-deleted organizations to retention workers', async () => {
     expect(
       migrationApplied,
       'Required RLS migration 20260608010000_rls_organizations_exclude_soft_deleted.sql is not applied.',
@@ -131,7 +131,7 @@ describe('Security: organizations RLS — soft-deleted orgs excluded (sec-new-D3
 
     await database.transaction(async (transaction) => {
       await transaction.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
-      // Retention workers set global_retention_cleanup instead of an org-scoped id.
+      // Retention workers set global_retention_cleanup instead of an organization-scoped id.
       await transaction.execute(
         drizzleSql`SELECT set_config('app.global_retention_cleanup', 'true', true)`,
       );

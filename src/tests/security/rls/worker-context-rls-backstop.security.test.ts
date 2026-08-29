@@ -19,14 +19,14 @@ import {
  * context via {@link withAppDatabaseContext} (the real wrapper used by every tenant-scoped
  * job). `worker-tenant-isolation.security.test.ts` proves the repository layer scopes by
  * `organizationPublicId`; this proves the LAST line of defense: even a raw query run inside
- * `withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: orgB })` cannot read or mutate orgA's rows), because the wrapper sets
+ * `withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationB })` cannot read or mutate organizationA's rows), because the wrapper sets
  * the `app.current_organization_public_id` GUC and RLS engages.
  *
  * The production worker connects as the non-bypass `core_be_app` role; the test connection is
  * the RLS-exempt `core` superuser, so each callback issues `SET LOCAL ROLE core_be_app` to
- * reproduce production faithfully (the wrapper has already set the org GUC for the transaction).
+ * reproduce production faithfully (the wrapper has already set the organization GUC for the transaction).
  */
-describe('Security: worker context RLS backstop (wrong-org context cannot reach another tenant)', () => {
+describe('Security: worker context RLS backstop (wrong-organization context cannot reach another tenant)', () => {
   beforeAll(async () => {
     await grantCoreBeAppRoleForTests();
   });
@@ -54,13 +54,13 @@ describe('Security: worker context RLS backstop (wrong-org context cannot reach 
     return row!.id;
   }
 
-  it('a raw SELECT under withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: orgB }) cannot see orgA rows', async () => {
+  it('a raw SELECT under withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationB }) cannot see organizationA rows', async () => {
     const user = await createTestUser();
     const organizationA = await createTestOrganization({ ownerUserId: user.id });
     const organizationB = await createTestOrganization({ ownerUserId: user.id });
     const notificationId = await seedOrganizationNotification(organizationA.id, user.id);
 
-    // Wrong context: a worker scoped to org B raw-queries org A's row.
+    // Wrong context: a worker scoped to organization B raw-queries organization A's row.
     const visibleUnderB = await withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationB.public_id }),
       async (handle) => {
@@ -73,8 +73,8 @@ describe('Security: worker context RLS backstop (wrong-org context cannot reach 
     );
     expect(visibleUnderB).toHaveLength(0);
 
-    // Correct context: a worker scoped to org A sees its own row — proves the wrapper actually
-    // set the org GUC (so the empty result above is RLS isolation, not a broken query).
+    // Correct context: a worker scoped to organization A sees its own row — proves the wrapper actually
+    // set the organization GUC (so the empty result above is RLS isolation, not a broken query).
     const visibleUnderA = await withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationA.public_id }),
       async (handle) => {
@@ -88,7 +88,7 @@ describe('Security: worker context RLS backstop (wrong-org context cannot reach 
     expect(visibleUnderA).toHaveLength(1);
   });
 
-  it('a raw UPDATE under withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: orgB }) cannot mutate orgA rows', async () => {
+  it('a raw UPDATE under withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationB }) cannot mutate organizationA rows', async () => {
     const user = await createTestUser();
     const organizationA = await createTestOrganization({ ownerUserId: user.id });
     const organizationB = await createTestOrganization({ ownerUserId: user.id });
@@ -100,12 +100,12 @@ describe('Security: worker context RLS backstop (wrong-org context cannot reach 
         await handle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
         await handle
           .update(notifications)
-          .set({ title: 'tampered by org B' })
+          .set({ title: 'tampered by organization B' })
           .where(eq(notifications.id, notificationId));
       },
     );
 
-    // Re-read as the RLS-exempt superuser: org A's row is untouched (RLS USING blocked the UPDATE).
+    // Re-read as the RLS-exempt superuser: organization A's row is untouched (RLS USING blocked the UPDATE).
     const [row] = await database
       .select({ title: notifications.title })
       .from(notifications)

@@ -7,7 +7,7 @@ vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', 
     invalidateOrganizationPermissionsMock(...parameters),
 }));
 
-// create() now bootstraps the org atomically via provisionOrganizationWithOwner (org + owner
+// create() now bootstraps the organization atomically via provisionOrganizationWithOwner (organization + owner
 // role + permissions + membership), not repository.create — mock that boundary here.
 const provisionOrganizationWithOwnerMock = vi.fn();
 vi.mock('@/domains/tenancy/sub-domains/organization/organization-provisioning.js', () => ({
@@ -181,7 +181,7 @@ describe('OrganizationService', () => {
     expect(uploadService.tombstoneAllByOrganizationId).toHaveBeenCalledWith(organizationRow.id);
   });
 
-  it('route-audit-#2: delete cancels the org active subscription so billing stops', async () => {
+  it('route-audit-#2: delete cancels the organization active subscription so billing stops', async () => {
     const uploadService = { tombstoneAllByOrganizationId: vi.fn().mockResolvedValue(0) };
     const subscriptionService = {
       cancelActiveForOrganizationOffboarding: vi.fn().mockResolvedValue(undefined),
@@ -193,7 +193,7 @@ describe('OrganizationService', () => {
     );
   });
 
-  it('route-audit-#2: a Stripe cancel failure aborts the delete (no soft-delete of a billing org)', async () => {
+  it('route-audit-#2: a Stripe cancel failure aborts the delete (no soft-delete of a billing organization)', async () => {
     const uploadService = { tombstoneAllByOrganizationId: vi.fn().mockResolvedValue(0) };
     const subscriptionService = {
       cancelActiveForOrganizationOffboarding: vi
@@ -246,7 +246,7 @@ describe('OrganizationService', () => {
   });
 
   it('uploadLogo rejects an SVG logo (stored-XSS defense) and never persists it', async () => {
-    // The org-logo attach path carries its own independent content-type gate — an SVG logo is
+    // The organization-logo attach path carries its own independent content-type gate — an SVG logo is
     // served inline and is a stored-XSS vector. The upload domain's SVG tests do not cover this
     // path; here headObject reports the confirmed object as image/svg+xml.
     vi.mocked(objectStorage.headObject).mockResolvedValueOnce({
@@ -361,7 +361,7 @@ describe('OrganizationService', () => {
   });
 
   it('create rejects when team organizations are disabled (capability gate)', async () => {
-    // Personal-only deployment: the server must reject team-org creation, not just hide it.
+    // Personal-only deployment: the server must reject team-organization creation, not just hide it.
     const original = env.TEAM_ORGANIZATION_ENABLED;
     (env as { TEAM_ORGANIZATION_ENABLED: boolean }).TEAM_ORGANIZATION_ENABLED = false;
     try {
@@ -552,7 +552,7 @@ describe('OrganizationService', () => {
     vi.mocked(objectStorage.headObject).mockClear();
     vi.mocked(repository.findByPublicId).mockResolvedValue({
       ...organizationRow,
-      logo_url: 'https://cdn.example.com/no-org-logos/here.png',
+      logo_url: 'https://cdn.example.com/no-organization-logos/here.png',
     } as never);
     const result = await service.deleteLogo(asScope(organizationRow.public_id), 'owner_public');
     expect(objectStorage.headObject).not.toHaveBeenCalled();

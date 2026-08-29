@@ -1,8 +1,8 @@
-/** In-process count of in-flight org-scoped RLS transaction checkouts (HTTP request-pinned and service unit-of-work). */
+/** In-process count of in-flight organization-scoped RLS transaction checkouts (HTTP request-pinned and service unit-of-work). */
 let activeOrganizationRlsCheckouts = 0;
 
 /**
- * Which code path opened the org-scoped RLS checkout being measured:
+ * Which code path opened the organization-scoped RLS checkout being measured:
  * - `scoped_context` — a `withAppDatabaseContext` / `withAppDatabaseContext` unit of work
  *   (the default `DATABASE_RLS_SCOPED_CONTEXTS=true` path; also used by workers and scripts).
  * - `request_transaction` — the legacy per-HTTP-request `organization-rls-transaction` middleware
@@ -14,11 +14,11 @@ export type OrganizationRlsCheckoutPath =
   // A5 all-scope coverage: session (pre-auth artifact) and maintenance (bypass)
   // pattern transactions also hold pooled checkouts — counted so the
   // pool-exhaustion alerter and hold histogram see the WHOLE checkout load
-  // (retention sweeps can hold long transactions), not just org-scoped work.
+  // (retention sweeps can hold long transactions), not just organization-scoped work.
   | 'session_context'
   | 'maintenance_context';
 
-/** One completed org-RLS checkout: how long the pooled connection was held and by which path. */
+/** One completed organization-RLS checkout: how long the pooled connection was held and by which path. */
 export type OrganizationRlsCheckoutHoldSample = {
   readonly path: OrganizationRlsCheckoutPath;
   readonly durationSeconds: number;
@@ -31,7 +31,7 @@ export type OrganizationRlsCheckoutHoldObserver = (
 
 let checkoutHoldObserver: OrganizationRlsCheckoutHoldObserver | null = null;
 
-/** Increments the in-process org-RLS checkout gauge when a pooled checkout is acquired. */
+/** Increments the in-process organization-RLS checkout gauge when a pooled checkout is acquired. */
 export function incrementOrganizationRlsCheckoutCount(): void {
   activeOrganizationRlsCheckouts += 1;
 }

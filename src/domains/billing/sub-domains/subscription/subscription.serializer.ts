@@ -24,7 +24,7 @@ interface SubscriptionRow {
    */
   seats_total: number | null;
   /**
-   * REQ-4: seats currently consumed — the count of ACTIVE + INVITED memberships in the org,
+   * REQ-4: seats currently consumed — the count of ACTIVE + INVITED memberships in the organization,
    * resolved cross-domain via the tenancy membership service. Computed by
    * {@link SubscriptionService}.
    */

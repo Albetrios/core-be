@@ -85,7 +85,7 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
   const webhookRepository = {
     create: vi.fn().mockResolvedValue(webhook),
     countActiveByOrganization: vi.fn().mockResolvedValue(0),
-    // audit-#8: per-org creation quota advisory lock (no-op in unit tests).
+    // audit-#8: per-organization creation quota advisory lock (no-op in unit tests).
     acquireCreationQuotaLock: vi.fn().mockResolvedValue(undefined),
   } as unknown as WebhookRepository;
 
@@ -102,7 +102,7 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockReset();
   });
 
-  it('allows create when the org is below the cap', async () => {
+  it('allows create when the organization is below the cap', async () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockResolvedValue(5);
     await service.create(
       scope,
@@ -116,7 +116,7 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
     expect(webhookRepository.create).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects create when the org is at the cap (default 25)', async () => {
+  it('rejects create when the organization is at the cap (default 25)', async () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockResolvedValue(25);
     await expect(
       service.create(
@@ -132,7 +132,7 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
     expect(webhookRepository.create).not.toHaveBeenCalled();
   });
 
-  it('rejects create when the org is over the cap (defensive)', async () => {
+  it('rejects create when the organization is over the cap (defensive)', async () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockResolvedValue(30);
     await expect(
       service.create(

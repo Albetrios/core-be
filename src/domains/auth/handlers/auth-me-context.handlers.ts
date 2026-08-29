@@ -10,7 +10,7 @@ import type { AuthContainer } from '@/domains/auth/auth.container.js';
 
 type AuthMeContextHandlersDependencies = Pick<AuthContainer, 'authMeContextService'>;
 
-/** Builds the `GET /auth/me/context` handler — the single authoritative call returning the caller's identity, active org (+capabilities), resolved permissions, global role, and org-switcher list. */
+/** Builds the `GET /auth/me/context` handler — the single authoritative call returning the caller's identity, active organization (+capabilities), resolved permissions, global role, and organization-switcher list. */
 export function createAuthMeContextHandlers({
   authMeContextService,
 }: AuthMeContextHandlersDependencies) {

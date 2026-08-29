@@ -33,7 +33,7 @@ const meScope = PRINCIPAL_SCOPE.REQUEST({
 }) as UserPrincipalDatabaseScope;
 
 describe('AuthMeContextService.getContext', () => {
-  it('aggregates the user, active organization, resolved permissions, and org list', async () => {
+  it('aggregates the user, active organization, resolved permissions, and organization list', async () => {
     const activeOrganization = { id: 'org_active', type: 'TEAM' };
     const userService = { getMe: vi.fn().mockResolvedValue({ id: 'usr_1', email: 'a@b.com' }) };
     const organizationService = {
@@ -132,7 +132,7 @@ describe('AuthMeContextService.getContext', () => {
     expect(data.myPermissions).toEqual(['organization:read']);
   });
 
-  it('returns a null active organization and no permissions when no active org is in scope', async () => {
+  it('returns a null active organization and no permissions when no active organization is in scope', async () => {
     const userService = { getMe: vi.fn().mockResolvedValue({ id: 'usr_1' }) };
     const organizationService = {
       list: vi.fn().mockResolvedValue({ items: [] }),
@@ -145,13 +145,13 @@ describe('AuthMeContextService.getContext', () => {
       authorizationService as never,
     );
 
-    // Org-less token = the /users/me self-heal transitional state: the active-org
+    // Org-less token = the /users/me self-heal transitional state: the active-organization
     // slice is skipped rather than erroring.
-    const orgLessScope = PRINCIPAL_SCOPE.REQUEST({
+    const organizationLessScope = PRINCIPAL_SCOPE.REQUEST({
       userPublicId: 'usr_1',
     }) as UserPrincipalDatabaseScope;
     const data = await service.getContext({
-      scope: orgLessScope,
+      scope: organizationLessScope,
       globalRole: undefined,
     });
 
@@ -164,7 +164,7 @@ describe('AuthMeContextService.getContext', () => {
 });
 
 describe('AuthMeContextService.getActiveOrganizationContext', () => {
-  it('resolves only the active-org slice (org + permissions) without the user / org-list reads', async () => {
+  it('resolves only the active-organization slice (organization + permissions) without the user / organization-list reads', async () => {
     const activeOrganization = { id: 'org_active', type: 'TEAM' };
     const userService = { getMe: vi.fn() };
     const organizationService = {

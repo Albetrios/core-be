@@ -70,9 +70,9 @@ describe('MemberRoleService', () => {
     findByInternalId: vi.fn().mockResolvedValue(roleRow),
     // sec-r5-followup-ratelimit-dos-2: create() now consults this guard
     // before insert. Default to 0 so the lifecycle tests still reach create;
-    // the cap regression lives in `per-org-row-caps.unit.test.ts`.
+    // the cap regression lives in `per-organization-row-caps.unit.test.ts`.
     countActiveByOrganization: vi.fn().mockResolvedValue(0),
-    // audit-#8: per-org creation quota advisory lock (no-op in unit tests).
+    // audit-#8: per-organization creation quota advisory lock (no-op in unit tests).
     acquireCreationQuotaLock: vi.fn().mockResolvedValue(undefined),
     create: vi.fn().mockResolvedValue(roleRow),
     update: vi.fn().mockResolvedValue(roleRow),

@@ -127,10 +127,10 @@ describe('organization-tombstone-retention.worker', () => {
     );
 
     createOrganizationTombstoneRetentionWorker();
-    workerState.onHandlers.stalled?.('job-org-789');
+    workerState.onHandlers.stalled?.('job-organization-789');
 
     expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
-      { jobId: 'job-org-789', queue: 'organization-tombstone-retention' },
+      { jobId: 'job-organization-789', queue: 'organization-tombstone-retention' },
       'organization-tombstone-retention.stalled',
     );
   });

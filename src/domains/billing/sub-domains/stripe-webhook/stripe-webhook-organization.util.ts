@@ -120,7 +120,7 @@ export async function resolveOrganizationPublicIdForStripeEvent(
 
   // Database mapping wins when present; metadata is the binding of last resort
   // for a first-contact subscription with no local row, guarded by the
-  // subscriptions WITH CHECK (audit #41) against a non-existent org.
+  // subscriptions WITH CHECK (audit #41) against a non-existent organization.
   return fromDatabase ?? fromMetadata;
 }
 

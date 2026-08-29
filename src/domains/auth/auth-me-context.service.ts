@@ -12,16 +12,16 @@ import type { AuthMeContextData } from './auth-me-context.types.js';
 /**
  * Aggregates the authenticated caller's "effective context" in one read: their
  * self profile, the active organization (with type-derived capabilities), the
- * permission codes they hold in that org, their global role, and the
- * organizations they belong to (for an org switcher).
+ * permission codes they hold in that organization, their global role, and the
+ * organizations they belong to (for an organization switcher).
  *
  * @remarks
  * - **Algorithm:** sequential cross-domain reads through services (never
  *   repositories) — `UserService.getMe`, `OrganizationService.list`, and, when an
- *   active org is in scope, `OrganizationService.getByPublicId` +
+ *   active organization is in scope, `OrganizationService.getByPublicId` +
  *   `AuthorizationService.resolveUserOrganizationPermissions`.
- * - **Failure modes:** propagates `NotFoundError` when the user or active org is
- *   not accessible to the caller; an absent active-org claim yields
+ * - **Failure modes:** propagates `NotFoundError` when the user or active organization is
+ *   not accessible to the caller; an absent active-organization claim yields
  *   `activeOrganization: null` and empty permissions rather than an error.
  * - **Side effects:** none (read-only); permission resolution is Redis-cached.
  * - **Notes:** owns no tables — it composes the existing `/users/me`,
@@ -92,12 +92,12 @@ export class AuthMeContextService {
   }
 
   /**
-   * Resolves the active-org slice of the context for one organization — the
+   * Resolves the active-organization slice of the context for one organization — the
    * `active_organization` (with capabilities) and the caller's `my_permissions`
    * in it — without the heavier `user` / `organizations[]` payload.
    *
    * @remarks
-   * - **Algorithm:** the same two reads `getContext` performs for the active org —
+   * - **Algorithm:** the same two reads `getContext` performs for the active organization —
    *   `OrganizationService.getByPublicId` + `AuthorizationService.resolveUserOrganizationPermissions`
    *   — issued concurrently, since neither consumes the other's result.
    * - **Failure modes:** propagates `NotFoundError` when the organization is not
@@ -105,7 +105,7 @@ export class AuthMeContextService {
    * - **Side effects:** none (read-only); permission resolution is Redis-cached.
    * - **Notes:** returned inline by `POST /auth/switch-to-organization` and
    *   `POST /auth/switch-to-personal` so the client repaints the dashboard for the
-   *   newly active org without a follow-up `GET /auth/me/context`. The omitted
+   *   newly active organization without a follow-up `GET /auth/me/context`. The omitted
    *   `user` and `organizations[]` are stable across a switch, so the client reuses
    *   the values from its initial `/me/context` and only flips `is_active` locally.
    */

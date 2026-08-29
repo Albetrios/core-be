@@ -17,7 +17,7 @@ are enforced by gates — do not re-litigate what a gate already proves.
 ## Repo-specific checks (in priority order)
 
 1. **Tenant isolation / RLS** — every new tenant-owned table has ENABLE + FORCE
-   RLS with an org-scoped policy carrying both USING and WITH CHECK; workers use
+   RLS with an organization-scoped policy carrying both USING and WITH CHECK; workers use
    context wrappers and tenant jobs carry `organizationPublicId`.
 2. **Money paths** — billing ledgers are append-only; Stripe mutations forward
    the client `X-Idempotency-Key` as Stripe's `idempotencyKey`.

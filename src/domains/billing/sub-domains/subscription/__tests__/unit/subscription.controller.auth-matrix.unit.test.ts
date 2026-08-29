@@ -93,7 +93,7 @@ describe('createSubscriptionController auth matrix', () => {
     expect(service.changePlan).not.toHaveBeenCalled();
   });
 
-  it('ignores an invalid org path param on mutating handlers — the signed claim decides', async () => {
+  it('ignores an invalid organization path param on mutating handlers — the signed claim decides', async () => {
     const request = buildRequest({
       auth: { userId: generatePublicId('user'), role: 'user', organizationPublicId },
       params: { organization_id: 'not-a-public-id', subscription_id: subscriptionPublicId },

@@ -37,7 +37,7 @@ import shutdownMiddleware from './core/shutdown.middleware.js';
  * never open a DB transaction". That justification has been stale since
  * `organization-rls-transaction.middleware.ts` became a no-op stub that
  * returns `'no_transaction'` immediately — no HTTP-side transaction is opened
- * anywhere now; org-scoped work runs inside `withAppDatabaseContext`.
+ * anywhere now; organization-scoped work runs inside `withAppDatabaseContext`.
  * The no-op is kept registered because `request-lifecycle.middleware.ts`
  * imports its settlement-outcome type as part of the lifecycle contract; a
  * future drop must update both files together. See the no-op's own TSDoc.
@@ -70,7 +70,7 @@ export const middlewarePlugins = [
   tenantMiddleware,
   // `tenantMiddleware` stays AFTER `i18nMiddleware` because it throws a
   // translated `ValidationError` on header/path mismatch.
-  // `rateLimitMiddleware` runs after auth + tenant so per-user / per-org keys
+  // `rateLimitMiddleware` runs after auth + tenant so per-user / per-organization keys
   // are available (the global limiter is keyed on `request.ip`, so it does
   // not strictly require either, but per-route limits do). Order is otherwise
   // irrelevant against `organizationRlsTransactionMiddleware`, which is a

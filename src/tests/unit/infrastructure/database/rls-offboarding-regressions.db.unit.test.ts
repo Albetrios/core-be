@@ -81,7 +81,7 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
     expect(outcome.adminUpdateCount).toBe(1);
   });
 
-  it('organization soft-delete is rejected under the plain org scope and succeeds under retention (sec-new-D3 kept)', async () => {
+  it('organization soft-delete is rejected under the plain organization scope and succeeds under retention (sec-new-D3 kept)', async () => {
     const outcome = await runRolledBack(async (tx) => {
       await tx.execute(
         drizzleSql`SELECT set_config('app.current_user_public_id', 'usr_rlsregression000002', true)`,
@@ -95,8 +95,8 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
                    VALUES ('org_rlsregression00001', 'RLS Regression Org',
                            (SELECT id FROM auth.users WHERE public_id = 'usr_rlsregression000002'))`,
       );
-      // Plain org scope: the sec-new-D3 SELECT gate hides the tombstoned NEW row → 42501.
-      let orgScopeRejected = false;
+      // Plain organization scope: the sec-new-D3 SELECT gate hides the tombstoned NEW row → 42501.
+      let organizationScopeRejected = false;
       try {
         await tx.execute(drizzleSql`SAVEPOINT org_attempt`);
         await tx.execute(
@@ -105,7 +105,7 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
         );
         await tx.execute(drizzleSql`RELEASE SAVEPOINT org_attempt`);
       } catch {
-        orgScopeRejected = true;
+        organizationScopeRejected = true;
         await tx.execute(drizzleSql`ROLLBACK TO SAVEPOINT org_attempt`);
       }
 
@@ -122,9 +122,9 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
       const rows = Array.isArray(updated)
         ? updated
         : ((updated as { rows?: unknown[] }).rows ?? []);
-      return { orgScopeRejected, retentionUpdateCount: rows.length };
+      return { organizationScopeRejected, retentionUpdateCount: rows.length };
     });
-    expect(outcome.orgScopeRejected).toBe(true);
+    expect(outcome.organizationScopeRejected).toBe(true);
     expect(outcome.retentionUpdateCount).toBe(1);
   });
 
@@ -145,7 +145,7 @@ describe('RLS offboarding regressions (as core_be_app)', () => {
     expect(visible).toBe(1);
   });
 
-  it('the audit drain resolvers return org and api-key ids under global_admin only', async () => {
+  it('the audit drain resolvers return organization and api-key ids under global_admin only', async () => {
     const outcome = await runRolledBack(async (tx) => {
       await tx.execute(
         drizzleSql`SELECT set_config('app.current_user_public_id', 'usr_rlsregression000004', true)`,

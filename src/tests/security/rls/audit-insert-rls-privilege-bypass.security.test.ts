@@ -128,11 +128,12 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
     const owner = await createTestUser({ email: 'audit-d1-tenant@example.com' });
     const organization = await createTestOrganization({ ownerUserId: owner.id });
 
-    // Verify the DB row for the org actually exists so the sub-select will resolve.
-    const orgRows = await database.execute(
+    // Verify the DB row for the organization actually exists so the sub-select will resolve.
+    const organizationRows = await database.execute(
       drizzleSql`SELECT id FROM tenancy.organizations WHERE id = ${organization.id}`,
     );
-    const resolvedOrg = ((orgRows as { rows?: unknown[] }).rows ?? orgRows) as Array<{
+    const resolvedOrg = ((organizationRows as { rows?: unknown[] }).rows ??
+      organizationRows) as Array<{
       id: number;
     }>;
     expect(resolvedOrg).toHaveLength(1);

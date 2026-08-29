@@ -23,7 +23,7 @@ import { ensurePersonalOrganization } from '@/domains/tenancy/sub-domains/organi
 import type { OAuthProfile, OAuthProvider } from './oauth.types.js';
 import type { UserAuthRecord } from '@/domains/user/user.types.js';
 
-/** Account-takeover guard + bare-placeholder claim for an OAuth find-or-link into a PRE-EXISTING account. Refuses to silently merge into an account whose email is unverified — throwing `ForbiddenError('errors:oauthLinkRequiresVerifiedAccount')` — UNLESS this OAuth identity is already linked, the account's email is already verified, or the account is a bare invited placeholder (no password, no login-capable method, and no WebAuthn passkey), which has no credential or data to take over and whose email the provider has now proven. A claimed bare placeholder has its email flipped to verified (parity with a fresh OAuth signup, and so the claimer can accept their org invite). Returns the (possibly re-read) user row and whether a bare placeholder was claimed. Extracted from {@link completeOAuthUserSession} to keep that function under the cognitive-complexity budget. */
+/** Account-takeover guard + bare-placeholder claim for an OAuth find-or-link into a PRE-EXISTING account. Refuses to silently merge into an account whose email is unverified — throwing `ForbiddenError('errors:oauthLinkRequiresVerifiedAccount')` — UNLESS this OAuth identity is already linked, the account's email is already verified, or the account is a bare invited placeholder (no password, no login-capable method, and no WebAuthn passkey), which has no credential or data to take over and whose email the provider has now proven. A claimed bare placeholder has its email flipped to verified (parity with a fresh OAuth signup, and so the claimer can accept their organization invite). Returns the (possibly re-read) user row and whether a bare placeholder was claimed. Extracted from {@link completeOAuthUserSession} to keep that function under the cognitive-complexity budget. */
 async function resolveExistingOAuthAccount(parameters: {
   authMethodService: AuthMethodService;
   userService: UserService;
@@ -63,7 +63,7 @@ async function resolveExistingOAuthAccount(parameters: {
   return { user: resolvedUser, claimedBareAccount };
 }
 
-/** Final stage of an OAuth callback: finds-or-creates the user and idempotently links the OAuth provider (via {@link AuthMethodService.linkOAuthProviderIfMissing}) inside one {@link withTransaction} pinned through {@link runWithPinnedDatabaseHandle}, so a failed auth-method insert (e.g. the `method_type` CHECK) rolls back the freshly created user instead of leaving a verified orphan. AFTER that transaction commits, a first-time signup — or a freshly-claimed bare invited placeholder — best-effort provisions the personal organization — it runs in a separate global-admin connection that cannot see an uncommitted user, so it must run post-commit — then mints an access token + persisted session via {@link completeFirstFactorAuth} so the issued token carries the personal-org claim. Inserts use {@link AUTH_METHOD_TYPE.OAUTH} to match the database CHECK constraint. Rejects disposable emails for first-time signups. Refuses to silently find-or-link into a pre-existing account whose email is not verified, throwing `ForbiddenError` to prevent account takeover — EXCEPT when this OAuth identity is already linked, or the account is a bare invited placeholder (no password, no login-capable method, and no WebAuthn passkey), which has no credential or data to take over and whose email the provider has now proven; that placeholder is claimed (its email flipped to verified). Rejects suspended/locked accounts with `UnauthorizedError('errors:accountNotActive')` before issuing a session. */
+/** Final stage of an OAuth callback: finds-or-creates the user and idempotently links the OAuth provider (via {@link AuthMethodService.linkOAuthProviderIfMissing}) inside one {@link withTransaction} pinned through {@link runWithPinnedDatabaseHandle}, so a failed auth-method insert (e.g. the `method_type` CHECK) rolls back the freshly created user instead of leaving a verified orphan. AFTER that transaction commits, a first-time signup — or a freshly-claimed bare invited placeholder — best-effort provisions the personal organization — it runs in a separate global-admin connection that cannot see an uncommitted user, so it must run post-commit — then mints an access token + persisted session via {@link completeFirstFactorAuth} so the issued token carries the personal-organization claim. Inserts use {@link AUTH_METHOD_TYPE.OAUTH} to match the database CHECK constraint. Rejects disposable emails for first-time signups. Refuses to silently find-or-link into a pre-existing account whose email is not verified, throwing `ForbiddenError` to prevent account takeover — EXCEPT when this OAuth identity is already linked, or the account is a bare invited placeholder (no password, no login-capable method, and no WebAuthn passkey), which has no credential or data to take over and whose email the provider has now proven; that placeholder is claimed (its email flipped to verified). Rejects suspended/locked accounts with `UnauthorizedError('errors:accountNotActive')` before issuing a session. */
 export async function completeOAuthUserSession(parameters: {
   userService: UserService;
   authMethodService: AuthMethodService;
@@ -161,11 +161,11 @@ export async function completeOAuthUserSession(parameters: {
 
   // Account-level personal organization for a first-time onboard — a brand-new OAuth user OR a
   // freshly-claimed bare invited placeholder (which `findOrCreateInvitedByEmail` created without one,
-  // so the claimer would otherwise have no personal org). Provisioned AFTER the user commits: it runs
+  // so the claimer would otherwise have no personal organization). Provisioned AFTER the user commits: it runs
   // in a SEPARATE global-admin transaction (its own pool connection) which cannot see an uncommitted
   // user, so doing it inside the transaction above always FK-failed and was silently swallowed;
   // post-commit it succeeds. Best-effort + idempotent (the partial unique index makes a retry a no-op
-  // and tool:backfill-personal-orgs recovers a miss). Team-only mode skips it.
+  // and tool:backfill-personal-organizations recovers a miss). Team-only mode skips it.
   if ((isNewUser || claimedBareAccount) && env.PERSONAL_ORGANIZATION_ENABLED) {
     try {
       await ensurePersonalOrganization(user.id);
@@ -178,7 +178,7 @@ export async function completeOAuthUserSession(parameters: {
     }
   }
 
-  // Mint the session AFTER provisioning so the access token carries the personal-org claim. Like
+  // Mint the session AFTER provisioning so the access token carries the personal-organization claim. Like
   // login, completeFirstFactorAuth runs on the request handle (no pinned transaction needed).
   const authResult = await completeFirstFactorAuth({
     user: {

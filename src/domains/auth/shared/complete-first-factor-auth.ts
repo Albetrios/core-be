@@ -35,7 +35,7 @@ export type FirstFactorAuthResult =
  * cannot be bypassed by alternate authentication methods.
  *
  * `ensurePersonalOrganizationOnMiss` (item #5) opts a caller into self-healing: when the user
- * resolves to NO active organization but personal orgs are enabled, provision their personal org so
+ * resolves to NO active organization but personal organizations are enabled, provision their personal organization so
  * the minted token carries it instead of `undefined`. Only **non-pinned** callers may opt in — the
  * email-code login mints inside its single-use-code transaction (audit-#12) and self-provisions
  * post-commit, so it must NOT trigger this separate-connection write. `ensurePersonalOrganizationPublicId`
@@ -48,7 +48,7 @@ export async function completeFirstFactorAuth(options: {
   organizationSettingsService: OrganizationSettingsService;
   mfaService: MfaService;
   authSessionService: AuthSessionService;
-  /** Non-pinned callers only: provision a personal org when the user resolves to none (see @remarks). */
+  /** Non-pinned callers only: provision a personal organization when the user resolves to none (see @remarks). */
   ensurePersonalOrganizationOnMiss?: boolean;
 }): Promise<FirstFactorAuthResult> {
   const organizationRequiresMfa =
@@ -61,9 +61,9 @@ export async function completeFirstFactorAuth(options: {
   // Default active organization for this login: personal (when enabled) else most-recent team,
   // else undefined (team-only mode with no team yet → the frontend redirects to onboarding).
   let organizationPublicId = await resolveDefaultActiveOrganizationPublicId(options.user.id);
-  // Item #5: a personal-org user who resolves to nothing (a signup-time provisioning miss) would be
+  // Item #5: a personal-organization user who resolves to nothing (a signup-time provisioning miss) would be
   // stranded on the onboarding wizard. Self-heal on the opted-in non-pinned paths so the token
-  // carries their personal org. Best-effort + idempotent — never fails the login.
+  // carries their personal organization. Best-effort + idempotent — never fails the login.
   if (
     !organizationPublicId &&
     options.ensurePersonalOrganizationOnMiss &&

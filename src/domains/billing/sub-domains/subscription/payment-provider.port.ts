@@ -34,7 +34,7 @@ export interface PaymentProvider {
 
   /**
    * Cancels the subscription immediately (reaudit-#6). Used for never-activated `INCOMPLETE`
-   * subscriptions where `cancel_at_period_end` is a no-op — the org needs the slot freed now.
+   * subscriptions where `cancel_at_period_end` is a no-op — the organization needs the slot freed now.
    */
   cancelSubscriptionImmediately(
     providerSubscriptionId: string,

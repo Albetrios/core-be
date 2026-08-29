@@ -14,7 +14,7 @@
  *
  * Idempotent and safe to re-run: every seed primitive upserts, and `seedDemoUser` resets the
  * password on conflict, so this repairs a demo user that was seeded with a stale/random one.
- * Creates the demo org + Admin role + membership too, because login resolves an active
+ * Creates the demo organization + Admin role + membership too, because login resolves an active
  * organization for the token (a bare user row cannot sign in). Mirrors the demo-admin core of
  * `full.ts`; `db:seed:sync-demo` assumes exactly the rows this script guarantees.
  *

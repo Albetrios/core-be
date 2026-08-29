@@ -70,7 +70,7 @@ export type LoginResult =
  * @remarks
  * - **Algorithm:** lookup user by email, verify password (argon2 with optional rehash),
  *   then either issue a JWT + persisted session or return an `mfa_required` token when MFA
- *   is enabled on the user or required by org policy via
+ *   is enabled on the user or required by organization policy via
  *   {@link OrganizationSettingsService.userHasOrganizationRequiringMfa}. The account-lockout
  *   window is checked *after* password verification so a correct credential always bypasses
  *   it — the lock only rejects further failed attempts, preventing a victim-account DoS.
@@ -242,7 +242,7 @@ export class AuthService {
       organizationSettingsService: this.organizationSettingsService,
       mfaService: this.mfaService,
       authSessionService: this.authSessionService,
-      // Non-pinned path: self-heal a missing personal org into the token (item #5).
+      // Non-pinned path: self-heal a missing personal organization into the token (item #5).
       ensurePersonalOrganizationOnMiss: true,
     });
   }
@@ -283,7 +283,7 @@ export class AuthService {
       organizationSettingsService: this.organizationSettingsService,
       mfaService: this.mfaService,
       authSessionService: this.authSessionService,
-      // Non-pinned path: self-heal a missing personal org into the token (item #5).
+      // Non-pinned path: self-heal a missing personal organization into the token (item #5).
       ensurePersonalOrganizationOnMiss: true,
     });
   }
@@ -327,9 +327,9 @@ export class AuthService {
       throw new UnauthorizedError('errors:accountNotActive');
     }
 
-    // audit-#3: preserve the organization the caller switched to. The selected org is
+    // audit-#3: preserve the organization the caller switched to. The selected organization is
     // persisted on the session (`organization_id`) by `rebindAccessToken`; refresh must
-    // revalidate it (the user could have lost membership, or the org could have been
+    // revalidate it (the user could have lost membership, or the organization could have been
     // deleted/suspended) and only fall back to the default when it is no longer valid —
     // never silently move the caller to a different tenant while the UI still shows A.
     const persistedOrganizationPublicId =
@@ -414,7 +414,7 @@ export class AuthService {
   }): Promise<{ access_token: string; organization_public_id: string }> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (user.status !== 'ACTIVE') throw new UnauthorizedError('errors:accountNotActive');
-    // Self-heal: provision the personal org on demand when personal is enabled but missing,
+    // Self-heal: provision the personal organization on demand when personal is enabled but missing,
     // so this can no longer 404 for a personal-enabled deployment. Returns undefined only when
     // personal organizations are disabled → 404 as before.
     const personal = await ensurePersonalOrganization(user.id);

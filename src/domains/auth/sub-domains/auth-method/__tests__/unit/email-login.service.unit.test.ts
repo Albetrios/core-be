@@ -529,7 +529,7 @@ describe('EmailLoginService', () => {
     expect(redis.del).not.toHaveBeenCalled();
   });
 
-  it('login provisions the personal org on the first verification (claims a bare invited account)', async () => {
+  it('login provisions the personal organization on the first verification (claims a bare invited account)', async () => {
     env.PERSONAL_ORGANIZATION_ENABLED = true;
     try {
       vi.mocked(userService.findByEmail).mockResolvedValue({
@@ -549,7 +549,7 @@ describe('EmailLoginService', () => {
     }
   });
 
-  it('login does not re-provision a personal org for an already-verified returning user', async () => {
+  it('login does not re-provision a personal organization for an already-verified returning user', async () => {
     env.PERSONAL_ORGANIZATION_ENABLED = true;
     try {
       vi.mocked(userService.findByEmail).mockResolvedValue({
@@ -569,7 +569,7 @@ describe('EmailLoginService', () => {
     }
   });
 
-  it('does not provision a personal org in team-only mode (env flag off)', async () => {
+  it('does not provision a personal organization in team-only mode (env flag off)', async () => {
     vi.mocked(userService.findByEmail).mockResolvedValue(null);
     vi.mocked(userService.createForEmailCode).mockResolvedValue(user as never);
     await service.sendCode({ email: 'team-only@example.com' });

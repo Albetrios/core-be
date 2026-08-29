@@ -83,7 +83,7 @@ describe('Security: Idempotency', () => {
       url: testApiPath('/tenancy/organizations'),
       token,
       headers: { 'x-idempotency-key': 'bad key' },
-      payload: { name: 'Bad Key Org 2', slug: uniqueSlug('bad-key-org-2') },
+      payload: { name: 'Bad Key Org 2', slug: uniqueSlug('bad-key-organization-2') },
     });
 
     expect(spaceKeyResponse.statusCode).toBe(422);
@@ -219,8 +219,8 @@ describe('Security: Idempotency', () => {
     if (createRes.statusCode !== 200) throw new Error('Setup: create organization failed');
     const organizationId = (createRes.json() as { data: { id: string } }).data.id;
 
-    // The flat DELETE route resolves the target org from the JWT `org` claim;
-    // mint a token scoped to the just-created org (the creator owns it).
+    // The flat DELETE route resolves the target organization from the JWT `org` claim;
+    // mint a token scoped to the just-created organization (the creator owns it).
     const tokenScopedToOrg = await generateTestToken({
       userId: user.public_id,
       organizationPublicId: organizationId,
@@ -231,7 +231,7 @@ describe('Security: Idempotency', () => {
     // (`JSON.stringify(undefined)` -> `Buffer.byteLength` throw); the empty body now
     // normalizes to JSON `null`, so the route returns its real 204 contract.
     // (The cached-204 *replay* path — `JSON.parse('null')` -> empty body — is covered as a
-    // unit test; it cannot be exercised here because this DELETE removes the org the
+    // unit test; it cannot be exercised here because this DELETE removes the organization the
     // idempotency scope's auth/permission preHandlers resolve, so a replay 403s on membership.)
     const response = await injectAuthenticated(app, {
       method: 'DELETE',

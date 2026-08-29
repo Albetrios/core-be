@@ -1446,7 +1446,7 @@ src/
     │       ├── route-schema-docs-validation.util.ts
     │       ├── route-success-coverage.util.ts
     │       ├── validate-route-http-coverage.ts
-    │       ├── validate-route-org-scope.ts
+    │       ├── validate-route-organization-scope.ts
     │       ├── validate-route-param-schemas.ts
     │       ├── validate-route-schema-docs.ts
     │       ├── validate-route-success-coverage.ts
@@ -1797,7 +1797,7 @@ src/
     │   ├── route-catalog-auth.ts
     │   ├── route-catalog-registry.ts
     │   ├── route-http-coverage.helper.ts
-    │   ├── route-org-scope.helper.ts
+    │   ├── route-organization-scope.helper.ts
     │   ├── route-status-observer.ts
     │   ├── route-success-status.helper.ts
     │   ├── test-api-prefix.helper.ts

@@ -154,7 +154,7 @@ export class OrganizationRepository extends BaseRepository {
     // filter references only `organizations`. That lets the partial keyset index
     // `idx_organizations_created_id_active (created_at, id) WHERE deleted_at IS NULL` drive an
     // index-ordered scan — a join-side predicate in the OR branch forced a join + sort over the
-    // whole org table per page, so latency grew with total tenant count, not the user's org count.
+    // whole organization table per page, so latency grew with total tenant count, not the user's organization count.
     // The subquery reads `memberships` with the identical predicate, so the result set is unchanged.
     const accessWhere = and(
       isNull(organizations.deleted_at),
@@ -333,7 +333,7 @@ export class OrganizationRepository extends BaseRepository {
 
   /**
    * Confirm the user holds an ACTIVE membership in the organization identified by its internal
-   * `id` and return the org's `public_id`, or `null` — refresh-time revalidation of the org
+   * `id` and return the org's `public_id`, or `null` — refresh-time revalidation of the organization
    * persisted on a session (audit-#3). Constrained to the caller's own `user_id`.
    */
   async findActiveMembershipOrganizationPublicIdByInternalId(
@@ -437,7 +437,7 @@ export class OrganizationRepository extends BaseRepository {
           // is STILL an active member at write time. If a concurrent request suspends or removes
           // the prospective owner between the caller's status pre-check and this update, the EXISTS
           // fails, the UPDATE matches zero rows, and the caller surfaces a clean conflict — so the
-          // org can never end up owned by a suspended/removed member.
+          // organization can never end up owned by a suspended/removed member.
           sql`EXISTS (
             SELECT 1 FROM ${memberships}
             WHERE ${memberships.user_id} = ${owner_user_id}

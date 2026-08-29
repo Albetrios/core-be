@@ -1,6 +1,6 @@
 ---
 name: route-catalog
-description: Generates a docs/routes.txt file listing every API route grouped by domain with HTTP method, full path, and access control (public, authenticated, global role, org permission). Use after adding, removing, or updating any route in src/domains/.
+description: Generates a docs/routes.txt file listing every API route grouped by domain with HTTP method, full path, and access control (public, authenticated, global role, organization permission). Use after adding, removing, or updating any route in src/domains/.
 indexNote: regenerate docs/routes.txt after any route change
 ---
 
@@ -35,10 +35,10 @@ For every `app.<method>(path, ...)` call, extract:
 | **Relative path** | First string argument (e.g. `'/organizations/:id'`)         |
 | **S** (status)    | Declared happy-path status from `route-success-statuses.json` (success 200 for every method except DELETE 204; no exemptions) |
 | **I** (idempotency) | `req` if the route is one of the 8 `idempotencyRequired` writes (`X-Idempotency-Key` mandatory), else `-` |
-| **O** (org scope) | `both` if the route works for personal **and** team orgs; `team` if it is team-only (rejects a personal org with 422). Backed by `tooling/openapi/route-catalog/route-org-scope.json` |
+| **O** (organization scope) | `both` if the route works for personal **and** team organizations; `team` if it is team-only (rejects a personal organization with 422). Backed by `tooling/openapi/route-catalog/route-organization-scope.json` |
 | **Access**        | Inspect the `preHandler` array in the options object        |
 
-The three annotation columns (`S`, `I`, `O`) print **after the path** and before the ACCESS label — see the format block in Step 4. The `O` column is the only one carried by a hand-maintained side-table (`route-org-scope.json`); `pnpm validate:route-org-scope` fails CI if that map drifts from `docs/routes.txt`.
+The three annotation columns (`S`, `I`, `O`) print **after the path** and before the ACCESS label — see the format block in Step 4. The `O` column is the only one carried by a hand-maintained side-table (`route-organization-scope.json`); `pnpm validate:route-organization-scope` fails CI if that map drifts from `docs/routes.txt`.
 
 #### Access-level rules
 
@@ -80,7 +80,7 @@ Legend:
   ROLE    = Global role required (super_admin, admin, user)
   PERM    = Organization-scoped permission required
   TOKEN   = Non-JWT bearer token required
-  Columns after the path: S = success status · I = idempotency (req | -) · O = org scope (both | team-only, 422 on personal)
+  Columns after the path: S = success status · I = idempotency (req | -) · O = organization scope (both | team-only, 422 on personal)
 
 ================================================================================
   DOMAIN: AUTH (/api/v1/auth)
@@ -162,7 +162,7 @@ Legend:
 
 - **Method** column: left-aligned, padded to 6 chars wide (e.g. `GET` padded to `GET___`, `DELETE` already 6 chars; underscores show where spaces go)
 - **Path** column: left-aligned, padded so the annotation columns line up
-- **S / I / O** columns: printed after the path, before ACCESS — success status, idempotency (`req` | `-`), org scope (`both` | `team`)
+- **S / I / O** columns: printed after the path, before ACCESS — success status, idempotency (`req` | `-`), organization scope (`both` | `team`)
 - **Access** column: label (`PUBLIC`, `AUTH`, `ROLE: …`, `PERM: …`, `TOKEN`)
 - Group routes within a domain by sub-domain using `— Sub-domain Name —` dividers
 - Within each group, order routes by path alphabetically, then by method (GET, POST, PATCH, PUT, DELETE)
@@ -187,7 +187,7 @@ These three sections are derived programmatically — never hand-maintained:
 Related gates that keep the annotation columns honest:
 
 - `pnpm validate:route-success-statuses` — the declared `S` column (`route-success-statuses.json`) matches `docs/routes.txt`.
-- `pnpm validate:route-org-scope` — the `O` column side-table (`route-org-scope.json`) matches `docs/routes.txt`.
+- `pnpm validate:route-organization-scope` — the `O` column side-table (`route-organization-scope.json`) matches `docs/routes.txt`.
 - `pnpm validate:route-schema-docs` — every route declares a `schema` `summary` / `description` / `tags` block.
 
 ## Follow-up (same PR)

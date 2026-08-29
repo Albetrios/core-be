@@ -1,5 +1,5 @@
 /**
- * Full seed — runs minimal seed + demo data + common flows (add user to org, invite).
+ * Full seed — runs minimal seed + demo data + common flows (add user to organization, invite).
  * Orchestration only; entity logic lives in domain seeds.
  *
  * Usage: pnpm db:seed:full
@@ -72,7 +72,10 @@ export async function runFullSeed(): Promise<void> {
     owner_user_id: demoUser.id,
   });
   if (!demoOrganization) throw new Error('seed.full: failed to create demo org');
-  logger.info({ organizationId: demoOrganization.public_id }, 'seed.full: demo org created');
+  logger.info(
+    { organizationId: demoOrganization.public_id },
+    'seed.full: demo organization created',
+  );
 
   const adminRole = await seedRole({
     organization_id: demoOrganization.id,
@@ -117,7 +120,7 @@ export async function runFullSeed(): Promise<void> {
           status: 'ACTIVE',
           created_by_user_id: demoUser.id,
         });
-        logger.info('seed.full: extra user added to extra org (common flow)');
+        logger.info('seed.full: extra user added to extra organization (common flow)');
       }
     }
   }

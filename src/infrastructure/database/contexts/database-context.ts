@@ -87,7 +87,7 @@ export interface PrincipalDatabaseScope {
 
 /**
  * A {@link PrincipalDatabaseScope} guaranteed to carry an organization — what
- * org-scoped service methods accept. Under the personal/team organization model
+ * organization-scoped service methods accept. Under the personal/team organization model
  * every authenticated principal has an active organization; controllers narrow
  * to this via `requireOrganizationScope(request)`.
  */
@@ -103,9 +103,9 @@ export type OrganizationPrincipalDatabaseScope = PrincipalDatabaseScope & {
  * @remarks
  * The organization stays optional here because user-scoped routes are the
  * self-heal surface of the personal/team-organization invariant: `GET /users/me`
- * provisions a missing personal organization on demand, so an org-less token is
+ * provisions a missing personal organization on demand, so an organization-less token is
  * a legitimate TRANSITIONAL state on this family (and only this family — the
- * org-scoped accessor still 403s it).
+ * organization-scoped accessor still 403s it).
  */
 export type UserPrincipalDatabaseScope = PrincipalDatabaseScope & {
   readonly userPublicId: string;
@@ -141,7 +141,7 @@ export interface PrincipalScopeIdentityInput {
 
 /**
  * One {@link PRINCIPAL_SCOPE} member — overloads narrow the returned scope from
- * the identity shape passed (org-bearing → organization scope, user-only → user
+ * the identity shape passed (organization-bearing → organization scope, user-only → user
  * scope), matching the service signatures that demand one or the other.
  */
 export interface PrincipalScopeMinter {
@@ -189,7 +189,7 @@ export const PRINCIPAL_SCOPE: {
     createPrincipalDatabaseScope({ ...identity, source: 'verified' })) as PrincipalScopeMinter,
 });
 
-// The principal branch of withAppDatabaseContext: same-org reuse, user-GUC
+// The principal branch of withAppDatabaseContext: same-organization reuse, user-GUC
 // layering, and a fresh transaction with both identity GUCs in one round trip
 // otherwise. Only reachable through the exported app wrapper.
 async function runPrincipalDatabaseContext<T>(
@@ -225,7 +225,7 @@ async function runPrincipalDatabaseContext<T>(
   // and RLS-subquery a user row that may be UNCOMMITTED in the surrounding
   // transaction (OAuth find-or-create), so a second pooled connection could
   // neither see it nor preserve atomicity. Only the user GUC is layered — the
-  // pinned session's org GUC (if any) is left untouched, so an outer org scope
+  // pinned session's organization GUC (if any) is left untouched, so an outer organization scope
   // is never overwritten.
   if (
     activeSession !== undefined &&

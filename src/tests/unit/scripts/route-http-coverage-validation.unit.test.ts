@@ -23,7 +23,7 @@ const sampleRoute = (overrides: Partial<RouteEntry>): RouteEntry => ({
   method: 'GET',
   path: '/api/v1/tenancy/organization',
   domain: 'tenancy',
-  access: 'org-permission',
+  access: 'organization-permission',
   description: 'sample',
   ...overrides,
 });
@@ -53,7 +53,7 @@ describe('route-http-coverage-validation.util', () => {
 
   it('detects missing 403 coverage for domains with permission routes', () => {
     const registry = [
-      sampleRoute({ domain: 'coverage-test-no-forbidden', access: 'org-permission' }),
+      sampleRoute({ domain: 'coverage-test-no-forbidden', access: 'organization-permission' }),
       sampleRoute({ domain: 'billing', access: 'authenticated' }),
     ];
     const result = evaluateRouteHttpCoverage(
@@ -114,8 +114,10 @@ describe('route-http-coverage-validation.util', () => {
     ).toBe(false);
   });
 
-  it('requires forbidden coverage for org-permission and global-role routes', () => {
-    expect(requiresForbiddenStatusCoverage(sampleRoute({ access: 'org-permission' }))).toBe(true);
+  it('requires forbidden coverage for organization-permission and global-role routes', () => {
+    expect(
+      requiresForbiddenStatusCoverage(sampleRoute({ access: 'organization-permission' })),
+    ).toBe(true);
     expect(requiresForbiddenStatusCoverage(sampleRoute({ access: 'global-role' }))).toBe(true);
     expect(requiresForbiddenStatusCoverage(sampleRoute({ access: 'authenticated' }))).toBe(false);
   });

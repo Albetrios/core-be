@@ -19,8 +19,8 @@ import { organizations } from '@/domains/tenancy/sub-domains/organization/organi
  * Drizzle definition for `upload.uploads`. Stores upload metadata + lifecycle
  * status (`PENDING` → `UPLOADED` or `FAILED`) referenced by S3 object keys.
  * Two permissive RLS policies are layered: tenant-isolation by
- * `app.current_organization_public_id` for org-scoped rows, and an owner-access
- * policy via `app.current_user_public_id` for user-scoped (NULL-org) uploads such
+ * `app.current_organization_public_id` for organization-scoped rows, and an owner-access
+ * policy via `app.current_user_public_id` for user-scoped (NULL-organization) uploads such
  * as avatars.
  */
 export const uploads = uploadSchema
@@ -88,9 +88,9 @@ export const uploads = uploadSchema
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
       }),
-      // Owner access for user-scoped (NULL-org) uploads such as avatars. Permissive → OR'd with
+      // Owner access for user-scoped (NULL-organization) uploads such as avatars. Permissive → OR'd with
       // the tenant-isolation policy. Org-scoped rows (organization_id IS NOT NULL) are excluded
-      // so a former uploader cannot retain access after losing org permissions.
+      // so a former uploader cannot retain access after losing organization permissions.
       pgPolicy('uploads_owner_access', {
         as: 'permissive',
         for: 'all',

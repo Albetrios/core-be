@@ -160,8 +160,8 @@ describe('UploadRepository user/organization isolation (database)', () => {
     expect(byKey?.user_id).toBe(ownerUser.id);
   });
 
-  it('findByFileKey applies no organization predicate — it returns another org’s row (sec-UP5)', async () => {
-    const ownerUser = await createTestUser({ email: 'key-org-owner@example.com' });
+  it('findByFileKey applies no organization predicate — it returns another organization’s row (sec-UP5)', async () => {
+    const ownerUser = await createTestUser({ email: 'key-organization-owner@example.com' });
     const organizationA = await createTestOrganization({ ownerUserId: ownerUser.id });
     const organizationB = await createTestOrganization({ ownerUserId: ownerUser.id });
 
@@ -192,7 +192,7 @@ describe('UploadRepository user/organization isolation (database)', () => {
       status: 'UPLOADED',
     });
 
-    // The org-scoped sibling lookup returns B's row and keeps A's out…
+    // The organization-scoped sibling lookup returns B's row and keeps A's out…
     const scopedToOrganizationB = await repository.findActiveByOrganizationIdAfter(
       organizationB.id,
       0,

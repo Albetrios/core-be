@@ -84,8 +84,8 @@ async function resolvePermissionsWithRepository(
 
   // The recompute callback only computes; withPermissionCacheRecomputeLock owns the cache write
   // and guards it two ways so a racing invalidation cannot be clobbered by a stale write: the
-  // lock nonce (per-user invalidatePermissions deletes the lock) and the org cache version
-  // captured before the DB read (org-wide invalidateOrganizationPermissions bumps the version,
+  // lock nonce (per-user invalidatePermissions deletes the lock) and the organization cache version
+  // captured before the DB read (organization-wide invalidateOrganizationPermissions bumps the version,
   // orphaning this commit). See audit-#H1.
   return withPermissionCacheRecomputeLock(userPublicId, organizationPublicId, async () =>
     resolvePermissionsFromDatabase(repository, userPublicId, organizationPublicId),

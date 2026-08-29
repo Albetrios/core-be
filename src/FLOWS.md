@@ -136,11 +136,11 @@ sequenceDiagram
   participant Org as OrganizationService
   participant DB as Postgres
   Client->>Auth: POST /auth/switch-to-organization {organization_id}
-  Auth->>Sess: re-check membership, re-mint access token with org claim
-  Sess-->>Auth: {access_token} (org = target organization)
+  Auth->>Sess: re-check membership, re-mint access token with `org` claim
+  Sess-->>Auth: {access_token} (`org` claim = target organization)
   Auth-->>Client: 201 + new access token
   Client->>Tenancy: GET /api/v1/tenancy/organization (Bearer new token)
-  Tenancy->>Org: get active organization (from org claim)
+  Tenancy->>Org: get active organization (from `org` claim)
   Org->>DB: SELECT organization
   Org-->>Tenancy: organization (with type)
   Tenancy-->>Client: 200 {data: {..., type}}
@@ -149,14 +149,14 @@ sequenceDiagram
 
 ### Side effects
 
-- A new access token is minted with the target organization in the `org` claim (the prior token's org is replaced). No DB write to the organization itself.
-- Both switch endpoints (`switch-to-organization` / `switch-to-personal`) return the **active-org delta inline** — `{ access_token, active_organization, my_permissions, global_role }` (`AuthMeContextService.getActiveOrganizationContext` post-gate read) — so the client repaints the dashboard for the new org **without** a follow-up `GET /auth/me/context`. The omitted `user` / `organizations[]` are stable across a switch and reused from the client's initial context.
-- Serialized organization responses (this `GET`, list, create, patch) carry the org `type` (`PERSONAL` / `TEAM`) but **no** `capabilities` object. Clients derive team-only availability from `type` and gate the action on the caller's `my_permissions`. The personal-vs-team rule is enforced server-side by `assertTeamOrganization` in `src/domains/tenancy/sub-domains/organization/organization-capability.ts`.
+- A new access token is minted with the target organization in the `org` claim (the prior token's organization is replaced). No DB write to the organization itself.
+- Both switch endpoints (`switch-to-organization` / `switch-to-personal`) return the **active-organization delta inline** — `{ access_token, active_organization, my_permissions, global_role }` (`AuthMeContextService.getActiveOrganizationContext` post-gate read) — so the client repaints the dashboard for the new organization **without** a follow-up `GET /auth/me/context`. The omitted `user` / `organizations[]` are stable across a switch and reused from the client's initial context.
+- Serialized organization responses (this `GET`, list, create, patch) carry the organization `type` (`PERSONAL` / `TEAM`) but **no** `capabilities` object. Clients derive team-only availability from `type` and gate the action on the caller's `my_permissions`. The personal-vs-team rule is enforced server-side by `assertTeamOrganization` in `src/domains/tenancy/sub-domains/organization/organization-capability.ts`.
 
 ### Failure modes
 
-- **Not a member of the target organization** → switch is rejected (the token is not re-minted); the active org is unchanged.
-- **Client calls a team-only route on a personal org** → the centralized guard `assertTeamOrganization` rejects with **422** (`unprocessable_entity`), not 409, because the org `type` is immutable and retrying is futile. Clients hide/disable those actions up front from the org `type` + permissions instead of probing for the 422. The team-only routes: `DELETE /api/v1/tenancy/organization`, `POST .../organization/invitations`, `POST .../organization/memberships`, `POST .../organization/transfer-ownership`, `POST .../organization/roles`, and the four subscription mutations `POST /api/v1/billing/subscriptions` (+ `/{subscription_id}/change-plan`, `/cancel`, `/resume`).
+- **Not a member of the target organization** → switch is rejected (the token is not re-minted); the active organization is unchanged.
+- **Client calls a team-only route on a personal organization** → the centralized guard `assertTeamOrganization` rejects with **422** (`unprocessable_entity`), not 409, because the organization `type` is immutable and retrying is futile. Clients hide/disable those actions up front from the organization `type` + permissions instead of probing for the 422. The team-only routes: `DELETE /api/v1/tenancy/organization`, `POST .../organization/invitations`, `POST .../organization/memberships`, `POST .../organization/transfer-ownership`, `POST .../organization/roles`, and the four subscription mutations `POST /api/v1/billing/subscriptions` (+ `/{subscription_id}/change-plan`, `/cancel`, `/resume`).
 
 ## organization-invitation-flow
 
@@ -172,7 +172,7 @@ sequenceDiagram
   participant Mem as MembershipService
   participant Usr as UserService
   participant Inv as MemberInvitationService
-  participant DB as Postgres (RLS scoped to org)
+  participant DB as Postgres (RLS scoped to organization)
   participant Bus as event-bus
   participant Mail as mail.processor
   participant Invitee as Invitee Client
@@ -203,8 +203,8 @@ sequenceDiagram
 
 - New invitee → a bare ACTIVE `auth.users` row (`is_email_verified=false`, no auth method), claimed on first onboarding — **email verification-code login** or **OAuth**; an existing address resolves to that account.
 - `INVITED` `memberships` row + `member_invitations` row (hashed token; the raw token leaves the platform only via the email payload, parallel to the email verification code).
-- `MEMBER_INVITATION_EVENT.CREATED` (emitStrict — a failed outbox write rolls back the whole org transaction) → mail outbox → invitation email.
-- Accept requires authentication, a **verified** email, and an email matching the invitee (sec-T4 + follow-up) — so a forwarded invite token alone, or a password-claim that has not yet verified, cannot join the org. On accept the membership is activated (`status=ACTIVE`, `joined_at`) and the member's permission cache invalidated.
+- `MEMBER_INVITATION_EVENT.CREATED` (emitStrict — a failed outbox write rolls back the whole organization transaction) → mail outbox → invitation email.
+- Accept requires authentication, a **verified** email, and an email matching the invitee (sec-T4 + follow-up) — so a forwarded invite token alone, or a password-claim that has not yet verified, cannot join the organization. On accept the membership is activated (`status=ACTIVE`, `joined_at`) and the member's permission cache invalidated.
 - On revoke (`DELETE /organization/invitations/:id`): the invitation is revoked AND the auto-created `INVITED` membership is soft-deleted (no ghost invitee in the members table).
 
 ### Failure modes
@@ -222,7 +222,7 @@ sequenceDiagram
 Two paths:
 
 - **Inbound (authoritative)**: Stripe sends `customer.subscription.updated` → `POST /api/v1/billing/webhook`.
-- **User-initiated**: organization admin calls `POST /api/v1/billing/subscriptions/:subscription_id/change-plan` (active org from the JWT `org` claim). The service calls Stripe; the inbound webhook lands shortly after and reconciles state.
+- **User-initiated**: organization admin calls `POST /api/v1/billing/subscriptions/:subscription_id/change-plan` (active organization from the JWT `org` claim). The service calls Stripe; the inbound webhook lands shortly after and reconciles state.
 
 State changes always flow Stripe webhook → service → DB. We never write subscription state to DB without a Stripe-confirmed webhook behind it.
 
@@ -236,7 +236,7 @@ sequenceDiagram
   participant Queue as stripe-webhook queue (BullMQ)
   participant Worker as stripe-webhook worker
   participant Sub as SubscriptionService
-  participant DB as Postgres (RLS scoped to org)
+  participant DB as Postgres (RLS scoped to organization)
 
   Note over Stripe,Ingest: signature verified in the ingress plugin, before the handler
   Stripe->>Ingest: POST /api/v1/billing/webhook (Stripe-Signature)

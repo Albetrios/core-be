@@ -14,9 +14,9 @@ const CAP = 3;
 const CONCURRENT = 8;
 
 /**
- * audit-#8: per-org resource caps must be enforced atomically (advisory lock + count + insert in
+ * audit-#8: per-organization resource caps must be enforced atomically (advisory lock + count + insert in
  * one transaction). This drives the exact repository sequence the create services use — acquire
- * the per-org creation lock, count, then insert under the cap — concurrently, and asserts the cap
+ * the per-organization creation lock, count, then insert under the cap — concurrently, and asserts the cap
  * is strict. Without the lock, concurrent callers each pass the same count and overshoot.
  */
 describe('WebhookRepository creation-quota concurrency (database — audit-#8)', () => {
@@ -26,7 +26,7 @@ describe('WebhookRepository creation-quota concurrency (database — audit-#8)',
     await cleanupDatabase();
   });
 
-  it('never exceeds the per-org cap under concurrent create attempts', async () => {
+  it('never exceeds the per-organization cap under concurrent create attempts', async () => {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });
 

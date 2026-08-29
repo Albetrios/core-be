@@ -178,7 +178,7 @@ describe('OrganizationSettingsService', () => {
       expect(i18nLocaleCacheSpies.set).toHaveBeenCalledWith('org_public_abc', 'es');
     });
 
-    it('caches the "en" fallback so unknown org ids stop hitting the DB after the first lookup', async () => {
+    it('caches the "en" fallback so unknown organization ids stop hitting the DB after the first lookup', async () => {
       i18nLocaleCacheSpies.get.mockResolvedValueOnce(null);
       vi.mocked(settingsRepository.findDefaultLocaleByOrganizationPublicId).mockResolvedValueOnce(
         null,
@@ -187,7 +187,7 @@ describe('OrganizationSettingsService', () => {
       await service.resolveDefaultLocaleForOrganization('org_unknown');
 
       // The negative cache stops the existence-oracle path: every subsequent
-      // request for the same unknown org returns 'en' from Redis without
+      // request for the same unknown organization returns 'en' from Redis without
       // ever touching the SECURITY DEFINER function.
       expect(i18nLocaleCacheSpies.set).toHaveBeenCalledWith('org_unknown', 'en');
     });
@@ -214,7 +214,7 @@ describe('OrganizationSettingsService', () => {
       expect(settingsRepository.userHasOrganizationRequiringMfa).toHaveBeenCalledWith(1);
     });
 
-    it('returns false when no org requires MFA', async () => {
+    it('returns false when no organization requires MFA', async () => {
       const result = await service.userHasOrganizationRequiringMfa(1);
       expect(result).toBe(false);
     });

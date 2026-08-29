@@ -14,8 +14,8 @@ import { describe, expect, it } from 'vitest';
  * grants everything.
  *
  * That mismatch shipped three times:
- * - `provisionOrganization` — the org INSERT failed its WITH CHECK with SQLSTATE 42501.
- * - `resolve-active-organization` — every active-org read returned zero rows, so users logged in
+ * - `provisionOrganization` — the organization INSERT failed its WITH CHECK with SQLSTATE 42501.
+ * - `resolve-active-organization` — every active-organization read returned zero rows, so users logged in
  *   with no `org` claim, no permissions, and a "you don't have permission" dashboard.
  * - `OrganizationRepository`'s user-id resolvers — silently returned `null`, skipping the
  *   permission-cache purge on role change and nulling `created_by_user_id` attribution.

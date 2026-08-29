@@ -101,7 +101,7 @@ export function resolveActiveOrganizationId(request: FastifyRequest): string {
 
 /**
  * Narrows the middleware-attached `request.principalScope` to an
- * organization-bearing scope — the `requireAuth`-family accessor for org-scoped
+ * organization-bearing scope — the `requireAuth`-family accessor for organization-scoped
  * routes. Mints nothing: the scope was already attached by the auth middleware;
  * this only enforces the route contract and narrows the type.
  *
@@ -127,7 +127,7 @@ export function requireOrganizationScope(
  * Narrows the middleware-attached `request.principalScope` to a user-bearing
  * scope — the `requireAuth`-family accessor for user-owned resources (rejects
  * API-key principals, matching {@link requireAuth} semantics; the organization
- * stays optional — org-less tokens are the /users/me self-heal transitional
+ * stays optional — organization-less tokens are the /users/me self-heal transitional
  * state). Mints nothing.
  *
  * @remarks

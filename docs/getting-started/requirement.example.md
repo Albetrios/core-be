@@ -21,28 +21,28 @@ added" list up top, so you can change them before the document is finalized like
 - Table(s): invoices
 - Columns:
   - organization_id: bigint, notNull, FK organizations.id
-  - number: text, notNull (per-org sequence)
+  - number: text, notNull (per-organization sequence)
   - amount_cents: bigint, notNull
   - currency: text, notNull, default 'usd'
   - status: text, notNull (CHECK status in ('draft','open','paid','void'))
   - issued_at: timestamptz, notNull
 - Public-id prefix: inv
 - Relations / indexes: index (organization_id, issued_at desc); unique (organization_id, number)
-- Tenancy / soft-delete / audit: org-scoped, RLS on (USING + WITH CHECK app.current_organization_public_id) | soft-delete: no (immutable ledger) | audit: created_at, updated_at
+- Tenancy / soft-delete / audit: organization-scoped, RLS on (USING + WITH CHECK app.current_organization_public_id) | soft-delete: no (immutable ledger) | audit: created_at, updated_at
 
 ## 3. Public API
 - Endpoints:
   - GET /api/v1/billing/invoices — list the org's invoices
   - GET /api/v1/billing/invoices/{invoice_id} — get one invoice
   - POST /api/v1/billing/invoices — create an invoice
-- Auth per route: org-permission:billing.read on GET; org-permission:billing.write on POST
+- Auth per route: organization-permission:billing.read on GET; organization-permission:billing.write on POST
 - Request body: POST { amount_cents: integer > 0, currency: 'usd'|'eur', due_at?: ISO-8601 }
 - Response: { id, number, amount_cents, currency, status, issued_at, created_at }
 - Statuses / headers / pagination: 200 list/get/create, 403 no-permission, 404 not-found, 422 missing X-Idempotency-Key | X-Idempotency-Key required on POST | cursor pagination on list
 
 ## 4. Business logic
 - Service intent per operation: listInvoices({ organizationId, cursor }); getInvoice({ organizationId, invoiceId }); createInvoice({ organizationId, input })
-- Transactions / cross-domain: createInvoice wraps the insert in withTransaction and allocates the next per-org number; reads billing.subscription service for the active plan
+- Transactions / cross-domain: createInvoice wraps the insert in withTransaction and allocates the next per-organization number; reads billing.subscription service for the active plan
 - Events / workers: on createInvoice, enqueue an outbound webhook delivery via the notify webhook path (write a webhook_delivery row + emit NOTIFY_EVENT.WEBHOOK_DELIVERY_REQUESTED on commit); queue invoice-delivery; payload { invoicePublicId, organizationPublicId }
 - Idempotency / caching / rate limits: POST create is idempotencyRequired (X-Idempotency-Key); no caching; default rate limit
 
@@ -58,16 +58,16 @@ added" list up top, so you can change them before the document is finalized like
 
 ## 7. Tests
 - Unit: yes — validator rejects amount_cents <= 0 and unknown currency; serializer exposes id and hides the internal pk
-- Integration: yes — repository.listByOrganization returns only the org's rows ordered by issued_at desc; create allocates a unique per-org number
+- Integration: yes — repository.listByOrganization returns only the org's rows ordered by issued_at desc; create allocates a unique per-organization number
 - E2E: list 200 paginated; get 200; another org's invoice 404 (tenant boundary); no permission 403; missing X-Idempotency-Key 422; bad cursor 400
-- Smoke: GET /api/v1/billing/invoices returns 200 with a seeded org token after pnpm verify:base
+- Smoke: GET /api/v1/billing/invoices returns 200 with a seeded organization token after pnpm verify:base
 - Contract: none (no outbound calls)
 - Chaos: none
 
 ## 8. Non-functionals
 - Observability: log invoice.created with organization_id; counter invoices_created_total
-- Performance budget: list p95 < 100ms at 10k invoices per org
-- Security: RLS enforces org isolation; amounts are not secrets; no PII beyond the org link
+- Performance budget: list p95 < 100ms at 10k invoices per organization
+- Security: RLS enforces organization isolation; amounts are not secrets; no PII beyond the organization link
 
 ## 9. File structure & deliverables (drafted as a tree for review first)
 src/domains/billing/

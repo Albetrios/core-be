@@ -29,7 +29,7 @@ rationale and a concrete plan for each.
 ### R2 — invitation token issuance + email are atomic
 
 - **Fix:** `member-invitation.service.ts` `create`/`resend` run the invitation
-  INSERT and the mail-outbox INSERT inside the one org transaction opened by
+  INSERT and the mail-outbox INSERT inside the one organization transaction opened by
   `withOrganizationDatabaseContext`, and emit via `eventBus.emitStrict` (not the
   swallowing `emit`) so a failed outbox write rolls the transaction back. The
   request id is threaded for crash-safe post-commit dispatch.
@@ -65,10 +65,10 @@ rationale and a concrete plan for each.
 
 - **Fix:** the previously-unused `auth.sessions.organization_id` FK is now written
   on `switch-to-organization` / `switch-to-personal` (during the access-token
-  rebind) and read on `/auth/refresh`, which **re-validates** the persisted org
+  rebind) and read on `/auth/refresh`, which **re-validates** the persisted organization
   still maps to an ACTIVE membership (a removed member never retains access),
-  reuses it, and re-persists it; refresh falls back to the default org only when
-  there is no persisted org or it is no longer valid. New `*Ref` resolver variants
+  reuses it, and re-persists it; refresh falls back to the default organization only when
+  there is no persisted organization or it is no longer valid. New `*Ref` resolver variants
   return `{ id, public_id }`; the existing public-id helpers delegate to them.
 - **Tests:** `auth.service.unit.test.ts` — AUTH-14 preserve, AUTH-14 fallback,
   AUTH-15 switch-persists regressions.
@@ -98,7 +98,7 @@ rationale and a concrete plan for each.
 ### NOTIFY-11 — webhook secret rotation overlap gate is atomic
 
 - **Fix:** `webhook.service.ts` reads the rotation gate row via
-  `findByPublicIdForUpdate` (`SELECT … FOR UPDATE`) inside the org transaction, so
+  `findByPublicIdForUpdate` (`SELECT … FOR UPDATE`) inside the organization transaction, so
   concurrent rotations serialize and the second is rejected instead of clobbering
   the single `encrypted_secret_previous` slot.
 - **Tests:** `webhook.service.unit.test.ts` — re-rotation rejected within the
@@ -122,7 +122,7 @@ rationale and a concrete plan for each.
   (`infrastructure/database/resource-quota-lock.util.ts`) before the count, mirroring
   the per-user upload-quota lock — two parallel creates can no longer both pass at N-1.
   (audit R12: a redundant second lock module, `resource-cap-lock.ts`, was removed —
-  org-create now uses the single canonical quota lock like every other capped resource.)
+  organization-create now uses the single canonical quota lock like every other capped resource.)
 - **Tests:** cap service unit tests exercise the quota lock; `organization.service`
   asserts the owned-organization quota lock is taken before counting (TEN-02 / R12).
 
@@ -170,7 +170,7 @@ coverage already exists (and was extended where noted).
 ### TEN-06 / USER-04 / USER-09 — durable offboarding reconciler
 
 **Status:** built (see the offboarding reconciler worker).
-**Current mitigations already in place:** both org-delete and user-delete are
+**Current mitigations already in place:** both organization-delete and user-delete are
 idempotent (`deletion_started_at` watermark) and correctly ordered (Stripe cancel
 / session revoke are checkpoints before the soft-delete; S3 cleanup runs last), so
 **re-invoking the delete endpoint safely resumes** a partial offboarding. The

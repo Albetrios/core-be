@@ -84,7 +84,7 @@ export function createOrganizationController(
         organization_id: organizationId,
       };
       const result = await auditService.listForOrganization(organizationId, query);
-      // sec-T finding #4 + sec-re-08: route org-scoped audit log rows through
+      // sec-T finding #4 + sec-re-08: route organization-scoped audit log rows through
       // `AuditSerializer.many` so (a) the sensitive-metadata denylist runs and
       // (b) the strip-only allowlist drops every top-level bigint id, surfacing
       // the resolved actor/target/organization public ids instead. The admin

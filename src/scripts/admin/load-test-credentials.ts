@@ -53,7 +53,7 @@ async function main() {
   if (firstOrgId) {
     console.log(`export TEST_ORG_ID="${firstOrgId}"`);
   } else {
-    console.log('export TEST_ORG_ID=<your-org-public-id>  # No organizations found');
+    console.log('export TEST_ORG_ID=<your-organization-public-id>  # No organizations found');
   }
   console.log('');
 }

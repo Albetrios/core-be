@@ -258,8 +258,8 @@ export class MfaService {
     userAgent?: string,
   ): Promise<{ access_token: string; session_public_id: string; session_refresh_secret: string }> {
     // Bake the active-organization `org` claim into the token, mirroring the first-factor path
-    // (`complete-first-factor-auth.ts`). Without this an MFA login mints an org-less token and the
-    // user is locked out of every org-scoped route (which resolve the active org from the claim
+    // (`complete-first-factor-auth.ts`). Without this an MFA login mints an organization-less token and the
+    // user is locked out of every organization-scoped route (which resolve the active organization from the claim
     // post-flatten) until they call a switch endpoint — a regression that hit MFA-enforcing tenants.
     const organizationPublicId = await resolveDefaultActiveOrganizationPublicId(user.id);
     const jsonWebToken = await signAccessToken({
@@ -486,11 +486,11 @@ export class MfaService {
    * Refuses with `ForbiddenError('errors:lastMfaRequiredByOrganization')` when removing
    * the method would leave the user with zero MFA factors AND any organization the user
    * belongs to has `organization_settings.require_mfa = true` (sec-A4). Without this
-   * guard, a member of an MFA-required org could silently downgrade themselves to
-   * password-only authentication in direct contradiction of org policy. The check
+   * guard, a member of an MFA-required organization could silently downgrade themselves to
+   * password-only authentication in direct contradiction of organization policy. The check
    * pre-computes the remaining-count by listing first, so the revoke does NOT execute
    * when the policy would be violated. Non-last deletions and users in MFA-non-required
-   * orgs are unaffected.
+   * organizations are unaffected.
    */
   async deleteMfa(userPublicId: string, mfaMethodPublicId: string): Promise<void> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
@@ -500,7 +500,7 @@ export class MfaService {
       async () => {
         // route-audit C1 (deleteMfa sibling): serialize concurrent credential mutations for this user
         // so the "would this remove the last MFA factor?" count + revoke cannot interleave with a
-        // sibling delete and strip the user to zero factors in an MFA-required org.
+        // sibling delete and strip the user to zero factors in an MFA-required organization.
         await this.authMethodService.acquireCredentialMutationLock(user.id);
         // route-#10: resolve by opaque public id (not the leaked sequential id); the resolved row
         // still yields its numeric id for the user-scoped revoke below.
@@ -513,7 +513,7 @@ export class MfaService {
           throw new UnauthorizedError('errors:mfaNotTotpMethod');
         }
         // Pre-check: would this revoke leave zero MFA methods? If yes AND any of the user's
-        // orgs requires MFA, refuse BEFORE executing the revoke (sec-A4).
+        // organizations requires MFA, refuse BEFORE executing the revoke (sec-A4).
         const currentMethods = await this.authMethodService.listMfaMethodsByUserId(user.id);
         const wouldBeLastRemoval = currentMethods.length <= 1;
         if (wouldBeLastRemoval && this.organizationSettingsService) {

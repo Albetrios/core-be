@@ -51,7 +51,7 @@ describe('runOrganizationOffboardingReconcileJob (TEN-06)', () => {
     const result = await runOrganizationOffboardingReconcileJob(service);
 
     expect(result).toEqual({ scanned: 2, resumed: 1, failed: 1 });
-    // The failed org offboarding is reported to Sentry with its public id and the reconcile source
+    // The failed organization offboarding is reported to Sentry with its public id and the reconcile source
     // tag (mirrors the user-offboarding reconcile twin), so a stuck teardown is not lost silently.
     expect(captureException).toHaveBeenCalledTimes(1);
     expect(captureException).toHaveBeenCalledWith(expect.any(Error), {

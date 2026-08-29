@@ -5,7 +5,7 @@
  * 100 VUs = 100 independent user sessions — not 100 copies of the same token.
  *
  * Prerequisites:
- *   pnpm db:seed:loadtest          — seeds 12 orgs × 10 users with full domain data
+ *   pnpm db:seed:loadtest          — seeds 12 organizations × 10 users with full domain data
  *                                    and writes src/tests/load/k6/data/credential-pool.json
  *   RATE_LIMIT_MAX=10000 pnpm dev  — raise the rate limit for load testing
  *
@@ -60,10 +60,10 @@ export const options = {
     'http_req_duration{name:get-sessions}': ['p(95)<400', 'p(99)<800'],
     'http_req_duration{name:get-notif-prefs}': ['p(95)<300', 'p(99)<600'],
     // Org reads + writes
-    'http_req_duration{name:list-orgs}': ['p(95)<500', 'p(99)<1000'],
-    'http_req_duration{name:get-org}': ['p(95)<400', 'p(99)<800'],
-    'http_req_duration{name:get-org-settings}': ['p(95)<400', 'p(99)<800'],
-    'http_req_duration{name:patch-org-settings}': ['p(95)<600', 'p(99)<1200'],
+    'http_req_duration{name:list-organizations}': ['p(95)<500', 'p(99)<1000'],
+    'http_req_duration{name:get-organization}': ['p(95)<400', 'p(99)<800'],
+    'http_req_duration{name:get-organization-settings}': ['p(95)<400', 'p(99)<800'],
+    'http_req_duration{name:patch-organization-settings}': ['p(95)<600', 'p(99)<1200'],
     'http_req_duration{name:list-members}': ['p(95)<500', 'p(99)<1000'],
     'http_req_duration{name:list-roles}': ['p(95)<400', 'p(99)<800'],
     'http_req_duration{name:list-api-keys}': ['p(95)<400', 'p(99)<800'],
@@ -92,7 +92,7 @@ export const options = {
  * returns the token array that VUs index into. Argon2id is exercised N times
  * total — not N × iterations — so server CPU is not the bottleneck.
  *
- * @returns {Array<{token: string, orgPublicId: string, userPublicId: string}>}
+ * @returns {Array<{token: string, organizationPublicId: string, userPublicId: string}>}
  */
 export function setup() {
   return mintTokenPool(credentialPool);
@@ -163,12 +163,12 @@ function phaseOrg(authed) {
   checkResponseTime(getOrgRes, 400, 'get-org');
   sleep(0.2);
 
-  const orgSettingsRes = http.get(`${API_PREFIX}/tenancy/organization/settings`, {
+  const organizationSettingsRes = http.get(`${API_PREFIX}/tenancy/organization/settings`, {
     headers: authed,
-    tags: { name: 'get-org-settings' },
+    tags: { name: 'get-organization-settings' },
   });
-  checkOk(orgSettingsRes, 'get-org-settings');
-  checkResponseTime(orgSettingsRes, 400, 'get-org-settings');
+  checkOk(organizationSettingsRes, 'get-organization-settings');
+  checkResponseTime(organizationSettingsRes, 400, 'get-organization-settings');
   sleep(0.2);
 
   const listMembersRes = http.get(`${API_PREFIX}/tenancy/organization/memberships`, {
@@ -298,14 +298,14 @@ function phaseWebhooksAndWrites(authed, json) {
   checkResponseTime(patchSettingsRes, 500, 'patch-me-settings');
   sleep(0.2);
 
-  // Patch org settings
+  // Patch organization settings
   const patchOrgSettingsRes = http.patch(
     `${API_PREFIX}/tenancy/organization/settings`,
     JSON.stringify({ is_email_notifications_enabled: true }),
-    { headers: { ...authed, ...json }, tags: { name: 'patch-org-settings' } },
+    { headers: { ...authed, ...json }, tags: { name: 'patch-organization-settings' } },
   );
-  checkOk(patchOrgSettingsRes, 'patch-org-settings');
-  checkResponseTime(patchOrgSettingsRes, 600, 'patch-org-settings');
+  checkOk(patchOrgSettingsRes, 'patch-organization-settings');
+  checkResponseTime(patchOrgSettingsRes, 600, 'patch-organization-settings');
 }
 
 // ---------------------------------------------------------------------------
@@ -313,17 +313,17 @@ function phaseWebhooksAndWrites(authed, json) {
 // ---------------------------------------------------------------------------
 
 /**
- * Per-VU org-scoped token cache. The active org rides the token's `org` claim,
- * so we re-mint the pool token scoped to this VU's org exactly once per VU
+ * Per-VU organization-scoped token cache. The active organization rides the token's `org` claim,
+ * so we re-mint the pool token scoped to this VU's organization exactly once per VU
  * (not per iteration) — keeping the extra auth cost bounded like setup()'s mint.
  */
 let scopedToken = null;
 
 /**
  * One iteration = one realistic authenticated user session spanning all
- * major domains. Each VU uses its own token + org, so no cross-VU contention.
+ * major domains. Each VU uses its own token + organization, so no cross-VU contention.
  *
- * @param {Array<{token: string, orgPublicId: string, userPublicId: string}>} tokenPool
+ * @param {Array<{token: string, organizationPublicId: string, userPublicId: string}>} tokenPool
  */
 export function userJourney(tokenPool) {
   const entry = vuToken(tokenPool);
@@ -332,10 +332,10 @@ export function userJourney(tokenPool) {
     return;
   }
 
-  // Scope the token to this VU's org once — the flat org-scoped routes carry no
-  // org path segment, so the org must come from the token's `org` claim.
+  // Scope the token to this VU's organization once — the flat organization-scoped routes carry no
+  // organization path segment, so the organization must come from the token's `org` claim.
   if (!scopedToken) {
-    scopedToken = switchToOrganization(entry.token, entry.orgPublicId) || entry.token;
+    scopedToken = switchToOrganization(entry.token, entry.organizationPublicId) || entry.token;
   }
   const authed = authHeaders(scopedToken).headers;
   const json = { 'Content-Type': 'application/json' };

@@ -136,7 +136,7 @@ const i18nMiddleware: FastifyPluginAsync = async (app) => {
     });
   });
 
-  // After tenant middleware sets organizationId: apply org default_locale when Accept-Language is absent.
+  // After tenant middleware sets organizationId: apply organization default_locale when Accept-Language is absent.
   app.addHook('preHandler', async (request) => {
     if (request.headers['accept-language']) {
       return;

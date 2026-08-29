@@ -169,9 +169,9 @@ export const healthAuthUserRouteResponses: Record<string, ResponseDefinition> = 
     example: null,
   },
 
-  // ── Auth: Active-org switch + me context (REQ-5) ──
+  // ── Auth: Active-organization switch + me context (REQ-5) ──
   'POST /api/v1/auth/switch-to-organization': {
-    // Re-mints the access token bound to the newly active org AND returns the active-org delta
+    // Re-mints the access token bound to the newly active organization AND returns the active-organization delta
     // (active_organization + my_permissions + global_role) so the client repaints the dashboard
     // without a follow-up GET /auth/me/context.
     statusCode: 200,
@@ -195,7 +195,7 @@ export const healthAuthUserRouteResponses: Record<string, ResponseDefinition> = 
     example: null,
   },
   'POST /api/v1/auth/switch-to-personal': {
-    // Same active-org delta envelope as switch-to-organization; active_organization is the caller's
+    // Same active-organization delta envelope as switch-to-organization; active_organization is the caller's
     // own personal organization (type PERSONAL, all capabilities false).
     statusCode: 200,
     schema: wrapSuccess(

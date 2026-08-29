@@ -184,7 +184,7 @@ export const tenancyRouteResponses: Record<string, ResponseDefinition> = {
 
   // ── Invitations ── (add-member issues invitations via POST /organization/memberships, REQ-1)
   'POST /api/v1/tenancy/invitations/{invitation_id}/accept': {
-    // Returns the accepted invitation plus `organization_id` (the org just joined) so the client
+    // Returns the accepted invitation plus `organization_id` (the organization just joined) so the client
     // can POST /auth/switch-to-organization into it without a separate lookup.
     statusCode: 200,
     schema: wrapSuccess(

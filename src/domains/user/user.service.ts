@@ -75,7 +75,7 @@ export type UserOffboardingDependencies = {
   uploadService: UploadService;
   userDataExportService: UserDataExportService;
   /**
-   * route-audit-#2 follow-up: blocks deleting a user who still owns organizations (the org — with
+   * route-audit-#2 follow-up: blocks deleting a user who still owns organizations (the organization — with
    * its members + billing — would be orphaned at a tombstoned owner). Require transfer/delete first.
    */
   organizationOwnership?: UserOrganizationOwnershipPort | undefined;
@@ -197,9 +197,9 @@ export class UserService {
       if (!deleted) throw new NotFoundError('User');
       return;
     }
-    // route-audit-#2 follow-up: refuse to delete a user who still owns organizations — the org (and
+    // route-audit-#2 follow-up: refuse to delete a user who still owns organizations — the organization (and
     // its members + active subscription) would be orphaned at a tombstoned owner. The user must
-    // transfer ownership (or delete the org, which now cancels its subscription) first. Checked
+    // transfer ownership (or delete the organization, which now cancels its subscription) first. Checked
     // before markDeletionStarted so a blocked delete leaves no half-state.
     if (offboarding.organizationOwnership) {
       const ownedCount = await offboarding.organizationOwnership.countOrganizationsOwnedByUser(
@@ -312,7 +312,7 @@ export class UserService {
    * - **Notes:** the invitee *claims* the account on first OAuth/magic-link login — both already
    *   find-or-create by email, so they reuse this row and attach the auth method, then accept the
    *   invitation. Call this OUTSIDE any organization context so the public-id retry can open its own
-   *   transaction (a pinned org transaction would abort on the rare public-id collision).
+   *   transaction (a pinned organization transaction would abort on the rare public-id collision).
    */
   async findOrCreateInvitedByEmail(data: { email: string }): Promise<UserAuthRecord> {
     const existing = await this.findByEmail(data.email);
@@ -477,7 +477,7 @@ export class UserService {
       this.repository.findByPublicId(publicId),
     );
     if (!user || user.deleted_at) throw new NotFoundError('User');
-    // Self-heal: when personal orgs are enabled, provision on demand if missing so
+    // Self-heal: when personal organizations are enabled, provision on demand if missing so
     // `personal_organization_id` is reliably non-null (never dead-ends onboarding). When
     // personal is disabled this returns undefined and we report null, unchanged.
     const personalOrganizationId = env.PERSONAL_ORGANIZATION_ENABLED

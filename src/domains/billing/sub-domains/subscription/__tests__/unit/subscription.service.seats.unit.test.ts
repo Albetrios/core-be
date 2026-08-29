@@ -112,7 +112,7 @@ describe('SubscriptionService seat counters (REQ-4)', () => {
     expect(rows[0]!.seats_total).toBe(10);
     // Second row: purchased seats win over the plan fallback.
     expect(rows[1]!.seats_total).toBe(50);
-    // seats_used is the org membership count, shared across rows; resolved once.
+    // seats_used is the organization membership count, shared across rows; resolved once.
     expect(rows[0]!.seats_used).toBe(3);
     expect(rows[1]!.seats_used).toBe(3);
     expect(membershipSeatUsage.countActiveMembers).toHaveBeenCalledTimes(1);
@@ -127,7 +127,7 @@ describe('SubscriptionService seat counters (REQ-4)', () => {
     expect(row.seats_used).toBe(3);
   });
 
-  it('reserveSeatCeilingForMemberAdd falls back to the Free-tier ceiling when the org has no active subscription (F3)', async () => {
+  it('reserveSeatCeilingForMemberAdd falls back to the Free-tier ceiling when the organization has no active subscription (F3)', async () => {
     vi.mocked(repository.findActiveSeatStateByOrganizationForUpdate).mockResolvedValue(null);
     vi.mocked(planService.getFreePlanSeatCeiling).mockResolvedValue(1);
     await expect(service.reserveSeatCeilingForMemberAdd(1)).resolves.toBe(1);
@@ -227,13 +227,13 @@ describe('SubscriptionService seat counters (REQ-4)', () => {
     expect(call.idempotencyKey).toMatch(/^seat-sync:org_public:/);
   });
 
-  it('enqueueSeatQuantitySync namespaces an explicit caller key by org before Stripe (changePlan path)', () => {
+  it('enqueueSeatQuantitySync namespaces an explicit caller key by organization before Stripe (changePlan path)', () => {
     service.enqueueSeatQuantitySync('org_public', 'client-key-123');
     const call = vi.mocked(seatSyncMocks.enqueueSubscriptionSeatSyncBestEffort).mock
       .calls[0]![0] as {
       idempotencyKey?: string;
     };
-    // sec-review: the raw client key must be org-namespaced so two orgs reusing the same client-key
+    // sec-review: the raw client key must be organization-namespaced so two organizations reusing the same client-key
     // string with the same resulting seat count cannot collide on ONE Stripe idempotency key
     // (`${token}:qty:${n}`) across different subscriptions (Stripe 400 → retries exhaust → no sync).
     expect(call.idempotencyKey).toBe('sub-seat-sync:org_public:client-key-123');

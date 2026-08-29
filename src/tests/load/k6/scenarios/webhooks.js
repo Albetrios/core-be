@@ -29,8 +29,8 @@ export function webhookOps() {
     return;
   }
 
-  // TEST_TOKEN must be minted scoped to TEST_ORG_ID — the active org rides the
-  // token's `org` claim, so the flat webhook routes carry no org path segment.
+  // TEST_TOKEN must be minted scoped to TEST_ORG_ID — the active organization rides the
+  // token's `org` claim, so the flat webhook routes carry no organization path segment.
   const headers = authHeaders(token).headers;
 
   // List webhooks

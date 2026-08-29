@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
  * Regression guard: the non-superuser RLS suite must run on the PR gate, not post-merge only.
  *
  * FORCE ROW LEVEL SECURITY bugs are invisible under the local/CI superuser; they surface only when
- * tests run as the non-superuser `core_be_app` role against a real Postgres. The org-mandated-MFA
+ * tests run as the non-superuser `core_be_app` role against a real Postgres. The organization-mandated-MFA
  * bypass reached production partly because the RLS suite ran post-merge only — too late to block the
  * merge. This test fails if the PR-gate RLS job is removed, stops running the `rls` test directory,
  * or loses its database.

@@ -78,7 +78,7 @@ export class OrganizationNotificationPolicyService {
     return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
-      // sec-r5-followup-ratelimit-dos-3 + audit-#8: serialize the per-org count + insert with a
+      // sec-r5-followup-ratelimit-dos-3 + audit-#8: serialize the per-organization count + insert with a
       // transaction-scoped advisory lock so concurrent creates cannot both pass the same count
       // and overshoot ORGANIZATION_NOTIFICATION_POLICY_MAX_PER_ORG. The lock auto-releases at commit.
       await this.policyRepository.acquireCreationQuotaLock(organization.id);

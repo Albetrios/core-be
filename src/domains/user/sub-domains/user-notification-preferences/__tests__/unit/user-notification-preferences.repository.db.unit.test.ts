@@ -88,10 +88,10 @@ describe('UserNotificationPreferencesRepository (database)', () => {
   });
 
   // sec-U7: defense-in-depth pin on `organization_id`. The original RLS
-  // policy carried an org branch that only verified the `app.current_organization_public_id`
+  // policy carried an organization branch that only verified the `app.current_organization_public_id`
   // GUC matched, NOT membership — a future route wrapping this table in
   // `withAppDatabaseContext` would have let any user write
-  // preferences against any org id they passed in `X-Organization-Id`,
+  // preferences against any organization id they passed in `X-Organization-Id`,
   // bypassing membership entirely. The schema-level CHECK constraint
   // (`chk_user_notif_prefs_no_org`) refuses non-null `organization_id`
   // outright so even a direct raw-SQL bypass of the application guard
@@ -103,7 +103,7 @@ describe('UserNotificationPreferencesRepository (database)', () => {
     // Raw insert via the privileged test connection — RLS does not apply at
     // this role, so only the CHECK constraint can refuse the write. This
     // simulates a future hostile/buggy code path attempting to persist an
-    // org-scoped preference outside the membership-gated route.
+    // organization-scoped preference outside the membership-gated route.
     await expect(
       database.insert(user_notification_preferences).values({
         user_id: user.id,

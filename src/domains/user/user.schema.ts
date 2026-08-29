@@ -42,7 +42,7 @@ export const users = authSchema
       is_mfa_enabled: boolean('is_mfa_enabled').notNull().default(false),
       // Stamped when the user finishes the onboarding wizard. NULL = not yet
       // onboarded → the frontend routes every fresh user (personal or team) through
-      // onboarding once, regardless of whether a personal org is auto-provisioned.
+      // onboarding once, regardless of whether a personal organization is auto-provisioned.
       onboarding_completed_at: timestamp('onboarding_completed_at', { withTimezone: true }),
       status: varchar('status', { length: 20 }).notNull().default('ACTIVE'),
       last_active_at: timestamp('last_active_at', { withTimezone: true }),

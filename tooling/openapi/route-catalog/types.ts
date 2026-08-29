@@ -9,10 +9,10 @@ export type RegistryAccess =
   | 'public'
   | 'authenticated'
   | 'global-role'
-  | 'org-permission'
+  | 'organization-permission'
   | 'bearer-token';
 
-/** Whether a route works for any organization (`both`) or rejects a personal org with 422 (`team`). */
+/** Whether a route works for any organization (`both`) or rejects a personal organization with 422 (`team`). */
 export type OrgScope = 'both' | 'team';
 
 export type ParsedRoute = {
@@ -27,6 +27,6 @@ export type ParsedRoute = {
   successStatus?: number;
   /** True when the route is registered with `config.idempotencyRequired = true`. */
   idempotencyRequired?: boolean;
-  /** Organization scope (from route-org-scope.json): `both` or team-only. */
-  orgScope?: OrgScope;
+  /** Organization scope (from route-organization-scope.json): `both` or team-only. */
+  organizationScope?: OrgScope;
 };

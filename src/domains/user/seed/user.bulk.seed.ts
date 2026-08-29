@@ -16,7 +16,7 @@ const BULK_EMAIL_PREFIX = 'bulk-user-';
 const BULK_EMAIL_SUFFIX = '@seed.local';
 const BULK_EMAIL_PATTERN = `${BULK_EMAIL_PREFIX}%${BULK_EMAIL_SUFFIX}`;
 
-/** Pool size: one owner + members across all organizations (average of the per-org range). */
+/** Pool size: one owner + members across all organizations (average of the per-organization range). */
 function poolSize(context: SeedContext): number {
   const { organizations, usersPerOrg } = context.counts;
   const averagePerOrg = Math.max(1, Math.round((usersPerOrg.min + usersPerOrg.max) / 2));

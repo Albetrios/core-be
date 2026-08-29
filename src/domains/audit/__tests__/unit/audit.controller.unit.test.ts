@@ -48,7 +48,7 @@ function auditLogRow(overrides: Record<string, unknown> = {}) {
 
 describe('createAuditController', () => {
   // sec-re-08: the service now also returns a `resolution` map so the
-  // serializer can surface user/org public ids in place of the bigserials.
+  // serializer can surface user/organization public ids in place of the bigserials.
   // The default mock returns empty maps; specific tests can override.
   const defaultResolution = {
     userPublicIds: new Map(),
@@ -89,7 +89,7 @@ describe('createAuditController', () => {
       data: [
         expect.objectContaining({
           // sec-re-08: bigserial id is DROPPED; action + sanitized metadata
-          // pass through; user/org bigints are replaced by resolved public ids.
+          // pass through; user/organization bigints are replaced by resolved public ids.
           action: 'user.login',
           metadata: { source: 'test' },
           actor_user_id: 'usr_actor_pub',

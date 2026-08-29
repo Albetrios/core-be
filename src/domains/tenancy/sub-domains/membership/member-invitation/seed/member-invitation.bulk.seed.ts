@@ -1,12 +1,12 @@
 /**
  * Member-invitation bulk seeder — creates a few pending invitations per organization in the
  * registry. Each invitation is backed by a fresh `INVITED` membership (the invitee is a registry
- * user not already a member of that org) joined to the org's Admin role, then a
+ * user not already a member of that organization) joined to the org's Admin role, then a
  * `tenancy.member_invitations` row with the SHA-256 `token_hash` of the raw token. When
- * `counts.edgeCases` is set, the last invitation per org is created already-expired (past
+ * `counts.edgeCases` is set, the last invitation per organization is created already-expired (past
  * `created_at`/`expires_at`).
  *
- * Idempotency: the per-(org, slot) `token_hash` is a deterministic SHA-256 marker and is unique,
+ * Idempotency: the per-(organization, slot) `token_hash` is a deterministic SHA-256 marker and is unique,
  * so re-runs skip slots that already exist; the backing INVITED membership is created with
  * `seedMembership` only for slots that need a new invitation.
  */
@@ -24,7 +24,7 @@ import { generateBulkInviteeEmail } from './member-invitation.faker.js';
 const INVITATIONS_PER_ORG = 2;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Deterministic 64-char invitation token hash for a given org + slot (idempotency marker). */
+/** Deterministic 64-char invitation token hash for a given organization + slot (idempotency marker). */
 function invitationTokenHash(organizationPublicId: string, slot: number): string {
   return createHash('sha256').update(`seed-invite:${organizationPublicId}:${slot}`).digest('hex');
 }
@@ -84,7 +84,7 @@ export async function seedMemberInvitationsBulk(context: SeedContext): Promise<v
 
 /**
  * Seeds one organization's pending invitations + backing INVITED memberships, returning the
- * number created. Returns 0 when the org has no Admin role; stops early when the registry has no
+ * number created. Returns 0 when the organization has no Admin role; stops early when the registry has no
  * remaining eligible (non-member) invitee.
  */
 async function seedOrganizationMemberInvitations(options: {

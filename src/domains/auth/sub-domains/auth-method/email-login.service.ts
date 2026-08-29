@@ -183,14 +183,14 @@ export class EmailLoginService {
 
   /**
    * Auto-signs-up a brand-new passwordless user for an unknown email: inserts the user and its
-   * `EMAIL_CODE` auth-method atomically, then best-effort provisions the personal org.
+   * `EMAIL_CODE` auth-method atomically, then best-effort provisions the personal organization.
    *
    * @remarks
    * The user + auth-method commit together (a failed method insert rolls the user back rather than
    * leaving a credential-less orphan). On a concurrent create race (two sends for the same new
    * email), the loser hits the unique-email index, rolls back, and falls back to the now-existing
    * user so both requests converge on issuing a code — email login is auto-signup, so a duplicate
-   * email is NOT a 409 here. Personal-org provisioning runs AFTER the commit (it uses a separate
+   * email is NOT a 409 here. Personal-organization provisioning runs AFTER the commit (it uses a separate
    * global-admin connection that cannot see an uncommitted user) and is best-effort, exactly
    * mirroring email/password and OAuth signup.
    */
@@ -209,7 +209,7 @@ export class EmailLoginService {
     } catch (error) {
       // A concurrent send for the same new email won the create race; the unique-email index aborted
       // (and rolled back) this transaction. Re-fetch on a fresh connection and converge on the
-      // existing user — the winner already created the auth-method + personal org.
+      // existing user — the winner already created the auth-method + personal organization.
       if (isPostgresUniqueViolation(error)) {
         const existing = await this.userService.findByEmail(email);
         if (existing) return existing;
@@ -340,7 +340,7 @@ export class EmailLoginService {
     }
 
     // First successful completion for an as-yet-unverified account: the email is about to be proven,
-    // so this is the moment a bare invited placeholder (created without a personal org) gets claimed.
+    // so this is the moment a bare invited placeholder (created without a personal organization) gets claimed.
     const isFirstVerification = !user.is_email_verified;
 
     // audit-#12: consume the one-time code AND complete first-factor auth (session creation, or the
@@ -426,7 +426,7 @@ export class EmailLoginService {
 
     // On the first successful login, ensure the personal organization exists — a bare invited
     // placeholder is created WITHOUT one, so an email-code claimer would otherwise have no personal
-    // org (a brand-new passwordless signup already provisioned one at send time, making this an
+    // organization (a brand-new passwordless signup already provisioned one at send time, making this an
     // idempotent no-op for that path). Runs post-commit in a separate global-admin connection that
     // cannot see an uncommitted user — and after the code is consumed, so a wrong code can never
     // force-provision. Best-effort + idempotent (partial unique index), matching signup / OAuth.

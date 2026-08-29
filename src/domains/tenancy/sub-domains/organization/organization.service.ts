@@ -202,7 +202,7 @@ export class OrganizationService {
   }
 
   /**
-   * Resolves the organization row for the active-org public id, throwing `NotFoundError` when it
+   * Resolves the organization row for the active-organization public id, throwing `NotFoundError` when it
    * does not exist. Renamed from `requireOrganizationMembershipByPublicId` (audit-#T2).
    *
    * @remarks
@@ -304,7 +304,7 @@ export class OrganizationService {
     organization_public_id: string,
     stripe_customer_id: string,
   ): Promise<void> {
-    // tenancy.organizations is FORCE RLS — persist the Stripe customer id under the org GUC
+    // tenancy.organizations is FORCE RLS — persist the Stripe customer id under the organization GUC
     // so the update is not silently dropped when called from the payment provider outside HTTP.
     return withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
@@ -401,9 +401,9 @@ export class OrganizationService {
   }
 
   async create(body: unknown, owner_user_public_id: string): Promise<OrganizationOutput> {
-    // Capability gate: this endpoint only ever provisions a TEAM organization (personal orgs are
+    // Capability gate: this endpoint only ever provisions a TEAM organization (personal organizations are
     // auto-provisioned, never created here). Enforce what `/users/me` advertises — in a
-    // personal-only deployment (TEAM_ORGANIZATION_ENABLED=false) team-org creation is rejected
+    // personal-only deployment (TEAM_ORGANIZATION_ENABLED=false) team-organization creation is rejected
     // server-side, not merely hidden by the frontend.
     if (!env.TEAM_ORGANIZATION_ENABLED) {
       throw new ForbiddenError('errors:teamOrganizationsDisabled');
@@ -495,7 +495,7 @@ export class OrganizationService {
       try {
         updated = await this.repository.update(public_id, omitUndefined(parsed), userId ?? null);
       } catch (error) {
-        // Two concurrent slug updates (on different orgs, to the same new slug) can both pass
+        // Two concurrent slug updates (on different organizations, to the same new slug) can both pass
         // the findBySlug pre-check above; the loser hits the `idx_organizations_slug` unique
         // index. Map the unique_violation to a 409 instead of letting it surface as a 500 —
         // mirroring the create path.
@@ -522,7 +522,7 @@ export class OrganizationService {
    *   offboarding resumes (logo/upload cleanup, subscription cancel, soft-delete,
    *   permission-cache purge) and completes.
    * - **Failure modes:** propagates so the reconciler can count + alert and retry on
-   *   the next tick; a PERSONAL org (never deletable standalone, and excluded by the
+   *   the next tick; a PERSONAL organization (never deletable standalone, and excluded by the
    *   reconciler scan) would surface `ConflictError`.
    * - **Side effects:** same as `delete`.
    * - **Notes:** thin alias kept distinct from `delete` so the reconciler's intent is
@@ -552,16 +552,16 @@ export class OrganizationService {
       await this.offboardingDependencies.uploadService.tombstoneAllByOrganizationId(
         organization.id,
       );
-      // route-audit-#2: cancel the org's active subscription so deleting the org stops Stripe
+      // route-audit-#2: cancel the org's active subscription so deleting the organization stops Stripe
       // billing (offboarding previously never touched billing). Done BEFORE the soft-delete so a
-      // Stripe failure aborts the whole delete instead of soft-deleting an org that keeps billing.
+      // Stripe failure aborts the whole delete instead of soft-deleting an organization that keeps billing.
       await this.offboardingDependencies.subscriptionService?.cancelActiveForOrganizationOffboarding(
         public_id,
       );
     }
     // The tombstoning UPDATE runs under the global-retention context: sec-new-D3 keeps
     // `deleted_at IS NULL` on the tenant SELECT arm, and Postgres requires the UPDATE's
-    // NEW row to stay SELECT-visible — under the plain org scope the soft-delete is
+    // NEW row to stay SELECT-visible — under the plain organization scope the soft-delete is
     // RLS-rejected (42501) AFTER Stripe cancellation already ran. The retention arm
     // covers USING, WITH CHECK, and new-row visibility; identity columns are unchanged.
     const deleted = await withMaintenanceDatabaseContext(
@@ -569,7 +569,7 @@ export class OrganizationService {
       () => this.repository.softDelete(public_id),
     );
     if (!deleted) throw new NotFoundError('Organization');
-    // Purge every member's cached permissions for this org so access stops
+    // Purge every member's cached permissions for this organization so access stops
     // immediately on soft-delete rather than lingering until the cache TTL.
     await invalidateOrganizationPermissions(public_id);
   }

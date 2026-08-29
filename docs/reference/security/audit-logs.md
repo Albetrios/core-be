@@ -4,7 +4,7 @@ Core-be records security-relevant mutations in `audit.logs` via `recordScopedAud
 
 ## Query API
 
-- `GET /api/v1/tenancy/organization/audit-logs` — requires `audit-log:read`, scoped to the active organization carried by the access token's `org` claim (`withAppDatabaseContext`, org scope).
+- `GET /api/v1/tenancy/organization/audit-logs` — requires `audit-log:read`, scoped to the active organization carried by the access token's `org` claim (`withAppDatabaseContext`, organization scope).
 - `GET /api/v1/audit/logs` — global admin only (`SUPER_ADMIN` / `ADMIN`); cross-tenant listing runs under `withGlobalAdminDatabaseContext` (`app.global_admin = true`) so FORCE RLS / `core_be_app` see all tenants explicitly.
 
 ## Action naming
@@ -22,7 +22,7 @@ Actions use dot-separated names: `<domain>.<resource>.<verb>`.
 | `auth.mfa.delete` | `mfa_method` | MFA removal |
 | `auth.session.revoke` | `session` | Revoke one session |
 | `auth.session.revoke_all` | `session` | Revoke all sessions |
-| `tenancy.organization_settings.update` | `organization_settings` | PATCH org settings |
+| `tenancy.organization_settings.update` | `organization_settings` | PATCH organization settings |
 | `tenancy.role.create` | `role` | Create member role |
 | `tenancy.role.update` | `role` | Update member role |
 | `tenancy.role.delete` | `role` | Delete member role |
@@ -30,7 +30,7 @@ Actions use dot-separated names: `<domain>.<resource>.<verb>`.
 | `tenancy.membership.create` | `membership` | Add member |
 | `tenancy.membership.update` | `membership` | Update membership |
 | `tenancy.membership.delete` | `membership` | Remove member |
-| `tenancy.membership.leave` | `membership` | Member leaves org |
+| `tenancy.membership.leave` | `membership` | Member leaves organization |
 | `tenancy.membership.transfer_ownership` | `organization` | Ownership transfer |
 | `tenancy.member_invitation.create` | `member_invitation` | Send invitation |
 | `tenancy.member_invitation.resend` | `member_invitation` | Resend invitation |
@@ -53,7 +53,7 @@ Actions use dot-separated names: `<domain>.<resource>.<verb>`.
 ## Row shape
 
 - `actor_user_id` — resolved from JWT `userId` (public id).
-- `organization_id` — set when the mutation is org-scoped (resolved from the access token's `org` claim).
+- `organization_id` — set when the mutation is organization-scoped (resolved from the access token's `org` claim).
 - `metadata` — public ids and non-PII context (no passwords or tokens). The list API runs `sanitizeAuditLogMetadata` so internal numeric `*_id` keys (except `*_public_id`), underscore-prefixed keys, and credential-like fields are stripped from responses.
 
 ## Storage & partitioning
@@ -82,5 +82,5 @@ Daily NDJSON export to S3 is documented in [audit-export.md](./audit-export.md).
 
 ## Tests
 
-- `src/tests/security/infrastructure/mutation-audit.security.test.ts` — login, logout, org settings.
+- `src/tests/security/infrastructure/mutation-audit.security.test.ts` — login, logout, organization settings.
 - `src/tests/security/infrastructure/queue-dashboard-audit.security.test.ts` — Bull Board mutations.

@@ -39,26 +39,26 @@ export interface AuditOutboxDrainResult {
 
 interface ResolutionMaps {
   readonly userIdsByPublicId: ReadonlyMap<string, number>;
-  readonly orgIdsByPublicId: ReadonlyMap<string, number>;
+  readonly organizationIdsByPublicId: ReadonlyMap<string, number>;
   readonly apiKeyIdsByPublicId: ReadonlyMap<string, number>;
 }
 
 /** Collects the distinct user / organization / API-key public ids referenced by a drain batch. */
 function collectAuditOutboxPublicIds(batch: readonly AuditOutboxRow[]): {
   userPublicIds: Set<string>;
-  orgPublicIds: Set<string>;
+  organizationPublicIds: Set<string>;
   apiKeyPublicIds: Set<string>;
 } {
   const userPublicIds = new Set<string>();
-  const orgPublicIds = new Set<string>();
+  const organizationPublicIds = new Set<string>();
   const apiKeyPublicIds = new Set<string>();
   for (const row of batch) {
     if (row.actor_user_public_id) userPublicIds.add(row.actor_user_public_id);
     if (row.target_user_public_id) userPublicIds.add(row.target_user_public_id);
-    if (row.organization_public_id) orgPublicIds.add(row.organization_public_id);
+    if (row.organization_public_id) organizationPublicIds.add(row.organization_public_id);
     if (row.actor_api_key_public_id) apiKeyPublicIds.add(row.actor_api_key_public_id);
   }
-  return { userPublicIds, orgPublicIds, apiKeyPublicIds };
+  return { userPublicIds, organizationPublicIds, apiKeyPublicIds };
 }
 
 /** Runs one SECURITY DEFINER resolver query and normalizes the driver's row shape. */
@@ -75,7 +75,7 @@ async function executeResolverFunction(
 }
 
 /**
- * Pre-resolves every distinct actor / target / org / API-key public id in the batch
+ * Pre-resolves every distinct actor / target / organization / API-key public id in the batch
  * to its internal id in 3 round trips (one per table). Done UNDER `app.global_admin = true`
  * so a single drain pass can resolve identifiers across many tenants without per-row
  * RLS context switching. Returns lookup maps consumed by the per-row insert path.
@@ -94,7 +94,8 @@ async function buildResolutionMaps(
 ): Promise<ResolutionMaps> {
   await setLocalDatabaseConfig(databaseHandle, 'app.global_admin', 'true');
 
-  const { userPublicIds, orgPublicIds, apiKeyPublicIds } = collectAuditOutboxPublicIds(batch);
+  const { userPublicIds, organizationPublicIds, apiKeyPublicIds } =
+    collectAuditOutboxPublicIds(batch);
 
   const userIdsByPublicId = new Map<string, number>();
   if (userPublicIds.size > 0) {
@@ -108,19 +109,19 @@ async function buildResolutionMaps(
   // Org and API-key ids resolve through SECURITY DEFINER functions (migration
   // 20260827040000): app.global_admin grants NOTHING on tenancy.*, so plain
   // selects here returned ZERO rows under the RLS-subject roles and every
-  // org-scoped / api-key-actor outbox row was permanently discarded after max
+  // organization-scoped / api-key-actor outbox row was permanently discarded after max
   // attempts. The functions are narrow id lookups, mirroring the existing
   // billing.resolve_organization_public_id_for_stripe_subscription pattern.
-  const orgIdsByPublicId = new Map<string, number>();
-  if (orgPublicIds.size > 0) {
+  const organizationIdsByPublicId = new Map<string, number>();
+  if (organizationPublicIds.size > 0) {
     const rows = await executeResolverFunction(
       databaseHandle,
       // Bound as one comma-joined param + string_to_array: the driver's JS-array
       // binding is not a reliable text[] literal, and public ids are [a-z0-9_] so
       // the join is unambiguous.
-      drizzleSql`SELECT id, public_id FROM audit.resolve_organization_ids_for_public_ids(string_to_array(${[...orgPublicIds].join(',')}, ','))`,
+      drizzleSql`SELECT id, public_id FROM audit.resolve_organization_ids_for_public_ids(string_to_array(${[...organizationPublicIds].join(',')}, ','))`,
     );
-    for (const row of rows) orgIdsByPublicId.set(row.public_id, Number(row.id));
+    for (const row of rows) organizationIdsByPublicId.set(row.public_id, Number(row.id));
   }
 
   const apiKeyIdsByPublicId = new Map<string, number>();
@@ -132,7 +133,7 @@ async function buildResolutionMaps(
     for (const row of rows) apiKeyIdsByPublicId.set(row.public_id, Number(row.id));
   }
 
-  return { userIdsByPublicId, orgIdsByPublicId, apiKeyIdsByPublicId };
+  return { userIdsByPublicId, organizationIdsByPublicId, apiKeyIdsByPublicId };
 }
 
 interface ResolvedAuditLogInsertRow {
@@ -163,7 +164,7 @@ function resolveRowInserts(
     ? (maps.userIdsByPublicId.get(row.target_user_public_id) ?? null)
     : null;
   const organization_id = row.organization_public_id
-    ? (maps.orgIdsByPublicId.get(row.organization_public_id) ?? null)
+    ? (maps.organizationIdsByPublicId.get(row.organization_public_id) ?? null)
     : null;
 
   if (actor_user_id === null && actor_api_key_id === null) {
@@ -202,7 +203,7 @@ type DrainOutboxRowOutcome =
 
 /**
  * Drains one claimed `audit.outbox` row into `audit.logs`: resolves the row, sets the per-row
- * tenant GUC (org-scoped or system-audit), inserts, and on failure records a transient or terminal
+ * tenant GUC (organization-scoped or system-audit), inserts, and on failure records a transient or terminal
  * failure. Extracted from {@link runAuditOutboxDrainJob} so the batch loop stays within complexity
  * budget; the marking side effects happen here and the caller only tallies the returned outcome.
  */
@@ -325,7 +326,7 @@ export async function runAuditOutboxDrainJob(
   let permanentlyFailed = 0;
 
   // Each row's tenant GUC is a `SET LOCAL` that persists until the next iteration replaces it;
-  // `drainOutboxRow` always re-sets the correct GUC (org-scoped or system-audit) per row.
+  // `drainOutboxRow` always re-sets the correct GUC (organization-scoped or system-audit) per row.
   for (const row of batch) {
     const outcome = await drainOutboxRow({
       databaseHandle,

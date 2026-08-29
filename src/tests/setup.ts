@@ -91,7 +91,7 @@ process.env.DATABASE_SSL_ENABLED = 'false';
  * `false` for the legacy request-pinned RLS transaction mode used by `pnpm dev`, but that mode
  * commits the per-request transaction in an `onResponse` hook — i.e. AFTER `fastify.inject()`
  * resolves. Tests that assert a DB side effect (e.g. an audit row) immediately after an
- * authenticated org request then race the deferred commit and flake. Forcing the scoped-context
+ * authenticated organization request then race the deferred commit and flake. Forcing the scoped-context
  * mode (inline `withAppDatabaseContext` commits) makes local runs deterministic and
  * match CI, the source of truth.
  */

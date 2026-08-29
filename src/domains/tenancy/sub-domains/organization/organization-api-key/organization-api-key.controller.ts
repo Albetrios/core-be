@@ -52,7 +52,7 @@ export function createOrganizationApiKeyController(service: OrganizationApiKeySe
       const scope = requireOrganizationScope(request);
       const _organizationId = scope.organizationPublicId;
       const result = await service.create(scope, request.body, auth.userId);
-      // Long-lived org bearer credentials: audit minting at WARNING so creation is never silent.
+      // Long-lived organization bearer credentials: audit minting at WARNING so creation is never silent.
       await recordScopedAuditEvent(request, {
         actorUserPublicId: auth.userId,
         action: 'organization.api_key.create',
@@ -97,7 +97,7 @@ export function createOrganizationApiKeyController(service: OrganizationApiKeySe
       const _organizationId = scope.organizationPublicId;
       const apiKeyId = validatePublicIdParam(rawParams.api_key_id ?? '', 'api_key_id');
       await service.delete(scope, apiKeyId);
-      // Revoking a long-lived org credential is a security-relevant change; audit at WARNING.
+      // Revoking a long-lived organization credential is a security-relevant change; audit at WARNING.
       await recordScopedAuditEvent(request, {
         ...buildAuditActorFields(auth),
         action: 'organization.api_key.revoke',

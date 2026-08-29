@@ -14,7 +14,7 @@
 | --------- | ------------- | ----- |
 | **Overall** | **79** | Strong foundations; gaps are mostly scale, observability depth, and a few API/security edges |
 | Security | 82 | RLS FORCE, JWT RS256 prod, MCP/dashboard gated; BullMQ payload validation and numeric API IDs are gaps |
-| Reliability | 80 | DLQ, graceful shutdown, Stripe idempotency ledger; org-scoped RLS txn holds pool slots per request |
+| Reliability | 80 | DLQ, graceful shutdown, Stripe idempotency ledger; organization-scoped RLS txn holds pool slots per request |
 | Scalability | 72 | Default `DATABASE_POOL_MAX=10`, per-request pinned transactions, limited load-test route coverage |
 | Maintainability | 86 | Domain layout, skills, CI gates, route catalog; a few large services |
 | DevOps | 88 | Multi-job CI, Trivy, HEALTHCHECK, non-root image |
@@ -36,7 +36,7 @@
 | 4 | [No Prometheus/metrics scrape path (deferred)](#issue-no-prometheus) | Medium | Observability | §9 |
 | 5 | [Internal numeric IDs exposed in organization-notification-policy API](#issue-numeric-policy-id) | Medium | API | §4 |
 | 6 | [GDPR export uses cross-domain Drizzle reads without repository/RLS layering](#issue-gdpr-export-layer) | Medium | Architecture | §1 |
-| 7 | [Default Postgres pool size (10) may bottleneck under concurrent org traffic](#issue-db-pool-default) | Medium | Performance | §6 |
+| 7 | [Default Postgres pool size (10) may bottleneck under concurrent organization traffic](#issue-db-pool-default) | Medium | Performance | §6 |
 | 8 | [Cookie refresh allows absent `Origin` (non-browser clients)](#issue-cookie-origin-absent) | Medium | Security | §2 |
 | 9 | [Subscription service complexity (~296 LOC) increases change risk](#issue-subscription-god) | Medium | Maintainability | §1 |
 | 10 | [k6 load scenarios cover subset of 135 routes](#issue-k6-coverage) | Medium | Testing | §7 |
@@ -59,7 +59,7 @@ Before broad production traffic or enterprise onboarding:
 
 1. Add **Zod parse** (or shared schema) at BullMQ `queue.add` boundaries for all job types ([mail](#issue-bullmq-no-zod), [stripe-webhook](#issue-bullmq-no-zod), [notification](#issue-bullmq-no-zod), [webhook-delivery](#issue-bullmq-no-zod)).
 2. Extend **`tenant-isolation.security.test.ts`** (or catalog-driven security tests) to **billing** subscription and **upload** list routes.
-3. Document and load-test **org RLS transaction** pool impact; tune `DATABASE_POOL_MAX` / connection limits on Railway per [resource-limits runbook](../deployment/runbooks/resource-limits.md).
+3. Document and load-test **organization RLS transaction** pool impact; tune `DATABASE_POOL_MAX` / connection limits on Railway per [resource-limits runbook](../deployment/runbooks/resource-limits.md).
 4. Add **`public_id`** to organization-notification-policy (migration + serializer) or document numeric ID as intentional with rate limits.
 5. Reconcile **deploy env** with observability deferral (remove stale `METRICS_*` if still in workflow).
 
@@ -103,7 +103,7 @@ Architecture
 [`src/domains/user/sub-domains/user-data-export/user-data-export.service.ts`](../../src/domains/user/sub-domains/user-data-export/user-data-export.service.ts) lines 51–76: `getRequestDatabase().select()` across `users`, `memberships`, `organizations`, `sessions`, `notifications`, `logs`.
 
 #### Production Risk
-Schema drift in any domain breaks export; a bug in `userPublicId` scoping could over-fetch another user's org memberships. Blast radius: GDPR compliance incident.
+Schema drift in any domain breaks export; a bug in `userPublicId` scoping could over-fetch another user's organization memberships. Blast radius: GDPR compliance incident.
 
 #### Recommended Fix
 Keep export orchestration in the sub-domain but delegate reads to each domain's **read-only service methods** (or a dedicated export repository module per domain). Add integration test asserting user A cannot export user B's data.
@@ -178,7 +178,7 @@ Small
 
 - JWT RS256 required in production (`env-schema` refine); 15-minute access tokens ([`jwt.util.ts`](../../src/shared/utils/security/jwt.util.ts)).
 - MCP routes require JWT + `super_admin`/`admin` ([`mcp-server.ts`](../../src/infrastructure/mcp/mcp-server.ts) lines 291–311).
-- Idempotency keys scoped per org/user ([`idempotency.middleware.ts`](../../src/shared/middlewares/core/idempotency.middleware.ts) `resolveIdempotencyScope`).
+- Idempotency keys scoped per organization/user ([`idempotency.middleware.ts`](../../src/shared/middlewares/core/idempotency.middleware.ts) `resolveIdempotencyScope`).
 - Stripe webhook signature + raw body ([`stripe-webhook-ingress.plugin.ts`](../../src/domains/billing/sub-domains/stripe-webhook/stripe-webhook-ingress.plugin.ts); controller enqueues only).
 - Session refresh Origin check when `ALLOWED_ORIGINS` set ([`cookie-session-origin.pre-handler.ts`](../../src/shared/middlewares/cookie-session-origin.pre-handler.ts)).
 
@@ -285,7 +285,7 @@ When `X-Organization-Id` is set, `organizationRlsTransactionMiddleware` pins one
 503s / timeouts when pool saturated; slow handlers block slots for 30s statement timeout.
 
 #### Recommended Fix
-Load-test org-scoped routes; increase `DATABASE_POOL_MAX` and Railway Postgres limits; keep handlers short; consider narrowing middleware to routes that truly need RLS GUC on same connection.
+Load-test organization-scoped routes; increase `DATABASE_POOL_MAX` and Railway Postgres limits; keep handlers short; consider narrowing middleware to routes that truly need RLS GUC on same connection.
 
 #### Implementation Priority
 Before scale
@@ -463,7 +463,7 @@ Performance
 [`connection.ts`](../../src/infrastructure/database/connection.ts) line 48: `max: env.DATABASE_POOL_MAX ?? 10`.
 
 #### Production Risk
-Latency spikes under parallel org users.
+Latency spikes under parallel organization users.
 
 #### Recommended Fix
 Set `DATABASE_POOL_MAX` per Railway instance size; horizontal scale API replicas; monitor pool wait time in logs.
@@ -485,7 +485,7 @@ Medium
 Performance
 
 #### Current Problem
-Eight k6 scripts exist (health, billing, auth-onboarding, webhooks, etc.) but 135 routes exist—many permission-gated org routes untested under load.
+Eight k6 scripts exist (health, billing, auth-onboarding, webhooks, etc.) but 135 routes exist—many permission-gated organization routes untested under load.
 
 #### Evidence
 [`src/tests/load/k6/scenarios/`](../../src/tests/load/k6/scenarios/) listing; [`docs/routes.txt`](../routes.txt) 135 routes.
@@ -712,7 +712,7 @@ Small
 | -------- | ------- | ------------ | ---------- |
 | **Duplicate Stripe webhook** | Stripe retries same `event.id` | Double subscription state | `tryClaimEvent` ledger + monotonic `last_stripe_event_created_at` |
 | **Queue explosion** | Webhook fan-out / mail backlog | Redis memory, slow workers | DLQ depth worker; rate limits; `removeOnComplete` limits in queue options |
-| **DB pool exhaustion** | Traffic spike + RLS txn per request | All org routes 503 | Tune `DATABASE_POOL_MAX`, scale replicas, shorten handlers |
+| **DB pool exhaustion** | Traffic spike + RLS txn per request | All organization routes 503 | Tune `DATABASE_POOL_MAX`, scale replicas, shorten handlers |
 | **Auth bypass** | Missing `requireOrganizationPermission` on new route | Cross-tenant data | Route catalog + `auth-enforcement` / expand tenant-isolation tests |
 | **Billing bug** | Out-of-order subscription events | Wrong plan/status | Monotonic migration functions; webhook service tests |
 | **Migration failure** | Unsafe DDL in prod | Downtime | `pnpm db:migrate:lint`; no destructive without flag |

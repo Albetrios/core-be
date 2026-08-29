@@ -172,7 +172,7 @@ describe('NotificationRepository (database)', () => {
   });
 
   it('findOrganizationPublicIdByOrganizationId resolves public id by internal id', async () => {
-    const user = await createTestUser({ email: 'notify-resolve-org@example.com' });
+    const user = await createTestUser({ email: 'notify-resolve-organization@example.com' });
     const organization = await createTestOrganization({ ownerUserId: user.id });
 
     const resolved = await repository.findOrganizationPublicIdByOrganizationId(organization.id);

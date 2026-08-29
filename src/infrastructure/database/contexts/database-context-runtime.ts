@@ -79,7 +79,7 @@ const FORCE_RLS_ALLOWED_KINDS: ReadonlySet<WorkerDatabaseContextKind> = new Set(
   'session_retention_cleanup',
   // The audit-outbox drain legitimately reads/writes FORCE RLS tables: audit.outbox (via the
   // app.audit_outbox_drain policies) and audit.logs / auth.users / organizations / api_keys, which
-  // it resolves under per-row org or app.global_admin context. RLS still scopes every row — listing
+  // it resolves under per-row organization or app.global_admin context. RLS still scopes every row — listing
   // the kind here only lets the (currently advisory) pinned-context assertion recognise the drain as
   // a valid FORCE-RLS accessor rather than rejecting it. Required now that audit.outbox is FORCE RLS.
   'audit_outbox_drain',
@@ -170,7 +170,7 @@ export function assertWorkerForceRlsTableAccess(tableRef: ForceRlsTableRef): voi
 /**
  * Builds an `organization`-kind {@link WorkerDatabaseContext} tagged with the tenant
  * public id — passed to {@link runWithWorkerDatabaseContext} by tenant-scoped
- * worker wrappers so RLS-bound jobs carry the org identity through ALS.
+ * worker wrappers so RLS-bound jobs carry the organization identity through ALS.
  */
 export function workerDatabaseContextForOrganization(
   organizationPublicId: string,

@@ -158,7 +158,7 @@ describe('SubscriptionService cancel / resume / changePlan guards', () => {
       undefined,
     );
     expect(paymentProvider.cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
-    // ...and the local row is set CANCELED, which releases the per-org subscription slot.
+    // ...and the local row is set CANCELED, which releases the per-organization subscription slot.
     expect(repository.update).toHaveBeenCalledWith(
       'sub_public',
       organization.id,
@@ -184,8 +184,8 @@ describe('SubscriptionService cancel / resume / changePlan guards', () => {
 
     await service.cancelActiveForOrganizationOffboarding('org_public');
 
-    // Immediate Stripe cancel (org is going away — stop billing now, not at period end)
-    // with a deterministic idempotency key so an org-delete retry dedups (audit L1).
+    // Immediate Stripe cancel (organization is going away — stop billing now, not at period end)
+    // with a deterministic idempotency key so an organization-delete retry dedups (audit L1).
     expect(paymentProvider.cancelSubscriptionImmediately).toHaveBeenCalledWith(
       'sub_provider',
       'sub-cancel-offboarding:org_public:sub_provider',

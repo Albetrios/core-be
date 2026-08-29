@@ -199,7 +199,7 @@ describe('MemberRoleService.update — sec-T3 is_system guard', () => {
     updated_at: now,
   };
 
-  const orgServiceForUpdate = {
+  const organizationServiceForUpdate = {
     requireOrganizationRecordByPublicId: vi.fn().mockResolvedValue(organization),
     resolveUserInternalIdByPublicId: vi.fn().mockResolvedValue(null),
   } as unknown as OrganizationService;
@@ -212,7 +212,7 @@ describe('MemberRoleService.update — sec-T3 is_system guard', () => {
   } as unknown as MemberRoleRepository;
 
   const updateService = new MemberRoleService(
-    orgServiceForUpdate,
+    organizationServiceForUpdate,
     roleRepoForUpdate,
     stubMemberRolePermissionRepository,
     stubAuthorizationService,
@@ -221,7 +221,7 @@ describe('MemberRoleService.update — sec-T3 is_system guard', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(orgServiceForUpdate.requireOrganizationRecordByPublicId).mockResolvedValue(
+    vi.mocked(organizationServiceForUpdate.requireOrganizationRecordByPublicId).mockResolvedValue(
       organization as never,
     );
   });

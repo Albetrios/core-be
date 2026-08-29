@@ -52,7 +52,7 @@ describe('Security: member name-sort resolver under FORCE RLS', () => {
     await cleanupDatabase();
   });
 
-  it('resolver returns name-ordered membership ids under org-only context, where a raw join is RLS-blocked to 0 rows', async () => {
+  it('resolver returns name-ordered membership ids under organization-only context, where a raw join is RLS-blocked to 0 rows', async () => {
     const owner = await createTestUser({
       email: 'sort-owner@example.com',
       firstName: 'Mallory',
@@ -174,7 +174,7 @@ describe('Security: member name-sort resolver under FORCE RLS', () => {
     });
   });
 
-  it('resolver is organization-scoped: it never returns another org’s membership', async () => {
+  it('resolver is organization-scoped: it never returns another organization’s membership', async () => {
     const shared = await createTestUser({
       email: 'sort-shared@example.com',
       firstName: 'Shared',
@@ -182,32 +182,36 @@ describe('Security: member name-sort resolver under FORCE RLS', () => {
     });
 
     const ownerA = await createTestUser({ email: 'sort-a@example.com' });
-    const orgA = await createTestOrganization({ ownerUserId: ownerA.id });
+    const organizationA = await createTestOrganization({ ownerUserId: ownerA.id });
     const roleA = await createRoleWithPermissions({
-      organizationId: orgA.id,
+      organizationId: organizationA.id,
       permissionCodes: [],
       createdByUserId: ownerA.id,
     });
     const membershipA = await createMembership({
       userId: shared.id,
-      organizationId: orgA.id,
+      organizationId: organizationA.id,
       roleId: roleA.id,
     });
 
     const ownerB = await createTestUser({ email: 'sort-b@example.com' });
-    const orgB = await createTestOrganization({ ownerUserId: ownerB.id });
+    const organizationB = await createTestOrganization({ ownerUserId: ownerB.id });
     const roleB = await createRoleWithPermissions({
-      organizationId: orgB.id,
+      organizationId: organizationB.id,
       permissionCodes: [],
       createdByUserId: ownerB.id,
     });
-    await createMembership({ userId: shared.id, organizationId: orgB.id, roleId: roleB.id });
+    await createMembership({
+      userId: shared.id,
+      organizationId: organizationB.id,
+      roleId: roleB.id,
+    });
 
-    await executeAsCoreBeAppTenant(orgA.public_id, async (transaction) => {
+    await executeAsCoreBeAppTenant(organizationA.public_id, async (transaction) => {
       const resolved = await transaction.execute(
-        drizzleSql`SELECT id, sort_value FROM tenancy.list_organization_membership_ids_by_name(${orgA.id}::bigint, ${'%shared%'}::text, ${false}::boolean, ${null}::text, ${null}::bigint, ${50}::int)`,
+        drizzleSql`SELECT id, sort_value FROM tenancy.list_organization_membership_ids_by_name(${organizationA.id}::bigint, ${'%shared%'}::text, ${false}::boolean, ${null}::text, ${null}::bigint, ${50}::int)`,
       );
-      // Only org A's membership for the shared user — org B's row for the same user is excluded.
+      // Only organization A's membership for the shared user — organization B's row for the same user is excluded.
       expect(orderedRowsFromResult(resolved).map((row) => row.id)).toEqual([membershipA.id]);
     });
   });

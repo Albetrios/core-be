@@ -17,7 +17,7 @@ vi.mock('@/infrastructure/database/contexts/database-context.js', async (importO
             )
           : callback({}),
     ),
-    // Arg-shift adapter: the org-branch spy keeps its (organizationPublicId, callback)
+    // Arg-shift adapter: the organization-branch spy keeps its (organizationPublicId, callback)
     // signature so the existing implementations and assertions stay valid.
     withAppDatabaseContext: vi.fn(
       (

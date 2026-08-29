@@ -131,9 +131,9 @@ describe('audit-retention.worker', () => {
   });
 
   /**
-   * The load-bearing assertion in this file. `audit.logs` is FORCE RLS with an org-scoped
+   * The load-bearing assertion in this file. `audit.logs` is FORCE RLS with an organization-scoped
    * isolation policy; without `app.global_retention_cleanup = true` the purge would see only the
-   * rows of whatever org context happened to be set — i.e. none — and every pass would silently
+   * rows of whatever organization context happened to be set — i.e. none — and every pass would silently
    * delete nothing while reporting success. The context wrapper is the only thing that makes a
    * global purge visible, and the handle it yields must be the one the job runs on.
    */

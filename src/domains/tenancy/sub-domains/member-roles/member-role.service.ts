@@ -173,7 +173,7 @@ export class MemberRoleService {
       // (which exist to grant scoped permissions to OTHER members) are meaningless there. Reject —
       // role management is a TEAM-organization feature.
       assertTeamOrganization(organization, 'ROLES');
-      // sec-r5-followup-ratelimit-dos-2 + audit-#8: serialize the per-org count + insert with a
+      // sec-r5-followup-ratelimit-dos-2 + audit-#8: serialize the per-organization count + insert with a
       // transaction-scoped advisory lock so concurrent creates cannot both pass the same count
       // and overshoot MEMBER_ROLE_MAX_PER_ORG. The lock auto-releases at commit.
       await this.memberRoleRepository.acquireCreationQuotaLock(organization.id);

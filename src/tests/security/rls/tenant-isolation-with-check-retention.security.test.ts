@@ -15,15 +15,15 @@ import {
 } from '@/tests/helpers/rls-matrix.helper.js';
 
 /**
- * audit H1: every org-scoped `_tenant_isolation` policy now declares an explicit
- * `WITH CHECK` pinned to the active-org GUC (migration
+ * audit H1: every organization-scoped `_tenant_isolation` policy now declares an explicit
+ * `WITH CHECK` pinned to the active-organization GUC (migration
  * `20260621020000_tenant_isolation_with_check_propagation`), while the `USING`
  * arm keeps the `app.global_retention_cleanup` bypass. Before this, the implicit
  * WITH CHECK reused the bypass-carrying USING, so a retention-context process
  * could INSERT/UPDATE a row under an arbitrary tenant. This proves, across a
  * representative set of the propagated tables, that:
  *   1. a retention-context write setting a foreign organization_id is rejected;
- *   2. a tenant-context cross-org reassignment is rejected (write confinement);
+ *   2. a tenant-context cross-organization reassignment is rejected (write confinement);
  *   3. retention DELETE still works via the USING bypass (positive control).
  */
 const ORG_SCOPED_TABLES = [
@@ -52,7 +52,7 @@ function flattenErrorChain(error: unknown): string {
   return parts.join(' | ');
 }
 
-describe('Security: tenant-isolation WITH CHECK propagation confines cross-org writes', () => {
+describe('Security: tenant-isolation WITH CHECK propagation confines cross-organization writes', () => {
   let fixture: RlsTenantFixture;
   let organizationAInternalId: number;
   let organizationBInternalId: number;
@@ -92,14 +92,14 @@ describe('Security: tenant-isolation WITH CHECK propagation confines cross-org w
 
       expect(
         caught,
-        `expected explicit WITH CHECK to reject a retention-context cross-org write on ${tableName}`,
+        `expected explicit WITH CHECK to reject a retention-context cross-organization write on ${tableName}`,
       ).toBeDefined();
       expect(flattenErrorChain(caught)).toMatch(/row-level security/i);
     },
   );
 
   it.each(ORG_SCOPED_TABLES)(
-    'rejects reassigning an org-B $tableName row to org A under the org-B tenant context',
+    'rejects reassigning an organization-B $tableName row to organization A under the organization-B tenant context',
     async ({ schemaName, tableName }) => {
       const rowIds = fixture.rowIdsByTable.get(tableKey(schemaName, tableName))!;
 
@@ -144,7 +144,7 @@ describe('Security: tenant-isolation WITH CHECK propagation confines cross-org w
     expect(deletedCount).toBe(1);
   });
 
-  it('allows a same-org reassignment under the matching tenant context (positive control)', async () => {
+  it('allows a same-organization reassignment under the matching tenant context (positive control)', async () => {
     const rowIds = fixture.rowIdsByTable.get(tableKey('tenancy', 'memberships'))!;
 
     const affected = await executeAsCoreBeAppTenant(

@@ -99,7 +99,7 @@ describe('personal organization provisioning (database)', () => {
       const stranger = await createTestUser();
       const { organization } = await provisionPersonalOrganization(member.id);
 
-      // The stranger has no membership in the member's personal org → undefined (→ 403).
+      // The stranger has no membership in the member's personal organization → undefined (→ 403).
       expect(
         await findUserActiveOrganizationPublicId(stranger.id, organization.public_id),
       ).toBeUndefined();
@@ -113,11 +113,11 @@ describe('personal organization provisioning (database)', () => {
       env.PERSONAL_ORGANIZATION_ENABLED = originalPersonalEnabled;
     });
 
-    it('provisions a personal org on demand when missing and personal is enabled', async () => {
+    it('provisions a personal organization on demand when missing and personal is enabled', async () => {
       env.PERSONAL_ORGANIZATION_ENABLED = true;
       const user = await createTestUser();
 
-      // Precondition: no personal org (signup-time provision failed/was skipped).
+      // Precondition: no personal organization (signup-time provision failed/was skipped).
       expect(await resolvePersonalOrganizationPublicId(user.id)).toBeUndefined();
 
       const ensured = await ensurePersonalOrganization(user.id);
@@ -128,7 +128,7 @@ describe('personal organization provisioning (database)', () => {
       expect(await resolvePersonalOrganizationPublicId(user.id)).toBe(ensured!.public_id);
     });
 
-    it('returns the existing personal org without creating a second one', async () => {
+    it('returns the existing personal organization without creating a second one', async () => {
       env.PERSONAL_ORGANIZATION_ENABLED = true;
       const user = await createTestUser();
       const { organization } = await provisionPersonalOrganization(user.id);
@@ -153,7 +153,7 @@ describe('personal organization provisioning (database)', () => {
       const user = await createTestUser();
 
       expect(await ensurePersonalOrganization(user.id)).toBeUndefined();
-      // No org created — switch-to-personal legitimately stays a 404.
+      // No organization created — switch-to-personal legitimately stays a 404.
       expect(await resolvePersonalOrganizationPublicId(user.id)).toBeUndefined();
     });
 
@@ -194,7 +194,7 @@ describe('personal organization provisioning (database)', () => {
 
       // provisioning FK-fails, but the read-safe variant swallows it → undefined (→ null id).
       await expect(ensurePersonalOrganizationPublicId(user.id)).resolves.toBeUndefined();
-      // No personal org was created (the provision genuinely failed).
+      // No personal organization was created (the provision genuinely failed).
       expect(await resolvePersonalOrganizationPublicId(user.id)).toBeUndefined();
     });
 

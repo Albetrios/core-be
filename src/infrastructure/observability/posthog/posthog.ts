@@ -66,7 +66,7 @@ export function isPostHogInitialized(): boolean {
  * @param params.distinctId Stable per-user identifier (e.g. user id).
  * @param params.event Event name (e.g. `subscription_activated`).
  * @param params.properties Optional event properties.
- * @param params.groups Optional group analytics keys (e.g. `{ organization: orgId }`).
+ * @param params.groups Optional group analytics keys (e.g. `{ organization: organizationId }`).
  */
 export function capturePostHogEvent(params: {
   distinctId: string;

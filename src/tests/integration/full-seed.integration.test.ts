@@ -70,7 +70,7 @@ describe('Full seed — integration', () => {
     await runFullSeed();
     const second = await resolveDemoSeed();
 
-    // Stable public ids across runs → the demo user + org were upserted, not re-created.
+    // Stable public ids across runs → the demo user + organization were upserted, not re-created.
     expect(second.user?.public_id).toBe(first.user?.public_id);
     expect(second.organization?.public_id).toBe(first.organization?.public_id);
 

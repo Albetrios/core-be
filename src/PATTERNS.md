@@ -15,7 +15,7 @@ Prevent cross-tenant data leaks. Every read and write performed under an organiz
 ### Where it lives
 
 - HTTP layer: [src/shared/middlewares/tenant/tenant.middleware.ts](src/shared/middlewares/tenant/tenant.middleware.ts) — reads `X-Organization-Id`, validates its format, and decorates `request.organizationId`. The **authoritative** active organization is the signed `org` JWT claim; routes carry no `{organization_id}` path segment.
-- Database layer: [src/infrastructure/database/contexts/database-context.ts](src/infrastructure/database/contexts/database-context.ts) — `withAppDatabaseContext(scope, …)` opens a Drizzle transaction and sets the identity GUCs (`app.current_organization_public_id` / `app.current_user_public_id`) from the token-minted principal scope in one `set_config` statement. RLS policies on org-scoped tables read those GUCs.
+- Database layer: [src/infrastructure/database/contexts/database-context.ts](src/infrastructure/database/contexts/database-context.ts) — `withAppDatabaseContext(scope, …)` opens a Drizzle transaction and sets the identity GUCs (`app.current_organization_public_id` / `app.current_user_public_id`) from the token-minted principal scope in one `set_config` statement. RLS policies on organization-scoped tables read those GUCs.
 - Worker layer: [src/infrastructure/queue/worker-runtime/worker-processor.util.ts](src/infrastructure/queue/worker-runtime/worker-processor.util.ts) — `runTenantScopedWorkerJob` requires `organizationPublicId` in the job payload and wraps the processor body in `withAppDatabaseContext` (with a job-minted principal scope) so RLS sees the same GUC the HTTP layer would have set.
 
 ### Implementation
@@ -31,9 +31,9 @@ sequenceDiagram
   Mw->>Mw: validate X-Organization-Id format
   Mw->>Svc: request.organizationId
   Svc->>Ctx: withAppDatabaseContext(scope, fn)
-  Ctx->>DB: BEGIN; SET LOCAL app.current_organization_public_id = orgId
+  Ctx->>DB: BEGIN; SET LOCAL app.current_organization_public_id = organizationId
   Ctx->>Svc: pinned databaseHandle (transaction)
-  Svc->>DB: SELECT/INSERT/UPDATE (RLS filters by org)
+  Svc->>DB: SELECT/INSERT/UPDATE (RLS filters by organization)
   Ctx->>DB: COMMIT
 ```
 
@@ -88,7 +88,7 @@ flowchart TD
     A[Mutating request] --> B{X-Idempotency-Key present?}
     B -- No, but required --> R[400 Validation error]
     B -- No, optional --> X[Pass through]
-    B -- Yes --> C[GET idempotency:user:org:method:path:key]
+    B -- Yes --> C[GET idempotency:user:organization:method:path:key]
     C -- hit completed --> D[Return cached status, body, headers]
     C -- hit in_flight --> E[409 conflict / wait]
     C -- miss --> F[SETNX placeholder TTL=60s]
@@ -148,8 +148,8 @@ Postgres Row-Level Security is the **defense-in-depth** layer for tenant isolati
 ### Implementation
 
 - HTTP requests get RLS via `tenant.middleware` + `organization-rls-transaction.middleware` opening a request-scoped transaction with `SET LOCAL app.current_organization_public_id = $1`.
-- Workers get RLS via `runTenantScopedWorkerJob` which **requires** `organizationPublicId` in the job payload and opens its own `withAppDatabaseContext` transaction (job-minted org scope). Workers are forbidden from importing `database-context-runtime.ts` (enforced by `worker-database-guard.unit.test.ts` and global tests).
-- Global-scope workers (cross-org sweeps) use `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, …)`, which sets a different GUC that RLS policies recognize as "global retention" — strictly limited to retention/cleanup operations.
+- Workers get RLS via `runTenantScopedWorkerJob` which **requires** `organizationPublicId` in the job payload and opens its own `withAppDatabaseContext` transaction (job-minted organization scope). Workers are forbidden from importing `database-context-runtime.ts` (enforced by `worker-database-guard.unit.test.ts` and global tests).
+- Global-scope workers (cross-organization sweeps) use `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, …)`, which sets a different GUC that RLS policies recognize as "global retention" — strictly limited to retention/cleanup operations.
 
 ### Each context grants only what a policy names
 
@@ -157,14 +157,14 @@ A context sets **one** GUC. It grants access only on tables whose policies test 
 
 | Context | GUC it sets | Grants on |
 | --- | --- | --- |
-| `withAppDatabaseContext` (org scope) | `app.current_organization_public_id` | tenant-scoped tables (`organizations_tenant_isolation` and the per-table `*_tenant_isolation` policies) |
+| `withAppDatabaseContext` (organization scope) | `app.current_organization_public_id` | tenant-scoped tables (`organizations_tenant_isolation` and the per-table `*_tenant_isolation` policies) |
 | `withAppDatabaseContext` (user scope) | `app.current_user_public_id` | user-owned rows — `auth.users`, `auth.auth_methods`, uploads/notifications, **and the tenancy discovery policies** (`organizations_user_discovery`, `memberships_user_self_discovery`) |
 | `MAINTENANCE_SCOPE.GLOBAL_ADMIN` | `app.global_admin` | **`auth.*` and `audit.logs` ONLY** |
 | `MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP` | `app.global_retention_cleanup` | retention-sweep tables only |
 
-**`app.global_admin` grants nothing on `tenancy.*`.** No tenancy policy carries that arm — the tenancy tables are reachable only through the active-org GUC or the user GUC. Reading `tenancy.organizations` / `tenancy.memberships` under the admin context returns zero rows; writing fails its `WITH CHECK`. This shipped to production three times (organization provisioning, active-org resolution at login, and the `OrganizationRepository` user-id resolvers) before being pinned by [no-global-admin-in-tenancy.global.test.ts](src/tests/global/no-global-admin-in-tenancy.global.test.ts) and [tenancy-global-admin-invisibility.security.test.ts](src/tests/security/rls/tenancy-global-admin-invisibility.security.test.ts).
+**`app.global_admin` grants nothing on `tenancy.*`.** No tenancy policy carries that arm — the tenancy tables are reachable only through the active-organization GUC or the user GUC. Reading `tenancy.organizations` / `tenancy.memberships` under the admin context returns zero rows; writing fails its `WITH CHECK`. This shipped to production three times (organization provisioning, active-organization resolution at login, and the `OrganizationRepository` user-id resolvers) before being pinned by [no-global-admin-in-tenancy.global.test.ts](src/tests/global/no-global-admin-in-tenancy.global.test.ts) and [tenancy-global-admin-invisibility.security.test.ts](src/tests/security/rls/tenancy-global-admin-invisibility.security.test.ts).
 
-To read `auth.users` from a context that is not the user's own (e.g. inside org context, or post-commit with no GUC), use an `auth.*` **SECURITY DEFINER** resolver — `auth.resolve_user_id_by_public_id`, `auth.resolve_user_by_internal_id`, `auth.resolve_user_public_ids_by_ids` — never a direct join.
+To read `auth.users` from a context that is not the user's own (e.g. inside organization context, or post-commit with no GUC), use an `auth.*` **SECURITY DEFINER** resolver — `auth.resolve_user_id_by_public_id`, `auth.resolve_user_by_internal_id`, `auth.resolve_user_public_ids_by_ids` — never a direct join.
 
 ### Connection-holding discipline
 

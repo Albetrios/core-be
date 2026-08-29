@@ -5,7 +5,7 @@ exposes. **Almost every reported "404 / missing feature" already exists — at a
 This doc is the client-integration checklist to realign the FE; it does not restate server internals.
 
 > Companions: [frontend-auth-guide.md](frontend-auth-guide.md) (Bearer/refresh/headers),
-> [route-consistency-and-org-model.md](route-consistency-and-org-model.md) (the org-type model
+> [route-consistency-and-organization-model.md](route-consistency-and-organization-model.md) (the organization-type model
 > and the 422 backstop), and the generated [route catalog](../../routes.txt) (every route, S/I/O columns).
 > All success bodies are wrapped in a `{ "data": … }` envelope.
 
@@ -78,12 +78,12 @@ Item shape: `{ id, type, title, message, data, action_url, action_label, is_read
 - `GET /users/me/notification-preferences` → `[{ notification_type, channel, is_enabled }]`
 - **`PUT`** `/users/me/notification-preferences` — full-set replace (the method is `PUT`, not `PATCH`)
 
-> Not to be confused with org-level **notification policies** at
-> `/tenancy/organization/notification-policies` — those are org defaults, gated by `notification-policy:*`.
+> Not to be confused with organization-level **notification policies** at
+> `/tenancy/organization/notification-policies` — those are organization defaults, gated by `notification-policy:*`.
 
 ### Webhooks (Integrations)
 
-Webhooks live in the **notify** domain (still org-scoped, enforced by `webhook:*` permissions — not the
+Webhooks live in the **notify** domain (still organization-scoped, enforced by `webhook:*` permissions — not the
 tenancy path the FE used):
 
 - `GET /notify/webhooks` (`webhook:read`), `POST /notify/webhooks` (`webhook:manage`, idempotency-key required)
@@ -152,15 +152,15 @@ rejected (`400`). The logo is an uploaded object, attached by key (same pattern 
 4. **`PUT /tenancy/organization/logo`** with `{ key }` (the `organization-logos/…` key) — requires `organization:update`
 5. `DELETE /tenancy/organization/logo` clears it
 
-### Billing — gate on org `type` + the permission (there is no capability object)
+### Billing — gate on organization `type` + the permission (there is no capability object)
 
-There is **no** `capabilities` object on the API. The org `type` says whether billing exists for the
-org kind at all (`TEAM` only — a `PERSONAL` org has no subscription); `my_permissions` says whether
+There is **no** `capabilities` object on the API. The organization `type` says whether billing exists for the
+organization kind at all (`TEAM` only — a `PERSONAL` organization has no subscription); `my_permissions` says whether
 *this* member may act. Gate the billing UI in two layers (mirrors backend enforcement — `422` for
 personal, `403` for missing perm):
 
-- **Show billing at all?** `active_organization.type === "TEAM"` (hide entirely for personal orgs).
+- **Show billing at all?** `active_organization.type === "TEAM"` (hide entirely for personal organizations).
 - **Enable manage actions?** `my_permissions.includes("subscription:manage")` (read-only with `subscription:read`).
 
 Both `active_organization.type` and `my_permissions` are already on `GET /auth/me/context` and the
-switch-org responses.
+switch-organization responses.

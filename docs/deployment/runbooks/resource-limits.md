@@ -141,8 +141,8 @@ Size the connection budget against Neon `max_connections` (see formula above).
 
 Org-scoped HTTP routes (`X-Organization-Id` set) hold **one pool checkout** for the full request via `organizationRlsTransactionMiddleware` (`BEGIN` + `SET LOCAL app.current_organization_public_id`). That keeps Postgres RLS policies aligned with the handler on a single connection.
 
-> **Throughput SLA (RLS ceiling).** Because each org-scoped request holds its connection for the
-> whole request, a single process sustains at most `DATABASE_POOL_MAX` concurrent org-scoped
+> **Throughput SLA (RLS ceiling).** Because each organization-scoped request holds its connection for the
+> whole request, a single process sustains at most `DATABASE_POOL_MAX` concurrent organization-scoped
 > requests. Steady-state RPS ≈ `DATABASE_POOL_MAX / avg_request_seconds` per process (e.g. 20 / 0.05s
 > ≈ 400 RPS). Beyond that, requests queue against `connect_timeout` and the 5s HTTP statement timeout
 > and surface as 504s. Scale by raising `DATABASE_POOL_MAX` (within the connection budget above) or
@@ -150,7 +150,7 @@ Org-scoped HTTP routes (`X-Organization-Id` set) hold **one pool checkout** for 
 
 | Concern                | Guidance                                                                                               |
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
-| Effective concurrency  | Treat **`DATABASE_POOL_MAX` as the per-process ceiling** for concurrent org-scoped requests            |
+| Effective concurrency  | Treat **`DATABASE_POOL_MAX` as the per-process ceiling** for concurrent organization-scoped requests            |
 | Workers                | Pass `organization_id` / `organizationPublicId` in queries — do not rely on session GUC                |
 | Billing tables         | PK / FK / RLS per table: [billing-database-schema.md](../../reference/data/billing-database-schema.md) |
 | System tables (no RLS) | [system-tables-without-tenant-rls.md](../../reference/security/system-tables-without-tenant-rls.md)    |
@@ -174,7 +174,7 @@ The API process polls every `DATABASE_POOL_ALERT_POLL_INTERVAL_MS` (default **5s
 
 | Variable                                | Default | Meaning                                                              |
 | --------------------------------------- | ------- | -------------------------------------------------------------------- |
-| `DATABASE_POOL_ACTIVE_WARN_RATIO`       | `0.8`   | Warn when in-process org RLS checkouts ≥ `DATABASE_POOL_MAX × ratio` |
+| `DATABASE_POOL_ACTIVE_WARN_RATIO`       | `0.8`   | Warn when in-process organization RLS checkouts ≥ `DATABASE_POOL_MAX × ratio` |
 | `DATABASE_POOL_ACTIVE_CRITICAL_RATIO`   | `0.95`  | Critical threshold for same signal                                   |
 | `DATABASE_POOL_CLUSTER_WARN_RATIO`      | `0.8`   | Warn when cluster active+waiting connections exceed budget × ratio   |
 | `DATABASE_POOL_CLUSTER_CRITICAL_RATIO`  | `0.95`  | Critical cluster threshold                                           |

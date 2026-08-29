@@ -18,6 +18,6 @@ Outbound webhook HTTP delivery: durable attempt records, BullMQ queue/worker, ci
 ## Key invariants
 
 - Delivery attempts are organization-scoped; workers pass `organizationPublicId` in job payloads.
-- The dashboard history read (`listByWebhook`) takes a `webhook_id` the controller already resolved for the active org (`getWebhookId(public_id, organization_id)`), and the `webhook_delivery_attempts_tenant_isolation` RLS policy backstops it — a foreign `webhook_id` returns zero rows, so no extra org predicate is needed on the page read.
+- The dashboard history read (`listByWebhook`) takes a `webhook_id` the controller already resolved for the active organization (`getWebhookId(public_id, organization_id)`), and the `webhook_delivery_attempts_tenant_isolation` RLS policy backstops it — a foreign `webhook_id` returns zero rows, so no extra organization predicate is needed on the page read.
 - SSRF protections and pinned DNS apply in the worker outbound fetch path.
 - Tombstone retention for old delivery rows stays on the parent `webhook/workers/` aggregate.

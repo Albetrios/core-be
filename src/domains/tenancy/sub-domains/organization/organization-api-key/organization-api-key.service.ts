@@ -125,7 +125,7 @@ export class OrganizationApiKeyService {
     return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
-      // sec-r5-followup-ratelimit-dos-1 + audit-#8: serialize the per-org count + insert with a
+      // sec-r5-followup-ratelimit-dos-1 + audit-#8: serialize the per-organization count + insert with a
       // transaction-scoped advisory lock so concurrent creates cannot both pass the same count
       // and overshoot ORGANIZATION_API_KEY_MAX_PER_ORG. The lock auto-releases at commit.
       await this.apiKeyRepository.acquireCreationQuotaLock(organization.id);
@@ -216,7 +216,7 @@ export class OrganizationApiKeyService {
       if (!hashCompare(candidate.key_hash, key_hash)) continue;
       if (candidate.expires_at && candidate.expires_at <= now) continue;
       // The resolver already returned the owning organization public id (FORCE RLS on
-      // tenancy.organizations means we cannot read it here without an org context). Establish that
+      // tenancy.organizations means we cannot read it here without an organization context). Establish that
       // context so the last_used_at touch passes the api_keys tenant-isolation policy.
       await withAppDatabaseContext(
         PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: candidate.organization_public_id }),

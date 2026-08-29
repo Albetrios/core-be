@@ -498,7 +498,7 @@ const envSchemaBase = z.object({
    * Max number of active (not deleted) custom roles allowed per organization
    * (sec-r5-followup-ratelimit-dos-2). Parity with `WEBHOOK_MAX_PER_ORG`. The
    * sec-r4-D4 `.limit(256)` on `findByRoleId` already caps the per-role
-   * permission read; this caps the per-org role count so a churning Admin
+   * permission read; this caps the per-organization role count so a churning Admin
    * cannot unbound the role table itself. Default 50 fits realistic RBAC
    * granularity (admin/editor/viewer + a few custom flavours).
    */
@@ -520,10 +520,10 @@ const envSchemaBase = z.object({
   /**
    * Max number of live pending (not accepted, not revoked, not expired) member invitations allowed
    * per organization. Parity with `WEBHOOK_MAX_PER_ORG`. Invitations are otherwise only seat-bounded,
-   * and a PERSONAL / free-tier org has no seat ceiling (null), so without this cap an Admin could
+   * and a PERSONAL / free-tier organization has no seat ceiling (null), so without this cap an Admin could
    * enqueue an unbounded backlog of outstanding invites — each sending an email (amplification) and
    * growing the table. Default 100 is a generous ceiling for real onboarding while bounding abuse;
-   * raise it deliberately for large orgs bulk-inviting more than 100 people at once.
+   * raise it deliberately for large organizations bulk-inviting more than 100 people at once.
    */
   INVITATION_MAX_PENDING_PER_ORG: z.coerce.number().int().min(1).max(1000).default(100),
   /**
@@ -641,9 +641,9 @@ const envSchemaBase = z.object({
   UPLOAD_MAX_PENDING_PER_USER: z.coerce.number().int().min(1).default(100),
   /**
    * Per-organization cap on concurrent PENDING uploads across ALL members
-   * (sec-UP4). Without this, a 200-member org sitting at the per-user cap
-   * could mint 20,000 in-flight uploads — ~200 GB per org at the 10 MB
-   * default limit. Default 2000 (4× expected 500-member org × 4 in-flight).
+   * (sec-UP4). Without this, a 200-member organization sitting at the per-user cap
+   * could mint 20,000 in-flight uploads — ~200 GB per organization at the 10 MB
+   * default limit. Default 2000 (4× expected 500-member organization × 4 in-flight).
    * The PENDING sweeper reconciles eventually.
    */
   UPLOAD_MAX_PENDING_PER_ORGANIZATION: z.coerce.number().int().min(1).max(100_000).default(2_000),
@@ -785,9 +785,9 @@ const envSchemaBase = z.object({
    * only. Mirrors the `HTTP vs WORKER` split already used for `statement_timeout`.
    */
   DATABASE_WORKER_LOCK_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(30_000),
-  /** Warn when in-process org RLS checkouts reach this fraction of DATABASE_POOL_MAX (default 0.8). */
+  /** Warn when in-process organization RLS checkouts reach this fraction of DATABASE_POOL_MAX (default 0.8). */
   DATABASE_POOL_ACTIVE_WARN_RATIO: z.coerce.number().min(0).max(1).default(0.8),
-  /** Critical alert when in-process org RLS checkouts reach this fraction of DATABASE_POOL_MAX (default 0.95). */
+  /** Critical alert when in-process organization RLS checkouts reach this fraction of DATABASE_POOL_MAX (default 0.95). */
   DATABASE_POOL_ACTIVE_CRITICAL_RATIO: z.coerce.number().min(0).max(1).default(0.95),
   /** Warn when cluster-wide active connections (pg_stat_activity) reach this fraction of allowed budget. */
   DATABASE_POOL_CLUSTER_WARN_RATIO: z.coerce.number().min(0).max(1).default(0.8),

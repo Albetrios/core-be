@@ -76,7 +76,7 @@ Lanes currently rolled up (**authoritative source: `quality-gate.needs` in pr-ci
 
 Post-merge Docker (Trivy + GHCR), SBOM, API docs, deploy, and release automation run from [post-merge-ci.yml](../../../.github/workflows/post-merge-ci.yml) when a PR merges (not required PR checks).
 
-> **`RLS security (non-superuser)` is the one DB-backed PR lane.** Every other PR-CI job is DB-less, but the RLS suite must run as the non-superuser `core_be_app` role against a real Postgres — the local/CI superuser is RLS-exempt and hides FORCE-RLS bugs (this is how the org-mandated-MFA bypass shipped). It is scoped to `src/tests/security/rls` to stay fast; the rest of `--project security` and the full DB integration and chaos suites remain post-merge / local-only (`pnpm test:integration`, `pnpm test:chaos`). It is gated the same as every other lane: `quality-gate` `needs: rls-security`, so a red RLS run fails `Quality gate` and blocks the merge (pinned by [`pr-rls-security-gate.policy.unit.test.ts`](../../../src/tests/unit/ci/pr-rls-security-gate.policy.unit.test.ts)).
+> **`RLS security (non-superuser)` is the one DB-backed PR lane.** Every other PR-CI job is DB-less, but the RLS suite must run as the non-superuser `core_be_app` role against a real Postgres — the local/CI superuser is RLS-exempt and hides FORCE-RLS bugs (this is how the organization-mandated-MFA bypass shipped). It is scoped to `src/tests/security/rls` to stay fast; the rest of `--project security` and the full DB integration and chaos suites remain post-merge / local-only (`pnpm test:integration`, `pnpm test:chaos`). It is gated the same as every other lane: `quality-gate` `needs: rls-security`, so a red RLS run fails `Quality gate` and blocks the merge (pinned by [`pr-rls-security-gate.policy.unit.test.ts`](../../../src/tests/unit/ci/pr-rls-security-gate.policy.unit.test.ts)).
 
 ### Advisory PR jobs (run but not in the aggregate)
 
@@ -168,7 +168,7 @@ The tool ([`tooling/setup/github/governance-mode.ts`](../../../tooling/setup/git
 
 ### To move to team mode
 
-1. Add owner(s) to [`.github/CODEOWNERS`](../../../.github/CODEOWNERS) so it lists **≥2 individual users** with write+ access. (Team handles like `@org/team` resolve only on **organization** repos — the `@core/dev` TODO in CODEOWNERS requires transferring the repo into an org first; a personal repo lists individual handles only.)
+1. Add owner(s) to [`.github/CODEOWNERS`](../../../.github/CODEOWNERS) so it lists **≥2 individual users** with write+ access. (Team handles like `@organization/team` resolve only on **organization** repos — the `@core/dev` TODO in CODEOWNERS requires transferring the repo into an organization first; a personal repo lists individual handles only.)
 2. Run `pnpm github:tool:governance-mode team` then `pnpm github:sync`.
 
 > **Invariant guard.** `pnpm github:tool:governance-mode:check` (and the unit test [`governance-mode.policy.unit.test.ts`](../../../src/tests/unit/ci/governance-mode.policy.unit.test.ts), which runs in the `unit` lane of `Quality gate`) fails if the two committed files ever drift into an inconsistent or deadlocking combination.
@@ -188,7 +188,7 @@ The tool ([`tooling/setup/github/governance-mode.ts`](../../../tooling/setup/git
 
 ## Apply rulesets via GitHub CLI (`gh`)
 
-Requires [`gh`](https://cli.github.com/) authenticated with **`repo`** scope (and organization permission if the repo belongs to an org).
+Requires [`gh`](https://cli.github.com/) authenticated with **`repo`** scope (and organization permission if the repo belongs to an organization).
 
 ### One-step init (recommended)
 
@@ -223,7 +223,7 @@ Repository rulesets on **private** repos require **GitHub Pro / Team / Enterpris
 
 > `Upgrade to GitHub Pro or make this repository public to enable this feature.`
 
-The sync script surfaces this message verbatim and exits non-zero. Either upgrade the account/org plan or make the repository public to apply rulesets.
+The sync script surfaces this message verbatim and exits non-zero. Either upgrade the account/organization plan or make the repository public to apply rulesets.
 
 **Verifying check names:** After at least one PR run, open the PR → **Checks** tab and confirm the two required contexts appear as the **bare strings** `Quality gate` and `Checks` — **not** a `PR CI / …` prefixed form. If GitHub shows a different label, align [`.github/rulesets/main.json`](../../../.github/rulesets/main.json) and this doc.
 

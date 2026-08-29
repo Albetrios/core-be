@@ -88,8 +88,8 @@ export async function createStripeCustomer(options: {
       operation: async () => {
         const stripe = getStripeClient();
         // A deterministic idempotency key prevents a retried subscription-create (which mints the
-        // customer when the org has none) from creating a SECOND Stripe customer if a prior
-        // attempt created the customer in Stripe but died before the local org row committed.
+        // customer when the organization has none) from creating a SECOND Stripe customer if a prior
+        // attempt created the customer in Stripe but died before the local organization row committed.
         return stripe.customers.create(
           omitUndefined({
             email: options.email,

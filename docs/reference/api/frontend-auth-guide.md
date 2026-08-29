@@ -10,7 +10,7 @@ frontend exactly what to do.
 > [csrf-and-session-cookies.md](../security/csrf-and-session-cookies.md); the organization model in
 > [personal-vs-team-organizations.md](../architecture/personal-vs-team-organizations.md).
 >
-> Realigning FE calls (passkeys, notifications, preferences, webhooks, MFA, sessions, org logo,
+> Realigning FE calls (passkeys, notifications, preferences, webhooks, MFA, sessions, organization logo,
 > billing gating) to the real routes: [frontend-endpoint-mapping.md](frontend-endpoint-mapping.md).
 
 ---
@@ -25,8 +25,8 @@ frontend exactly what to do.
 5. **Refresh on app boot** — the in-memory token is gone after a reload, but the `session_id` cookie
    survives, so a silent refresh logs the user back in.
 6. **The active organization is inside the token** (`org` claim). To change it, call a switch
-   endpoint and **replace the in-memory token** with the one it returns. There is no org header or
-   org path segment.
+   endpoint and **replace the in-memory token** with the one it returns. There is no organization header or
+   organization path segment.
 7. **Read the body envelope**: every success response is `{ "data": { … } }`, so the access token is
    `json.data.access_token`.
 
@@ -39,7 +39,7 @@ core-be splits one short-lived, JS-held **access token** from one long-lived, br
 
 | Credential | Where it lives | Lifetime | Sent how | Purpose |
 |------------|----------------|----------|----------|---------|
-| **Access token** (JWT, RS256) | JavaScript memory | ~15 min | `Authorization: Bearer` header | Authorizes every API call; carries the signed **`org`** claim (active organization) |
+| **Access token** (JWT, RS256) | JavaScript memory | ~15 min | `Authorization: Bearer` header | Authorizes every API call; carries the signed **`org`** claim (active organization; the compact key is intentional — JWT claim convention, rides on every request) |
 | **Refresh session** | `session_id` httpOnly cookie (path `/api/v1/auth`, `SameSite=Strict`) | days (default 7) | browser sends it automatically to `/auth/*` | Mints fresh access tokens via `POST /auth/refresh`; revocable server-side |
 | **CSRF token** | `csrf_token` cookie (readable by JS) | matches session | mirrored into `X-CSRF-Token` **only** for cookie-auth fallback | Double-submit defense on `/auth/refresh` when no `Origin` is sent |
 
@@ -71,7 +71,7 @@ flowchart LR
 | `X-Idempotency-Key: <uuid>` | `POST`/`PUT`/`PATCH` writes | **Required on 13 routes**, optional elsewhere | `422` if missing on a required route. See [Idempotency keys](#idempotency-keys). |
 | `X-Captcha-Token: <widget token>` | public auth forms | **Required only when Turnstile is configured** (production) | From the Cloudflare Turnstile widget. Routes: `login`, `mfa/login`, `email/send-code`, `password/forgot`, `password/reset`, `email/verify`, OAuth init. |
 | `X-CSRF-Token: <csrf_token cookie value>` | `POST /auth/refresh` **only**, **only if you don't send `Origin`** | Browsers: **not needed** | Browsers always send `Origin`, which satisfies the refresh origin check. This is a fallback for non-browser clients. |
-| `X-Organization-Id: <org_…>` | **upload domain routes only** | Upload only | The flat org-scoped routes **ignore** it (org comes from the token claim). Do **not** send it elsewhere. |
+| `X-Organization-Id: <org_…>` | **upload domain routes only** | Upload only | The flat organization-scoped routes **ignore** it (organization comes from the token claim). Do **not** send it elsewhere. |
 
 **Cookies — never touched by JS.** The browser stores and sends `session_id` (httpOnly) and
 `csrf_token` automatically, scoped to `/api/v1/auth`. Always call `fetch` with
@@ -120,8 +120,8 @@ To act in a different organization, **re-mint the token**:
 
 | Endpoint | Body | Auth | Result |
 |----------|------|------|--------|
-| `POST /auth/switch-to-organization` | `{ "organization_id": "org_…" }` | `Bearer` | `200` → new `access_token` scoped to that org. `403` if the caller isn't a member, `400` if the id is missing. |
-| `POST /auth/switch-to-personal` | none | `Bearer` | `200` → new `access_token` scoped to the caller's personal org. Cannot fail with `403`. |
+| `POST /auth/switch-to-organization` | `{ "organization_id": "org_…" }` | `Bearer` | `200` → new `access_token` scoped to that organization. `403` if the caller isn't a member, `400` if the id is missing. |
+| `POST /auth/switch-to-personal` | none | `Bearer` | `200` → new `access_token` scoped to the caller's personal organization. Cannot fail with `403`. |
 
 Switching re-binds the session to the new token, so **the previous access token immediately stops
 working** (hash drift). Always swap your in-memory token for the returned one. No new refresh cookie
@@ -142,21 +142,21 @@ is issued — the same `session_id` keeps working, and a later refresh re-mints 
 }
 ```
 
-- **`type` vs `my_permissions` — render on the intersection.** The org `type` says what the org **kind** allows (only a `TEAM` org can invite members); `my_permissions` is what **this caller** may do in the active org (resolved permission codes). Show a team-only action only when `type === 'TEAM'` **and** the caller holds the permission.
-- **`organizations`** is the org-switcher list, each flagged `is_active` — render it directly.
-- **Switch flow (one call):** `POST /auth/switch-to-organization` (or `…-personal`) re-mints the token **and returns the active-org delta** — `{ access_token, active_organization, my_permissions, global_role }`. Swap your in-memory Bearer for the new `access_token`, repaint from `active_organization` + `my_permissions`, and flip `is_active` in your cached `organizations[]`. The `user` and org-switcher list are stable across a switch, so **no follow-up `GET /auth/me/context` is needed** — re-fetch the full context only on a cold reload.
+- **`type` vs `my_permissions` — render on the intersection.** The organization `type` says what the organization **kind** allows (only a `TEAM` organization can invite members); `my_permissions` is what **this caller** may do in the active organization (resolved permission codes). Show a team-only action only when `type === 'TEAM'` **and** the caller holds the permission.
+- **`organizations`** is the organization-switcher list, each flagged `is_active` — render it directly.
+- **Switch flow (one call):** `POST /auth/switch-to-organization` (or `…-personal`) re-mints the token **and returns the active-organization delta** — `{ access_token, active_organization, my_permissions, global_role }`. Swap your in-memory Bearer for the new `access_token`, repaint from `active_organization` + `my_permissions`, and flip `is_active` in your cached `organizations[]`. The `user` and organization-switcher list are stable across a switch, so **no follow-up `GET /auth/me/context` is needed** — re-fetch the full context only on a cold reload.
 - **Join flow:** `POST /tenancy/invitations/{invitation_id}/accept` returns the joined `organization_id`; pass it straight to `POST /auth/switch-to-organization` (above) to land on the new team's dashboard — no lookup in between.
-  - **Invited user with no account (first time):** the invite already created a passwordless, unverified **placeholder** for that email, and `accept` requires a **verified** email (else `403 errors:invitationRequiresVerifiedEmail` — a forwarded invite must not be claimable by the wrong person). So the new user first authenticates in a way that proves email control: **email verification-code** (`/auth/email/send-code` → `/auth/email/login`) or **OAuth** both claim the placeholder, verify the email, and provision their personal org in one step. After that, the same `accept` → (`organization_id`) → `switch-to-organization` tail applies. Don't hard-block the UI when `is_email_verified` is false — route the user through the email-code login, then call `accept`.
+  - **Invited user with no account (first time):** the invite already created a passwordless, unverified **placeholder** for that email, and `accept` requires a **verified** email (else `403 errors:invitationRequiresVerifiedEmail` — a forwarded invite must not be claimable by the wrong person). So the new user first authenticates in a way that proves email control: **email verification-code** (`/auth/email/send-code` → `/auth/email/login`) or **OAuth** both claim the placeholder, verify the email, and provision their personal organization in one step. After that, the same `accept` → (`organization_id`) → `switch-to-organization` tail applies. Don't hard-block the UI when `is_email_verified` is false — route the user through the email-code login, then call `accept`.
 
-This works **identically for personal and team organizations** — there is one route surface, and the org `type` (not different URLs) tells the UI what to show. See [route-consistency-and-org-model.md](route-consistency-and-org-model.md).
+This works **identically for personal and team organizations** — there is one route surface, and the organization `type` (not different URLs) tells the UI what to show. See [route-consistency-and-organization-model.md](route-consistency-and-organization-model.md).
 
-`GET /users/me` (profile + deployment `capabilities`) and `GET /tenancy/organizations` (paginated org list) remain available if you need them individually.
+`GET /users/me` (profile + deployment `capabilities`) and `GET /tenancy/organizations` (paginated organization list) remain available if you need them individually.
 
-> The org-scoped resources are **flat**: `/api/v1/tenancy/organization` (singular — settings, logo,
+> The organization-scoped resources are **flat**: `/api/v1/tenancy/organization` (singular — settings, logo,
 > audit-logs, api-keys, notification-policies, memberships, roles, invitations live under it),
 > `/api/v1/billing/subscriptions`, `/api/v1/notify/webhooks`. Account-level routes that aren't tied
-> to one active org stay plural: `GET|POST /api/v1/tenancy/organizations`,
-> `GET /api/v1/tenancy/organizations/by-slug/{slug}`, and the cross-org invitation-accept action
+> to one active organization stay plural: `GET|POST /api/v1/tenancy/organizations`,
+> `GET /api/v1/tenancy/organizations/by-slug/{slug}`, and the cross-organization invitation-accept action
 > `POST /api/v1/tenancy/invitations/{invitation_id}/accept`.
 >
 > **Inviting is not a separate resource.** There is **no** `POST` or `GET /tenancy/organization/invitations`.
@@ -172,7 +172,7 @@ This works **identically for personal and team organizations** — there is one 
 
 ## Entry flows → how many calls to the dashboard
 
-Every way into the app converges on the same tail: **obtain an access token, then make one call — `GET /auth/me/context` ([above](#active-organization--switching)) — to paint the dashboard.** So "land on the dashboard" costs *(calls to obtain a token)* **+ 1**. The only exception is an org **switch**, which returns the active-org delta inline and needs no `/auth/me/context` follow-up.
+Every way into the app converges on the same tail: **obtain an access token, then make one call — `GET /auth/me/context` ([above](#active-organization--switching)) — to paint the dashboard.** So "land on the dashboard" costs *(calls to obtain a token)* **+ 1**. The only exception is an organization **switch**, which returns the active-organization delta inline and needs no `/auth/me/context` follow-up.
 
 ```mermaid
 sequenceDiagram
@@ -180,7 +180,7 @@ sequenceDiagram
   participant API as core-be
   Note over FE,API: step 1 — obtain an access token (any entry flow below)
   FE->>API: POST /auth/login  [or email verification-code login / oauth callback / passkey verify / refresh]
-  alt user has MFA, or org policy requires it
+  alt user has MFA, or organization policy requires it
     API-->>FE: 200 { mfa_required: true, mfa_session_token }
     FE->>API: POST /auth/mfa/login { mfa_session_token, totp_code }
   end
@@ -395,7 +395,7 @@ export interface OrganizationCapabilities {
 export interface Organization {
   id: string;                   // org_…
   name: string;
-  slug: string | null;          // null for a PERSONAL org
+  slug: string | null;          // null for a PERSONAL organization
   type: 'PERSONAL' | 'TEAM';
   status: string;
   logo_url: string | null;
@@ -421,19 +421,19 @@ export interface MeUser {
   created_at: string;
   updated_at: string;
   capabilities?: { personal_organizations: boolean; team_organizations: boolean };
-  personal_organization_id?: string | null;   // null when personal orgs are disabled (team-only deployment)
+  personal_organization_id?: string | null;   // null when personal organizations are disabled (team-only deployment)
 }
 // source: src/domains/auth/auth-me-context.types.ts → AuthMeContextOutput
 export interface MeContext {
   user: MeUser;
-  active_organization: Organization | null;             // the active org (may be an auto-provisioned personal org)
+  active_organization: Organization | null;             // the active organization (may be an auto-provisioned personal organization)
   my_permissions: string[];                              // e.g. ["organization:read", "membership:manage"]
   global_role: GlobalRole | null;                        // null for a standard user
-  organizations: Array<Organization & { is_active: boolean }>;   // org-switcher list
+  organizations: Array<Organization & { is_active: boolean }>;   // organization-switcher list
 }
 // Onboarding routing is driven by user.onboarding_completed, NOT by active_organization:
 // every fresh user (any deployment mode) is routed to /onboarding once — even personal
-// deployments, whose personal org is auto-provisioned at signup. The wizard finish calls
+// deployments, whose personal organization is auto-provisioned at signup. The wizard finish calls
 // POST /users/me/onboarding/complete (idempotent; empty body) to stamp the flag, then
 // re-reads /auth/me/context so the next resolve lands on the dashboard.
 // source: src/domains/auth/auth.serializer.ts → AuthSerializer.accessTokenWithActiveOrganization
@@ -553,7 +553,7 @@ export const landOnDashboard = {
   // 2 calls — silent refresh + /me/context; null when there is no live session
   resume: async (): Promise<MeContext | null> => (await bootstrap()) ? getMeContext() : null,
 
-  // invited teammate: accept → switch into the team → refresh context (the switcher list just gained an org).
+  // invited teammate: accept → switch into the team → refresh context (the switcher list just gained an organization).
   // Onboarding (email verification-code / OAuth) happens via one of the flows above before this runs.
   acceptInvitationAndEnter: async (invitationId: string, token: string): Promise<MeContext> => {
     const { organization_id } = await acceptInvitation(invitationId, token);
@@ -625,11 +625,11 @@ API on `localhost`:
 
 ---
 
-## Recent changes (active-org claim model)
+## Recent changes (active-organization claim model)
 
 The auth/tenancy flow was reshaped across mid-2026 — if you integrated against an older build, note:
 
-- **Active org moved from the URL/header into the token.** Org-scoped routes were **flattened**: the
+- **Active organization moved from the URL/header into the token.** Org-scoped routes were **flattened**: the
   per-organization path segment (`/organizations/{id}/…`) and the path parser were removed; the
   singular `/tenancy/organization` resource now sources the tenant from the signed **`org`** claim.
 - **Switch endpoints** `POST /auth/switch-to-personal` and `POST /auth/switch-to-organization` mint a
@@ -646,7 +646,7 @@ organization model and deployment modes.
 
 - [authentication.md](../security/authentication.md) — auth methods, rate limits, CAPTCHA boot guard
 - [csrf-and-session-cookies.md](../security/csrf-and-session-cookies.md) — cookie + CSRF posture, Origin checks
-- [personal-vs-team-organizations.md](../architecture/personal-vs-team-organizations.md) — org model, `org` claim, switching
+- [personal-vs-team-organizations.md](../architecture/personal-vs-team-organizations.md) — organization model, `org` claim, switching
 - [response-codes.md](response-codes.md) — method→status policy, error envelope
 - [idempotency.md](../reliability/idempotency.md) — idempotency-key semantics
 - [api-versioning.md](api-versioning.md) — `/api/v1`, deprecation headers

@@ -95,7 +95,7 @@ export class StripeWebhookService {
    * when the ledger transition was `claimed` or `reclaimed`. Returns the claim result.
    *
    * @remarks
-   * - **Algorithm:** claims the event id under {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)} (no org GUC),
+   * - **Algorithm:** claims the event id under {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)} (no organization GUC),
    *   then enqueues on `claimed`/`reclaimed`. `processed_duplicate` (already terminal) and
    *   `still_processing_within_lease` (an in-flight worker will finish) skip the enqueue and log.
    * - **Failure modes:** an enqueue failure propagates so the caller returns non-2xx and Stripe

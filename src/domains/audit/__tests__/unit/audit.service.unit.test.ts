@@ -151,7 +151,7 @@ describe('AuditService', () => {
       );
     });
 
-    it('R10: org-scoped rows reserve the outbox slot under organization RLS context', async () => {
+    it('R10: organization-scoped rows reserve the outbox slot under organization RLS context', async () => {
       await service.record({
         actorUserPublicId: 'user_public',
         action: 'tenancy.role.create',
@@ -187,7 +187,7 @@ describe('AuditService', () => {
     });
 
     it('does NOT swallow a DB INSERT failure — caller wrappers (recordAuditEvent) must handle it', async () => {
-      // The previous path swallowed DB errors silently inside the org DB context;
+      // The previous path swallowed DB errors silently inside the organization DB context;
       // the outbox path propagates so `recordAuditEvent` catches + logs, preserving the
       // "audit never fails the request" contract at the wrapper level (not the service).
       insertAuditOutboxRowMock.mockRejectedValueOnce(new Error('outbox-rls-rejected'));

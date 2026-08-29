@@ -110,11 +110,11 @@ export interface CreateInvitationForMembershipParams {
  *   {@link generateInvitationToken} produces a 64-char hex secret; only the SHA-256 hash from
  *   {@link hashInvitationToken} is persisted as `token_hash`. Org-scoped methods (resend/revoke)
  *   run inside {@link withAppDatabaseContext}; {@link MemberInvitationService.createForMembership}
- *   is called from within `MembershipService.create`'s existing org transaction (it does not open its
- *   own). The public accept route has no org context up front — it calls the SECURITY DEFINER lookup
- *   `lookupOrganizationByInvitationPublicId` to resolve the owning org, then wraps the UPDATE in
+ *   is called from within `MembershipService.create`'s existing organization transaction (it does not open its
+ *   own). The public accept route has no organization context up front — it calls the SECURITY DEFINER lookup
+ *   `lookupOrganizationByInvitationPublicId` to resolve the owning organization, then wraps the UPDATE in
  *   `withAppDatabaseContext`.
- * - **Failure modes:** `NotFoundError` for missing org/membership/invitation; `ValidationError`
+ * - **Failure modes:** `NotFoundError` for missing organization/membership/invitation; `ValidationError`
  *   (i18n keys `errors:validation.invalidToken`, `invitationRevoked`, `invitationAlreadyAccepted`,
  *   `invitationExpired`) for state/input violations; `ForbiddenError('errors:invitationRequiresVerifiedEmail')`
  *   when the accepting user's email is not verified; `ForbiddenError('errors:invitationEmailMismatch')`
@@ -125,7 +125,7 @@ export interface CreateInvitationForMembershipParams {
  *   table shows no ghost invitee. Emits {@link MEMBER_INVITATION_EVENT.CREATED} / `RESENT` on the
  *   in-process event bus (the invitation-email handler turns these into a mail-outbox row dispatched on
  *   commit). The raw token is delivered **only** through the email — never in any HTTP response. Issue
- *   and resend use `emitStrict` so a failed outbox write rolls back the surrounding org transaction,
+ *   and resend use `emitStrict` so a failed outbox write rolls back the surrounding organization transaction,
  *   making token issuance and email delivery atomic.
  * - **Notes:** invitations have mutually-exclusive terminal states (`accepted_at` vs `revoked_at`);
  *   resend regenerates the token and pushes `expires_at`.
@@ -146,7 +146,7 @@ export class MemberInvitationService {
    * - **Algorithm:** mints a single-use token, persists only its hash, and `emitStrict`s the CREATED
    *   mail event so the `token_hash` row and the secret-bearing outbox row commit atomically with the
    *   surrounding membership transaction.
-   * - **Failure modes:** propagates a failed outbox write (rolls back the org transaction).
+   * - **Failure modes:** propagates a failed outbox write (rolls back the organization transaction).
    * - **Side effects:** INSERTs `member_invitations`; enqueues the invitation email (raw token only via email).
    * - **Notes:** MUST be called inside the caller's `withAppDatabaseContext` (it does not open one).
    */
@@ -154,7 +154,7 @@ export class MemberInvitationService {
     params: CreateInvitationForMembershipParams,
   ): Promise<MemberInvitationOutput> {
     // Bound the organization's outstanding invitations (email-amplification / row-growth abuse).
-    // Runs inside MembershipService.create's org transaction, so the advisory lock serializes the
+    // Runs inside MembershipService.create's organization transaction, so the advisory lock serializes the
     // count + insert — two concurrent invites cannot both pass the same count and overshoot the cap.
     await this.invitationRepository.acquireCreationQuotaLock(params.organization_id);
     const pendingCount = await this.invitationRepository.countPendingByOrganization(
@@ -211,7 +211,7 @@ export class MemberInvitationService {
     }
     const actingUser = await this.userService.requireUserRecordByPublicId(actingUserPublicId);
     if (!actingUser) throw new NotFoundError('User');
-    // sec-T4 follow-up: require a VERIFIED email to join an org. magic-link / OAuth onboarding prove
+    // sec-T4 follow-up: require a VERIFIED email to join an organization. magic-link / OAuth onboarding prove
     // email control (and set is_email_verified); an email/password signup-claim of a pre-provisioned
     // invited account stays unverified until the emailed code is entered. Without this, someone merely
     // FORWARDED the invite email could claim the invited address via password signup and accept —
@@ -220,9 +220,9 @@ export class MemberInvitationService {
       throw new ForbiddenError('errors:invitationRequiresVerifiedEmail');
     }
     /**
-     * Public route: no org context up front. Resolve the owning org via the
+     * Public route: no organization context up front. Resolve the owning organization via the
      * SECURITY DEFINER lookup, then wrap the read + UPDATE in
-     * `withAppDatabaseContext` so RLS sees the org GUC.
+     * `withAppDatabaseContext` so RLS sees the organization GUC.
      */
     const lookup =
       await this.invitationRepository.lookupOrganizationByInvitationPublicId(invitation_public_id);
@@ -265,7 +265,7 @@ export class MemberInvitationService {
             activatedMembership.user_id,
           )) ?? null;
         // Item #10: notify the org's `membership:manage` holders that the invite was accepted.
-        // Recipients are resolved HERE (inside the org RLS context, minus the invitee) so the notify
+        // Recipients are resolved HERE (inside the organization RLS context, minus the invitee) so the notify
         // handler only fans out. Emitted via `emit` (which swallows handler errors) and wrapped so a
         // notification-path failure can NEVER roll back the accept.
         try {
@@ -369,7 +369,7 @@ export class MemberInvitationService {
       const output = serializeMemberInvitation(updated, membership.public_id);
 
       // R2: emitStrict so the rotated token_hash (already persisted above in this
-      // same org transaction) and the new outbox row commit atomically. The old
+      // same organization transaction) and the new outbox row commit atomically. The old
       // token was overwritten by `resend`, so a swallowed email failure would
       // otherwise leave the invitee with no working link and no error surfaced.
       await eventBus.emitStrict(

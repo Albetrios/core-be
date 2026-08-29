@@ -167,7 +167,7 @@ describe('Performance: billing list routes stay O(1) in cross-domain work', () =
     expect(elapsedMs).toBeLessThan(2_000);
   });
 
-  /** Team org with billing permissions holding `subscriptionCount` subscriptions. */
+  /** Team organization with billing permissions holding `subscriptionCount` subscriptions. */
   async function createListContext(subscriptionCount: number) {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });
@@ -176,7 +176,7 @@ describe('Performance: billing list routes stay O(1) in cross-domain work', () =
       await createTestSubscription({
         organizationId: organization.id,
         planId: plan.id,
-        // Only one subscription may be non-terminal per org (partial unique index), so the
+        // Only one subscription may be non-terminal per organization (partial unique index), so the
         // filler rows are CANCELED — they still exercise the join + per-row decoration.
         status: index === 0 ? 'ACTIVE' : 'CANCELED',
         providerSubscriptionId: null,

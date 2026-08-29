@@ -243,7 +243,7 @@ describe('Security: tenancy grant escalation (API-key scopes, role assignment, o
 
   describe('POST /tenancy/organizations cannot redirect ownership', () => {
     it('rejects an owner_user_id in the create body (strict DTO)', async () => {
-      // `auth-self-mutation`: the acting user is the only possible owner of a newly created org.
+      // `auth-self-mutation`: the acting user is the only possible owner of a newly created organization.
       // A body field that named someone else would let a caller plant an organization under another
       // user's account — the strict DTO is what prevents it, so the rejection is asserted here.
       const actor = await createTestUser();
@@ -279,16 +279,16 @@ describe('Security: tenancy grant escalation (API-key scopes, role assignment, o
       expect(created.statusCode).toBe(200);
       const organizationId = (created.json() as { data: { id: string } }).data.id;
 
-      // The creator is bootstrapped as owner: they can read the org through the org claim and
+      // The creator is bootstrapped as owner: they can read the organization through the organization claim and
       // exercise an owner-only operation (transfer-ownership reaches the owner check, not a 403).
-      const orgToken = await generateTestToken({
+      const organizationToken = await generateTestToken({
         userId: actor.public_id,
         organizationPublicId: organizationId,
       });
       const read = await injectAuthenticated(app, {
         method: 'GET',
         url: testApiPath('/tenancy/organization'),
-        token: orgToken,
+        token: organizationToken,
       });
       expect(read.statusCode).toBe(200);
       expect((read.json() as { data: { id: string } }).data.id).toBe(organizationId);

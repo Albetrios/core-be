@@ -50,8 +50,8 @@ export interface TwoOrganizationSubscriptionFixture {
 }
 
 /**
- * Seeds two organizations (A, B), two users (one owner per org), billing subscriptions in each org,
- * and grants subscription + upload permissions in the home org only.
+ * Seeds two organizations (A, B), two users (one owner per organization), billing subscriptions in each organization,
+ * and grants subscription + upload permissions in the home organization only.
  */
 export async function seedTwoOrganizationsWithSubscriptions(options?: {
   billingPermissionCodes?: string[];

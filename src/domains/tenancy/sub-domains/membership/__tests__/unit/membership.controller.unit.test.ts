@@ -145,14 +145,14 @@ describe('createMembershipController', () => {
   });
 
   it('rejects missing organization id on validated handlers with ForbiddenError', async () => {
-    // No organization_id path param and no auth.organizationPublicId claim → no org in scope.
+    // No organization_id path param and no auth.organizationPublicId claim → no organization in scope.
     await expect(
       controller.listMemberships(mockRequest({ params: {} }), mockReply()),
     ).rejects.toBeInstanceOf(ForbiddenError);
     await expect(
       controller.createMembership(mockRequest({ params: {}, body: {} }), mockReply()),
     ).rejects.toBeInstanceOf(ForbiddenError);
-    // Empty-string organization_id also resolves to "no org in scope".
+    // Empty-string organization_id also resolves to "no organization in scope".
     await expect(
       controller.createMembership(
         mockRequest({ params: { organization_id: '' }, body: {} }),
@@ -167,7 +167,7 @@ describe('createMembershipController', () => {
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('ignores org path params on validated handlers — the signed claim decides', async () => {
+  it('ignores organization path params on validated handlers — the signed claim decides', async () => {
     vi.mocked(service.list).mockClear();
     await controller.listMemberships(
       mockRequest({
@@ -231,7 +231,7 @@ describe('createMembershipController', () => {
     // forwarded to the service (which would then fail elsewhere with unbounded
     // cardinality on the observability path). sec-re-18 binds at the boundary so
     // the request is rejected before the service is reached. With no organization_id
-    // path param and no auth.organizationPublicId claim, the org is out of scope and
+    // path param and no auth.organizationPublicId claim, the organization is out of scope and
     // resolveActiveOrganizationId throws ForbiddenError.
     vi.mocked(service.update).mockClear();
     vi.mocked(service.delete).mockClear();
@@ -251,7 +251,7 @@ describe('createMembershipController', () => {
     expect(service.delete).not.toHaveBeenCalled();
   });
 
-  it('sec-re-18: every membership handler that takes path params rejects undefined params (no org in scope) with ForbiddenError', async () => {
+  it('sec-re-18: every membership handler that takes path params rejects undefined params (no organization in scope) with ForbiddenError', async () => {
     vi.mocked(service.getByPublicId).mockClear();
     vi.mocked(service.update).mockClear();
     vi.mocked(service.delete).mockClear();

@@ -91,7 +91,7 @@ describe('authorization.util', () => {
       expect(mockedResolvePermissions).not.toHaveBeenCalled();
     });
 
-    it('falls back to the token org claim when the route carries no path param', async () => {
+    it('falls back to the token organization claim when the route carries no path param', async () => {
       mockedResolvePermissions.mockResolvedValue(['membership:read']);
       const handler = requireOrganizationPermission('membership:read');
       await expect(
@@ -108,7 +108,7 @@ describe('authorization.util', () => {
           mockReply,
         ),
       ).resolves.toBeUndefined();
-      // Resolved against the claim org, not a path param.
+      // Resolved against the claim organization, not a path param.
       expect(mockedResolvePermissions).toHaveBeenCalledWith('user-1', 'org-from-claim');
     });
 
@@ -134,7 +134,7 @@ describe('authorization.util', () => {
 
     it('defensive fallback: rejects an API key when a legacy {organization_id} path param disagrees with the key org', async () => {
       // NOTE: post-flatten NO production route carries an `{organization_id}` path param, so this
-      // mismatch cannot occur in production — the key's org IS the active org. This exercises the
+      // mismatch cannot occur in production — the key's organization IS the active organization. This exercises the
       // belt-and-suspenders `params[paramName] ?? claim` fallback only; the mockRequest default
       // injects `params.organization_id: 'org-public'`, which differs from the key's `other-org`.
       const handler = requireOrganizationPermission('membership:read');
@@ -149,8 +149,8 @@ describe('authorization.util', () => {
       await expect(handler(request, mockReply)).rejects.toThrow(ForbiddenError);
     });
 
-    it('production path: an API key with no path param is scoped to its own claim org and passes when scoped', async () => {
-      // The real post-flatten shape: no `organization_id` path param, so the org resolves to the
+    it('production path: an API key with no path param is scoped to its own claim organization and passes when scoped', async () => {
+      // The real post-flatten shape: no `organization_id` path param, so the organization resolves to the
       // key's pinned `organizationPublicId` (the claim). A correctly-scoped key is authorized.
       const handler = requireOrganizationPermission('membership:read');
       const request = mockRequest({

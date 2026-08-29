@@ -70,16 +70,16 @@ export async function resolveDefaultActiveOrganizationPublicId(
 }
 
 /**
- * Confirm the user holds an ACTIVE membership in the given organization (and the org is
+ * Confirm the user holds an ACTIVE membership in the given organization (and the organization is
  * active/not-deleted), returning both the internal `id` and `public_id`. Runs under the caller's own
- * user RLS context (no org context at switch time) so the tenancy discovery policies match,
+ * user RLS context (no organization context at switch time) so the tenancy discovery policies match,
  * and the query is additionally constrained to the caller's own `user_id`.
  *
  * @remarks
  * - **Algorithm:** one indexed join (memberships → organizations) filtered to ACTIVE
- *   membership + active/non-deleted org matching `organizationPublicId`.
+ *   membership + active/non-deleted organization matching `organizationPublicId`.
  * - **Side effects:** none (read-only). Returns `undefined` when no such active
- *   membership exists (caller maps to 403, or falls back to a default org).
+ *   membership exists (caller maps to 403, or falls back to a default organization).
  */
 export async function findUserActiveOrganizationByPublicId(
   userInternalId: number,
@@ -95,10 +95,10 @@ export async function findUserActiveOrganizationByPublicId(
 }
 
 /**
- * Confirm the user holds an ACTIVE membership in the given organization (and the org is
+ * Confirm the user holds an ACTIVE membership in the given organization (and the organization is
  * active/not-deleted) — the membership gate for `switch-to-organization`. Returns the
- * org `public_id` when valid, otherwise `undefined` (caller maps to 403). Runs under the caller's own
- * user RLS context (no org context at switch time) so the tenancy discovery policies match,
+ * organization `public_id` when valid, otherwise `undefined` (caller maps to 403). Runs under the caller's own
+ * user RLS context (no organization context at switch time) so the tenancy discovery policies match,
  * and the query is additionally constrained to the caller's own `user_id`.
  */
 export async function findUserActiveOrganizationPublicId(
@@ -112,10 +112,10 @@ export async function findUserActiveOrganizationPublicId(
 /**
  * Refresh-time revalidation of the active organization persisted on a session
  * (audit-#3). Given the session's stored internal `organization_id`, confirm the
- * user still holds an ACTIVE membership in that active/non-deleted org and return
+ * user still holds an ACTIVE membership in that active/non-deleted organization and return
  * its `public_id`; otherwise `undefined` so the caller falls back to the default
  * active organization. Constrained to the caller's own `user_id` under that same
- * user RLS context (no org context at refresh time).
+ * user RLS context (no organization context at refresh time).
  */
 export async function findUserActiveOrganizationPublicIdByInternalId(
   userInternalId: number,
@@ -169,7 +169,7 @@ export async function resolvePersonalOrganization(
  *
  * @remarks
  * - **Idempotency:** `provisionPersonalOrganization` is guarded by the
- *   `idx_org_one_personal_per_owner` partial unique index (at most one personal org per
+ *   `idx_org_one_personal_per_owner` partial unique index (at most one personal organization per
  *   owner). A concurrent provision that loses the race raises a unique violation; we absorb it
  *   and re-resolve, so this function never creates a duplicate and never surfaces the race to
  *   the caller.
@@ -178,7 +178,7 @@ export async function resolvePersonalOrganization(
  *   {@link provisionPersonalOrganization}); the surrounding reads run under the caller's own
  *   user context, constrained to the caller's own `user_id`.
  * - **Side effects:** provisions one organization (+ owner role, permissions, membership)
- *   on the self-heal path; read-only when the personal org already exists or personal is
+ *   on the self-heal path; read-only when the personal organization already exists or personal is
  *   disabled.
  */
 export async function ensurePersonalOrganization(
@@ -220,7 +220,7 @@ export async function ensurePersonalOrganization(
  * (e.g. `getMe` → `personal_organization_id`). Attempts the on-demand provision, but if it
  * throws (a genuine provisioning failure — e.g. a missing reference row / transient DB error,
  * NOT a lost idempotency race, which {@link ensurePersonalOrganization} already absorbs) it
- * **degrades gracefully**: it logs and returns the pre-existing personal-org id, or
+ * **degrades gracefully**: it logs and returns the pre-existing personal-organization id, or
  * `undefined` when there is still none. This guarantees a read like `GET /users/me` returns
  * 200 with `personal_organization_id: null` rather than 500-ing on a self-heal hiccup; the
  * user simply retries and the next read (or `switch-to-personal`) heals them once the

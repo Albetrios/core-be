@@ -97,7 +97,7 @@ describe('dlq-replay.util', () => {
     });
   });
 
-  it('buildReplayJobPayload reconstructs a global notification with null org scope', () => {
+  it('buildReplayJobPayload reconstructs a global notification with null organization scope', () => {
     const notificationData: DeadLetterJobData = {
       original_queue: NOTIFICATION_QUEUE_NAME,
       original_job_id: 'notif-2',

@@ -24,8 +24,8 @@ Keep seed data domain-owned, idempotent, and in sync with schemas and **routes**
 
 All three share the contract and the per-domain seeders:
 
-- **`pnpm db:seed`** — minimal: bootstrap/reference data only (permission codes, plans). No users or orgs required for the app to start.
-- **`pnpm db:seed:full`** — fixed demo set: a small, coherent set of users/orgs/memberships and the cross-domain flows that exercise the API (demo, manual testing).
+- **`pnpm db:seed`** — minimal: bootstrap/reference data only (permission codes, plans). No users or organizations required for the app to start.
+- **`pnpm db:seed:full`** — fixed demo set: a small, coherent set of users/organizations/memberships and the cross-domain flows that exercise the API (demo, manual testing).
 - **`pnpm db:seed:bulk`** — scaled volume via the orchestrator and profiles, for load/pagination/filter testing and full demo tenants.
 
 ## Per-domain `seed/` directory
@@ -57,7 +57,7 @@ Canonical examples to copy: `src/domains/user/seed/` and `src/domains/tenancy/se
 - **`DomainSeedModule`** — `SeedContribution` + `name` + `dependsOn?` (cross-**domain** bulk ordering) + required `seedBulk`. Exported **only** by a top-level domain's `seed/index.ts`; the only unit the orchestrator registers.
 - **`composeContributions(...parts)`** — folds children up: runs each part's `seedReference` first, then each part's `seedBulk`. Used at every level (nested → sub-domain → domain).
 - **`SeedContext`** — `{ counts, faker, registry, logger }`, handed to every seeder.
-- **`SeedRegistry`** — cross-domain parents (orgs/users). The user/tenancy bulk seeders append (`addUser` / `addOrganization`); downstream domains read `registry.users` / `registry.organizations`.
+- **`SeedRegistry`** — cross-domain parents (organizations/users). The user/tenancy bulk seeders append (`addUser` / `addOrganization`); downstream domains read `registry.users` / `registry.organizations`.
 
 **Seed only your own tables.** A domain/sub-domain seeder writes only its own tables and reads parents from the registry. Cross-domain wiring lives only in the orchestrator/context — never inside a domain seeder (preserves "no cross-domain insert logic inside domains").
 

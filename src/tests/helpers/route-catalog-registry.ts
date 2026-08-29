@@ -5,7 +5,7 @@ export type RouteCatalogAccess =
   | 'public'
   | 'authenticated'
   | 'global-role'
-  | 'org-permission'
+  | 'organization-permission'
   | 'bearer-token';
 
 export type RouteEntry = {
@@ -34,7 +34,7 @@ function parseRouteCatalogLine(line: string): {
   const remainder = line.slice(methodMatch[0].length);
 
   // Path is the leading token. The optional S/I/O columns (success status,
-  // idempotency, org scope) and the access token that follow are matched
+  // idempotency, organization scope) and the access token that follow are matched
   // separately — access is end-anchored — so the middle columns are ignored and
   // both the legacy `PATH  ACCESS` and the columnar `PATH  S  I  O  ACCESS`
   // formats parse identically here.
@@ -58,7 +58,7 @@ function catalogAccessToRegistry(accessToken: string): RouteCatalogAccess {
   if (accessToken === 'AUTH') return 'authenticated';
   if (accessToken.startsWith('ROLE')) return 'global-role';
   if (accessToken.startsWith('TOKEN')) return 'bearer-token';
-  return 'org-permission';
+  return 'organization-permission';
 }
 
 /**
@@ -141,7 +141,7 @@ export function loadOrganizationPermissionRoutesFromCatalog(
       method: routeMatch.method,
       path: routeMatch.path,
       domain: currentDomain,
-      access: 'org-permission',
+      access: 'organization-permission',
       description: `${routeMatch.method} ${routeMatch.path}`,
       permissionCode,
     });

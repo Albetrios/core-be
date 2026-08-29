@@ -141,14 +141,14 @@ describe('createMemberRoleController', () => {
   });
 
   it('createRole rejects missing organization id when params omit id', async () => {
-    // No organization_id path param and no auth.organizationPublicId claim → no org in scope.
+    // No organization_id path param and no auth.organizationPublicId claim → no organization in scope.
     await expect(
       controller.createRole(mockRequest({ params: {}, body: { name: 'X' } }), mockReply()),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('rejects missing organization id on listRoles and createRole with ForbiddenError', async () => {
-    // Missing param or empty-string param → no org in scope.
+    // Missing param or empty-string param → no organization in scope.
     await expect(
       controller.listRoles(mockRequest({ params: {} }), mockReply()),
     ).rejects.toBeInstanceOf(ForbiddenError);
@@ -163,7 +163,7 @@ describe('createMemberRoleController', () => {
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('ignores org path params on listRoles and createRole — the signed claim decides', async () => {
+  it('ignores organization path params on listRoles and createRole — the signed claim decides', async () => {
     vi.mocked(service.list).mockClear();
     await controller.listRoles(
       mockRequest({
@@ -207,7 +207,7 @@ describe('createMemberRoleController', () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it('getRole ignores a malformed org path param — claim decides (sec-new-T3 superseded)', async () => {
+  it('getRole ignores a malformed organization path param — claim decides (sec-new-T3 superseded)', async () => {
     vi.mocked(service.getByPublicId).mockClear();
     await controller.getRole(
       mockRequest({
@@ -246,7 +246,7 @@ describe('createMemberRoleController', () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it('updateRole ignores a malformed org path param — claim decides (sec-new-T3 superseded)', async () => {
+  it('updateRole ignores a malformed organization path param — claim decides (sec-new-T3 superseded)', async () => {
     vi.mocked(service.update).mockClear();
     await controller.updateRole(
       mockRequest({

@@ -48,7 +48,7 @@ describe('scope shape contract (fixed key/value pairs from every doorway)', () =
     expect(scope.source).toBe('request');
   });
 
-  it('an org-less token attaches exactly the principal keys (org undefined)', () => {
+  it('an organization-less token attaches exactly the principal keys (organization undefined)', () => {
     const scope = attachedScope(userPrincipal);
     expect(sortedRuntimeKeys(scope)).toEqual(PRINCIPAL_KEYS);
     expect(scope.userPublicId).toBe(USER_PUBLIC_ID);

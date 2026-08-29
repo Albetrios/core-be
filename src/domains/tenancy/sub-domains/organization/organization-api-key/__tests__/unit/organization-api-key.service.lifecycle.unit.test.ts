@@ -59,9 +59,9 @@ function buildService() {
     findByPublicId: vi.fn().mockResolvedValue(KEY_ROW),
     // sec-r5-followup-ratelimit-dos-1: create() now consults this guard
     // before insert. Default to 0 so existing tests still reach the create
-    // path; the cap regression lives in `per-org-row-caps.unit.test.ts`.
+    // path; the cap regression lives in `per-organization-row-caps.unit.test.ts`.
     countActiveByOrganization: vi.fn().mockResolvedValue(0),
-    // audit-#8: per-org creation quota advisory lock (no-op in unit tests).
+    // audit-#8: per-organization creation quota advisory lock (no-op in unit tests).
     acquireCreationQuotaLock: vi.fn().mockResolvedValue(undefined),
     create: vi.fn().mockResolvedValue(KEY_ROW),
     update: vi.fn().mockResolvedValue({ ...KEY_ROW, name: 'Renamed' }),

@@ -29,7 +29,7 @@ describe('Security: Auth Enforcement', () => {
         method: method.toUpperCase() as 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
         url: path,
       });
-      // PERM routes may return 403 when auth middleware runs after missing org context in edge
+      // PERM routes may return 403 when auth middleware runs after missing organization context in edge
       // cases. `/auth/refresh` (TOKEN: session-cookie) also answers 403: the missing X-CSRF-Token
       // is refused before the missing session cookie would be — still an unauthenticated rejection.
       const expectedStatuses =

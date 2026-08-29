@@ -51,7 +51,7 @@ describe('withAppDatabaseContext', () => {
     expect(sqlText).toContain('app.current_organization_public_id');
   });
 
-  it('sets only the organization GUC for an org-only (API-key) scope', async () => {
+  it('sets only the organization GUC for an organization-only (API-key) scope', async () => {
     const scope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
     });
@@ -154,14 +154,14 @@ describe('withAppDatabaseContext', () => {
   });
 
   it('user-only scopes reuse ANY pinned handle and layer only the user GUC (FK atomicity)', async () => {
-    const orgScope = PRINCIPAL_SCOPE.REQUEST({
+    const organizationScope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
     });
     const userOnly = PRINCIPAL_SCOPE.VERIFIED({
       userPublicId: 'usr_a',
     });
 
-    await withAppDatabaseContext(orgScope, async (outerHandle) => {
+    await withAppDatabaseContext(organizationScope, async (outerHandle) => {
       mockExecute.mockClear();
       await withAppDatabaseContext(userOnly, async (innerHandle) => {
         // Same transaction handle — no second pool checkout, atomic with the outer trx.
@@ -170,30 +170,30 @@ describe('withAppDatabaseContext', () => {
       const sqlTexts = executedSqlTexts();
       expect(sqlTexts).toHaveLength(1);
       expect(sqlTexts[0]).toContain('app.current_user_public_id');
-      // The pinned session's org GUC is never rewritten by a user-only scope.
+      // The pinned session's organization GUC is never rewritten by a user-only scope.
       expect(sqlTexts[0]).not.toContain('app.current_organization_public_id');
     });
   });
 
-  it('an org-bearing scope for a DIFFERENT org opens its own transaction (second checkout)', async () => {
-    const orgScope = PRINCIPAL_SCOPE.REQUEST({
+  it('an organization-bearing scope for a DIFFERENT organization opens its own transaction (second checkout)', async () => {
+    const organizationScope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
     });
     const otherOrg = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_y',
     });
 
-    await withAppDatabaseContext(orgScope, async () => {
+    await withAppDatabaseContext(organizationScope, async () => {
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
       await withAppDatabaseContext(otherOrg, async () => {
-        // Cross-org nesting must NOT reuse — a fresh transaction takes a second checkout.
+        // Cross-organization nesting must NOT reuse — a fresh transaction takes a second checkout.
         expect(getActiveOrganizationRlsCheckoutCount()).toBe(2);
       });
       expect(getActiveOrganizationRlsCheckoutCount()).toBe(1);
     });
   });
 
-  it('counts one organization checkout for a fresh org-bearing scope and releases it', async () => {
+  it('counts one organization checkout for a fresh organization-bearing scope and releases it', async () => {
     const scope = PRINCIPAL_SCOPE.REQUEST({
       organizationPublicId: 'org_x',
     });

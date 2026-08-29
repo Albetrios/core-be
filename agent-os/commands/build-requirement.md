@@ -17,7 +17,7 @@ The user normally gives a direct task, not the whole form. Build the document fo
 
 ### Question catalog (ask only the unresolved items; ★ = never guess)
 
-- **Placement** — ★ domain (auth · user · tenancy · billing · notify · audit · upload · new) · ★ sub-domain (new · extend) · ★ tenancy (org-scoped/RLS · user-scoped · global)
+- **Placement** — ★ domain (auth · user · tenancy · billing · notify · audit · upload · new) · ★ sub-domain (new · extend) · ★ tenancy (organization-scoped/RLS · user-scoped · global)
 - **Data model** — ★ new tables? (yes · reuse) · ★ lifecycle (soft-delete · hard delete · immutable ledger) · columns (type/null/unique/FK/CHECK) · public-id prefix · indexes (AI proposes · specify)
 - **Public API** — ★ auth per route (public · authenticated · `org-permission:<code>` · global-role:admin) · endpoint shape (standard REST · custom) · pagination (cursor · offset · none) · ★ idempotency on writes (yes · no)
 - **Business logic** — cross-domain (none · read · write service `<X>`) · ★ async side effects (none · event · event + queue + worker) · caching / rate limits (default · custom)

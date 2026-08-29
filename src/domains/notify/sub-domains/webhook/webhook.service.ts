@@ -164,7 +164,7 @@ export class WebhookService {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       // sec-N4: enforce the per-organization webhook cap before insert. Race-
-      // audit-#8: serialize the per-org count + insert with a transaction-scoped advisory lock
+      // audit-#8: serialize the per-organization count + insert with a transaction-scoped advisory lock
       // so concurrent creates cannot both pass the same count and overshoot WEBHOOK_MAX_PER_ORG.
       // The lock auto-releases at commit.
       await this.webhookRepository.acquireCreationQuotaLock(organization.id);
@@ -362,7 +362,7 @@ export class WebhookService {
     payload: Record<string, unknown>,
     _requestId?: string,
   ): Promise<void> {
-    // sec-N4: defense-in-depth backstop — share the same per-org cap with create().
+    // sec-N4: defense-in-depth backstop — share the same per-organization cap with create().
     // If we ever load >= cap rows the create cap and runtime list have drifted
     // OR an operator just lifted the cap; surface the truncation so an alert
     // can fire (Sentry log warnings, ops dashboard).

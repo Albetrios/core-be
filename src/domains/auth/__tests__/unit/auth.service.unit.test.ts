@@ -376,7 +376,7 @@ describe('AuthService', () => {
     expect(authSessionService.refreshSessionCredentials).toHaveBeenCalled();
   });
 
-  it('AUTH-14: refreshToken preserves the session-selected org (re-validated) instead of resetting to default', async () => {
+  it('AUTH-14: refreshToken preserves the session-selected organization (re-validated) instead of resetting to default', async () => {
     const resolve = await import(
       '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
     );
@@ -397,7 +397,7 @@ describe('AuthService', () => {
       refreshSecret: 'refresh-secret',
     });
 
-    // The selected org is re-validated by internal id and reused for the token claim.
+    // The selected organization is re-validated by internal id and reused for the token claim.
     expect(resolve.findUserActiveOrganizationPublicIdByInternalId).toHaveBeenCalledWith(1, 42);
     expect(resolve.resolveDefaultActiveOrganizationPublicId).not.toHaveBeenCalled();
     expect(jwt.signAccessToken).toHaveBeenCalledWith(
@@ -405,7 +405,7 @@ describe('AuthService', () => {
     );
   });
 
-  it('AUTH-14: refreshToken falls back to the default org when the persisted org is no longer a valid membership', async () => {
+  it('AUTH-14: refreshToken falls back to the default organization when the persisted organization is no longer a valid membership', async () => {
     const resolve = await import(
       '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
     );
@@ -416,7 +416,7 @@ describe('AuthService', () => {
       expires_at: new Date(Date.now() + 86_400_000),
       is_revoked: false,
     } as never);
-    // Membership revoked / org deleted → re-validation returns undefined.
+    // Membership revoked / organization deleted → re-validation returns undefined.
     vi.mocked(resolve.findUserActiveOrganizationPublicIdByInternalId).mockResolvedValue(undefined);
     vi.mocked(resolve.resolveDefaultActiveOrganizationPublicId).mockResolvedValue('org_default');
 
@@ -428,7 +428,7 @@ describe('AuthService', () => {
     expect(resolve.resolveDefaultActiveOrganizationPublicId).toHaveBeenCalledWith(1);
   });
 
-  it('AUTH-15: switchToOrganization persists the selected org on the session for refresh to preserve', async () => {
+  it('AUTH-15: switchToOrganization persists the selected organization on the session for refresh to preserve', async () => {
     const resolve = await import(
       '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
     );
@@ -500,11 +500,11 @@ describe('AuthService', () => {
     expect(order).toEqual(['context:open', 'context:close', 'session:rebind']);
   });
 
-  it('switchToPersonal self-heals the personal org via ensurePersonalOrganization (no 404 when personal is enabled)', async () => {
+  it('switchToPersonal self-heals the personal organization via ensurePersonalOrganization (no 404 when personal is enabled)', async () => {
     const resolve = await import(
       '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
     );
-    // ensurePersonalOrganization provisions on demand → returns the (possibly just-created) org.
+    // ensurePersonalOrganization provisions on demand → returns the (possibly just-created) organization.
     vi.mocked(resolve.ensurePersonalOrganization).mockResolvedValue({
       id: 7,
       public_id: 'org_personal',

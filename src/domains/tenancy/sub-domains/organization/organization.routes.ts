@@ -115,7 +115,7 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.post(
       '/organizations',
       {
-        // sec-new-M1: add STRICT_AUTHED_RATE_LIMIT (10 req/60s per user) — org creation is a
+        // sec-new-M1: add STRICT_AUTHED_RATE_LIMIT (10 req/60s per user) — organization creation is a
         // high-value mutation (provisions DB rows, mints memberships, charges billing);
         // without a cap an authenticated user could flood the endpoint. Merge rateLimit
         // into the existing config object rather than spreading STRICT_AUTHED_RATE_LIMIT at
@@ -135,7 +135,7 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.patch(
       '/organization',
       {
-        // sec-r4-I2: organization-scoped mutation — cap per (org, actor) so a
+        // sec-r4-I2: organization-scoped mutation — cap per (organization, actor) so a
         // single member cannot churn organization metadata in a loop or starve
         // siblings, and a cross-tenant probe cannot exhaust the victim's bucket.
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
@@ -157,8 +157,8 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
         // sec-r4-I2: organization deletion is irreversible (cascades members,
         // subscriptions, audit logs, storage objects). Cap at the expensive-authed
         // tier (5 req / 5 min keyed by actor) so a hijacked session cannot bulk
-        // delete tenants. The keyGenerator is user-scoped (not org-scoped) since
-        // a delete burst targets multiple orgs by definition.
+        // delete tenants. The keyGenerator is user-scoped (not organization-scoped) since
+        // a delete burst targets multiple organizations by definition.
         ...EXPENSIVE_AUTHED_RATE_LIMIT,
         schema: {
           summary: 'Delete organization',
@@ -176,8 +176,8 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.put(
       '/organization/logo',
       {
-        // sec-r4-I2: logo upload writes to S3 and rewrites the org row; cap at
-        // the org-scoped tier so a hijacked session cannot mint unbounded
+        // sec-r4-I2: logo upload writes to S3 and rewrites the organization row; cap at
+        // the organization-scoped tier so a hijacked session cannot mint unbounded
         // storage objects for one tenant.
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         schema: {
@@ -195,8 +195,8 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.delete(
       '/organization/logo',
       {
-        // sec-r4-I2: same org-scoped tier as upload — each call deletes an S3
-        // object and rewrites the org row.
+        // sec-r4-I2: same organization-scoped tier as upload — each call deletes an S3
+        // object and rewrites the organization row.
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         onRequest: [app.authenticate],
         preHandler: [requireOrganizationPermission(TENANCY_PERMISSIONS.ORGANIZATION_UPDATE)],
@@ -245,7 +245,7 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.patch(
       '/organization/settings',
       {
-        // sec-r4-I2: org-scoped settings mutation — bound per (org, actor) so
+        // sec-r4-I2: organization-scoped settings mutation — bound per (organization, actor) so
         // policy churn or notification-config flapping cannot loop unbounded.
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         schema: {
@@ -294,10 +294,10 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.post(
       '/organization/api-keys',
       {
-        // sec-r5-ratelimit-dos-1: per (org, actor) cap on API key creation so a
+        // sec-r5-ratelimit-dos-1: per (organization, actor) cap on API key creation so a
         // single Admin role-holder (or a hijacked session for one) cannot churn
         // unbounded API key rows. Parity with sec-r4-I2 / sec-r4-I3 on every
-        // other org-scoped mutation.
+        // other organization-scoped mutation.
         config: { idempotencyRequired: true, ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT.config },
         schema: {
           summary: 'Create API key',
@@ -314,7 +314,7 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.patch<{ Params: { api_key_id: string } }>(
       '/organization/api-keys/:api_key_id',
       {
-        // R4: org-scoped admin mutation — cap per (org, actor).
+        // R4: organization-scoped admin mutation — cap per (organization, actor).
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         schema: {
           summary: 'Update API key',
@@ -331,7 +331,7 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.delete<{ Params: { api_key_id: string } }>(
       '/organization/api-keys/:api_key_id',
       {
-        // R4: org-scoped admin mutation — cap per (org, actor).
+        // R4: organization-scoped admin mutation — cap per (organization, actor).
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         onRequest: [app.authenticate],
         preHandler: [requireOrganizationPermission(TENANCY_PERMISSIONS.API_KEY_MANAGE)],
@@ -394,9 +394,9 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.post(
       '/organization/notification-policies',
       {
-        // sec-r5-ratelimit-dos-3: per (org, actor) cap on notification-policy
+        // sec-r5-ratelimit-dos-3: per (organization, actor) cap on notification-policy
         // creation. The `notification_type` field is free-form varchar(50)
-        // with no enum constraint and no per-org row cap, so without this
+        // with no enum constraint and no per-organization row cap, so without this
         // limiter an Admin-role-holder could churn policies and flap
         // downstream notification routing. Parity with sec-r4-I2.
         config: { idempotencyRequired: true, ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT.config },
@@ -415,7 +415,7 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.patch<{ Params: { notification_policy_id: string } }>(
       '/organization/notification-policies/:notification_policy_id',
       {
-        // R4: org-scoped admin mutation — cap per (org, actor).
+        // R4: organization-scoped admin mutation — cap per (organization, actor).
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         schema: {
           summary: 'Update notification policy',
@@ -433,7 +433,7 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
     zodApplication.delete<{ Params: { notification_policy_id: string } }>(
       '/organization/notification-policies/:notification_policy_id',
       {
-        // R4: org-scoped admin mutation — cap per (org, actor).
+        // R4: organization-scoped admin mutation — cap per (organization, actor).
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         onRequest: [app.authenticate],
         preHandler: [requireOrganizationPermission(TENANCY_PERMISSIONS.NOTIFICATION_POLICY_MANAGE)],

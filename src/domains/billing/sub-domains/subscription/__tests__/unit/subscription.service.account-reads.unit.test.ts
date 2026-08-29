@@ -115,7 +115,7 @@ describe('SubscriptionService.listInvoices — fail-open read', () => {
     expect(stripeMocks.listStripeInvoices).not.toHaveBeenCalled();
   });
 
-  it('returns the empty page when the org has no provider customer, EVEN with Stripe configured', async () => {
+  it('returns the empty page when the organization has no provider customer, EVEN with Stripe configured', async () => {
     stripeMocks.isStripeConfigured.mockReturnValue(true);
     const { service } = buildService({ activeSubscription: null });
 
@@ -199,7 +199,7 @@ describe('SubscriptionService.listPaymentMethods — fail-open read', () => {
 });
 
 describe('SubscriptionService.createPaymentMethodSetup — fail-closed write', () => {
-  it('refuses with 422 when the org has no provider customer (nothing to attach a card to)', async () => {
+  it('refuses with 422 when the organization has no provider customer (nothing to attach a card to)', async () => {
     const { service } = buildService({ activeSubscription: null });
 
     await expect(service.createPaymentMethodSetup(scope)).rejects.toBeInstanceOf(
@@ -228,7 +228,7 @@ describe('SubscriptionService.createPaymentMethodSetup — fail-closed write', (
       { idempotencyKey?: string },
     ];
     expect(customerId).toBe('cus_live');
-    // pm-setup namespace + org + client key — a raw client key forwarded verbatim could collide
+    // pm-setup namespace + organization + client key — a raw client key forwarded verbatim could collide
     // with the same key used on a different Stripe mutation.
     expect(options.idempotencyKey).toContain('pm-setup');
     expect(options.idempotencyKey).toContain('client-key-1');

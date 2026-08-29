@@ -6,7 +6,7 @@ Parent: [organization](../organization.overview.md)
 
 ## Purpose
 
-Read/write service for the per-organization settings row — default locale and the MFA-required flag — exposed under the active-org resource (`/tenancy/organization/settings`). Also provides two unscoped helpers consumed during authentication, before any tenant context exists.
+Read/write service for the per-organization settings row — default locale and the MFA-required flag — exposed under the active-organization resource (`/tenancy/organization/settings`). Also provides two unscoped helpers consumed during authentication, before any tenant context exists.
 
 ## Layout
 
@@ -20,4 +20,4 @@ Read/write service for the per-organization settings row — default locale and 
 ## Key invariants
 
 - PATCH semantics: only provided fields change (`omitUndefined` in the service); the settings row is lazily upserted on first write, so an organization without a row behaves as all-defaults.
-- `resolveDefaultLocaleForOrganization` (falls back to `'en'`) and `userHasOrganizationRequiringMfa` intentionally run **without** organization RLS context — they execute at login/i18n time before the tenant GUC is set; every other read/write is org-scoped.
+- `resolveDefaultLocaleForOrganization` (falls back to `'en'`) and `userHasOrganizationRequiringMfa` intentionally run **without** organization RLS context — they execute at login/i18n time before the tenant GUC is set; every other read/write is organization-scoped.

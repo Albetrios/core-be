@@ -11,13 +11,13 @@ An organization has an **immutable** `type`:
 - **`PERSONAL`** — a single-owner account workspace. No collaboration.
 - **`TEAM`** — a shareable, multi-member workspace.
 
-There is **one** set of routes for both. The API never forks into personal-only or team-only URLs, and there is no per-organization path segment — the active organization rides the signed `org` token claim, and org-scoped sub-resources hang off the singular `/api/v1/tenancy/organization` resource. Switch the active org with `POST /api/v1/auth/switch-to-personal` or `POST /api/v1/auth/switch-to-organization { organization_id }` (both re-mint the access token).
+There is **one** set of routes for both. The API never forks into personal-only or team-only URLs, and there is no per-organization path segment — the active organization rides the signed `org` token claim, and organization-scoped sub-resources hang off the singular `/api/v1/tenancy/organization` resource. Switch the active organization with `POST /api/v1/auth/switch-to-personal` or `POST /api/v1/auth/switch-to-organization { organization_id }` (both re-mint the access token).
 
 Nine routes are structurally unavailable to a personal organization. The API does **not** advertise them as a per-response object; clients derive availability from the organization `type`, and a centralized guard backstops every team-only route so a mis-targeted request is rejected consistently.
 
 ### 1.1 Deriving team-only availability from `type`
 
-Every serialized organization response — get, list, create, patch — carries the org `type`:
+Every serialized organization response — get, list, create, patch — carries the organization `type`:
 
 ```json
 {
@@ -29,8 +29,8 @@ Every serialized organization response — get, list, create, patch — carries 
 }
 ```
 
-- `type === 'TEAM'` ⇒ the nine team-only routes are available for the org; `type === 'PERSONAL'` ⇒ none are. This is a property of the org **type**, not the caller's permission — permissions and roles govern what the caller may do, separately.
-- A client gates a team-only action on **both**: `type === 'TEAM'` (the action exists for this org) **and** the caller holding the relevant permission (e.g. `subscription:manage`). Never probe for a 422 to discover availability.
+- `type === 'TEAM'` ⇒ the nine team-only routes are available for the organization; `type === 'PERSONAL'` ⇒ none are. This is a property of the organization **type**, not the caller's permission — permissions and roles govern what the caller may do, separately.
+- A client gates a team-only action on **both**: `type === 'TEAM'` (the action exists for this organization) **and** the caller holding the relevant permission (e.g. `subscription:manage`). Never probe for a 422 to discover availability.
 - There is no `capabilities` object on the response — it was a redundant projection of `type` and was removed. The personal-vs-team rule lives only in the server-side guard (§1.2).
 
 ### 1.2 The 9 team-only routes and the `assertTeamOrganization` backstop
@@ -47,7 +47,7 @@ Every serialized organization response — get, list, create, patch — carries 
 | Cancel subscription | `POST /api/v1/billing/subscriptions/{subscription_id}/cancel` | `BILLING` |
 | Resume subscription | `POST /api/v1/billing/subscriptions/{subscription_id}/resume` | `BILLING` |
 
-The single point of enforcement is `assertTeamOrganization(organization, capability)` (capability buckets `MEMBERS | ROLES | MUTATION | BILLING`). On a personal organization it throws `UnprocessableEntityError` → **HTTP 422** `unprocessable_entity`. Clients hide or disable these actions up front from the org `type` + the caller's permissions, so a well-behaved client never triggers the 422.
+The single point of enforcement is `assertTeamOrganization(organization, capability)` (capability buckets `MEMBERS | ROLES | MUTATION | BILLING`). On a personal organization it throws `UnprocessableEntityError` → **HTTP 422** `unprocessable_entity`. Clients hide or disable these actions up front from the organization `type` + the caller's permissions, so a well-behaved client never triggers the 422.
 
 ---
 
@@ -56,7 +56,7 @@ The single point of enforcement is `assertTeamOrganization(organization, capabil
 A personal organization rejected from a team-only capability returns **422 `unprocessable_entity`**, not 409.
 
 - **409** means *conflict with current state* — try again may succeed once the state changes (e.g. a duplicate slug is freed).
-- **422** means *the request is well-formed but its meaning is rejected* — and here the rejection is **permanent**: the org `type` is immutable, so an identical retry can **never** succeed.
+- **422** means *the request is well-formed but its meaning is rejected* — and here the rejection is **permanent**: the organization `type` is immutable, so an identical retry can **never** succeed.
 
 Returning 409 would invite clients to retry a request that is futile by construction. 422 tells the caller the request will never be accepted for this resource. This is the same rule documented under `409 vs 422` in [response-codes.md](response-codes.md) ("the target resource **type** makes the capability permanently unavailable"). These rejections were previously modeled as 409 and were moved to 422 for exactly this reason.
 
@@ -75,7 +75,7 @@ Returning 409 would invite clients to retry a request that is futile by construc
 | ------ | ------- | ------ |
 | **S** | Declared happy-path success status | `200` / `204` (uniform policy: 200 everywhere, 204 for DELETE) |
 | **I** | Idempotency | `req` = one of the 8 `idempotencyRequired` writes (`X-Idempotency-Key` required); `-` = optional key |
-| **O** | Org scope | `both` = works for personal **and** team orgs; `team` = team-only (422 on a personal org) |
+| **O** | Org scope | `both` = works for personal **and** team organizations; `team` = team-only (422 on a personal organization) |
 | **ACCESS** | Authorization | `PUBLIC` / `AUTH` / `ROLE: …` / `PERM: …` / `TOKEN` |
 
 ### 3.1 Auto-generated footer sections
@@ -87,11 +87,11 @@ Two footer sections are derived programmatically — never hand-curated:
 
 ### 3.2 The `O` column side-table and its gate
 
-The `S` and `I` columns are computed from the route registrations and the success-status registry. The `O` column is the one annotation backed by a hand-maintained map, [`tooling/openapi/route-catalog/route-org-scope.json`](../../../tooling/openapi/route-catalog/route-org-scope.json), and is kept honest by a CI gate:
+The `S` and `I` columns are computed from the route registrations and the success-status registry. The `O` column is the one annotation backed by a hand-maintained map, [`tooling/openapi/route-catalog/route-organization-scope.json`](../../../tooling/openapi/route-catalog/route-organization-scope.json), and is kept honest by a CI gate:
 
 | Gate | Keeps in sync |
 | ---- | ------------- |
-| `pnpm validate:route-org-scope` | the `O` column map (`route-org-scope.json`) ↔ `docs/routes.txt` |
+| `pnpm validate:route-organization-scope` | the `O` column map (`route-organization-scope.json`) ↔ `docs/routes.txt` |
 | `pnpm validate:route-success-statuses` | the `S` column (`route-success-statuses.json`) ↔ `docs/routes.txt` |
 | `pnpm validate:route-schema-docs` | every route declares a `schema` `summary` / `description` / `tags` block |
 
@@ -123,13 +123,13 @@ The old `/auth/mfa*` (non-login) paths now return **404** — there are no depre
 ## 5. Vocabulary notes
 
 - **Revoke invitation** — deleting an invitation is "revoke": `DELETE /api/v1/tenancy/organization/invitations/:invitation_id`.
-- **Audit logs naming (kept intentionally distinct):** `GET /api/v1/audit/logs` is **platform-admin** (global role); `GET /api/v1/tenancy/organization/audit-logs` is **org-scoped**. The two surfaces are deliberately named differently.
+- **Audit logs naming (kept intentionally distinct):** `GET /api/v1/audit/logs` is **platform-admin** (global role); `GET /api/v1/tenancy/organization/audit-logs` is **organization-scoped**. The two surfaces are deliberately named differently.
 
 ---
 
 ## Related
 
 - Method→status policy and the `409 vs 422` rule: [response-codes.md](response-codes.md)
-- Domain layout, the org-type model, and the active-org model: [domains-and-public-api-design.md](../architecture/domains-and-public-api-design.md)
+- Domain layout, the organization-type model, and the active-organization model: [domains-and-public-api-design.md](../architecture/domains-and-public-api-design.md)
 - Route catalog generator: `agent-os/skills/route-catalog/SKILL.md`
 - Header matrix and id conventions: `agent-os/skills/api-contract-guard/SKILL.md`

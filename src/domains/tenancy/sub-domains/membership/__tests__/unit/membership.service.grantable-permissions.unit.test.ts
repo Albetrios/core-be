@@ -42,7 +42,7 @@ import {
 } from '@/infrastructure/database/contexts/database-context.js';
 
 /**
- * Regression for the Critical org-takeover finding (T1).
+ * Regression for the Critical organization-takeover finding (T1).
  *
  * A `MEMBERSHIP_MANAGE` + `INVITATION_MANAGE` holder must not be able to mint an Admin (or
  * any other privileged-role) membership for a throwaway account that the caller does not

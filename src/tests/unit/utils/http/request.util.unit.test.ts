@@ -105,7 +105,7 @@ describe('request.util', () => {
       expect(resolveActiveOrganizationId(request)).toBe(pathOrg);
     });
 
-    it('falls back to the token org claim when the route carries no path param', () => {
+    it('falls back to the token organization claim when the route carries no path param', () => {
       const request = mockRequest({
         params: {} as Record<string, string>,
         auth: { ...userPrincipal, organizationPublicId: claimOrg },
@@ -135,7 +135,7 @@ describe('request.util', () => {
 
     it('throws ValidationError when the resolved organization id is malformed', () => {
       const request = mockRequest({
-        params: { organization_id: 'not-an-org-id' } as Record<string, string>,
+        params: { organization_id: 'not-an-organization-id' } as Record<string, string>,
         auth: userPrincipal,
       });
       expect(() => resolveActiveOrganizationId(request)).toThrow(ValidationError);
@@ -147,7 +147,7 @@ describe('principal scope narrowing accessors (over the middleware-attached scop
   const claimOrg = 'org_z9y8x7w6v5u4t3s2r1q0p';
 
   describe('requireOrganizationScope', () => {
-    it('narrows to the org-bearing scope for a user principal with an org claim', () => {
+    it('narrows to the organization-bearing scope for a user principal with an organization claim', () => {
       const request = mockRequest({ auth: { ...userPrincipal, organizationPublicId: claimOrg } });
       const scope = requireOrganizationScope(request);
       expect(scope.organizationPublicId).toBe(claimOrg);
@@ -155,7 +155,7 @@ describe('principal scope narrowing accessors (over the middleware-attached scop
       expect(scope.source).toBe('request');
     });
 
-    it('throws ForbiddenError for a stale token with no org claim (personal/team invariant)', () => {
+    it('throws ForbiddenError for a stale token with no organization claim (personal/team invariant)', () => {
       const request = mockRequest({ auth: userPrincipal });
       expect(() => requireOrganizationScope(request)).toThrow(ForbiddenError);
     });
@@ -180,7 +180,7 @@ describe('principal scope narrowing accessors (over the middleware-attached scop
       expect(scope.organizationPublicId).toBe(claimOrg);
     });
 
-    it('keeps the org optional for an org-less token (the /users/me self-heal state)', () => {
+    it('keeps the organization optional for an organization-less token (the /users/me self-heal state)', () => {
       const request = mockRequest({ auth: userPrincipal });
       const scope = requireUserScope(request);
       expect(scope.userPublicId).toBe(userPrincipal.userId);
