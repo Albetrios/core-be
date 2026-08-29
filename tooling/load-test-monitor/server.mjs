@@ -686,7 +686,7 @@ th .info .tip{right:-4px;text-transform:none}
         <div class="kpi"><div class="k">VUs<i class="info" tabindex="0" aria-label="What does VUs mean?"><span class="tip">Simulated users. Taken from the value the load script <b>announces</b> for itself, which is exact. If nothing announced a run it falls back to peak overlapping requests recovered from the recorded timings &mdash; an estimate, and one that <b>undercounts a ramp</b>, because users that start late never overlap the ones that already finished. An announced figure shows plain; an inferred one is marked <b>~</b>.</span></i></div><div class="v" id="k-vus">&mdash;</div></div>
         <div class="kpi"><div class="k">journeys<i class="info" tabindex="0" aria-label="What does journeys mean?"><span class="tip">Complete walks through the flow, counted from <code>/auth/email/send-code</code> &mdash; it fires exactly once per journey. <b>This is why call counts exceed your VU count:</b> in duration or ramp mode each user loops, so 100 users produce far more than 100 journeys.</span></i></div><div class="v" id="k-journeys">0</div></div>
 
-        <div class="kpi"><div class="k">calls / journey<i class="info" tabindex="0" aria-label="What does calls per journey mean?"><span class="tip">Recorded calls divided by journeys. The scenario has <b>16 steps</b>, so a healthy run sits near 16. Well below that means journeys are dying partway and never firing their later steps.</span></i></div><div class="v" id="k-perjourney">0</div></div>
+        <div class="kpi"><div class="k">calls / journey<i class="info" tabindex="0" aria-label="What does calls per journey mean?"><span class="tip">Recorded calls divided by journeys, shown against the step count the scenario <b>announced for itself</b> &mdash; not a fixed number, since scenarios here range from 19 to 64 steps. Well below the expected figure means journeys are dying partway and never firing their later steps. No expected figure and no warning appear when nothing announced the run.</span></i></div><div class="v" id="k-perjourney">0</div></div>
 
         <div class="kpi"><div class="k">total time<i class="info" tabindex="0" aria-label="What does total time mean?"><span class="tip"><b>Wall clock.</b> From the first recorded call starting to the last one finishing &mdash; how long the whole recorded session actually took.</span></i></div><div class="v" id="k-span">0<small>s</small></div></div>
 
@@ -768,14 +768,19 @@ function kpis(){
   document.getElementById('k-span').innerHTML=fmtDur(span);
   document.getElementById('k-apitime').innerHTML=fmtDur(apiTime);
 
-  // send-code fires exactly once per journey, so counting it counts journeys —
-  // and calls/journey shows at a glance whether journeys are finishing all 16 steps.
+  // send-code fires exactly once per journey, so counting it counts journeys — and calls/journey
+  // shows at a glance whether journeys are finishing every step or dying partway.
   const journeys=v.filter(c=>c.route.endsWith('/auth/email/send-code')).length;
   const per=journeys?(v.length/journeys):0;
   document.getElementById('k-journeys').textContent=journeys;
   const pj=document.getElementById('k-perjourney');
-  pj.textContent=journeys?per.toFixed(1):'0';
-  pj.className='v'+(journeys&&per<12?' warn':'');
+  // The expected count comes from the scenario itself (stepsPerJourney on /__monitor/run). It is
+  // NOT hardcoded: scenarios in this repo range from 19 to 64 steps, so any fixed number would be
+  // wrong for all but one of them. With nothing announced there is no baseline, so no warning is
+  // shown rather than one invented from a guess.
+  const expected=runMeta&&Number(runMeta.stepsPerJourney)>0?Number(runMeta.stepsPerJourney):null;
+  pj.textContent=journeys?(expected?per.toFixed(1)+' / '+expected:per.toFixed(1)):'0';
+  pj.className='v'+(journeys&&expected&&per<expected*0.8?' warn':'');
 }
 
 /** Same scaling as fmtDur but without markup — for table cells. */
@@ -842,17 +847,18 @@ function renderCommand(){
   const vus=Math.max(1,peak);
     // Nothing announced this run, so this came from timings — flag it as approximate.
     document.getElementById('k-vus').textContent='~'+vus;
-  // 16 calls per full journey — many more than that per journey means it looped.
-  const looped=journeys>0&&api.length/journeys>20;
-  const mode=looped?'DURATION=1m':'ITERATIONS=1';
-
-  el.innerHTML='<span class="p">$</span> <span class="e">BASE_URL=http://localhost:${PORT}</span> '+
-    '<span class="e">VUS='+vus+'</span> <span class="e">'+mode+'</span> \\\\\\n'+
-    '    k6 run src/tests/load/k6/scenarios/fe-login-to-org.js\\n'+
-    (journeys
-      ? '<span class="c"># '+journeys+' journey(s), '+api.length+' API call(s), peak concurrency '+vus+'</span>'
-      : '<span class="c"># '+api.length+' API call(s) recorded &mdash; no journey traffic yet</span>')+
-    (/k6/i.test(ua)?'':'\\n<span class="c"># note: current traffic is '+esc(ua.slice(0,40))+', not k6</span>');
+    // No command is reconstructed here on purpose. This branch only runs when nothing announced
+    // itself to POST /__monitor/run, so the scenario, its flags and its step count are all unknown
+    // and the board would have to invent them. It used to: one hardcoded scenario path plus an
+    // ITERATIONS=1 / DURATION=1m flag no scenario actually reads — a line that could not reproduce
+    // the run and named the wrong file for every scenario but one. Recorded facts only.
+    el.innerHTML=
+      '<span class="c"># no run announced &mdash; showing what was recorded</span>\\n'+
+      (journeys
+        ? '<span class="c"># '+journeys+' journey(s), '+api.length+' API call(s), peak concurrency '+vus+'</span>'
+        : '<span class="c"># '+api.length+' API call(s) recorded &mdash; no journey traffic yet</span>')+
+      '\\n<span class="c"># a scenario that POSTs /__monitor/run reports its own exact command here</span>'+
+      (/k6/i.test(ua)?'':'\\n<span class="c"># note: current traffic is '+esc(ua.slice(0,40))+', not k6</span>');
 }
 
 function rowHTML(c){
