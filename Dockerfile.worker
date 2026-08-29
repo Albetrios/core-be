@@ -62,7 +62,14 @@ ENV NODE_ENV=production
 # install: the pinned alpine base ships a stale cached index, so a bare `apk upgrade`
 # can miss already-fixed CVEs (e.g. openssl CVE-2026-45447). `apk update` pulls the
 # current index first so the upgrade picks up the patched packages.
-RUN apk update && apk upgrade --no-cache
+#
+# SECURITY_PATCH_EPOCH cache-busts THIS layer only (issue #1119): with the gha
+# layer cache, an unchanged RUN line is reused forever, so patches published
+# AFTER the layer was first cached (e.g. openssl CVE-2026-14456, fixed upstream
+# hours before alpine shipped 3.5.8-r0) never install and Trivy keeps failing.
+# The workflow passes the run id, so every build re-runs the upgrade (~seconds).
+ARG SECURITY_PATCH_EPOCH=0
+RUN echo "security-patch-epoch: ${SECURITY_PATCH_EPOCH}" && apk update && apk upgrade --no-cache
 
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 

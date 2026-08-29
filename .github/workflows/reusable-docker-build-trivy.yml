@@ -114,6 +114,7 @@ jobs:
           load: true
           tags: ${{ env.DOCKER_LOCAL_API_TAG }}:ci
           build-args: |
+            SECURITY_PATCH_EPOCH=${{ github.run_id }}
             GENERATE_MCP_DOCS=true
             BUILD_REVISION=${{ env.MERGE_COMMIT_SHA }}
             IMAGE_SOURCE=${{ github.server_url }}/${{ github.repository }}
@@ -128,6 +129,7 @@ jobs:
           load: true
           tags: ${{ env.WORKER_IMAGE }}:ci
           build-args: |
+            SECURITY_PATCH_EPOCH=${{ github.run_id }}
             BUILD_REVISION=${{ env.MERGE_COMMIT_SHA }}
             IMAGE_SOURCE=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha,scope=${{ env.GHCR_CACHE_SCOPE_WORKER }}
