@@ -60,7 +60,7 @@ describe('AuditRepository (database)', () => {
   });
 
   it('findWithFilters supports organization_id and unfiltered pagination', async () => {
-    const actor = await createTestUser({ email: 'audit-org@example.com' });
+    const actor = await createTestUser({ email: 'audit-organization@example.com' });
     const organization = await createTestOrganization({ ownerUserId: actor.id });
 
     await repository.insert({

@@ -27,6 +27,7 @@ import {
   setOauthNonceCookie,
   setSessionCookie,
 } from '@/domains/auth/auth.http.util.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 /**
  * `auth.http.util.ts` owns the entire CSRF + session-cookie surface described in
@@ -54,7 +55,12 @@ function mockReply(): FastifyReply {
 }
 
 function mockRequest(overrides: Record<string, unknown> = {}): FastifyRequest {
-  return { headers: {}, cookies: {}, ip: '203.0.113.7', ...overrides } as unknown as FastifyRequest;
+  return attachPrincipalScope({
+    headers: {},
+    cookies: {},
+    ip: '203.0.113.7',
+    ...overrides,
+  }) as unknown as FastifyRequest;
 }
 
 describe('auth.http.util — session cookie options', () => {

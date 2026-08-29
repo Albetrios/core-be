@@ -6,7 +6,7 @@ import type { Faker } from '@faker-js/faker';
 
 /** Generated content for one `tenancy.organization_settings` row. */
 export interface BulkOrganizationSettingsProfile {
-  /** Whether org-wide email notifications are enabled. */
+  /** Whether organization-wide email notifications are enabled. */
   is_email_notifications_enabled: boolean;
   /** Default UI locale; constrained to `en`/`es` by check constraint. */
   default_locale: string;

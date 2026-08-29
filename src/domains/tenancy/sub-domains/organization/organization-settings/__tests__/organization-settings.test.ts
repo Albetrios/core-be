@@ -199,7 +199,7 @@ describe('Tenancy Organization Settings Sub-Domain — Integration', () => {
     });
 
     // audit #11: security_policy is MERGED, not whole-object replaced — so a second PATCH editing a
-    // different key cannot silently revert the first (e.g. an admin enabling org-mandated MFA).
+    // different key cannot silently revert the first (e.g. an admin enabling organization-mandated MFA).
     it('merges security_policy keys across sequential PATCHes (no lost update)', async () => {
       const { token } = await createAuthorizedOrganizationContext([
         TENANCY_PERMISSIONS.ORGANIZATION_READ,

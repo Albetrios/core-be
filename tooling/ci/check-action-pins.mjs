@@ -60,7 +60,7 @@ if (violations.length > 0) {
   for (const violation of violations) {
     console.error(`  - ${violation}`);
   }
-  console.error('\nPin actions with: uses: org/repo@<40-char-sha> # vX.Y.Z');
+  console.error('\nPin actions with: uses: organization/repo@<40-char-sha> # vX.Y.Z');
   process.exit(1);
 }
 

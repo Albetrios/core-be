@@ -105,7 +105,9 @@ describe('Organization Sub-Domain — Integration', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const ids = (response.json() as { data: { id: string }[] }).data.map((org) => org.id);
+      const ids = (response.json() as { data: { id: string }[] }).data.map(
+        (organization) => organization.id,
+      );
       expect(ids).toContain(ownedOrg.public_id);
       expect(ids).toContain(memberOrg.public_id);
     });
@@ -145,7 +147,7 @@ describe('Organization Sub-Domain — Integration', () => {
       // One admin who owns two organizations races both to the SAME previously-unused slug.
       // With flat routes each request targets the active organization carried in its token
       // claim, so we mint a per-organization token for the same user. Both requests pass the
-      // findBySlug pre-check (neither org holds it yet), so the loser hits the
+      // findBySlug pre-check (neither organization holds it yet), so the loser hits the
       // idx_organizations_slug unique index — which must map to 409, never a 500.
       const user = await createTestUser();
       const [organizationA, organizationB] = await Promise.all([
@@ -177,7 +179,7 @@ describe('Organization Sub-Domain — Integration', () => {
         }),
       ]);
 
-      const sharedSlug = 'race-shared-org-slug';
+      const sharedSlug = 'race-shared-organization-slug';
       const patchSlug = (token: string) =>
         injectAuthenticated(app, {
           method: 'PATCH',

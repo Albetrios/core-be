@@ -17,9 +17,9 @@ vi.mock('@/shared/utils/security/jwt.util.js', () => ({
   signAccessToken: vi.fn().mockReturnValue('access-token'),
 }));
 
-// H1: the MFA login path now bakes the active-org `org` claim into the token (mirroring the
+// H1: the MFA login path now bakes the active-organization `org` claim into the token (mirroring the
 // first-factor path). Mock the resolver — without this the unit lane (no Postgres) would hit a
-// real DB call. The verifyLoginMfa test below asserts the resolved org reaches signAccessToken.
+// real DB call. The verifyLoginMfa test below asserts the resolved organization reaches signAccessToken.
 vi.mock('@/domains/tenancy/sub-domains/organization/resolve-active-organization.js', () => ({
   resolveDefaultActiveOrganizationPublicId: vi.fn().mockResolvedValue('org_mfaactive0000000000'),
 }));
@@ -58,11 +58,21 @@ vi.mock('@/shared/utils/security/field-secret-encryption.util.js', () => ({
   decryptFieldSecret: (value: string) => value,
 }));
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = {
   id: 1,
@@ -136,9 +146,9 @@ describe('MfaService', () => {
     // The handler audits recovery-code use distinctly, so the factor must be surfaced.
     expect(result.factor).toBe('totp');
     expect(authSessionService.createSessionForUser).toHaveBeenCalled();
-    // H1 regression guard: the MFA-login token MUST carry the active-org `org` claim, exactly like
-    // the first-factor path. Without it an MFA user gets an org-less token and is locked out of
-    // every org-scoped route (which resolve the active org from the claim post-flatten).
+    // H1 regression guard: the MFA-login token MUST carry the active-organization `org` claim, exactly like
+    // the first-factor path. Without it an MFA user gets an organization-less token and is locked out of
+    // every organization-scoped route (which resolve the active organization from the claim post-flatten).
     expect(vi.mocked(signAccessToken)).toHaveBeenCalledWith(
       expect.objectContaining({ organizationPublicId: 'org_mfaactive0000000000' }),
     );
@@ -349,8 +359,8 @@ describe('MfaService', () => {
     redis.getdel.mockResolvedValueOnce('TESTSECRET');
 
     // Track call order: createAuthMethodRecord → insertMfaRecoveryCodes → updateMfaEnabled
-    // must all happen inside the withUserDatabaseContext callback (same transaction).
-    // sec-re-06: the prior code called updateMfaEnabled AFTER withUserDatabaseContext
+    // must all happen inside the withAppDatabaseContext (user scope) callback (same transaction).
+    // sec-re-06: the prior code called updateMfaEnabled AFTER withAppDatabaseContext (user scope)
     // returned, on a separate connection; a crash between commit and the flip left the
     // user with valid TOTP + codes but is_mfa_enabled=false, bypassing MFA at login.
     const callOrder: string[] = [];
@@ -604,17 +614,17 @@ describe('MfaService', () => {
     );
   });
 
-  it('sec-new-A4: updateMfaEnabled is called inside the withUserDatabaseContext transaction (no TOCTOU window)', async () => {
-    // Regression: the previous code called updateMfaEnabled AFTER withUserDatabaseContext
+  it('sec-new-A4: updateMfaEnabled is called inside the withAppDatabaseContext (user scope) transaction (no TOCTOU window)', async () => {
+    // Regression: the previous code called updateMfaEnabled AFTER withAppDatabaseContext (user scope)
     // returned, leaving a TOCTOU gap where a concurrent enroll could flip is_mfa_enabled
     // back to true between the revoke commit and the flag update.
-    const { withUserDatabaseContext } = await import(
-      '@/infrastructure/database/contexts/user-database.context.js'
+    const { withAppDatabaseContext } = await import(
+      '@/infrastructure/database/contexts/database-context.js'
     );
 
     const callOrder: string[] = [];
-    vi.mocked(withUserDatabaseContext).mockImplementationOnce(
-      async (_userPublicId: string, callback: Parameters<typeof withUserDatabaseContext>[1]) => {
+    vi.mocked(withAppDatabaseContext).mockImplementationOnce(
+      async (_scope: unknown, callback: Parameters<typeof withAppDatabaseContext>[1]) => {
         callOrder.push('txn_start');
         await callback(null as never);
         callOrder.push('txn_end');

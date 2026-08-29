@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { trimmedStringMinMax } from '@/shared/utils/validation/validation.util.js';
 
 /**
- * Zod schema for routes that carry the `invitation_id` path param — the org-scoped
+ * Zod schema for routes that carry the `invitation_id` path param — the organization-scoped
  * revoke / resend under `/organization/invitations/:invitation_id` and the
  * invitee-facing `/invitations/:invitation_id/accept`.
  */

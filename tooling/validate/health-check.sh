@@ -68,7 +68,7 @@ phase "Route HTTP coverage"      validate:route-http-coverage
 phase "Route success statuses"   validate:route-success-statuses
 phase "Route schema docs"        validate:route-schema-docs
 phase "Route param schemas"      validate:route-param-schemas
-phase "Route org scope"          validate:route-org-scope
+phase "Route organization scope"          validate:route-organization-scope
 phase "Test naming"              validate:test-naming
 phase "TSDoc coverage"           tsdoc:check
 phase "Env example sync"         tool:sync-env-example

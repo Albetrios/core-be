@@ -33,7 +33,7 @@ Per organization and UTC date:
 - **Data format:** gzip-compressed NDJSON (one JSON object per line)
 - **Data metadata:** `format=ndjson`, `schema_version=1`, `export_date`, `row_count`, `sha256` (hex digest of the gzip bytes)
 - **Manifest:** JSON with `schema_version`, `export_date`, `organization_id`, and `objects[]` (`key`, `row_count`, `sha256`, `format`, `content_type`)
-- **Idempotency:** skips org+date when `manifest.json` already exists (`HeadObject` on manifest key)
+- **Idempotency:** skips organization+date when `manifest.json` already exists (`HeadObject` on manifest key)
 
 ## Environment
 
@@ -67,7 +67,7 @@ The worker does **not** push directly to a SIEM. Ingest is **pull-based from S3*
 
    Production SIEM connector wiring remains an ops step outside this repo.
 
-**Out of scope for v1 (explicit deferrals):** Apache Parquet, per-org HTTPS webhook push, admin presigned download (`audit:export` permission). NDJSON gzip + manifest + tests satisfy operational accept criteria.
+**Out of scope for v1 (explicit deferrals):** Apache Parquet, per-organization HTTPS webhook push, admin presigned download (`audit:export` permission). NDJSON gzip + manifest + tests satisfy operational accept criteria.
 
 ## Related
 

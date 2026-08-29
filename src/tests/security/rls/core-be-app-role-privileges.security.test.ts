@@ -13,7 +13,7 @@ import {
  *
  * Every other RLS security test means something ONLY if `core_be_app` is genuinely a non-superuser,
  * non-BYPASSRLS role: otherwise `SET LOCAL ROLE core_be_app` is a no-op, the whole lane passes, and
- * production — which runs as this role — is exposed. The org-mandated-MFA bypass was this class of
+ * production — which runs as this role — is exposed. The organization-mandated-MFA bypass was this class of
  * failure (a FORCE-RLS table resolving to zero rows under the app role, read as "no MFA required").
  *
  * The baseline created the role with a bare `CREATE ROLE core_be_app NOLOGIN;`, relying on Postgres
@@ -71,7 +71,7 @@ describe('Security: core_be_app application role is least-privilege (RLS-bound)'
     );
     expect(superuserCount).toBe(1);
 
-    // Proof — under `core_be_app` with no `app.current_user_id`, FORCE RLS on the self-scoped
+    // Proof — under `core_be_app` with no `app.current_user_public_id`, FORCE RLS on the self-scoped
     // `auth.users` hides the row. If the role ever gained BYPASSRLS/SUPERUSER this returns 1 and
     // fails, which is the whole point: it pins the role's RLS-subjection behaviorally, not just by
     // catalog attribute.

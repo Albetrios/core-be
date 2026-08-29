@@ -6,7 +6,7 @@
  * only creates indices beyond those already present, so a re-run with the same counts is a no-op.
  */
 import { like } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { users } from '@/domains/user/user.schema.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';
 import { generateBulkUser } from './user.faker.js';
@@ -16,7 +16,7 @@ const BULK_EMAIL_PREFIX = 'bulk-user-';
 const BULK_EMAIL_SUFFIX = '@seed.local';
 const BULK_EMAIL_PATTERN = `${BULK_EMAIL_PREFIX}%${BULK_EMAIL_SUFFIX}`;
 
-/** Pool size: one owner + members across all organizations (average of the per-org range). */
+/** Pool size: one owner + members across all organizations (average of the per-organization range). */
 function poolSize(context: SeedContext): number {
   const { organizations, usersPerOrg } = context.counts;
   const averagePerOrg = Math.max(1, Math.round((usersPerOrg.min + usersPerOrg.max) / 2));

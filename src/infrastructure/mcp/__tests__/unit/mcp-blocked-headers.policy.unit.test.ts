@@ -23,7 +23,7 @@ describe('MCP call_api blocked headers policy (route-#8)', () => {
     'x-csrf-token',
     'x-forwarded-for',
     'x-real-ip',
-    'x-organization-id', // route-#8: tenant selector → RLS GUC; must not be caller-settable
+    'x-organization-id', // removed from the API; stays blocked so MCP clients can never smuggle it back
   ])('blocks the %s header on the proxied sub-request', (header) => {
     expect(blockedBlock).toContain(`'${header}'`);
   });

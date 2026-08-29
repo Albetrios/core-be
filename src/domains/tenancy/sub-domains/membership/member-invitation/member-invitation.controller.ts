@@ -3,14 +3,14 @@ import { successResponse } from '@/shared/utils/http/response.util.js';
 import { ForbiddenError } from '@/shared/errors/index.js';
 import {
   getRequestIdentifier,
+  requireOrganizationScope,
   requirePrincipal,
-  resolveActiveOrganizationId,
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
 import type { MemberInvitationService } from './member-invitation.service.js';
 
 /**
- * Builds the HTTP handler map for the invitation routes that remain after REQ-1: the org-scoped
+ * Builds the HTTP handler map for the invitation routes that remain after REQ-1: the organization-scoped
  * `revoke` / `resend` under `/organization/invitations/:invitation_id` and the invitee-facing
  * `/invitations/:invitation_id/accept`. Adding a member now issues the invitation via
  * `POST /organization/memberships`, so the standalone create/list, the invitee pending-list, and
@@ -35,20 +35,22 @@ export function createMemberInvitationController(service: MemberInvitationServic
     },
     revokeMemberInvitation: async (request: FastifyRequest, reply: FastifyReply) => {
       requirePrincipal(request);
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
       // sec-new-T2: reject malformed path params before reaching the service layer.
       const { invitation_id: rawRevokeId } = request.params as { invitation_id: string };
       const invitationId = validatePublicIdParam(rawRevokeId ?? '', 'invitation_id');
-      await service.revoke(organizationId, invitationId);
+      await service.revoke(scope, invitationId);
       return reply.code(204).send();
     },
     resendInvitation: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
       // sec-new-T2: reject malformed path params before reaching the service layer.
       const { invitation_id: rawResendId } = request.params as { invitation_id: string };
       const invitationId = validatePublicIdParam(rawResendId ?? '', 'invitation_id');
       // R1 / TEN-34: regenerated token is delivered only via email, never returned.
-      const invitation = await service.resend(organizationId, invitationId, request.body, {
+      const invitation = await service.resend(scope, invitationId, request.body, {
         requestId: getRequestIdentifier(request),
       });
       return successResponse({ invitation }, getRequestIdentifier(request));

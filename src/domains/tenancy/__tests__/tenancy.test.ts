@@ -53,7 +53,7 @@ describe('Tenancy Domain — flows (memberships, leave, roles)', () => {
     await seedAllPermissions();
   });
 
-  // ─── Helper: create user with full org permissions ────────────
+  // ─── Helper: create user with full organization permissions ────────────
   async function createAuthorizedUserAndOrganization(permissionCodes = ALL_TENANCY_PERMISSIONS) {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });
@@ -67,7 +67,7 @@ describe('Tenancy Domain — flows (memberships, leave, roles)', () => {
       roleId: role.id,
     });
     // Flat tenancy routes resolve the organization from the JWT `org` claim, so
-    // the bearer must embed `organizationPublicId` to reach the org-scoped
+    // the bearer must embed `organizationPublicId` to reach the organization-scoped
     // permission preHandlers and controllers.
     const token = await generateTestToken({
       userId: user.public_id,

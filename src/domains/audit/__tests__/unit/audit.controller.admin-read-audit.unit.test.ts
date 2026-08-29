@@ -8,7 +8,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 /**
  * Regression for sec-U4 (Medium): the admin audit-log listing accepts
  * `actor_user_id` / `organization_id` filters and runs under
- * `withGlobalAdminDatabaseContext`. An ADMIN-roled employee could read any
+ * `withMaintenanceDatabaseContext`. An ADMIN-roled employee could read any
  * user's full audit timeline (IPs, sessions, actions, resources) without the
  * platform ever recording who watched whom — combined with U2's metadata
  * stripping, "who watched whom?" was unanswerable.

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { runWithWorkerDatabaseContext } from '@/infrastructure/database/contexts/worker-database.context.js';
-import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/worker-database.context.error.js';
+import { runWithWorkerDatabaseContext } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import type { WorkerDatabaseHandle } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { createWorkerNotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
 

@@ -1,5 +1,5 @@
 import { eq, sql as drizzleSql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { DEFAULT_REPOSITORY_LIST_LIMIT } from '@/shared/constants/query-limits.constants.js';
 import { capListWithWarning } from '@/shared/utils/infrastructure/list-cap.util.js';
 import { user_notification_preferences } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.schema.js';
@@ -54,7 +54,7 @@ export class UserNotificationPreferencesRepository {
     // against other writers, so two simultaneous PUTs for the same user would both delete then
     // re-insert the same (user_id, type, channel) tuples and the loser would hit the unique
     // index (23505) or a serialization failure (40001) → HTTP 500. This transaction-scoped
-    // advisory lock (released at COMMIT/ROLLBACK of the surrounding withUserDatabaseContext
+    // advisory lock (released at COMMIT/ROLLBACK of the surrounding withAppDatabaseContext (user scope)
     // transaction) makes the replace strict per user.
     await requestDatabase.execute(
       drizzleSql`SELECT pg_advisory_xact_lock(${USER_NOTIFICATION_PREFERENCES_REPLACE_LOCK_NAMESPACE}::int, ${user_id}::int)`,

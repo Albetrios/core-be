@@ -37,8 +37,8 @@ export function billingOps() {
 
   sleep(0.3);
 
-  // TEST_TOKEN must be minted scoped to TEST_ORG_ID — the active org rides the
-  // token's `org` claim, so the flat subscriptions route carries no org path segment.
+  // TEST_TOKEN must be minted scoped to TEST_ORG_ID — the active organization rides the
+  // token's `org` claim, so the flat subscriptions route carries no organization path segment.
   const subsResponse = http.get(`${API_PREFIX}/billing/subscriptions`, {
     headers,
     tags: { name: 'list-subscriptions' },

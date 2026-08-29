@@ -21,7 +21,7 @@ import { idempotencyOnResponse } from './idempotency.middleware.js';
  *   3. Flush the on-commit outbox (enqueue BullMQ side-effect jobs).
  *
  * Idempotency cache writes and outbox flushes run only when settlement reports
- * `committed` or `no_transaction` (autocommit / non-org routes). Rollback and settle
+ * `committed` or `no_transaction` (autocommit / non-organization routes). Rollback and settle
  * failures release idempotency placeholders without caching 2xx responses and skip
  * `flushOnCommit` so workers never observe uncommitted writes.
  */

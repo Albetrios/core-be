@@ -11,11 +11,11 @@ const INVITE_ACCEPTED_NOTIFICATION_TYPE = 'membership.invite_accepted';
 const INVITE_ACCEPTED_ACTION_URL = '/settings/members';
 
 /**
- * Fans out an `membership.invite_accepted` notification (in-app + email) to each org
+ * Fans out an `membership.invite_accepted` notification (in-app + email) to each organization
  * `membership:manage` holder resolved by the tenancy accept path.
  *
- * @remarks Runs synchronously inside the accept's `withOrganizationDatabaseContext` (the event is
- * awaited there), so each `createAndDispatchNotification` INSERT sees the org GUC and satisfies the
+ * @remarks Runs synchronously inside the accept's `withAppDatabaseContext` (the event is
+ * awaited there), so each `createAndDispatchNotification` INSERT sees the organization GUC and satisfies the
  * notification write-RLS. `requestId` is intentionally omitted so the commit-dispatch uses the
  * in-memory `onCommit` path — no Redis write inside the caller's RLS-context transaction. Per-recipient
  * try/catch means one bad insert cannot drop the rest, and the bus swallows any throw so accept is safe.

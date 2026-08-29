@@ -4,7 +4,7 @@
 
 **Goal:** A single configurable, reproducible bulk seeder that exhaustively populates every domain up to tens of thousands of rows, built on a shared orchestrator + a per-domain `seed/` directory contract.
 
-**Architecture:** A thin orchestrator (`src/scripts/seed/bulk.ts`) resolves a profile/scale config and runs each domain's `DomainSeedModule`. Every folder that owns tables gets a `seed/` dir exporting a `SeedContribution`; parents compose children up the tree, and only the top-level domain registers a `DomainSeedModule`. A `SeedRegistry` carries parent org/user refs across domains so each domain seeds only its own tables.
+**Architecture:** A thin orchestrator (`src/scripts/seed/bulk.ts`) resolves a profile/scale config and runs each domain's `DomainSeedModule`. Every folder that owns tables gets a `seed/` dir exporting a `SeedContribution`; parents compose children up the tree, and only the top-level domain registers a `DomainSeedModule`. A `SeedRegistry` carries parent organization/user refs across domains so each domain seeds only its own tables.
 
 **Tech Stack:** TypeScript, Drizzle, postgres.js, @faker-js/faker, Vitest.
 
@@ -60,11 +60,11 @@ Exports (full TSDoc required per tsdoc-export-guard):
 **Files:** Create `src/scripts/seed/bulk-config.ts`; Test `src/tests/unit/scripts/seed/bulk-config.unit.test.ts`.
 
 - `type BulkProfile = 'demo' | 'edge' | 'load'`.
-- `const PROFILES: Record<BulkProfile, ResolvedCounts>` — demo (~10 orgs), edge (~25 orgs, edgeCases:true), load (1000 orgs / usersPerOrg 5–15 / auditMonths 6 / auditPerOrgPerMonth ~15 → ~90k audit rows).
+- `const PROFILES: Record<BulkProfile, ResolvedCounts>` — demo (~10 organizations), edge (~25 organizations, edgeCases:true), load (1000 organizations / usersPerOrg 5–15 / auditMonths 6 / auditPerOrgPerMonth ~15 → ~90k audit rows).
 - `const HARD_CAP = { organizations: 5000, auditRows: 500_000 }`.
 - `function resolveCounts(env: NodeJS.ProcessEnv): { profile; scale; counts: ResolvedCounts }` — reads `BULK_PROFILE` (default `demo`), `SCALE` (default 1, multiplies organizations + auditPerOrgPerMonth), per-knob overrides (`BULK_ORGS`, `BULK_USERS_PER_ORG`, `BULK_AUDIT_MONTHS`, `BULK_AUDIT_PER_ORG_PER_MONTH`). Throws if resolved organizations > cap or projected audit rows > cap (message points at the COPY path being out of scope).
 
-- [ ] Unit test: default → demo; `BULK_PROFILE=load` counts; `SCALE=2` doubles orgs; `BULK_ORGS=50` override; over-cap throws.
+- [ ] Unit test: default → demo; `BULK_PROFILE=load` counts; `SCALE=2` doubles organizations; `BULK_ORGS=50` override; over-cap throws.
 - [ ] Implement; tests + typecheck pass.
 - [ ] Commit: `feat(seed): bulk profiles + scale resolver`.
 

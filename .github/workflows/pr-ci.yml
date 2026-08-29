@@ -330,7 +330,7 @@ jobs:
 
       - run: pnpm build
 
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
       - name: Verify Dockerfile.worker sync
         run: node tooling/ci/check-dockerfile-sync.mjs
@@ -490,7 +490,7 @@ jobs:
 
       - name: Upload IaC Trivy SARIF
         if: always() && hashFiles('trivy-config.sarif') != ''
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v3
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v3
         with:
           sarif_file: trivy-config.sarif
           category: trivy-config

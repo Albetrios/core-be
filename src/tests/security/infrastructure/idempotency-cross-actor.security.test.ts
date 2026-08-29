@@ -124,7 +124,7 @@ describe('Security: idempotency cross-actor isolation', () => {
     expect(second.statusCode).toBe(200);
     const secondOrganization = (second.json() as CreatedOrganizationResponse).data;
 
-    // When the cache entry survived, the replay returns the ORIGINAL org (proving
+    // When the cache entry survived, the replay returns the ORIGINAL organization (proving
     // self-replay works); when Redis evicted it, a fresh 2xx is allowed.
     if (second.headers['x-idempotency-replay'] === 'true') {
       expect(secondOrganization?.id).toBe(firstOrganization?.id);

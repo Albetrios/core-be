@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { and, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { countWithCap } from '@/infrastructure/database/utils/capped-count.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import { api_keys } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
@@ -193,7 +193,7 @@ export class AuditRepository {
 
   /**
    * Batch-resolves the internal organization ids carried on a page of audit rows to their
-   * public ids. `tenancy.organizations` is not FORCE RLS for the admin / org-audit contexts
+   * public ids. `tenancy.organizations` is not FORCE RLS for the admin / organization-audit contexts
    * the audit list runs under, so a plain SELECT works (no resolver needed).
    *
    * sec-r4-D2: filter on `deleted_at IS NULL` so soft-deleted organization public ids do

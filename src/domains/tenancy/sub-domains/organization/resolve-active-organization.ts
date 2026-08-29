@@ -1,8 +1,11 @@
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { env } from '@/shared/config/env.config.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { provisionPersonalOrganization } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
 import { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Orchestrates the login/active-organization lookups under the caller's own user RLS context. The
@@ -10,12 +13,12 @@ import { OrganizationRepository } from '@/domains/tenancy/sub-domains/organizati
  * repository's `null` to `undefined` for their callers.
  *
  * @remarks
- * - **RLS:** every tenancy lookup runs under {@link withUserDatabaseContext} via
- *   {@link withUserContextForInternalId}, which sets `app.current_user_id` so the
+ * - **RLS:** every tenancy lookup runs under {@link withAppDatabaseContext (user scope)} via
+ *   {@link withUserContextForInternalId}, which sets `app.current_user_public_id` so the
  *   `organizations_user_discovery` / `memberships_user_self_discovery` policies (migration
  *   `20260520000004`) match the caller's own rows. These reads must NOT run under the
  *   global-admin context: `tenancy.organizations` and `tenancy.memberships` are
- *   FORCE RLS and their policies honor only `app.current_organization_id` and `app.current_user_id`
+ *   FORCE RLS and their policies honor only `app.current_organization_public_id` and `app.current_user_public_id`
  *   — never `app.global_admin` (only the `auth.*` and `audit.logs` policies carry that arm). Under
  *   the admin context every policy evaluates false and the memberships → organizations join returns
  *   zero rows, stranding users on the onboarding wizard once the login role lost BYPASSRLS.
@@ -27,14 +30,14 @@ const organizationRepository = new OrganizationRepository();
 
 /**
  * Resolves `userInternalId` → `auth.users.public_id` through the `auth.resolve_user_by_internal_id`
- * SECURITY DEFINER resolver, then runs `callback` under {@link withUserDatabaseContext} so the
- * tenancy policies see `app.current_user_id`.
+ * SECURITY DEFINER resolver, then runs `callback` under {@link withAppDatabaseContext (user scope)} so the
+ * tenancy policies see `app.current_user_public_id`.
  *
  * Returns `undefined` when the internal id resolves to no live user, so callers degrade to
  * "no organization" exactly as they did when the underlying query returned no rows.
  *
  * @remarks
- * The resolver replaces a `withGlobalAdminDatabaseContext` wrapper. That wrapper worked — the
+ * The resolver replaces a `withMaintenanceDatabaseContext` wrapper. That wrapper worked — the
  * `auth.users` policy does carry an `app.global_admin` arm — but it opened the admin escape hatch
  * on a self-service login path (the same objection recorded in `provisionOrganization`) and cost a
  * second transaction on every login, refresh, and `getMe`. The resolver needs neither.
@@ -45,7 +48,7 @@ async function withUserContextForInternalId<T>(
 ): Promise<T | undefined> {
   const userPublicId = await organizationRepository.resolveUserPublicIdByInternalId(userInternalId);
   if (userPublicId === null) return undefined;
-  return withUserDatabaseContext(userPublicId, callback);
+  return withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }), callback);
 }
 
 /**
@@ -67,16 +70,16 @@ export async function resolveDefaultActiveOrganizationPublicId(
 }
 
 /**
- * Confirm the user holds an ACTIVE membership in the given organization (and the org is
+ * Confirm the user holds an ACTIVE membership in the given organization (and the organization is
  * active/not-deleted), returning both the internal `id` and `public_id`. Runs under the caller's own
- * user RLS context (no org context at switch time) so the tenancy discovery policies match,
+ * user RLS context (no organization context at switch time) so the tenancy discovery policies match,
  * and the query is additionally constrained to the caller's own `user_id`.
  *
  * @remarks
  * - **Algorithm:** one indexed join (memberships → organizations) filtered to ACTIVE
- *   membership + active/non-deleted org matching `organizationPublicId`.
+ *   membership + active/non-deleted organization matching `organizationPublicId`.
  * - **Side effects:** none (read-only). Returns `undefined` when no such active
- *   membership exists (caller maps to 403, or falls back to a default org).
+ *   membership exists (caller maps to 403, or falls back to a default organization).
  */
 export async function findUserActiveOrganizationByPublicId(
   userInternalId: number,
@@ -92,10 +95,10 @@ export async function findUserActiveOrganizationByPublicId(
 }
 
 /**
- * Confirm the user holds an ACTIVE membership in the given organization (and the org is
+ * Confirm the user holds an ACTIVE membership in the given organization (and the organization is
  * active/not-deleted) — the membership gate for `switch-to-organization`. Returns the
- * org `public_id` when valid, otherwise `undefined` (caller maps to 403). Runs under the caller's own
- * user RLS context (no org context at switch time) so the tenancy discovery policies match,
+ * organization `public_id` when valid, otherwise `undefined` (caller maps to 403). Runs under the caller's own
+ * user RLS context (no organization context at switch time) so the tenancy discovery policies match,
  * and the query is additionally constrained to the caller's own `user_id`.
  */
 export async function findUserActiveOrganizationPublicId(
@@ -109,10 +112,10 @@ export async function findUserActiveOrganizationPublicId(
 /**
  * Refresh-time revalidation of the active organization persisted on a session
  * (audit-#3). Given the session's stored internal `organization_id`, confirm the
- * user still holds an ACTIVE membership in that active/non-deleted org and return
+ * user still holds an ACTIVE membership in that active/non-deleted organization and return
  * its `public_id`; otherwise `undefined` so the caller falls back to the default
  * active organization. Constrained to the caller's own `user_id` under that same
- * user RLS context (no org context at refresh time).
+ * user RLS context (no organization context at refresh time).
  */
 export async function findUserActiveOrganizationPublicIdByInternalId(
   userInternalId: number,
@@ -166,16 +169,16 @@ export async function resolvePersonalOrganization(
  *
  * @remarks
  * - **Idempotency:** `provisionPersonalOrganization` is guarded by the
- *   `idx_org_one_personal_per_owner` partial unique index (at most one personal org per
+ *   `idx_org_one_personal_per_owner` partial unique index (at most one personal organization per
  *   owner). A concurrent provision that loses the race raises a unique violation; we absorb it
  *   and re-resolve, so this function never creates a duplicate and never surfaces the race to
  *   the caller.
- * - **RLS:** provisioning runs inside its own `withOrganizationDatabaseContext` write
+ * - **RLS:** provisioning runs inside its own `withAppDatabaseContext` write
  *   transaction scoped to the new org's pre-generated `public_id` (see
  *   {@link provisionPersonalOrganization}); the surrounding reads run under the caller's own
  *   user context, constrained to the caller's own `user_id`.
  * - **Side effects:** provisions one organization (+ owner role, permissions, membership)
- *   on the self-heal path; read-only when the personal org already exists or personal is
+ *   on the self-heal path; read-only when the personal organization already exists or personal is
  *   disabled.
  */
 export async function ensurePersonalOrganization(
@@ -217,7 +220,7 @@ export async function ensurePersonalOrganization(
  * (e.g. `getMe` → `personal_organization_id`). Attempts the on-demand provision, but if it
  * throws (a genuine provisioning failure — e.g. a missing reference row / transient DB error,
  * NOT a lost idempotency race, which {@link ensurePersonalOrganization} already absorbs) it
- * **degrades gracefully**: it logs and returns the pre-existing personal-org id, or
+ * **degrades gracefully**: it logs and returns the pre-existing personal-organization id, or
  * `undefined` when there is still none. This guarantees a read like `GET /users/me` returns
  * 200 with `personal_organization_id: null` rather than 500-ing on a self-heal hiccup; the
  * user simply retries and the next read (or `switch-to-personal`) heals them once the

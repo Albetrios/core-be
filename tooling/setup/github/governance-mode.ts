@@ -138,7 +138,7 @@ export function parseCodeownersOwners(codeownersText: string): string[] {
 
 /**
  * The subset of CODEOWNERS handles usable as production-environment reviewers:
- * individual users only. Team handles (`@org/team`, containing a slash) are
+ * individual users only. Team handles (`@organization/team`, containing a slash) are
  * dropped — they resolve only on organization repositories, not personal ones.
  */
 export function codeownerUsers(owners: readonly string[]): string[] {

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * sec-r4-I2 regression — organization mutation endpoints must each carry a
- * rate-limit preset so a hijacked session or member cannot churn the org row,
+ * rate-limit preset so a hijacked session or member cannot churn the organization row,
  * mint unbounded logo objects, flap settings, or delete tenants in bulk.
  *
  * Anchored per-route so a silent regression on any single path fails.

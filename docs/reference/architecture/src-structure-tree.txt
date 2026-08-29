@@ -1126,22 +1126,14 @@ src/
     │   │   │   ├── assert-connection-budget.unit.test.ts
     │   │   │   ├── assert-database-rls-safety.unit.test.ts
     │   │   │   ├── assert-database-tls-safety.unit.test.ts
-    │   │   │   ├── tenant-database.context.test.ts
-    │   │   │   ├── worker-context-database-handle.unit.test.ts
-    │   │   │   └── worker-database.context.test.ts
+    │   │   │   ├── database-context-runtime.test.ts
+    │   │   │   ├── maintenance-pool-selection.test.ts
+    │   │   │   ├── principal-checkout-accounting.test.ts
+    │   │   │   ├── principal-database-context.test.ts
+    │   │   │   └── worker-context-database-handle.unit.test.ts
     │   ├── contexts/
-    │   │   ├── audit-outbox-drain-database.context.ts
-    │   │   ├── global-admin-database.context.ts
-    │   │   ├── organization-database.context.ts
-    │   │   ├── request-database.context.ts
-    │   │   ├── retention-database.context.ts
-    │   │   ├── system-audit-insert-database.context.ts
-    │   │   ├── tenant-database.context.ts
-    │   │   ├── user-database.context.ts
-    │   │   ├── worker-database-guard.util.ts
-    │   │   ├── worker-database.context.error.ts
-    │   │   ├── worker-database.context.ts
-    │   │   └── worker-statement-timeout.util.ts
+    │   │   ├── database-context-runtime.ts
+    │   │   └── database-context.ts
     │   ├── migration/
     │   │   ├── migrate.ts
     │   │   ├── migration-error-hint.ts
@@ -1414,6 +1406,7 @@ src/
     │   ├── production-guard.ts
     │   ├── seed-contract.ts
     │   ├── seed-registry.ts
+    │   ├── seed-runtime-url.ts
     │   ├── seed.overview.md
     │   └── sync-demo-permissions.ts
     ├── tooling/
@@ -1453,7 +1446,7 @@ src/
     │       ├── route-schema-docs-validation.util.ts
     │       ├── route-success-coverage.util.ts
     │       ├── validate-route-http-coverage.ts
-    │       ├── validate-route-org-scope.ts
+    │       ├── validate-route-organization-scope.ts
     │       ├── validate-route-param-schemas.ts
     │       ├── validate-route-schema-docs.ts
     │       ├── validate-route-success-coverage.ts
@@ -1541,8 +1534,7 @@ src/
     │   │   ├── cookie-session-origin.pre-handler.ts
     │   │   └── cookie.middleware.ts
     │   ├── tenant/
-    │   │   ├── organization-rls-transaction.middleware.ts
-    │   │   └── tenant.middleware.ts
+    │   │   └── organization-rls-transaction.middleware.ts
     │   └── index.ts
     ├── types/
     │   └── index.ts
@@ -1793,8 +1785,10 @@ src/
     │   │   │   ├── test-api-prefix.helper.unit.test.ts
     │   │   │   └── test-http-inject.helper.unit.test.ts
     │   ├── audit-log-partition.helper.ts
+    │   ├── database-context-mock.helper.ts
     │   ├── fast-check-property.util.ts
     │   ├── object-storage-mock.helper.ts
+    │   ├── principal-scope.helper.ts
     │   ├── redis-mock.helper.ts
     │   ├── registered-route.util.ts
     │   ├── rls-matrix.helper.ts
@@ -1802,7 +1796,7 @@ src/
     │   ├── route-catalog-auth.ts
     │   ├── route-catalog-registry.ts
     │   ├── route-http-coverage.helper.ts
-    │   ├── route-org-scope.helper.ts
+    │   ├── route-organization-scope.helper.ts
     │   ├── route-status-observer.ts
     │   ├── route-success-status.helper.ts
     │   ├── test-api-prefix.helper.ts
@@ -1883,7 +1877,8 @@ src/
     │   │   │   ├── billing.js
     │   │   │   ├── comprehensive-journey.js
     │   │   │   ├── daily-ops.js
-    │   │   │   ├── fe-user-journey.js
+    │   │   │   ├── fe-full-surface.js
+    │   │   │   ├── fe-login-to-org.js
     │   │   │   ├── health-breakpoint.js
     │   │   │   ├── health-stress.js
     │   │   │   ├── health.js
@@ -2102,9 +2097,20 @@ src/
     │   │   │   ├── capped-count.util.db.unit.test.ts
     │   │   │   ├── connection-url.util.unit.test.ts
     │   │   │   ├── connection.options.unit.test.ts
+    │   │   │   ├── context-directory-standard.policy.unit.test.ts
+    │   │   │   ├── maintenance-context-confinement.policy.unit.test.ts
+    │   │   │   ├── maintenance-database-context.unit.test.ts
+    │   │   │   ├── maintenance-role.db.unit.test.ts
     │   │   │   ├── migration-execution-mode.unit.test.ts
-    │   │   │   ├── retention-database.context.unit.test.ts
+    │   │   │   ├── principal-scope-minting.policy.unit.test.ts
+    │   │   │   ├── rls-offboarding-regressions.db.unit.test.ts
+    │   │   │   ├── rls-table-scope-map.db.unit.test.ts
+    │   │   │   ├── role-taxonomy.db.unit.test.ts
+    │   │   │   ├── scope-observability.unit.test.ts
+    │   │   │   ├── scope-shape-contract.policy.unit.test.ts
+    │   │   │   ├── session-context-confinement.policy.unit.test.ts
     │   │   │   ├── transaction.util.db.unit.test.ts
+    │   │   │   ├── verified-scope-usage.policy.unit.test.ts
     │   │   │   └── worker-database-guard.unit.test.ts
     │   │   ├── mail/
     │   │   │   ├── __snapshots__/
@@ -2156,8 +2162,7 @@ src/
     │   │   ├── response-format.middleware.hook.unit.test.ts
     │   │   ├── response-format.middleware.unit.test.ts
     │   │   ├── server-timing.middleware.unit.test.ts
-    │   │   ├── shutdown.middleware.unit.test.ts
-    │   │   └── tenant.middleware.unit.test.ts
+    │   │   └── shutdown.middleware.unit.test.ts
     │   ├── observability/
     │   │   ├── business-metrics.unit.test.ts
     │   │   ├── db-pool-alert.service.unit.test.ts

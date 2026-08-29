@@ -8,6 +8,8 @@ Parent: [auth-method](../auth-method.overview.md)
 
 Coordinates the OAuth authorize-and-callback dance for the supported providers. This is an **internal module** of auth-method, not an API resource — no controller or routes file; auth-method's routes call `oauth.service.ts` directly.
 
+Browser contract: the provider's registered redirect URI (`OAUTH_<PROVIDER>_REDIRECT_URI`) is the **SPA's provider-specific `/callback/<provider>` page** (e.g. `/callback/google`), not this API. The provider lands the browser there with `code`+`state`; the SPA forwards both to `GET /api/v1/auth/oauth/:provider/callback` (an XHR carrying the `oauth_nonce` cookie), and this module consumes the state, exchanges the code, and mints the session — the route stays a plain 200-JSON endpoint.
+
 ## Layout
 
 - `oauth.service.ts` — `getRedirectUrl` (mints state + PKCE + nonce) and `handleCallback` (consumes state, exchanges code, completes the session)

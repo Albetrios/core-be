@@ -1,5 +1,8 @@
 import { ForbiddenError, NotFoundError } from '@/shared/errors/index.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  withAppDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { MemberRoleRepository } from '@/domains/tenancy/sub-domains/member-roles/member-role.repository.js';
 import type { MembershipRepository } from '@/domains/tenancy/sub-domains/membership/membership.repository.js';
@@ -15,8 +18,8 @@ import { assertCallerCanGrantPermissionCodes } from '@/domains/tenancy/sub-domai
  * organization.
  *
  * @remarks
- * - **Algorithm:** every public method runs under {@link withOrganizationDatabaseContext}
- *   so Postgres RLS sees `app.current_organization_id`; the org and role are
+ * - **Algorithm:** every public method runs under `withAppDatabaseContext`
+ *   so Postgres RLS sees `app.current_organization_public_id`; the organization and role are
  *   resolved by public id, then the repository is invoked.
  * - **Failure modes:** `NotFoundError` when the organization or role does not
  *   exist (or has been soft-deleted); Zod `ValidationError` from
@@ -25,10 +28,10 @@ import { assertCallerCanGrantPermissionCodes } from '@/domains/tenancy/sub-domai
  *   (DELETE then INSERT) in a single repository call, then calls
  *   {@link invalidateOrganizationPermissions} so every member holding the role
  *   re-resolves their permissions on the next request (a role's permission set
- *   change can affect many users, so the whole org namespace is bumped).
+ *   change can affect many users, so the whole organization namespace is bumped).
  * - **Notes:** `listPermissionCodesForRole` is the read path consumed by
  *   {@link MembershipService.getPermissions}; it returns only `permission_code`
- *   strings and does not enforce org context (callers must already be inside
+ *   strings and does not enforce organization context (callers must already be inside
  *   one).
  */
 export class MemberRolePermissionService {
@@ -46,8 +49,9 @@ export class MemberRolePermissionService {
     return rows.map((row) => row.permission_code);
   }
 
-  async list(organization_public_id: string, role_public_id: string) {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async list(scope: OrganizationPrincipalDatabaseScope, role_public_id: string) {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const role = await this.memberRoleRepository.findByPublicId(role_public_id, organization.id);
@@ -57,13 +61,14 @@ export class MemberRolePermissionService {
   }
 
   async put(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     role_public_id: string,
     body: unknown,
     created_by_user_public_id: string | undefined,
   ) {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validatePutMemberRolePermissions(body);
-    const result = await withOrganizationDatabaseContext(organization_public_id, async () => {
+    const result = await withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const role = await this.memberRoleRepository.findByPublicId(role_public_id, organization.id);

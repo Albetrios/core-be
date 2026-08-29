@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import {
   grantCoreBeAppRoleForTests,
   executeAsCoreBeAppTenant,
@@ -13,12 +16,12 @@ import {
 
 /**
  * audit #41: the `subscriptions_tenant_isolation` policy now declares an explicit
- * WITH CHECK pinned to the active-org GUC, while its USING arm keeps the
+ * WITH CHECK pinned to the active-organization GUC, while its USING arm keeps the
  * `app.global_retention_cleanup` bypass. Two halves to prove:
  *
- *   1. Tenant context (org B): reassigning a visible org-B subscription to org A
+ *   1. Tenant context (organization B): reassigning a visible organization-B subscription to organization A
  *      is rejected — the standard write-confinement backstop.
- *   2. Retention context (`global_retention_cleanup='true'`, no org GUC): a write
+ *   2. Retention context (`global_retention_cleanup='true'`, no organization GUC): a write
  *      that sets a foreign `organization_id` is rejected by WITH CHECK. Before
  *      this migration the implicit WITH CHECK reused USING (which carries the
  *      retention bypass), so a retention-context process could have written a
@@ -48,7 +51,7 @@ function flattenErrorChain(error: unknown): string {
   return parts.join(' | ');
 }
 
-describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () => {
+describe('Security: subscriptions RLS WITH CHECK confines cross-organization writes', () => {
   let fixture: RlsTenantFixture;
   let organizationAInternalId: number;
   let organizationBInternalId: number;
@@ -64,7 +67,7 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
     organizationBInternalId = await resolveOrganizationInternalId(fixture.organizationBPublicId);
   });
 
-  it('rejects reassigning an org-B subscription to org A under the org-B tenant context', async () => {
+  it('rejects reassigning an organization-B subscription to organization A under the organization-B tenant context', async () => {
     const rowIds = fixture.rowIdsByTable.get(tableKey('billing', 'subscriptions'));
     expect(rowIds, 'fixture seeds a subscriptions row for both orgs').toBeDefined();
 
@@ -93,7 +96,8 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
 
     let caught: unknown;
     try {
-      await withGlobalRetentionCleanupDatabaseContext(
+      await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
         async (databaseHandle) =>
           databaseHandle.execute(
             drizzleSql.raw(
@@ -108,7 +112,7 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
 
     expect(
       caught,
-      'expected explicit WITH CHECK to reject a retention-context cross-org write',
+      'expected explicit WITH CHECK to reject a retention-context cross-organization write',
     ).toBeDefined();
     expect(flattenErrorChain(caught)).toMatch(/row-level security/i);
   });
@@ -116,7 +120,8 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
   it('still allows a retention-context DELETE via the USING bypass (positive control)', async () => {
     const rowIds = fixture.rowIdsByTable.get(tableKey('billing', 'subscriptions'))!;
 
-    const deletedCount = await withGlobalRetentionCleanupDatabaseContext(
+    const deletedCount = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       async (databaseHandle) => {
         const result = await databaseHandle.execute(
           drizzleSql.raw(
@@ -132,7 +137,7 @@ describe('Security: subscriptions RLS WITH CHECK confines cross-org writes', () 
     expect(deletedCount).toBe(1);
   });
 
-  it('allows a same-org reassignment under the matching tenant context (positive control)', async () => {
+  it('allows a same-organization reassignment under the matching tenant context (positive control)', async () => {
     const rowIds = fixture.rowIdsByTable.get(tableKey('billing', 'subscriptions'))!;
 
     const affected = await executeAsCoreBeAppTenant(

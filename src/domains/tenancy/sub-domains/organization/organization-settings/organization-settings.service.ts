@@ -1,6 +1,10 @@
 import { NotFoundError } from '@/shared/errors/index.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { OrganizationSettingsRepository } from './organization-settings.repository.js';
 import type {
@@ -20,8 +24,9 @@ import {
  * unscoped helpers used during authentication.
  *
  * @remarks
- * - **Algorithm:** `get` and `update` run inside
- *   `withOrganizationDatabaseContext` (RLS) and lazily upsert the row when
+ * - **Algorithm:** `get` and `update` take the token-minted
+ *   {@link OrganizationPrincipalDatabaseScope} from the controller and run inside
+ *   `withAppDatabaseContext` (RLS) — they lazily upsert the row when
  *   missing; `update` strips undefined fields with `omitUndefined` so PATCH
  *   semantics preserve unchanged columns.
  *   `resolveDefaultLocaleForOrganization` falls back to `'en'` when nothing
@@ -42,9 +47,11 @@ export class OrganizationSettingsService {
     private readonly settingsRepository: OrganizationSettingsRepository,
   ) {}
 
-  async get(organization_public_id: string): Promise<OrganizationSettingsOutput> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
-      const organization = await this.organizationRepository.findByPublicId(organization_public_id);
+  async get(scope: OrganizationPrincipalDatabaseScope): Promise<OrganizationSettingsOutput> {
+    return withAppDatabaseContext(scope, async () => {
+      const organization = await this.organizationRepository.findByPublicId(
+        scope.organizationPublicId,
+      );
       if (!organization) throw new NotFoundError('Organization');
       const settings = await this.settingsRepository.findByOrganizationId(organization.id);
       if (!settings) {
@@ -56,13 +63,15 @@ export class OrganizationSettingsService {
   }
 
   async update(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     _updated_by_user_public_id: string | undefined,
   ): Promise<OrganizationSettingsOutput> {
     const parsed = validateUpdateOrganizationSettings(body);
-    const result = await withOrganizationDatabaseContext(organization_public_id, async () => {
-      const organization = await this.organizationRepository.findByPublicId(organization_public_id);
+    const result = await withAppDatabaseContext(scope, async () => {
+      const organization = await this.organizationRepository.findByPublicId(
+        scope.organizationPublicId,
+      );
       if (!organization) throw new NotFoundError('Organization');
       const updated = await this.settingsRepository.upsert(
         organization.id,
@@ -74,11 +83,11 @@ export class OrganizationSettingsService {
       );
       return serializeOrganizationSettings(organization.public_id, updated);
     });
-    // sec-M1: drop the i18n locale cache for the org so a dashboard switch
+    // sec-M1: drop the i18n locale cache for the organization so a dashboard switch
     // is reflected in the next request rather than waiting for the TTL.
-    // Outside the DB context (cache write must not roll back with the org tx).
+    // Outside the DB context (cache write must not roll back with the organization tx).
     if (parsed.default_locale !== undefined) {
-      await invalidateCachedOrganizationDefaultLocale(organization_public_id);
+      await invalidateCachedOrganizationDefaultLocale(scope.organizationPublicId);
     }
     return result;
   }
@@ -89,7 +98,7 @@ export class OrganizationSettingsService {
     /**
      * sec-M1: Redis cache short-circuits the SECURITY DEFINER DB call on every
      * pre-auth i18n preHandler hit. Without it, every unauthenticated request
-     * that supplies an `X-Organization-Id` header without `Accept-Language`
+     * authenticated without `Accept-Language`
      * triggers a DB round-trip — distributed attackers can drive thousands of
      * pre-auth lookups per second and use the differential response language
      * as an organization-existence oracle. The cache stores the canonical
@@ -101,11 +110,16 @@ export class OrganizationSettingsService {
     if (cached !== null) {
       return cached as OrganizationDefaultLocale;
     }
-    const locale = await withOrganizationDatabaseContext(organizationPublicId, async () => {
-      const found =
-        await this.settingsRepository.findDefaultLocaleByOrganizationPublicId(organizationPublicId);
-      return found ?? 'en';
-    });
+    const locale = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId }),
+      async () => {
+        const found =
+          await this.settingsRepository.findDefaultLocaleByOrganizationPublicId(
+            organizationPublicId,
+          );
+        return found ?? 'en';
+      },
+    );
     await setCachedOrganizationDefaultLocale(organizationPublicId, locale);
     return locale;
   }

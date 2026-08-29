@@ -53,7 +53,7 @@ export const member_invitations = tenancySchema
       ),
       index('idx_member_invitations_created_id').on(table.created_at, table.id),
       index('idx_member_invitations_email').on(table.email, table.accepted_at),
-      // audit #18: covers the cross-org pending-invitation keyset query
+      // audit #18: covers the cross-organization pending-invitation keyset query
       // (`tenancy.list_pending_member_invitations_for_email`), which filters
       // email + accepted_at IS NULL + revoked_at IS NULL and keyset-orders by
       // (created_at, id). The plain (email, accepted_at) index above left the
@@ -75,7 +75,7 @@ export const member_invitations = tenancySchema
             SELECT id FROM tenancy.memberships
             WHERE organization_id = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
@@ -83,7 +83,7 @@ export const member_invitations = tenancySchema
             SELECT id FROM tenancy.memberships
             WHERE organization_id = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )`,
       }),

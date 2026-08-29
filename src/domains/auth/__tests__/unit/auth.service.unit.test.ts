@@ -55,17 +55,21 @@ vi.mock('@/domains/tenancy/sub-domains/organization/resolve-active-organization.
   ensurePersonalOrganizationPublicId: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-  withSessionPublicIdDatabaseContext: vi.fn(
-    (_sessionPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-  withSessionTokenHashDatabaseContext: vi.fn(
-    (_tokenHash: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = {
   id: 1,
@@ -372,7 +376,7 @@ describe('AuthService', () => {
     expect(authSessionService.refreshSessionCredentials).toHaveBeenCalled();
   });
 
-  it('AUTH-14: refreshToken preserves the session-selected org (re-validated) instead of resetting to default', async () => {
+  it('AUTH-14: refreshToken preserves the session-selected organization (re-validated) instead of resetting to default', async () => {
     const resolve = await import(
       '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
     );
@@ -393,7 +397,7 @@ describe('AuthService', () => {
       refreshSecret: 'refresh-secret',
     });
 
-    // The selected org is re-validated by internal id and reused for the token claim.
+    // The selected organization is re-validated by internal id and reused for the token claim.
     expect(resolve.findUserActiveOrganizationPublicIdByInternalId).toHaveBeenCalledWith(1, 42);
     expect(resolve.resolveDefaultActiveOrganizationPublicId).not.toHaveBeenCalled();
     expect(jwt.signAccessToken).toHaveBeenCalledWith(
@@ -401,7 +405,7 @@ describe('AuthService', () => {
     );
   });
 
-  it('AUTH-14: refreshToken falls back to the default org when the persisted org is no longer a valid membership', async () => {
+  it('AUTH-14: refreshToken falls back to the default organization when the persisted organization is no longer a valid membership', async () => {
     const resolve = await import(
       '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
     );
@@ -412,7 +416,7 @@ describe('AuthService', () => {
       expires_at: new Date(Date.now() + 86_400_000),
       is_revoked: false,
     } as never);
-    // Membership revoked / org deleted → re-validation returns undefined.
+    // Membership revoked / organization deleted → re-validation returns undefined.
     vi.mocked(resolve.findUserActiveOrganizationPublicIdByInternalId).mockResolvedValue(undefined);
     vi.mocked(resolve.resolveDefaultActiveOrganizationPublicId).mockResolvedValue('org_default');
 
@@ -424,7 +428,7 @@ describe('AuthService', () => {
     expect(resolve.resolveDefaultActiveOrganizationPublicId).toHaveBeenCalledWith(1);
   });
 
-  it('AUTH-15: switchToOrganization persists the selected org on the session for refresh to preserve', async () => {
+  it('AUTH-15: switchToOrganization persists the selected organization on the session for refresh to preserve', async () => {
     const resolve = await import(
       '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
     );
@@ -448,11 +452,59 @@ describe('AuthService', () => {
     );
   });
 
-  it('switchToPersonal self-heals the personal org via ensurePersonalOrganization (no 404 when personal is enabled)', async () => {
+  /**
+   * `switchToOrganization`'s two user-scoped reads — the user record and the membership gate —
+   * both run under `app.current_user_public_id` set to the SAME value, so they must share ONE context
+   * and therefore one pooled checkout. Splitting them back into a context each is invisible in
+   * the response and only shows up as connection pressure under load, so it is pinned here.
+   *
+   * The session rebind is asserted to run AFTER that context closes. It writes under
+   * `app.current_session_public_id` — a different guc — so it needs its own transaction; nesting
+   * it would hold the user checkout open across it and make the request peak at two concurrent
+   * connections instead of taking them one after another.
+   */
+  it('runs both user-scoped reads in ONE database context and rebinds the session outside it', async () => {
     const resolve = await import(
       '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
     );
-    // ensurePersonalOrganization provisions on demand → returns the (possibly just-created) org.
+    const databaseContext = await import('@/infrastructure/database/contexts/database-context.js');
+    vi.mocked(resolve.findUserActiveOrganizationByPublicId).mockResolvedValue({
+      id: 9,
+      public_id: 'org_team',
+    });
+
+    const order: string[] = [];
+    vi.mocked(databaseContext.withAppDatabaseContext).mockImplementation(
+      // The real signature hands the callback a pinned database handle; the mock never touches
+      // it, so it is passed through as `never` rather than fabricating a fake handle.
+      (async (_scope: unknown, callback: (handle: never) => Promise<unknown>) => {
+        order.push('context:open');
+        const result = await callback(undefined as never);
+        order.push('context:close');
+        return result;
+      }) as unknown as typeof databaseContext.withAppDatabaseContext,
+    );
+    vi.mocked(authSessionService.rebindAccessToken).mockImplementation(async () => {
+      order.push('session:rebind');
+      return undefined;
+    });
+
+    await service.switchToOrganization({
+      userPublicId: user.public_id,
+      sessionPublicId: 'session_public',
+      organizationPublicId: 'org_team',
+    });
+
+    // One context for the whole route. Two would mean the same guc set twice, in two checkouts.
+    expect(databaseContext.withAppDatabaseContext).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['context:open', 'context:close', 'session:rebind']);
+  });
+
+  it('switchToPersonal self-heals the personal organization via ensurePersonalOrganization (no 404 when personal is enabled)', async () => {
+    const resolve = await import(
+      '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js'
+    );
+    // ensurePersonalOrganization provisions on demand → returns the (possibly just-created) organization.
     vi.mocked(resolve.ensurePersonalOrganization).mockResolvedValue({
       id: 7,
       public_id: 'org_personal',

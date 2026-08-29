@@ -14,9 +14,9 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
 /**
  * audit-#3: organization switching only re-bound the access-token hash; the
- * selected org was not persisted on the session, so `/auth/refresh` recomputed
- * the DEFAULT active organization and silently moved the caller off the org they
- * had switched to. The fix persists the active org on the session and refresh
+ * selected organization was not persisted on the session, so `/auth/refresh` recomputed
+ * the DEFAULT active organization and silently moved the caller off the organization they
+ * had switched to. The fix persists the active organization on the session and refresh
  * revalidates + preserves it. These tests drive the real HTTP login → switch →
  * refresh flow and assert the refreshed JWT `org` claim.
  */
@@ -34,7 +34,7 @@ describe('refresh preserves the switched active organization (audit-#3)', () => 
 
   beforeEach(async () => {
     await cleanupDatabase();
-    // Full catalog: provisionOrganizationWithOwner grants billing codes for TEAM orgs.
+    // Full catalog: provisionOrganizationWithOwner grants billing codes for TEAM organizations.
     await seedAllPermissions();
   });
 
@@ -52,13 +52,13 @@ describe('refresh preserves the switched active organization (audit-#3)', () => 
     return String(sessionHeader).split(';')[0]!.trim();
   }
 
-  it('refresh keeps the org claim on the organization the caller switched to', async () => {
+  it('refresh keeps the organization claim on the organization the caller switched to', async () => {
     const { user, password } = await createTestUserWithPassword();
-    // Default active org at login is the personal org; the caller then switches to TEAM org B.
+    // Default active organization at login is the personal organization; the caller then switches to TEAM organization B.
     const personal = await provisionPersonalOrganization(user.id);
-    const orgB = await provisionOrganizationWithOwner({
+    const organizationB = await provisionOrganizationWithOwner({
       name: 'Refresh Org B',
-      slug: `refresh-org-b-${generatePublicId('organization').slice(4, 14)}`,
+      slug: `refresh-organization-b-${generatePublicId('organization').slice(4, 14)}`,
       type: 'TEAM',
       ownerUserId: user.id,
     });
@@ -78,12 +78,12 @@ describe('refresh preserves the switched active organization (audit-#3)', () => 
       method: 'POST',
       url: testApiPath('/auth/switch-to-organization'),
       headers: { authorization: `Bearer ${loginToken}` },
-      payload: { organization_id: orgB.organization.public_id },
+      payload: { organization_id: organizationB.organization.public_id },
     });
     expect(switchResponse.statusCode).toBe(200);
     const switchedToken = (switchResponse.json() as { data: { access_token: string } }).data
       .access_token;
-    expect(decodeOrgClaim(switchedToken)).toBe(orgB.organization.public_id);
+    expect(decodeOrgClaim(switchedToken)).toBe(organizationB.organization.public_id);
 
     const refreshResponse = await app.inject({
       method: 'POST',
@@ -95,11 +95,11 @@ describe('refresh preserves the switched active organization (audit-#3)', () => 
     const refreshedToken = (refreshResponse.json() as { data: { access_token: string } }).data
       .access_token;
 
-    // The crux of audit-#3: refresh must NOT silently revert to the personal/default org.
-    expect(decodeOrgClaim(refreshedToken)).toBe(orgB.organization.public_id);
+    // The crux of audit-#3: refresh must NOT silently revert to the personal/default organization.
+    expect(decodeOrgClaim(refreshedToken)).toBe(organizationB.organization.public_id);
   });
 
-  it('refresh falls back to the default org when the persisted membership is no longer valid', async () => {
+  it('refresh falls back to the default organization when the persisted membership is no longer valid', async () => {
     const { user, password } = await createTestUserWithPassword();
     const personal = await provisionPersonalOrganization(user.id);
 
@@ -111,7 +111,7 @@ describe('refresh preserves the switched active organization (audit-#3)', () => 
     expect(loginResponse.statusCode).toBe(200);
     const cookie = sessionCookie(loginResponse.headers);
 
-    // No switch performed → session has no persisted org → refresh resolves the default.
+    // No switch performed → session has no persisted organization → refresh resolves the default.
     const refreshResponse = await app.inject({
       method: 'POST',
       url: testApiPath('/auth/refresh'),

@@ -9,7 +9,7 @@ import { webhookDeliveryJobDataSchema } from '@/domains/notify/sub-domains/webho
  * job schemas and had no test at all.
  *
  * Unlike the notification schema, `organizationPublicId` is **non-nullable**: every delivery
- * attempt belongs to a tenant, and the worker uses this value to open the org database context
+ * attempt belongs to a tenant, and the worker uses this value to open the organization database context
  * that RLS keys on. A null slipping through would mean an unscoped read.
  */
 describe('webhookDeliveryJobDataSchema', () => {
@@ -65,7 +65,7 @@ describe('webhookDeliveryJobDataSchema', () => {
   });
 
   it('rejects a null organizationPublicId — every delivery is tenant-scoped', () => {
-    // The worker opens withOrganizationContext from this value. A null here would mean the
+    // The worker opens withAppDatabaseContext from this value. A null here would mean the
     // attempt row is read outside the RLS scope it belongs to.
     const parsed = webhookDeliveryJobDataSchema.safeParse({
       deliveryAttemptId: 7,

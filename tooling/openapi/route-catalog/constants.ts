@@ -16,7 +16,7 @@ export const ROUTE_ORG_SCOPE_PATH = join(
   'tooling',
   'openapi',
   'route-catalog',
-  'route-org-scope.json',
+  'route-organization-scope.json',
 );
 export const METHOD_ORDER = ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'] as const;
 

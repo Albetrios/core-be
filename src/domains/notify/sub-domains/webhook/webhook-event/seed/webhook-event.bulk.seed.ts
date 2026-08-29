@@ -9,7 +9,7 @@
  * missing remainder up to the per-webhook target, so a re-run with the same counts is a no-op.
  */
 import { eq, like, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   webhook_delivery_attempts,
   webhooks,

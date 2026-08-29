@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
@@ -8,7 +12,6 @@ import {
   grantCoreBeAppRoleForTests,
   executeAsCoreBeAppTenant,
 } from '@/tests/helpers/rls-matrix.helper.js';
-import { withSystemAuditInsertContext } from '@/infrastructure/database/contexts/system-audit-insert-database.context.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
 /**
@@ -16,18 +19,18 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
  *
  * `audit.outbox` is the request-time staging table for the audit ledger. Its INSERT policy
  * (`audit_outbox_tenant_isolation_insert`) only passes when the row's `organization_public_id`
- * matches `app.current_organization_id` (org-scoped rows) OR `organization_public_id IS NULL` AND
+ * matches `app.current_organization_public_id` (organization-scoped rows) OR `organization_public_id IS NULL` AND
  * `app.system_audit_insert = 'true'` (tenantless rows). There is NO user arm.
  *
- * Post-sec-M4 the per-request org RLS transaction is a no-op, and HTTP controllers emit audit AFTER
- * the service's `withOrganizationDatabaseContext` block has already closed — so `AuditService.record`
+ * Post-sec-M4 the per-request organization RLS transaction is a no-op, and HTTP controllers emit audit AFTER
+ * the service's `withAppDatabaseContext` block has already closed — so `AuditService.record`
  * used to call `insertAuditOutboxRow` on the bare pool with NO GUC set. Under the production
  * `core_be_app` role (FORCE/ENABLE RLS, NOBYPASSRLS) the WITH CHECK rejected EVERY such INSERT, and
  * `recordAuditEvent` swallowed the error — so the production audit trail was silently dropped. The
  * harness never caught it because tests run as the superuser `core` owner role, which bypasses RLS.
  *
- * The fix opens the matching context inside `AuditService.record`: org rows under
- * `withOrganizationDatabaseContext`, tenantless rows under `withSystemAuditInsertContext`. These
+ * The fix opens the matching context inside `AuditService.record`: organization rows under
+ * `withAppDatabaseContext`, tenantless rows under `withMaintenanceDatabaseContext`. These
  * tests prove the policy behavior under `SET LOCAL ROLE core_be_app`.
  */
 
@@ -62,7 +65,7 @@ describe('Security: audit.outbox INSERT RLS (audit R10)', () => {
     await cleanupDatabase();
   });
 
-  it('R10 BUG: plain core_be_app (no GUC) CANNOT INSERT an org-scoped outbox row', async () => {
+  it('R10 BUG: plain core_be_app (no GUC) CANNOT INSERT an organization-scoped outbox row', async () => {
     const owner = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: owner.id });
 
@@ -109,7 +112,7 @@ describe('Security: audit.outbox INSERT RLS (audit R10)', () => {
     expect(flattenErrorChain(caught)).toMatch(/row-level security|permission denied/i);
   });
 
-  it('R10 FIX: core_be_app under organization context CAN INSERT the org-scoped outbox row', async () => {
+  it('R10 FIX: core_be_app under organization context CAN INSERT the organization-scoped outbox row', async () => {
     const owner = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: owner.id });
 
@@ -127,7 +130,8 @@ describe('Security: audit.outbox INSERT RLS (audit R10)', () => {
   it('R10 FIX: core_be_app under system-audit-insert context CAN INSERT the tenantless outbox row', async () => {
     let caught: unknown;
     try {
-      await withSystemAuditInsertContext(
+      await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT,
         (databaseHandle) => databaseHandle.execute(outboxInsertSql(null)),
         { useApplicationDatabaseRole: true },
       );
@@ -137,7 +141,7 @@ describe('Security: audit.outbox INSERT RLS (audit R10)', () => {
 
     expect(
       caught,
-      'tenantless INSERT under withSystemAuditInsertContext must succeed',
+      'tenantless INSERT under withMaintenanceDatabaseContext must succeed',
     ).toBeUndefined();
     const rows = await sql<{ count: string }[]>`
       SELECT COUNT(*)::text AS count FROM audit.outbox

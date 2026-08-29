@@ -17,7 +17,7 @@ import { processSubscriptionSeatSyncJob } from '@/domains/billing/sub-domains/su
 
 /**
  * Subset of {@link BillingContainer} the seat-sync worker needs (REQ-4): just the subscription
- * service, which manages its own org DB contexts and the Stripe quantity push.
+ * service, which manages its own organization DB contexts and the Stripe quantity push.
  *
  * @remarks
  * - **Algorithm:** structural `Pick` over the billing container.
@@ -42,7 +42,7 @@ export type SubscriptionSeatSyncWorkerBillingContainer = Pick<
  *   are warn-logged; poison payloads are dead-lettered by `parseJobDataOrDeadLetter`.
  * - **Side effects:** holds a Redis connection until the returned {@link WorkerHandle} is closed.
  * - **Notes:** the subscription service must be sourced from the worker composition root; the worker
- *   never instantiates services itself. `usesPostgres` true (the service opens org contexts).
+ *   never instantiates services itself. `usesPostgres` true (the service opens organization contexts).
  */
 export function createSubscriptionSeatSyncWorker(
   billingContainer: SubscriptionSeatSyncWorkerBillingContainer,
@@ -56,8 +56,8 @@ export function createSubscriptionSeatSyncWorker(
         job,
         queueName: SUBSCRIPTION_SEAT_SYNC_QUEUE_NAME,
       });
-      // Tenant-scoped job: the org public id rides in the payload (validated above) so the worker
-      // boundary is observably tenant-aware before the service re-enters the org RLS context.
+      // Tenant-scoped job: the organization public id rides in the payload (validated above) so the worker
+      // boundary is observably tenant-aware before the service re-enters the organization RLS context.
       const { organizationPublicId, requestId } = jobData;
       logger.info(
         { jobId: job.id, organizationPublicId, requestId },

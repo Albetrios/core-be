@@ -17,9 +17,9 @@ import { authSchema } from '@/infrastructure/database/pg-schemas.js';
  * `auth.users` — canonical platform identity table. Soft-deleted via `deleted_at` so audit and
  * billing FKs stay intact; the unique-by-email partial index excludes deleted rows so an address
  * can be reused after offboarding. Trigram indexes power admin search by email and display name;
- * lockout fields drive failed-login throttling. FORCE RLS-gated (audit #7) by `app.current_user_id`
- * (owner self-access via `withUserDatabaseContext`) or `app.global_admin` (cross-user admin via
- * `withGlobalAdminDatabaseContext`); pre-session reads go through the `auth.resolve_user_*`
+ * lockout fields drive failed-login throttling. FORCE RLS-gated (audit #7) by `app.current_user_public_id`
+ * (owner self-access via `withAppDatabaseContext (user scope)`) or `app.global_admin` (cross-user admin via
+ * `withMaintenanceDatabaseContext`); pre-session reads go through the `auth.resolve_user_*`
  * SECURITY DEFINER resolvers.
  */
 export const users = authSchema
@@ -42,7 +42,7 @@ export const users = authSchema
       is_mfa_enabled: boolean('is_mfa_enabled').notNull().default(false),
       // Stamped when the user finishes the onboarding wizard. NULL = not yet
       // onboarded → the frontend routes every fresh user (personal or team) through
-      // onboarding once, regardless of whether a personal org is auto-provisioned.
+      // onboarding once, regardless of whether a personal organization is auto-provisioned.
       onboarding_completed_at: timestamp('onboarding_completed_at', { withTimezone: true }),
       status: varchar('status', { length: 20 }).notNull().default('ACTIVE'),
       last_active_at: timestamp('last_active_at', { withTimezone: true }),
@@ -86,13 +86,14 @@ export const users = authSchema
         to: 'public',
         using: sql`(
           (
-            ${table.public_id} = current_setting('app.current_user_id', true)
+            ${table.public_id} = current_setting('app.current_user_public_id', true)
             AND ${table.deleted_at} IS NULL
           )
           OR current_setting('app.global_admin', true) = 'true'
+          OR current_setting('app.global_retention_cleanup', true) = 'true'
         )`,
         withCheck: sql`(
-          ${table.public_id} = current_setting('app.current_user_id', true)
+          ${table.public_id} = current_setting('app.current_user_public_id', true)
           OR current_setting('app.global_admin', true) = 'true'
         )`,
       }),

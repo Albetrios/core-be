@@ -4,8 +4,11 @@ import { database } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { stripe_webhook_events } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook.schema.js';
 import { runStripeWebhookEventRetentionJob } from '@/domains/billing/sub-domains/stripe-webhook/workers/stripe-webhook-event-retention.processor.js';
-import { withSystemTableRetentionContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { env } from '@/shared/config/env.config.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
@@ -45,8 +48,9 @@ describe('runStripeWebhookEventRetentionJob (database)', () => {
   }
 
   async function runRetention() {
-    return withSystemTableRetentionContext((databaseHandle) =>
-      runStripeWebhookEventRetentionJob(databaseHandle),
+    return withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.SYSTEM_TABLE_RETENTION,
+      (databaseHandle) => runStripeWebhookEventRetentionJob(databaseHandle),
     );
   }
 

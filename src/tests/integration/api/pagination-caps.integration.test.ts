@@ -33,7 +33,11 @@ describe('Pagination caps — integration', () => {
 
   it('GET /notifications rejects limit above 100', async () => {
     const user = await createTestUser();
-    const token = await generateTestToken({ userId: user.public_id });
+    const organization = await createTestOrganization({ ownerUserId: user.id });
+    const token = await generateTestToken({
+      userId: user.public_id,
+      organizationPublicId: organization.public_id,
+    });
     const response = await injectAuthenticated(app, {
       method: 'GET',
       url: testApiPath('/notify/notifications'),
@@ -44,8 +48,8 @@ describe('Pagination caps — integration', () => {
   });
 
   // The admin invitations list route was removed in REQ-1 (adding a member now issues the invitation
-  // via POST /organization/memberships). Retargeted to the remaining org-scoped cursor-paginated list
-  // route so the org-scoped pagination cap stays covered.
+  // via POST /organization/memberships). Retargeted to the remaining organization-scoped cursor-paginated list
+  // route so the organization-scoped pagination cap stays covered.
   it('GET /organization/memberships rejects limit above 100', async () => {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });

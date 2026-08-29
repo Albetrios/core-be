@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { grantCoreBeAppRoleForTests } from '@/tests/helpers/rls-matrix.helper.js';
-import { withSystemAuditInsertContext } from '@/infrastructure/database/contexts/system-audit-insert-database.context.js';
 
 /**
  * Regression for sec-r5-async-queue-1.
@@ -60,7 +63,8 @@ describe('Security: audit.logs INSERT system-audit arm (sec-r5-async-queue-1)', 
 
     let caught: unknown;
     try {
-      await withSystemAuditInsertContext(
+      await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT,
         async (databaseHandle) => {
           await databaseHandle.execute(
             drizzleSql`INSERT INTO audit.logs (organization_id, actor_user_id, action, resource_type, metadata, severity)
@@ -75,7 +79,7 @@ describe('Security: audit.logs INSERT system-audit arm (sec-r5-async-queue-1)', 
 
     expect(
       caught,
-      'tenantless INSERT under withSystemAuditInsertContext must succeed',
+      'tenantless INSERT under withMaintenanceDatabaseContext must succeed',
     ).toBeUndefined();
 
     const inserted = await sql<{ count: string }[]>`
@@ -92,7 +96,8 @@ describe('Security: audit.logs INSERT system-audit arm (sec-r5-async-queue-1)', 
 
     let caught: unknown;
     try {
-      await withSystemAuditInsertContext(
+      await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT,
         async (databaseHandle) => {
           // Attempt to pin a real tenant on the row while only the
           // system-audit-insert GUC is active. The new arm requires

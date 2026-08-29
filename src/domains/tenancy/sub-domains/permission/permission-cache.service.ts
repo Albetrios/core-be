@@ -20,7 +20,7 @@ const PERMISSION_CACHE_JITTER_MAX_SECONDS = 61;
  *
  * @remarks
  * Sized to ~90% of the recompute-lock TTL (was a fixed 40 ≈ 2s) so waiters wait
- * for the lock holder's recompute — which can exceed 2s for a large org or a DB
+ * for the lock holder's recompute — which can exceed 2s for a large organization or a DB
  * under load — instead of stampeding into N concurrent uncached 5-table joins.
  * Only a genuinely dead holder (lock expired at its TTL) makes a waiter recompute.
  * Waiters still exit the moment the cache populates, so the common fast-recompute
@@ -45,7 +45,7 @@ const PERMISSION_CACHE_RELEASE_LOCK_IF_HELD_LUA =
   "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end; return 0";
 
 /**
- * Atomically bumps the org cache-version (`INCR`) and (re)sets its TTL in one round-trip.
+ * Atomically bumps the organization cache-version (`INCR`) and (re)sets its TTL in one round-trip.
  * The TTL prevents the version key from lingering forever (audit-#T3 Redis hygiene) while
  * staying far longer than any data-key TTL, so a version-key expiry can never resurrect a
  * stale versioned entry — every data key from that epoch expired long before.
@@ -54,7 +54,7 @@ const PERMISSION_CACHE_BUMP_VERSION_LUA =
   "local v = redis.call('INCR', KEYS[1]); redis.call('EXPIRE', KEYS[1], ARGV[1]); return v";
 
 /**
- * TTL for the per-org cache-version key. Must comfortably exceed the maximum data-key TTL
+ * TTL for the per-organization cache-version key. Must comfortably exceed the maximum data-key TTL
  * ({@link PERMISSION_CACHE_DEFAULT_TTL_SECONDS} + jitter ≈ 6 min) so the invariant
  * "version-key TTL ≫ data-key TTL" holds: by the time an idle org's version key could expire,
  * every `perm:<version>:*` entry it namespaced has already expired, making a reset to 0 harmless.
@@ -66,7 +66,7 @@ function buildOrganizationVersionKey(organizationId: string): string {
 }
 
 /**
- * Read the org cache version. Absent/empty means "never invalidated" and maps to version 0
+ * Read the organization cache version. Absent/empty means "never invalidated" and maps to version 0
  * (a legitimate value). A Redis error or a corrupt (non-integer) value THROWS rather than
  * masquerading as `0`: security-critical callers ({@link invalidatePermissions}) must surface
  * the failure to Sentry instead of silently deleting the wrong `perm:0:*` key, and read callers
@@ -82,7 +82,7 @@ async function getOrganizationCacheVersion(organizationId: string): Promise<numb
   return parsed;
 }
 
-/** Atomically bumps the org cache-version and refreshes its TTL (see {@link PERMISSION_CACHE_BUMP_VERSION_LUA}). */
+/** Atomically bumps the organization cache-version and refreshes its TTL (see {@link PERMISSION_CACHE_BUMP_VERSION_LUA}). */
 async function bumpOrganizationCacheVersion(organizationId: string): Promise<void> {
   await redisConnection.eval(
     PERMISSION_CACHE_BUMP_VERSION_LUA,
@@ -93,7 +93,7 @@ async function bumpOrganizationCacheVersion(organizationId: string): Promise<voi
 }
 
 /**
- * Build the Redis key for a user's organization permissions, scoped by the org cache version
+ * Build the Redis key for a user's organization permissions, scoped by the organization cache version
  * so we can invalidate per-organization with a single INCR (no SCAN sweep).
  */
 function buildKey(version: number, userId: string, organizationId: string): string {
@@ -109,7 +109,7 @@ function buildRecomputeLockKey(userId: string, organizationId: string): string {
  * Returns null if not cached.
  *
  * @remarks
- * - **Algorithm:** reads the org cache version (defaulting to 0 if unset),
+ * - **Algorithm:** reads the organization cache version (defaulting to 0 if unset),
  *   then `GET`s the versioned key built by {@link buildKey} and `JSON.parse`s
  *   the value.
  * - **Failure modes:** Redis errors are caught, logged
@@ -118,7 +118,7 @@ function buildRecomputeLockKey(userId: string, organizationId: string): string {
  * - **Side effects:** none — read-only Redis lookups; never blocks the
  *   request path.
  * - **Notes:** versioned keys are why
- *   {@link invalidateOrganizationPermissions} can purge an entire org with a
+ *   {@link invalidateOrganizationPermissions} can purge an entire organization with a
  *   single `INCR` instead of a SCAN.
  */
 export async function getCachedPermissions(
@@ -140,7 +140,7 @@ export async function getCachedPermissions(
  * Cache permission codes for a user in an organization.
  *
  * @remarks
- * - **Algorithm:** reads the current org cache version and writes the JSON
+ * - **Algorithm:** reads the current organization cache version and writes the JSON
  *   array under the versioned key with a TTL of
  *   `ttlSeconds + jitter (0..60s)` so a stampede of expirations is smeared
  *   across a minute.
@@ -196,7 +196,7 @@ interface CommitCachedPermissionsOptions {
  * - **Side effects:** at most one Redis `SET` under `perm:<version>:...`.
  * - **Notes:** two guards prevent re-caching stale permissions — the lock-nonce compare-and-set
  *   (a concurrent per-user {@link invalidatePermissions} deleted the lock → this write is a
- *   no-op), and the captured `version` (a concurrent org-wide
+ *   no-op), and the captured `version` (a concurrent organization-wide
  *   {@link invalidateOrganizationPermissions} bumped the version during the recompute → this
  *   write lands in the now-orphaned old namespace instead of the live one). The latter closes
  *   audit-#H1, where re-reading the version at commit time let a stale set be published under
@@ -239,7 +239,7 @@ async function commitCachedPermissionsIfLockHeld(
  *   (`permission-cache.lock.acquire.failed`) and the caller falls back to a
  *   direct `recompute()` without locking — the database carries the load.
  *   `recompute()` errors propagate to the caller.
- * - **Side effects:** Redis SET/DEL on `perm:lock:<user>:<org>`; one
+ * - **Side effects:** Redis SET/DEL on `perm:lock:<user>:<organization>`; one
  *   Postgres-hitting `recompute()` per stampede on the happy path; cache
  *   write through {@link commitCachedPermissionsIfLockHeld}.
  * - **Notes:** the lock TTL is
@@ -302,8 +302,8 @@ export async function withPermissionCacheRecomputeLock(
       );
     }
 
-    // Bind the org cache version captured BEFORE the recompute's DB read (audit-#H1). If a
-    // concurrent org-wide invalidation INCRs the version during the recompute, this captured
+    // Bind the organization cache version captured BEFORE the recompute's DB read (audit-#H1). If a
+    // concurrent organization-wide invalidation INCRs the version during the recompute, this captured
     // value is now stale, so the commit lands in the orphaned old namespace (harmless) instead
     // of publishing the pre-invalidation set under the live version. A version-read failure
     // means we cannot bind safely, so we skip caching and just serve the fresh result.
@@ -354,8 +354,8 @@ export async function withPermissionCacheRecomputeLock(
  *   (`permission-cache.invalidate.failed`); the function still resolves so
  *   callers (membership create/update) never block on cache invalidation.
  * - **Side effects:** Redis `DEL` of two keys.
- * - **Notes:** for org-wide changes (e.g. role-permission set replaced),
- *   prefer {@link invalidateOrganizationPermissions}, which bumps the org
+ * - **Notes:** for organization-wide changes (e.g. role-permission set replaced),
+ *   prefer {@link invalidateOrganizationPermissions}, which bumps the organization
  *   version with a single `INCR` and orphans every per-user key at once.
  */
 export async function invalidatePermissions(userId: string, organizationId: string): Promise<void> {
@@ -377,9 +377,9 @@ export async function invalidatePermissions(userId: string, organizationId: stri
       tags: { subsystem: 'permission-cache', operation: 'invalidate' },
     });
     // Backstop (audit-#T1): we could not target the user's key (version read or DEL failed, e.g.
-    // a transient blip that returned a wrong/`0` version). Best-effort bump the org version so
-    // the stale per-user entry is orphaned org-wide rather than served until its TTL. This
-    // over-invalidates the org (everyone recomputes once) — the security-favouring tradeoff. If
+    // a transient blip that returned a wrong/`0` version). Best-effort bump the organization version so
+    // the stale per-user entry is orphaned organization-wide rather than served until its TTL. This
+    // over-invalidates the organization (everyone recomputes once) — the security-favouring tradeoff. If
     // Redis is fully down this also fails, harmlessly.
     try {
       await bumpOrganizationCacheVersion(organizationId);
@@ -396,17 +396,17 @@ export async function invalidatePermissions(userId: string, organizationId: stri
  * see the bumped version and operate on a fresh namespace.
  *
  * @remarks
- * - **Algorithm:** atomically bumps `perm:org:<org>:v` via `INCR` and refreshes its
+ * - **Algorithm:** atomically bumps `perm:org:<organization>:v` via `INCR` and refreshes its
  *   TTL in one Lua round-trip ({@link bumpOrganizationCacheVersion}). All subsequent
  *   reads/writes go through {@link buildKey} with the new version, so every previously
- *   cached entry for the org is instantly unreachable.
+ *   cached entry for the organization is instantly unreachable.
  * - **Failure modes:** Redis errors are caught and logged
  *   (`permission-cache.invalidate-organization.failed`); the function still
  *   resolves so callers (role/permission edits) never block on cache
  *   invalidation.
  * - **Side effects:** single Redis `INCR` + `EXPIRE`; orphans existing keys which
  *   expire naturally via their TTL — keeps invalidation O(1).
- * - **Notes:** use this whenever a change can affect many users in the org
+ * - **Notes:** use this whenever a change can affect many users in the organization
  *   (e.g. a role's permission set is replaced); per-user changes can use the
  *   narrower {@link invalidatePermissions}.
  */
@@ -414,7 +414,7 @@ export async function invalidateOrganizationPermissions(organizationId: string):
   try {
     await bumpOrganizationCacheVersion(organizationId);
   } catch (error) {
-    // Same privilege-retention risk as invalidatePermissions, org-wide: a failed version bump
+    // Same privilege-retention risk as invalidatePermissions, organization-wide: a failed version bump
     // leaves every user's cached permission set live until TTL. Surface to Sentry.
     logger.warn({ error }, 'permission-cache.invalidate-organization.failed');
     captureException(error, {

@@ -1,5 +1,5 @@
 import { getActiveOrganizationRlsCheckoutCount } from '@/infrastructure/database/pool/organization-rls-checkout-counter.js';
-import { isWorkerRuntime } from '@/infrastructure/database/contexts/worker-database.context.js';
+import { isWorkerRuntime } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { getWorkerPostgresPoolDemandContext } from '@/infrastructure/queue/worker-runtime/worker-pool-demand-context.js';
 import { env } from '@/shared/config/env.config.js';
 import { captureMessage } from '@/infrastructure/observability/sentry/sentry.js';
@@ -21,7 +21,7 @@ export type PoolPressureLevel = 'ok' | 'warn' | 'critical';
 
 /**
  * One-shot snapshot returned by {@link evaluatePoolExhaustionAndAlert} — overall
- * level plus the raw signals (in-process org-RLS checkouts and cluster active
+ * level plus the raw signals (in-process organization-RLS checkouts and cluster active
  * connection counts) the decision was based on.
  *
  * @remarks
@@ -239,7 +239,7 @@ function resolveOverallPressureLevel(parameters: {
  *
  * @remarks
  * - **Algorithm:** computes `warn`/`critical` thresholds from
- *   `poolMaxConnections × DATABASE_POOL_ACTIVE_*_RATIO` (in-process org RLS
+ *   `poolMaxConnections × DATABASE_POOL_ACTIVE_*_RATIO` (in-process organization RLS
  *   checkouts) and `allowedApplicationConnections × DATABASE_POOL_CLUSTER_*_RATIO`
  *   (cluster `pg_stat_activity`). Counters bump while over-threshold and reset
  *   to zero on `ok` or after an alert fires.

@@ -35,7 +35,7 @@ describe('PermissionRepository cross-organization isolation (database)', () => {
     expect(codes).toEqual([]);
   });
 
-  it('returns empty permission set for user whose membership in org is soft-deleted', async () => {
+  it('returns empty permission set for user whose membership in organization is soft-deleted', async () => {
     const owner = await createTestUser({ email: 'owner-soft-deleted@example.com' });
     const member = await createTestUser({ email: 'member-soft-deleted@example.com' });
     const organization = await createTestOrganization({ ownerUserId: owner.id });
@@ -105,16 +105,16 @@ describe('PermissionRepository cross-organization isolation (database)', () => {
     expect(suspendedCodes).toEqual([]);
   });
 
-  it('does not leak permissions across organizations (user in org A returns empty for org B)', async () => {
-    const owner = await createTestUser({ email: 'cross-org-owner@example.com' });
-    const member = await createTestUser({ email: 'cross-org-member@example.com' });
+  it('does not leak permissions across organizations (user in organization A returns empty for organization B)', async () => {
+    const owner = await createTestUser({ email: 'cross-organization-owner@example.com' });
+    const member = await createTestUser({ email: 'cross-organization-member@example.com' });
     const organizationA = await createTestOrganization({
       ownerUserId: owner.id,
-      slug: 'cross-org-a',
+      slug: 'cross-organization-a',
     });
     const organizationB = await createTestOrganization({
       ownerUserId: owner.id,
-      slug: 'cross-org-b',
+      slug: 'cross-organization-b',
     });
     const roleA = await createRoleWithPermissions({
       organizationId: organizationA.id,
@@ -148,8 +148,8 @@ describe('PermissionRepository cross-organization isolation (database)', () => {
   });
 
   it('returns empty permission set when the organization is soft-deleted', async () => {
-    const owner = await createTestUser({ email: 'owner-deleted-org@example.com' });
-    const member = await createTestUser({ email: 'member-deleted-org@example.com' });
+    const owner = await createTestUser({ email: 'owner-deleted-organization@example.com' });
+    const member = await createTestUser({ email: 'member-deleted-organization@example.com' });
     const organization = await createTestOrganization({ ownerUserId: owner.id });
     const role = await createRoleWithPermissions({
       organizationId: organization.id,

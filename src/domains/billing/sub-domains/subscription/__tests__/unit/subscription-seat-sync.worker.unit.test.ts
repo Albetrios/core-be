@@ -150,8 +150,8 @@ describe('subscription-seat-sync.worker', () => {
     expect(call[0].job).toBe(job);
     expect(call[0].queueName).toBe('subscription-seat-sync');
     expect(call[0].schema).toBeDefined();
-    // Ordering matters: an unvalidated org id must never reach the processor, which uses it to
-    // re-enter the org RLS context.
+    // Ordering matters: an unvalidated organization id must never reach the processor, which uses it to
+    // re-enter the organization RLS context.
     expect(parseJobDataOrDeadLetterMock.mock.invocationCallOrder[0] as number).toBeLessThan(
       processSubscriptionSeatSyncJobMock.mock.invocationCallOrder[0] as number,
     );

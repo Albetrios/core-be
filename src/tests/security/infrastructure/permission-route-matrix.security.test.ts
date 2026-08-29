@@ -119,7 +119,7 @@ function idempotencyHeadersForPermissionRoute(
 }
 
 /**
- * Authorization matrix — every org-permission route from docs/routes.txt returns 403 without permission.
+ * Authorization matrix — every organization-permission route from docs/routes.txt returns 403 without permission.
  */
 describe('Security: Permission route matrix', () => {
   let app: FastifyInstance;

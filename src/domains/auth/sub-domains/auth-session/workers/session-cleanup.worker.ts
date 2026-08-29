@@ -1,4 +1,8 @@
 import { Worker } from 'bullmq';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import {
   getRetentionWorkerOptions,
@@ -9,7 +13,6 @@ import { SESSION_CLEANUP_QUEUE_NAME } from '@/domains/auth/sub-domains/auth-sess
 import { sessions } from '@/domains/auth/sub-domains/auth-session/auth-session.schema.js';
 import { lt, or, eq, and } from 'drizzle-orm';
 import { deleteInBatchesByCondition } from '@/infrastructure/database/utils/batch-delete.util.js';
-import { withSessionRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { env } from '@/shared/config/env.config.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
@@ -18,7 +21,7 @@ import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
  * BullMQ worker that purges expired and revoked rows from `auth.sessions`.
  *
  * @remarks
- * - **Algorithm:** runs under {@link withSessionRetentionCleanupDatabaseContext}
+ * - **Algorithm:** runs under {@link withMaintenanceDatabaseContext}
  *   so the RLS escape hatch is active, then uses {@link deleteInBatchesByCondition}
  *   to delete sessions whose `expires_at < now()` or which were revoked more than
  *   `AUTH_SESSION_RETENTION_DAYS` ago.
@@ -43,23 +46,26 @@ export function createSessionCleanupWorker(): WorkerHandle {
         'session-cleanup.starting',
       );
 
-      return withSessionRetentionCleanupDatabaseContext(async (databaseHandle) => {
-        const { deletedCount, blockedCount } = await deleteInBatchesByCondition({
-          databaseHandle,
-          table: sessions,
-          idColumn: sessions.id,
-          whereCondition: or(
-            lt(sessions.expires_at, new Date()),
-            and(eq(sessions.is_revoked, true), lt(sessions.created_at, cutoffDate)),
-          )!,
-          logContext: 'session-cleanup',
-          tableLabel: 'auth.sessions',
-        });
+      return withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP,
+        async (databaseHandle) => {
+          const { deletedCount, blockedCount } = await deleteInBatchesByCondition({
+            databaseHandle,
+            table: sessions,
+            idColumn: sessions.id,
+            whereCondition: or(
+              lt(sessions.expires_at, new Date()),
+              and(eq(sessions.is_revoked, true), lt(sessions.created_at, cutoffDate)),
+            )!,
+            logContext: 'session-cleanup',
+            tableLabel: 'auth.sessions',
+          });
 
-        logger.info({ deletedCount, blockedCount, retentionDays }, 'session-cleanup.completed');
+          logger.info({ deletedCount, blockedCount, retentionDays }, 'session-cleanup.completed');
 
-        return { deletedCount, blockedCount };
-      });
+          return { deletedCount, blockedCount };
+        },
+      );
     },
     {
       connection: getBullMQConnectionOptions(),

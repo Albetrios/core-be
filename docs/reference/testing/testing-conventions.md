@@ -260,7 +260,7 @@ describe("example.validator", () => {
 
 ## Related
 
-- [SETUP.md](../../../SETUP.md) § 4 Testing → **Running a live server for a frontend / loopback E2E suite** — the `.env.development` env a real `pnpm dev` server needs when an external suite (e.g. core-fe Playwright) hits it over loopback (`RATE_LIMIT_RELAXED_CAPS`, `DATABASE_TLS_ENFORCED`, `DATABASE_RLS_SAFETY_ENFORCED`, org-mode flags). In-process Vitest tiers and CI self-configure and need none of it.
+- [SETUP.md](../../../SETUP.md) § 4 Testing → **Running a live server for a frontend / loopback E2E suite** — the `.env.development` env a real `pnpm dev` server needs when an external suite (e.g. core-fe Playwright) hits it over loopback (`RATE_LIMIT_RELAXED_CAPS`, `DATABASE_TLS_ENFORCED`, `DATABASE_RLS_SAFETY_ENFORCED`, organization-mode flags). In-process Vitest tiers and CI self-configure and need none of it.
 - [sub-domains-layout.md](../architecture/sub-domains-layout.md) — test placement vs with/without routes
 - [api-testing.md](../../getting-started/api-testing.md) — manual smoke checklist
 - [documentation-system.md](../architecture/documentation-system.md) — layered docs ownership map

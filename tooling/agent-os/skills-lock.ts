@@ -5,7 +5,7 @@
  * Each skill's SKILL.md is hashed (sha256) and recorded in
  * agent-os/skills-lock.json alongside its source. Home-grown skills are
  * `sourceType: "local"`; skills vendored from an upstream repo record the
- * `source` (github org/repo) so upstream drift or local tampering is a failing
+ * `source` (github organization/repo) so upstream drift or local tampering is a failing
  * gate (agent-os/evals/check.ts recomputes and compares), not a silent change.
  *
  * Workflow: edit a skill → `pnpm agent-os:lock` (rewrite hashes) → commit both

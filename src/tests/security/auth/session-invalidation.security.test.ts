@@ -97,10 +97,10 @@ describe('Security: Session invalidation', () => {
     expect(response.statusCode).toBe(401);
   });
 
-  // NEGATIVE — a user with no membership in org B cannot reach org B's resources.
+  // NEGATIVE — a user with no membership in organization B cannot reach organization B's resources.
   //
   // Flat tenancy routes resolve the organization from the JWT `org` claim, so
-  // cross-tenant access is expressed by scoping user A's token to org B's claim:
+  // cross-tenant access is expressed by scoping user A's token to organization B's claim:
   // A holds no membership in B, so the flat settings route resolves to B and the
   // permission preHandler denies it (403). A forged claim is scope, not authority.
   it("should return 403 when a user's token claims an organization they don't belong to", async () => {
@@ -289,22 +289,22 @@ describe('Security: Session invalidation', () => {
   // access on its NEXT request. The claim is SCOPE, not AUTHORITY: requireOrganizationPermission
   // re-checks membership per request, and a membership change invalidates the permission cache.
   // This proves that revoking someone's membership takes effect immediately even though their
-  // bearer token (claim still = the org) is otherwise unexpired.
-  it('should return 403 on the next request after a member is removed (stale org-claim token loses access)', async () => {
-    // An ACTIVE owner-member of org A holds role:read (the owner role grants all tenancy perms).
+  // bearer token (claim still = the organization) is otherwise unexpired.
+  it('should return 403 on the next request after a member is removed (stale organization-claim token loses access)', async () => {
+    // An ACTIVE owner-member of organization A holds role:read (the owner role grants all tenancy perms).
     const user = await createTestUser();
-    const orgA = await provisionOrganizationWithOwner({
+    const organizationA = await provisionOrganizationWithOwner({
       name: 'M3 Org A',
-      slug: `m3-org-a-${generatePublicId('organization').slice(4, 14)}`,
+      slug: `m3-organization-a-${generatePublicId('organization').slice(4, 14)}`,
       type: 'TEAM',
       ownerUserId: user.id,
     });
     const { token } = await generateTestTokenAndSession({
       userId: user.public_id,
-      organizationPublicId: orgA.organization.public_id,
+      organizationPublicId: organizationA.organization.public_id,
     });
 
-    // Pre-condition: the org-scoped role:read route resolves the org from the claim and allows it.
+    // Pre-condition: the organization-scoped role:read route resolves the organization from the claim and allows it.
     const before = await injectAuthenticated(app, {
       method: 'GET',
       url: testApiPath('/tenancy/organization/roles'),
@@ -312,20 +312,20 @@ describe('Security: Session invalidation', () => {
     });
     expect(before.statusCode).toBe(200);
 
-    // Remove the user's membership in org A, exactly as the membership service does: soft-delete
-    // the row, then invalidate the per-(user, org) permission cache so the change is immediate.
+    // Remove the user's membership in organization A, exactly as the membership service does: soft-delete
+    // the row, then invalidate the per-(user, organization) permission cache so the change is immediate.
     await database
       .update(memberships)
       .set({ deleted_at: new Date() })
       .where(
         and(
           eq(memberships.user_id, user.id),
-          eq(memberships.organization_id, orgA.organization.id),
+          eq(memberships.organization_id, organizationA.organization.id),
         ),
       );
-    await invalidatePermissions(user.public_id, orgA.organization.public_id);
+    await invalidatePermissions(user.public_id, organizationA.organization.public_id);
 
-    // The SAME token (claim still = org A) now resolves zero permissions for a non-member →
+    // The SAME token (claim still = organization A) now resolves zero permissions for a non-member →
     // requireOrganizationPermission denies role:read with 403. The token was never re-minted.
     const after = await injectAuthenticated(app, {
       method: 'GET',

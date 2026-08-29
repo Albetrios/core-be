@@ -13,11 +13,11 @@ organizations, and how the active organization is carried as a signed token clai
   organizations via `memberships`.
 - **Self-heal guarantee:** signup-time provisioning is best-effort (swallowed on failure and
   gated on first-verification), so a user could historically be left personal-enabled but with
-  no `PERSONAL` row — dead-ending onboarding. The personal-org read path now **self-heals**:
-  `ensurePersonalOrganization(userId)` provisions the org on demand when
+  no `PERSONAL` row — dead-ending onboarding. The personal-organization read path now **self-heals**:
+  `ensurePersonalOrganization(userId)` provisions the organization on demand when
   `PERSONAL_ORGANIZATION_ENABLED` is true and it is missing. Both `GET /users/me`
   (`personal_organization_id`) and `POST /auth/switch-to-personal` go through it, so a
-  personal-enabled deployment can never leave a user without a personal org and
+  personal-enabled deployment can never leave a user without a personal organization and
   `switch-to-personal` can no longer 404 in hybrid/B2C mode. When personal is **disabled** the
   helper creates nothing (id stays `null`, `switch-to-personal` still 404s). Idempotent — the
   partial unique index absorbs any provision race and the helper re-resolves the winner.
@@ -43,11 +43,11 @@ TEAM_ORGANIZATION_ENABLED       (default true)   — at least one must be true
 
 | Mode   | PERSONAL | TEAM | Signup                        | Login default                                                             |
 | ------ | -------- | ---- | ----------------------------- | ------------------------------------------------------------------------- |
-| Hybrid | on       | on   | personal org auto-provisioned | personal org                                                              |
-| B2C    | on       | off  | personal org auto-provisioned | personal org                                                              |
+| Hybrid | on       | on   | personal organization auto-provisioned | personal organization                                                              |
+| B2C    | on       | off  | personal organization auto-provisioned | personal organization                                                              |
 | B2B    | off      | on   | nothing provisioned           | most-recent team, else **none** → frontend redirects to "create your own" |
 
-`GET /users/me` returns `personal_organization_id` so the frontend can render the org switcher.
+`GET /users/me` returns `personal_organization_id` so the frontend can render the organization switcher.
 Which organization kinds are enabled is a deployment setting the frontend reads from its own
 build-time flags (`VITE_PERSONAL_ORGANIZATIONS` / `VITE_TEAM_ORGANIZATIONS`); the backend is the
 enforcement authority (provisioning is gated on `PERSONAL_ORGANIZATION_ENABLED` /
@@ -73,31 +73,31 @@ TEAM_ORGANIZATION_ENABLED=true
 PERSONAL_ORGANIZATION_ENABLED=true
 TEAM_ORGANIZATION_ENABLED=false
 
-# B2B — team orgs only
+# B2B — team organizations only
 PERSONAL_ORGANIZATION_ENABLED=false
 TEAM_ORGANIZATION_ENABLED=true
 ```
 
-`MAX_TEAM_ORGANIZATIONS_PER_OWNER` (default 20) caps how many TEAM orgs one user may
-create; personal orgs are exempt.
+`MAX_TEAM_ORGANIZATIONS_PER_OWNER` (default 20) caps how many TEAM organizations one user may
+create; personal organizations are exempt.
 
 ```mermaid
 flowchart TD
     account["User account — always exists (auth, login)"]
-    account -->|PERSONAL_ORGANIZATION_ENABLED| personal["PERSONAL org<br/>auto @ signup · one per user · immutable"]
-    account -->|TEAM_ORGANIZATION_ENABLED| team["TEAM orgs (N)<br/>create / join · members · roles · billing"]
+    account -->|PERSONAL_ORGANIZATION_ENABLED| personal["PERSONAL organization<br/>auto @ signup · one per user · immutable"]
+    account -->|TEAM_ORGANIZATION_ENABLED| team["TEAM organizations (N)<br/>create / join · members · roles · billing"]
 ```
 
 ### Route effects by mode
 
 Route *registration* is identical in every mode — the flags never add or remove routes.
-Two mechanisms change behavior: the **deployment flags** (403 / 404) and the **active-org
-type** matrix (`assertTeamOrganization` → 422 when the active org is PERSONAL). Every route
-not listed operates on the active org regardless of type.
+Two mechanisms change behavior: the **deployment flags** (403 / 404) and the **active-organization
+type** matrix (`assertTeamOrganization` → 422 when the active organization is PERSONAL). Every route
+not listed operates on the active organization regardless of type.
 
 | Route                                                       | B2C (personal only)                 | Hybrid                      | B2B (team only)           |
 | ----------------------------------------------------------- | ----------------------------------- | --------------------------- | ------------------------- |
-| `POST /auth/switch-to-personal`                             | 200                                 | 200                         | **404** (no personal org) |
+| `POST /auth/switch-to-personal`                             | 200                                 | 200                         | **404** (no personal organization) |
 | `POST /auth/switch-to-organization`                         | — (no teams)                        | 200                         | 200                       |
 | `POST /tenancy/organizations` (create team)                 | **403** `teamOrganizationsDisabled` | 200                         | 200                       |
 | `GET /tenancy/organizations` (list teams)                   | 200 (empty)                         | 200                         | 200                       |
@@ -111,11 +111,11 @@ not listed operates on the active org regardless of type.
 | `POST /billing/subscriptions/{subscription_id}/cancel`      | **422**                             | 200 team · **422** personal | 200                       |
 | `POST /billing/subscriptions/{subscription_id}/resume`      | **422**                             | 200 team · **422** personal | 200                       |
 
-The 422s come from the org-type guard: `personalOrganizationNoMembers`
+The 422s come from the organization-type guard: `personalOrganizationNoMembers`
 (invitations / memberships), `personalOrganizationNoRoles` (roles),
 `personalOrganizationImmutable` (delete / transfer-ownership), and
 `personalOrganizationNoBilling` (subscription create / change-plan / cancel / resume —
-a personal org cannot manage billing). All other routes — auth,
+a personal organization cannot manage billing). All other routes — auth,
 `/users/*`, the rest of `/tenancy/organization/*` (settings, logo, api-keys, audit-logs,
 notification-policies, membership / role reads, leave), the rest of `/billing/*` (plan
 catalog, subscription reads + PATCH update, Stripe webhook), `/notify/*`,
@@ -123,16 +123,16 @@ catalog, subscription reads + PATCH update, Stripe webhook), `/notify/*`,
 
 ### Switching mode after launch
 
-- **`PERSONAL` off → on** (B2B → hybrid): existing users have no personal org. The read-path
+- **`PERSONAL` off → on** (B2B → hybrid): existing users have no personal organization. The read-path
   self-heal provisions one lazily on each user's next `GET /users/me` / `switch-to-personal`,
   so no backfill is strictly required; run `pnpm tool:backfill-personal-orgs` to provision them
   all up front (idempotent) rather than on first access.
 - **`TEAM` on → off** (hybrid → B2C): `POST /tenancy/organizations` returns
-  `403 teamOrganizationsDisabled`; existing team orgs are not deleted, only no longer
+  `403 teamOrganizationsDisabled`; existing team organizations are not deleted, only no longer
   creatable. The frontend hides team UI based on its own `VITE_TEAM_ORGANIZATIONS` build flag.
-- **`PERSONAL` on → off** (hybrid → B2B): no new personal orgs are provisioned and
+- **`PERSONAL` on → off** (hybrid → B2B): no new personal organizations are provisioned and
   `switch-to-personal` returns `404`; users default to their most-recent team (or the
-  onboarding redirect when they have none). Existing personal orgs persist until account
+  onboarding redirect when they have none). Existing personal organizations persist until account
   deletion.
 
 ## Token model (active organization = signed claim)
@@ -144,7 +144,7 @@ The active organization is a signed JWT claim (`org`), not a header or path para
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /auth/login` (and email verification-code / OAuth / WebAuthn) | mints the token with the default-organization `org` claim                                                                         |
 | `POST /auth/refresh`                                                | re-mints with the resolved `org` claim                                                                                            |
-| `POST /auth/switch-to-personal`                                     | no body; self-heals (provisions the personal org if missing when personal is enabled), then re-mints + re-binds the session to it |
+| `POST /auth/switch-to-personal`                                     | no body; self-heals (provisions the personal organization if missing when personal is enabled), then re-mints + re-binds the session to it |
 | `POST /auth/switch-to-organization { organization_id }`             | membership-validated (403 if not a member, 400 missing id); re-mints + re-binds                                                   |
 
 Switching re-mints the access token and re-binds the session's `token_hash` to it (no refresh
@@ -152,45 +152,45 @@ rotation); the previously held token immediately fails `verifyActiveAccessToken`
 
 ## Account deletion
 
-`countActiveOwnedByUser` counts only `type='TEAM'` organizations — owning a team org blocks
-account deletion (transfer or delete the team first); the personal org cascades with the account.
+`countActiveOwnedByUser` counts only `type='TEAM'` organizations — owning a team organization blocks
+account deletion (transfer or delete the team first); the personal organization cascades with the account.
 
 ## Operational
 
 - **Read-path self-heal** (`ensurePersonalOrganization`) is the durable guarantee: any
-  personal-enabled user lacking a personal org gets one provisioned on their next
+  personal-enabled user lacking a personal organization gets one provisioned on their next
   `GET /users/me` / `POST /auth/switch-to-personal`. No operator action is required to
   unstick existing users.
-- `pnpm tool:backfill-personal-orgs` — optionally provisions the personal org for **all**
+- `pnpm tool:backfill-personal-orgs` — optionally provisions the personal organization for **all**
   existing users lacking one up front (idempotent), for when `PERSONAL_ORGANIZATION_ENABLED`
   is turned on after launch. The self-heal covers the same gap lazily; the backfill just does
   it eagerly.
 
-## Route shape (active org = token claim)
+## Route shape (active organization = token claim)
 
-The org-scoped routes are **flat**: they no longer carry a per-organization
-path segment. The active organization rides the signed `org` token claim, so the active-org
+The organization-scoped routes are **flat**: they no longer carry a per-organization
+path segment. The active organization rides the signed `org` token claim, so the active-organization
 resource is **singular** — `/api/v1/tenancy/organization` — with its sub-resources nested under it
 (settings, logo, audit-logs, api-keys, notification-policies, memberships, roles, invitations,
 leave, transfer-ownership). Other domains hang directly off the claim: `/api/v1/billing/subscriptions`,
 `/api/v1/notify/webhooks`.
 
-Account-level routes stay **plural** because they are not scoped to one active org:
-`GET|POST /api/v1/tenancy/organizations` (list / create a team org),
-`GET /api/v1/tenancy/organizations/by-slug/{slug}`, and the cross-org invitation accept action
+Account-level routes stay **plural** because they are not scoped to one active organization:
+`GET|POST /api/v1/tenancy/organizations` (list / create a team organization),
+`GET /api/v1/tenancy/organizations/by-slug/{slug}`, and the cross-organization invitation accept action
 `POST /api/v1/tenancy/invitations/{invitation_id}/accept`.
 
 ## Implementation status
 
-Delivered: schema (`type`, nullable slug, partial index) · capability flags · personal-org
+Delivered: schema (`type`, nullable slug, partial index) · capability flags · personal-organization
 auto-provisioning (OAuth signup) · **read-path self-heal** (`ensurePersonalOrganization` —
 `/users/me` + `switch-to-personal` provision on demand when personal is enabled and missing) ·
-deletion guard · `/users/me` `personal_organization_id` · personal-org immutability · backfill · JWT `org`/`sv` claims · login
-& refresh org-claim minting · `switch-to-personal` / `switch-to-organization` endpoints (e2e
-tested) · **route flatten** — org-scoped routes dropped the per-organization path
+deletion guard · `/users/me` `personal_organization_id` · personal-organization immutability · backfill · JWT `org`/`sv` claims · login
+& refresh organization-claim minting · `switch-to-personal` / `switch-to-organization` endpoints (e2e
+tested) · **route flatten** — organization-scoped routes dropped the per-organization path
 segment in favour of the singular `/tenancy/organization` resource sourced from the `org` claim ·
 permission layer + RLS sourced from the claim (per-request membership recheck, super-admin audited
 bypass).
 
-Planned (subsequent PRs): per-org-type capability matrix (enforce which capabilities each
+Planned (subsequent PRs): per-organization-type capability matrix (enforce which capabilities each
 `organizations.type` may use) · `sv` revocation wiring.

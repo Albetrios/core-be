@@ -4,7 +4,7 @@ import { dlqReplayJobFieldsSchema } from '@/infrastructure/queue/dlq/dlq-replay-
 
 /**
  * Redis payload for a seat-quantity-sync job (REQ-4). Carries `organizationPublicId` so the
- * worker re-enters Postgres under the org RLS context; the worker re-reads the authoritative
+ * worker re-enters Postgres under the organization RLS context; the worker re-reads the authoritative
  * member count + active subscription rather than trusting any count baked into the job.
  */
 export const subscriptionSeatSyncJobDataSchema = z

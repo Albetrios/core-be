@@ -9,7 +9,7 @@ Legend:
   ROLE    = Global role required (super_admin, admin, user)
   PERM    = Organization-scoped permission required
   TOKEN   = Credential enforced in-handler (non-JWT bearer token or session cookie)
-  Columns after the path: S = success status · I = idempotency (req | -) · O = org scope (both | team-only, 422 on personal)
+  Columns after the path: S = success status · I = idempotency (req | -) · O = organization scope (both | team-only, 422 on personal)
 
 ================================================================================
   DOMAIN: AUDIT (/api/v1/audit)

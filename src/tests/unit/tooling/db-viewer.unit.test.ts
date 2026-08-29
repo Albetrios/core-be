@@ -174,13 +174,13 @@ describe('db-viewer diffSchemas', () => {
       ],
       relations: [],
     } satisfies SchemaSnapshot;
-    const org = a.tables[0]!;
-    const col = org.columns[0]!;
+    const organization = a.tables[0]!;
+    const col = organization.columns[0]!;
     const b = {
       ...a,
       tables: [
         {
-          ...org,
+          ...organization,
           columns: [
             {
               ...col,

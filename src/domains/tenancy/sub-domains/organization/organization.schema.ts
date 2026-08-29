@@ -17,7 +17,7 @@ import { users } from '@/domains/user/user.schema.js';
  * Holds slug-based identity, ownership, lifecycle status, optional Stripe
  * customer linkage, and soft-delete via `deleted_at`. The `pgPolicy`
  * `organizations_tenant_isolation` enforces RLS by matching `public_id` to
- * `app.current_organization_id`, with a global retention-cleanup escape
+ * `app.current_organization_public_id`, with a global retention-cleanup escape
  * hatch for tombstone workers.
  */
 export const organizations = tenancySchema
@@ -56,7 +56,7 @@ export const organizations = tenancySchema
       // soft-deleted team's slug indexed, so `findBySlug` (which filters `deleted_at IS NULL`)
       // reports the slug free while the INSERT collides with the tombstone — burning the slug
       // for everyone until tombstone-retention hard-deletes the row. Mirrors `idx_users_email_unique`
-      // and `idx_memberships_user_org_unique`. (Personal orgs have NULL slug → never indexed here.)
+      // and `idx_memberships_user_org_unique`. (Personal organizations have NULL slug → never indexed here.)
       uniqueIndex('idx_organizations_slug').on(table.slug).where(sql`${table.deleted_at} IS NULL`),
       // At most one PERSONAL organization per owner (personal slug is NULL, so the slug
       // unique index does not constrain them — this partial index does).
@@ -84,13 +84,23 @@ export const organizations = tenancySchema
       // are allowed; team slugs must match the kebab pattern.
       check('chk_organizations_slug', sql`${table.slug} ~ '^[a-z0-9-]+$'`),
       check('chk_organizations_updated', sql`${table.updated_at} >= ${table.created_at}`),
+      // sec-new-D3 keeps `deleted_at IS NULL` on the tenant SELECT arm (a stale organization claim
+      // must never read a soft-deleted organization). Because Postgres requires an UPDATE's NEW row
+      // to stay SELECT-visible, the tombstoning soft-delete cannot run under the plain organization
+      // scope — the service runs it under the global-retention context, whose arm appears
+      // in BOTH USING and WITH CHECK (mirroring uploads_tenant_isolation; the tombstone
+      // never changes the org's identity columns).
       pgPolicy('organizations_tenant_isolation', {
         as: 'permissive',
         for: 'all',
         to: 'public',
-        using: sql`${table.public_id} = current_setting('app.current_organization_id', true)
+        using: sql`(
+            ${table.public_id} = current_setting('app.current_organization_public_id', true)
+            AND ${table.deleted_at} IS NULL
+          )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
-        withCheck: sql`${table.public_id} = current_setting('app.current_organization_id', true)`,
+        withCheck: sql`${table.public_id} = current_setting('app.current_organization_public_id', true)
+          OR current_setting('app.global_retention_cleanup', true) = 'true'`,
       }),
     ],
   )

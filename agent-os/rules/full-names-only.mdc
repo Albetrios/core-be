@@ -9,10 +9,11 @@ alwaysApply: false
 **Always use full, unabbreviated names** for every identifier you introduce or rename. This applies to:
 
 - **Functions** and **methods**: e.g. `getOrganizationById` not `getOrgById`, `findByPublicId` not `findByPid`
+- **Prose too** (comments, test titles, docs, log messages): write `organization` (and `organizations`, `organizationB`, …), never the short form. The ONLY sanctioned short-form survivors are intentional compact WIRE/DATA literals: the `org_` public-id prefix (3-letter id prefix by design), the JWT claim keys `org` / `sv` (compact claims are the JWT convention — `iss`/`sub`/`aud`; body-size on every request), and third-party payloads passed through verbatim. Prose may NAME those literals in backticks (`` `org` claim ``); it may not use the short form as an ordinary word.
 - **Variables** and **parameters**: e.g. `organization` not `org`, `repository` not `repo`, `identifier` not `id` when it stands for “identifier”, `request` not `req` (see exception below)
 - **Classes**, **interfaces**, **enums**, **types**: e.g. `OrganizationRepository` not `OrgRepo`, `UserSettings` not `UserSettings` (already full)
 - **File and folder names**: e.g. `organization.repository.ts` not `org.repo.ts`; directory `organization-settings` not `org-settings`
-- **Constants** and **properties**: e.g. `organizationId` not `orgId` in new code when the concept is “organization”
+- **Constants** and **properties**: e.g. `organizationId` not `organizationId` in new code when the concept is “organization”
 
 **Exception (framework convention):** In Fastify route handlers, `request` and `reply` are commonly shortened to `req` and `reply` in the function signature; that convention may be kept. Do not extend abbreviations elsewhere (e.g. use `request` in JSDoc or in your own helper parameters unless the helper is clearly Fastify-specific).
 

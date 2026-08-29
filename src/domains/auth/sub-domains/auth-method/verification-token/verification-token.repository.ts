@@ -1,5 +1,5 @@
 import { and, eq, gt, isNull } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { verification_tokens } from './verification-token.schema.js';
 
 /** Enum of token categories that share the unified {@link verification_tokens} table. */

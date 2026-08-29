@@ -2,9 +2,11 @@ import { and, desc, eq, isNull, lt, ne, type SQL } from 'drizzle-orm';
 import { countWithCap } from '@/infrastructure/database/utils/capped-count.util.js';
 import type { WorkerDatabaseHandle } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
-import { resolveRepositoryDatabaseHandle } from '@/infrastructure/database/contexts/worker-database-guard.util.js';
-import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
-import { assertWorkerDatabaseContext } from '@/infrastructure/database/contexts/worker-database.context.js';
+import {
+  type RequestScopedPostgresDatabase,
+  assertWorkerDatabaseContext,
+  resolveRepositoryDatabaseHandle,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   webhooks,
   webhook_delivery_attempts,
@@ -52,12 +54,12 @@ export class WebhookDeliveryAttemptRepository {
    * - **Tenant-isolation precondition (audit #42):** `webhook_id` MUST be an
    *   internal id the caller resolved for the active organization — the
    *   controller obtains it via {@link getWebhookId}`(public_id, organization_id)`,
-   *   so a webhook from another org never reaches this query. It is also a pure
+   *   so a webhook from another organization never reaches this query. It is also a pure
    *   defense-in-depth backstop: this runs on the request-scoped handle, and the
    *   `webhook_delivery_attempts_tenant_isolation` RLS policy scopes visibility to
    *   `webhook_id IN (SELECT id FROM notify.webhooks WHERE organization_id =
-   *   current_org)`, so even a forged `webhook_id` from a foreign org returns zero
-   *   rows. No explicit org predicate is added here to avoid duplicating the RLS
+   *   current_org)`, so even a forged `webhook_id` from a foreign organization returns zero
+   *   rows. No explicit organization predicate is added here to avoid duplicating the RLS
    *   join on every page read.
    * - **Algorithm:** descending `(created_at, id)` keyset page of `limit + 1`
    *   rows; an optional capped total when `include_total` is set.
@@ -299,7 +301,7 @@ export class WebhookDeliveryAttemptRepository {
   }
 }
 
-/** Worker-only factory — requires an explicit handle from `withOrganizationContext`. */
+/** Worker-only factory — requires an explicit handle from `withAppDatabaseContext`. */
 export function createWorkerWebhookDeliveryAttemptRepository(
   databaseHandle: WorkerDatabaseHandle,
 ): WebhookDeliveryAttemptRepository {

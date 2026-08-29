@@ -16,7 +16,7 @@ import { env } from '@/shared/config/env.config.js';
  *   `blockedCount`; database errors propagate to the worker for DLQ/Sentry handling.
  * - **Side effects:** destructive `DELETE` against `notify.webhooks` (which cascades into
  *   `notify.webhook_delivery_attempts`); structured logs at start and completion.
- * - **Notes:** runs under `withGlobalRetentionCleanupDatabaseContext` so the cleanup can see
+ * - **Notes:** runs under `withMaintenanceDatabaseContext` so the cleanup can see
  *   tombstones across tenants — never call this with a request-scoped handle.
  */
 export async function runWebhookTombstoneRetentionJob(

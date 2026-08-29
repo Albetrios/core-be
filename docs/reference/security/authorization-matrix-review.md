@@ -2,7 +2,7 @@
 
 > Review artifact. Generated from `tooling/openapi/route-catalog/route-authorization-model.json` on 2026-06-15; reconciled to the model on 2026-07-18.
 
-Every protected by-id route (plus the two owner-tier routes) and the authorization **model** assigned to it. Please review each row; to change one, tell me e.g. *"`PATCH /…/memberships/:id` should be `org`, not `tier:owner`"*. Once you are happy, I build the Phase 2 attack tests against exactly these models.
+Every protected by-id route (plus the two owner-tier routes) and the authorization **model** assigned to it. Please review each row; to change one, tell me e.g. *"`PATCH /…/memberships/:id` should be `organization`, not `tier:owner`"*. Once you are happy, I build the Phase 2 attack tests against exactly these models.
 
 **Total routes modelled: 49.**
 
@@ -13,7 +13,7 @@ Every protected by-id route (plus the two owner-tier routes) and the authorizati
 | Model | Meaning | Attacker the test uses | Expected |
 | --- | --- | --- | --- |
 | `user` | Cross-user (intra-tenant) BOLA | another authenticated user | 404 |
-| `org` | Cross-org BOLA | a member of a different organization | 404 / 403 |
+| `organization` | Cross-organization BOLA | a member of a different organization | 404 / 403 |
 | `email` | Email-targeted ownership | a user whose email ≠ the invitation | 403 |
 | `tier:owner` | Owner-tier protection | a non-owner / lower-tier member acting on the owner | 403 |
 | `grant` | Grant-grantability | a manager granting a permission they do not hold | 403 |
@@ -39,7 +39,7 @@ Every protected by-id route (plus the two owner-tier routes) and the authorizati
 | PATCH | `/api/v1/notify/notifications/:notification_id/read` | yes |
 | POST | `/api/v1/uploads/:upload_id/confirm` | yes |
 
-## `org` — Cross-org BOLA (27) → expect 404 / 403
+## `organization` — Cross-organization BOLA (27) → expect 404 / 403
 
 | Method | Path | verifyNoMutation |
 | --- | --- | --- |
@@ -108,7 +108,7 @@ Every protected by-id route (plus the two owner-tier routes) and the authorizati
 
 1. **Factories** — add victim-object creators returning `public_id` for the resources not yet wired: `notification`, `auth-session`, `mfa_method`, `auth_method`, `data_export`, `api_key`, `notification_policy`, `member_invitation`. (`upload`, `subscription`, `webhook`, `role`, `membership` already reuse existing fixtures.)
 2. **Engine** — `authz-attack.helper.ts`: per-model attacker builder + path materialization + request/body/idempotency headers + assertion + `verifyNoMutation` read-back + positive baseline.
-3. **Tests** (`src/tests/security/authz/`) — iterate the model file: `object-ownership` (`user`/`email`/`org`), `tier-and-grant` (`tier:owner`/`grant`), `admin-only` (`global-role`). No silent skips.
+3. **Tests** (`src/tests/security/authz/`) — iterate the model file: `object-ownership` (`user`/`email`/`organization`), `tier-and-grant` (`tier:owner`/`grant`), `admin-only` (`global-role`). No silent skips.
 4. **Phase 3 hardening** — extend the coverage gate to every mutation (models `self`/`public`/`function`), add the static `findByPublicId` ban.
 5. **Verify** — typecheck locally; the e2e attacks run in CI (`reusable-vitest-postgres-redis`, Postgres + Redis). This environment has no Docker, so green is confirmed in CI.
 
@@ -120,10 +120,10 @@ Every modelled route now has a dedicated attacker test, across **7 files** under
 
 | Suite | Models | Coverage |
 | --- | --- | --- |
-| `object-ownership.security.test.ts` | `user` (11) + `org`/subscription read | cross-user 404 + baselines + `verifyNoMutation`; step-up-gated session/MFA/webauthn/auth-method |
-| `cross-org-resource.security.test.ts` | `org` reads (11) | cross-org GET → 404 + same-org 200 baseline; by-slug scoped separately |
-| `cross-org-mutation.security.test.ts` | `org` writes (16) | cross-org PATCH/DELETE/POST/rotate → 404 (valid bodies + Idempotency-Key); subscriptions via two-org fixture |
-| `tier-and-grant.security.test.ts` | `tier:owner` (4) + `grant` (1) | non-owner/owner-membership protection; grant-grantability + cross-org PUT |
+| `object-ownership.security.test.ts` | `user` (11) + `organization`/subscription read | cross-user 404 + baselines + `verifyNoMutation`; step-up-gated session/MFA/webauthn/auth-method |
+| `cross-organization-resource.security.test.ts` | `organization` reads (11) | cross-organization GET → 404 + same-organization 200 baseline; by-slug scoped separately |
+| `cross-organization-mutation.security.test.ts` | `organization` writes (16) | cross-organization PATCH/DELETE/POST/rotate → 404 (valid bodies + Idempotency-Key); subscriptions via two-organization fixture |
+| `tier-and-grant.security.test.ts` | `tier:owner` (4) + `grant` (1) | non-owner/owner-membership protection; grant-grantability + cross-organization PUT |
 | `admin-only.security.test.ts` | `global-role` (5) | every `/users/:user_id` admin route: regular user → 401/403 + admin baseline |
 | `invitation-email.security.test.ts` | `email` (1) | email-mismatch accept → 403 + invitee baseline |
 | `auth-token-flow.security.test.ts` | (authn lifecycle) | bearer-contract + revoked-session 401 (complements `jwt-attacks`) |

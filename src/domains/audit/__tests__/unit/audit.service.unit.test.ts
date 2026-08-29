@@ -4,7 +4,24 @@ import type { AuditRepository } from '@/domains/audit/audit.repository.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Dispatch per kind so the per-context spies keep their original assertions.
+    withMaintenanceDatabaseContext: vi.fn((scope: { kind: string }, ...parameters: unknown[]) => {
+      const inner = (scope.kind === 'GLOBAL_ADMIN'
+        ? globalAdminContextMock
+        : systemAuditInsertContextMock) as unknown as (...innerParameters: unknown[]) => unknown;
+      return inner(...parameters);
+    }),
+    withAppDatabaseContext: vi.fn((_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 vi.mock('@/infrastructure/observability/sentry/sentry.js', () => ({
   captureMessage: vi.fn(),
@@ -26,35 +43,16 @@ vi.mock('@/domains/audit/audit-outbox.repository.js', () => ({
  * `listForOrganization`/`listForAdmin` still use the DB context wrappers — mock them
  * to invoke the inner callback so the tests run without Postgres.
  */
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
 
 const globalAdminContextMock = vi.hoisted(() =>
   vi.fn((callback: () => Promise<unknown>) => callback()),
 );
-
-vi.mock('@/infrastructure/database/contexts/global-admin-database.context.js', () => ({
-  withGlobalAdminDatabaseContext: globalAdminContextMock,
-}));
 
 // sec-R10: tenantless audit rows now reserve their outbox slot under the system-audit-insert
 // context. The unit test just runs the callback (the RLS gate is exercised in the security suite).
 const systemAuditInsertContextMock = vi.hoisted(() =>
   vi.fn((callback: () => Promise<unknown>) => callback()),
 );
-
-vi.mock('@/infrastructure/database/contexts/system-audit-insert-database.context.js', () => ({
-  withSystemAuditInsertContext: systemAuditInsertContextMock,
-}));
 
 describe('AuditService', () => {
   const repository = {
@@ -153,7 +151,7 @@ describe('AuditService', () => {
       );
     });
 
-    it('R10: org-scoped rows reserve the outbox slot under organization RLS context', async () => {
+    it('R10: organization-scoped rows reserve the outbox slot under organization RLS context', async () => {
       await service.record({
         actorUserPublicId: 'user_public',
         action: 'tenancy.role.create',
@@ -161,8 +159,8 @@ describe('AuditService', () => {
         organization_public_id: 'org_public',
       });
       // Without this context the outbox WITH CHECK rejects the INSERT under core_be_app.
-      expect(vi.mocked(withOrganizationDatabaseContext)).toHaveBeenCalledWith(
-        'org_public',
+      expect(vi.mocked(withAppDatabaseContext)).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationPublicId: 'org_public' }),
         expect.any(Function),
       );
       expect(systemAuditInsertContextMock).not.toHaveBeenCalled();
@@ -175,7 +173,7 @@ describe('AuditService', () => {
         resource_type: 'user',
       });
       expect(systemAuditInsertContextMock).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(withOrganizationDatabaseContext)).not.toHaveBeenCalled();
+      expect(vi.mocked(withAppDatabaseContext)).not.toHaveBeenCalled();
     });
 
     it('skips outbox INSERT when neither user nor API-key actor is supplied', async () => {
@@ -189,7 +187,7 @@ describe('AuditService', () => {
     });
 
     it('does NOT swallow a DB INSERT failure — caller wrappers (recordAuditEvent) must handle it', async () => {
-      // The previous path swallowed DB errors silently inside withOrganizationDatabaseContext;
+      // The previous path swallowed DB errors silently inside the organization DB context;
       // the outbox path propagates so `recordAuditEvent` catches + logs, preserving the
       // "audit never fails the request" contract at the wrapper level (not the service).
       insertAuditOutboxRowMock.mockRejectedValueOnce(new Error('outbox-rls-rejected'));

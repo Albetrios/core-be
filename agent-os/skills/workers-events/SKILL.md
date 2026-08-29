@@ -117,15 +117,15 @@ billing events  →  notify/sub-domains/webhook/events/billing-webhook.event-han
      - switch on `job.name`
      - log structured metadata (job id, organization id, etc.)
      - be idempotent when possible
-   - **Database access in workers/processors** (never `getRequestDatabase()` or `request-database.context` imports):
+   - **Database access in workers/processors** (never `getRequestDatabase()` or `database-context-runtime` imports):
      - Type handles via `PostgresDatabaseHandle` / `WorkerDatabaseHandle` in `src/infrastructure/database/utils/database-handle.types.ts` and `src/infrastructure/queue/worker-runtime/worker-processor.util.ts`
-     - **Runtime guard:** `src/worker.ts` sets `CORE_BE_RUNTIME=worker`. Unpinned `getRequestDatabase()` throws `WorkerDatabaseContextError`. Context kind is tracked in `worker-database.context.ts` (ALS).
-     - Use `runTenantScopedWorkerJob`, `runGlobalRetentionWorkerJob`, or `runUserScopedWorkerJob` from `worker-processor.util.ts`, or `createTenantScopedBullMQWorker` for tenant-scoped queues, or call the context wrappers directly
-     - Tenant-scoped jobs → `withOrganizationContext(organizationPublicId, (databaseHandle) => …)` — pins ALS + `SET LOCAL app.current_organization_id`
-     - Global tombstone/retention → `withGlobalRetentionCleanupDatabaseContext((databaseHandle) => …)` — `app.global_retention_cleanup`
-     - GDPR export → `withUserDatabaseContext(userPublicId, (databaseHandle) => …)` — `app.current_user_id`
-     - Session cleanup → `withSessionRetentionCleanupDatabaseContext((databaseHandle) => …)` — `app.session_retention_cleanup`
-     - Mail outbox + Stripe webhook ledger (no tenant RLS) → `withSystemTableWorkerContext((databaseHandle) => …)` in processors/workers
+     - **Runtime guard:** `src/worker.ts` sets `CORE_BE_RUNTIME=worker`. Unpinned `getRequestDatabase()` throws `WorkerDatabaseContextError`. Context kind is tracked in `database-context-runtime.ts` (ALS).
+     - Use `runOrganizationScopedWorkerJob`, `runGlobalRetentionWorkerJob`, or `runUserScopedWorkerJob` from `worker-processor.util.ts`, or `createTenantScopedBullMQWorker` for tenant-scoped queues, or call the context wrappers directly
+     - Tenant-scoped jobs → `withAppDatabaseContext(PRINCIPAL_SCOPE.JOB({ organizationPublicId }), (databaseHandle) => …)` — pins ALS + `SET LOCAL app.current_organization_public_id`
+     - Global tombstone/retention → `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, (databaseHandle) => …)` — `app.global_retention_cleanup`
+     - GDPR export → `withAppDatabaseContext(PRINCIPAL_SCOPE.JOB({ userPublicId }), (databaseHandle) => …)` — `app.current_user_public_id`
+     - Session cleanup → `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP, …)` — `app.session_retention_cleanup`
+     - Mail outbox + Stripe webhook ledger (no tenant RLS) → `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, …)` in processors/workers
      - Pass `databaseHandle` into `createWorker*Repository(databaseHandle)` factories; factories call `assertWorkerDatabaseContext` for the expected kind
 
 4. **Bootstrap**
@@ -215,5 +215,5 @@ The strict ratchet at pre-commit and CI ensures none of the four `MISSING_*` tok
 - Don't call integrations directly from services (emit events instead).
 - Don't push jobs from HTTP controllers; keep it in services/events so behavior stays consistent across entrypoints.
 - Don't place **processor** implementations in `src/infrastructure/queue/` — they belong in `src/domains/<domain>/<sub-domain>/workers/*`. Event-driven **queue + enqueue** helpers belong in `src/domains/<domain>/<sub-domain>/queues/*`. Exception: `scheduler.ts` registers repeatable **`upsertJobScheduler`** entries only (no processors).
-- Don't call `getRequestDatabase()` from workers, processors, or `batch-delete.util.ts` — ESLint blocks `request-database.context` and global `database` pool imports there; use explicit handles from context wrappers and `createWorker*Repository` factories.
+- Don't call `getRequestDatabase()` from workers, processors, or `batch-delete.util.ts` — the guard tests block `database-context-runtime` and global `database` pool imports there; use explicit handles from context wrappers and `createWorker*Repository` factories.
 - Don't register a worker outside the registry (`worker-registration.registry.ts`). Budget drift is the most common production-incident class this registry prevents.

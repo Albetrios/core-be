@@ -1,16 +1,17 @@
 import type { AuditRepository } from './audit.repository.js';
+import {
+  MAINTENANCE_SCOPE,
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { AuditLogFilters, AuditLogRecordInput } from './audit.types.js';
 import { validateListAuditLogsQuery } from './audit.validator.js';
 import { insertAuditOutboxRow } from './audit-outbox.repository.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { UserService } from '@/domains/user/user.service.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
-import { withGlobalAdminDatabaseContext } from '@/infrastructure/database/contexts/global-admin-database.context.js';
-import { withSystemAuditInsertContext } from '@/infrastructure/database/contexts/system-audit-insert-database.context.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-
 /**
  * Collects the distinct internal user ids (actor + target) and organization ids referenced by a
  * page of audit-log rows, so {@link AuditService.list} can batch-resolve them to public ids in two
@@ -39,7 +40,7 @@ function collectReferencedInternalIds(
  * @remarks
  * P0-#2 (audit outbox): {@link AuditService.record} now stages every audit row in
  * `audit.outbox` inside the caller's business transaction instead of opening a
- * fresh org-scoped transaction per row. The audit drain worker
+ * fresh organization-scoped transaction per row. The audit drain worker
  * ({@link auditOutboxDrainProcessor}) reads PENDING rows out-of-band, resolves
  * actor / target / organization public ids to internal ids, and inserts them into
  * `audit.logs`. Effects:
@@ -50,7 +51,7 @@ function collectReferencedInternalIds(
  *  - the read path ({@link AuditService.list}) is unchanged.
  *
  * Failure modes for `record`:
- *  - RLS rejects the outbox INSERT when the caller's `app.current_organization_id`
+ *  - RLS rejects the outbox INSERT when the caller's `app.current_organization_public_id`
  *    does not match the supplied `organization_public_id`. The thrown error
  *    bubbles to the audit-record wrapper, which catches + logs (the business
  *    write itself is never failed by an audit problem).
@@ -93,7 +94,7 @@ export class AuditService {
       return;
     }
 
-    const insert = (): Promise<number> =>
+    const insert = (): Promise<void> =>
       insertAuditOutboxRow({
         actorUserPublicId: input.actorUserPublicId,
         actorApiKeyPublicId: input.actorApiKeyPublicId,
@@ -109,15 +110,18 @@ export class AuditService {
       });
 
     // sec-R10: the `audit.outbox` INSERT is gated by RLS (audit_outbox_tenant_isolation_insert:
-    // org rows need `app.current_organization_id`, tenantless rows need `app.system_audit_insert`).
-    // Post-sec-M4 the per-request org RLS transaction is a no-op and controllers emit audit AFTER
-    // the service's withOrganizationDatabaseContext block has closed — so without establishing the
+    // organization rows need `app.current_organization_public_id`, tenantless rows need `app.system_audit_insert`).
+    // Post-sec-M4 the per-request organization RLS transaction is a no-op and controllers emit audit AFTER
+    // the service's withAppDatabaseContext block has closed — so without establishing the
     // matching context here the bare-pool INSERT is rejected under the production core_be_app role
     // and the row is silently dropped by `recordAuditEvent`. Open the right context per row.
     if (input.organization_public_id) {
-      await withOrganizationDatabaseContext(input.organization_public_id, insert);
+      await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: input.organization_public_id }),
+        insert,
+      );
     } else {
-      await withSystemAuditInsertContext(insert);
+      await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT, insert);
     }
   }
 
@@ -144,7 +148,10 @@ export class AuditService {
    * at the tenancy route via `requireOrganizationPermission`).
    */
   async listForOrganization(organization_public_id: string, query: Record<string, unknown>) {
-    return withOrganizationDatabaseContext(organization_public_id, () => this.list(query));
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
+      () => this.list(query),
+    );
   }
 
   /**
@@ -152,7 +159,7 @@ export class AuditService {
    * cross-tenant RLS context.
    *
    * @remarks
-   * Algorithm: wraps {@link AuditService.list} in `withGlobalAdminDatabaseContext`
+   * Algorithm: wraps {@link AuditService.list} in `withMaintenanceDatabaseContext`
    * so the read runs inside a transaction with `SET LOCAL app.global_admin = true`.
    * The `audit_logs_tenant_isolation` policy honours this escape hatch, so the
    * cross-tenant listing is RLS-correct even under FORCE RLS / least-privilege
@@ -168,7 +175,7 @@ export class AuditService {
    * isolation and must never be reachable without that gate.
    */
   async listForAdmin(query: Record<string, unknown>) {
-    return withGlobalAdminDatabaseContext(() => this.list(query));
+    return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_ADMIN, () => this.list(query));
   }
 
   async list(query: Record<string, unknown>) {
@@ -248,8 +255,9 @@ export class AuditService {
    */
   async listActivityForUserDataExport(options: { userPublicId: string; limit: number }) {
     const user = await this.userService.requireUserRecordByPublicId(options.userPublicId);
-    return withUserDatabaseContext(options.userPublicId, (_databaseHandle) =>
-      this.repository.listActivityForUserDataExport(user.id, options.limit),
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: options.userPublicId }),
+      (_databaseHandle) => this.repository.listActivityForUserDataExport(user.id, options.limit),
     );
   }
 }

@@ -69,7 +69,7 @@ describe('Security: mass-assignment / over-posting', () => {
     await seedPermissions(ADMIN_PERMISSIONS);
   });
 
-  /** Creates a user who is an admin member (org-update + webhook-manage) of a fresh org. */
+  /** Creates a user who is an admin member (organization-update + webhook-manage) of a fresh organization. */
   async function createOrgAdminContext() {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });
@@ -78,9 +78,9 @@ describe('Security: mass-assignment / over-posting', () => {
       permissionCodes: ADMIN_PERMISSIONS,
     });
     await createMembership({ userId: user.id, organizationId: organization.id, roleId: role.id });
-    // Scope the bearer to this org via the `org` claim. Flat webhook routes
-    // resolve the organization from the claim (no org path param); for the nested
-    // org-settings route the claim simply matches the path-derived org. Either
+    // Scope the bearer to this organization via the `org` claim. Flat webhook routes
+    // resolve the organization from the claim (no organization path param); for the nested
+    // organization-settings route the claim simply matches the path-derived organization. Either
     // way the request reaches DTO validation, where the strict-DTO check runs.
     const token = await generateTestToken({
       userId: user.public_id,

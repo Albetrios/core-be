@@ -141,9 +141,9 @@ export function domainHasValidationStatusCoverage(catalogDomain: string): boolea
   );
 }
 
-/** Routes guarded by org-permission or global-role authorization must exercise the 403 path in domain tests. */
+/** Routes guarded by organization-permission or global-role authorization must exercise the 403 path in domain tests. */
 export function requiresForbiddenStatusCoverage(route: RouteEntry): boolean {
-  return route.access === 'org-permission' || route.access === 'global-role';
+  return route.access === 'organization-permission' || route.access === 'global-role';
 }
 
 /** Mutating routes (POST/PUT/PATCH/DELETE) must exercise body validation (400/422) in domain tests. */
@@ -316,7 +316,7 @@ export function evaluateRouteHttpCoverage(
   for (const catalogDomain of domainsRequiringForbidden) {
     if (!domainHasForbiddenStatusCoverage(catalogDomain)) {
       missingForbiddenByDomain.push(
-        `${catalogDomain} (org-permission/global-role routes require 403 or assertRouteSmokeForbidden in domain HTTP tests)`,
+        `${catalogDomain} (organization-permission/global-role routes require 403 or assertRouteSmokeForbidden in domain HTTP tests)`,
       );
     }
   }

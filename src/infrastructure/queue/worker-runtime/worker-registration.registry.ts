@@ -282,7 +282,7 @@ const WORKER_QUEUE_REGISTRATION_DEFINITIONS: WorkerQueueRegistrationDefinition[]
       ),
   }),
   {
-    // REQ-4: reconciles the Stripe subscription quantity to the org member count, out-of-band so a
+    // REQ-4: reconciles the Stripe subscription quantity to the organization member count, out-of-band so a
     // Stripe outage never fails member management. Event-driven (enqueued on member add/remove +
     // change-plan). Stripe-gated like the rest of the family; the service phases the Stripe call
     // outside its DB context so no checkout is held during external IO.

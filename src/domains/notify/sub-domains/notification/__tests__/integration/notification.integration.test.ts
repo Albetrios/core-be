@@ -48,7 +48,10 @@ describe('Notification Sub-Domain — Integration', () => {
       organizationId: organization.id,
       roleId: role.id,
     });
-    const token = await generateTestToken({ userId: user.public_id });
+    const token = await generateTestToken({
+      userId: user.public_id,
+      organizationPublicId: organization.public_id,
+    });
     return { user, organization, token };
   }
 

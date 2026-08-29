@@ -10,11 +10,11 @@
  * plain table partition creation is skipped and rows are inserted directly.
  *
  * Idempotency: every bulk row carries a deterministic `metadata.seedBatch = 'YYYY-MM'` marker.
- * The seeder counts existing marker rows per org + month and only inserts the missing remainder,
+ * The seeder counts existing marker rows per organization + month and only inserts the missing remainder,
  * so a re-run with the same counts is a no-op. Rows are inserted in chunks of {@link INSERT_BATCH_SIZE}.
  */
 import { and, count, eq, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { logs, type AuditLogInsert } from '@/domains/audit/audit.schema.js';
 import type { SeedContext, SeededOrg } from '@/scripts/seed/seed-contract.js';
 import { generateBulkAudit } from './audit.faker.js';
@@ -86,7 +86,7 @@ async function ensureMonthlyPartition(monthWindow: MonthWindow): Promise<void> {
   `);
 }
 
-/** Counts existing bulk-seeded audit rows for an org + month (matched by the `seedBatch` marker). */
+/** Counts existing bulk-seeded audit rows for an organization + month (matched by the `seedBatch` marker). */
 async function countSeededRows(organizationId: number, monthKey: string): Promise<number> {
   const rows = await getRequestDatabase()
     .select({ value: count() })
@@ -114,7 +114,7 @@ async function insertInBatches(values: AuditLogInsert[]): Promise<void> {
  *
  * @remarks
  * Algorithm: detect partitioning once; for each month window ensure the partition exists (only
- * when partitioned), then for each org count existing marker rows and build only the missing
+ * when partitioned), then for each organization count existing marker rows and build only the missing
  * remainder with month-spread timestamps, inserting in batches. Side effects: optional partition
  * DDL + inserts into `audit.logs`. Failure modes: warns and returns early if the organization
  * registry is empty; otherwise propagates DB errors.
@@ -154,7 +154,7 @@ export async function seedAuditLogsBulk(context: SeedContext): Promise<void> {
   );
 }
 
-/** Seeds the missing audit rows for one org in one month window; returns how many were inserted. */
+/** Seeds the missing audit rows for one organization in one month window; returns how many were inserted. */
 async function seedOrganizationMonth(options: {
   context: SeedContext;
   organization: SeededOrg;

@@ -15,7 +15,7 @@ import { env } from '@/shared/config/env.config.js';
  *   worker which surfaces them via DLQ/Sentry.
  * - **Side effects:** destructive `DELETE` against `notify.notifications`; structured logs at
  *   start and completion.
- * - **Notes:** runs under `withGlobalRetentionCleanupDatabaseContext` so cross-tenant rows are
+ * - **Notes:** runs under `withMaintenanceDatabaseContext` so cross-tenant rows are
  *   visible — never call this with a request-scoped handle.
  */
 export async function runNotificationRetentionJob(databaseHandle: WorkerDatabaseHandle): Promise<{

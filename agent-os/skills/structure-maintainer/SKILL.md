@@ -81,7 +81,7 @@ src/infrastructure/
     pool/                     # Pool tuning helpers
     safety/                   # Statement timeout, RLS helpers
     utils/                    # Shared DB utilities
-    contexts/          # withOrganizationContext, withGlobalRetentionCleanupDatabaseContext, etc.
+    contexts/          # database-context.ts (3 scope patterns + dispatcher) + database-context-runtime.ts
     migration/         # migrate.ts, migration runner
   cache/
     redis.client.ts           # Redis connection (+ bullmq-redis.client.ts, redis-lock.util.ts,
@@ -130,7 +130,7 @@ src/shared/
     core/                     # auth, error-handler, health, request-context, …
     security/                 # cors, helmet, captcha, …
     session/                  # cookie session helpers
-    tenant/                   # X-Organization-Id + RLS transaction
+    tenant/                   # organization-rls-transaction settlement stub (header middleware removed)
     rate-limit/               # global + route presets
     index.ts                  # registerMiddleware()
   locales/                    # i18next resources (en/, es/ — common, errors, mail, success, openapi)

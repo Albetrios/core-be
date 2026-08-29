@@ -56,7 +56,7 @@ export type UploadPendingSweepResult = {
  * - Object exists with mismatched size → mark FAILED (will not be attachable).
  * - Object missing                    → hard-delete the orphan row (idempotent S3 delete first).
  *
- * Runs under withGlobalRetentionCleanupDatabaseContext so RLS does not block cross-tenant rows.
+ * Runs under withMaintenanceDatabaseContext so RLS does not block cross-tenant rows.
  *
  * @remarks
  * - **Algorithm:** cutoff = now − (`PRESIGNED_URL_EXPIRY_SECONDS` +

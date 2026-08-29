@@ -17,9 +17,17 @@ vi.mock('@/infrastructure/database/transaction.js', () => ({
   withTransaction: (callback: (transaction: unknown) => Promise<unknown>) => callback({}),
 }));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  runWithPinnedDatabaseHandle: (_handle: unknown, callback: () => Promise<unknown>) => callback(),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      runWithPinnedDatabaseHandle: (_handle: unknown, callback: () => Promise<unknown>) =>
+        callback(),
+    };
+  },
+);
 
 vi.mock('@/domains/tenancy/sub-domains/organization/resolve-active-organization.js', () => ({
   ensurePersonalOrganization: vi.fn().mockResolvedValue(undefined),
@@ -250,9 +258,9 @@ describe('completeOAuthUserSession', () => {
     expect('session_public_id' in result && result.session_public_id).toBe('session_public');
   });
 
-  it('provisions the personal org through the idempotent resolver on first-time signup', async () => {
+  it('provisions the personal organization through the idempotent resolver on first-time signup', async () => {
     // Must be `ensurePersonalOrganization`, not raw `provisionPersonalOrganization`:
-    // the raw insert trips `idx_org_one_personal_per_owner` (23505) whenever the org
+    // the raw insert trips `idx_org_one_personal_per_owner` (23505) whenever the organization
     // already exists, which logged a spurious ERROR on every such login.
     userService.findByEmail.mockResolvedValue(null);
 
@@ -261,7 +269,7 @@ describe('completeOAuthUserSession', () => {
     expect(vi.mocked(ensurePersonalOrganization)).toHaveBeenCalledWith(1);
   });
 
-  it('still issues a session when personal-org provisioning fails (best-effort)', async () => {
+  it('still issues a session when personal-organization provisioning fails (best-effort)', async () => {
     // Provisioning is deliberately best-effort — `tool:backfill-personal-orgs` and the
     // self-heal path recover a miss. A failure here must never cost the user their login.
     userService.findByEmail.mockResolvedValue(null);

@@ -24,11 +24,11 @@ import { database } from '@/infrastructure/database/connection.js';
 import { member_invitations } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.schema.js';
 
 /**
- * Cross-organization MUTATION isolation matrix — model `org` (write side) in
+ * Cross-organization MUTATION isolation matrix — model `organization` (write side) in
  * route-authorization-model.json. The read-side counterpart lives in
- * cross-org-resource.security.test.ts; here a member of org A who holds EVERY
- * manage permission in their own org still cannot mutate org B's resources:
- * every cross-org PATCH / DELETE / POST-action / rotate returns 404 (the scoped
+ * cross-organization-resource.security.test.ts; here a member of organization A who holds EVERY
+ * manage permission in their own organization still cannot mutate organization B's resources:
+ * every cross-organization PATCH / DELETE / POST-action / rotate returns 404 (the scoped
  * lookup resolves the resource by `(public_id, active_org_id)`), so no
  * cross-tenant write is possible — the handler never resolves the row. Minimal
  * valid bodies are sent where a route validates a body (so a denial is the
@@ -36,7 +36,7 @@ import { member_invitations } from '@/domains/tenancy/sub-domains/membership/mem
  * idempotency-required writes reach the scoping check rather than the
  * missing-key 422 gate. e2e — runs in CI (Postgres + Redis required).
  */
-describe('Security: cross-organization mutation isolation (model: org — writes)', () => {
+describe('Security: cross-organization mutation isolation (model: organization — writes)', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -53,14 +53,14 @@ describe('Security: cross-organization mutation isolation (model: org — writes
   });
 
   // Every tenancy + notify permission, so the acting member clears each route's
-  // MANAGE gate in their OWN org — a cross-org 404 therefore proves tenant
+  // MANAGE gate in their OWN organization — a cross-organization 404 therefore proves tenant
   // scoping, not a missing permission (which would surface as 403).
   const ALL_PERMISSION_CODES = [
     ...Object.values(TENANCY_PERMISSIONS),
     ...Object.values(NOTIFY_PERMISSIONS),
   ];
 
-  async function orgWithResources() {
+  async function organizationWithResources() {
     await seedPermissions(ALL_PERMISSION_CODES);
     const owner = await createTestUser();
     const member = await createTestUser();
@@ -88,7 +88,7 @@ describe('Security: cross-organization mutation isolation (model: org — writes
       createdByUserId: owner.id,
     });
     // A pending invitation (tied to an INVITED membership) so the invitation
-    // DELETE / resend routes have a real org-scoped target to attack.
+    // DELETE / resend routes have a real organization-scoped target to attack.
     const invitee = await createTestUser();
     const inviteeMembership = await createMembership({
       userId: invitee.id,
@@ -125,104 +125,111 @@ describe('Security: cross-organization mutation isolation (model: org — writes
     };
   }
 
-  type OrgFixture = Awaited<ReturnType<typeof orgWithResources>>;
+  type OrgFixture = Awaited<ReturnType<typeof organizationWithResources>>;
 
   const mutationCases: ReadonlyArray<{
     label: string;
     method: 'PATCH' | 'DELETE' | 'POST';
-    target: (org: OrgFixture) => string;
+    target: (organization: OrgFixture) => string;
     body?: Record<string, unknown>;
   }> = [
     {
       label: 'webhook PATCH',
       method: 'PATCH',
-      target: (org) => `/notify/webhooks/${org.webhook.public_id}`,
+      target: (organization) => `/notify/webhooks/${organization.webhook.public_id}`,
       body: {},
     },
     {
       label: 'webhook DELETE',
       method: 'DELETE',
-      target: (org) => `/notify/webhooks/${org.webhook.public_id}`,
+      target: (organization) => `/notify/webhooks/${organization.webhook.public_id}`,
     },
     {
       label: 'webhook test',
       method: 'POST',
-      target: (org) => `/notify/webhooks/${org.webhook.public_id}/test`,
+      target: (organization) => `/notify/webhooks/${organization.webhook.public_id}/test`,
     },
     {
       label: 'API key PATCH',
       method: 'PATCH',
-      target: (org) => `/tenancy/organization/api-keys/${org.apiKey.public_id}`,
+      target: (organization) => `/tenancy/organization/api-keys/${organization.apiKey.public_id}`,
       body: {},
     },
     {
       label: 'API key DELETE',
       method: 'DELETE',
-      target: (org) => `/tenancy/organization/api-keys/${org.apiKey.public_id}`,
+      target: (organization) => `/tenancy/organization/api-keys/${organization.apiKey.public_id}`,
     },
     {
       label: 'API key rotate',
       method: 'POST',
-      target: (org) => `/tenancy/organization/api-keys/${org.apiKey.public_id}/rotate`,
+      target: (organization) =>
+        `/tenancy/organization/api-keys/${organization.apiKey.public_id}/rotate`,
     },
     {
       label: 'role PATCH',
       method: 'PATCH',
-      target: (org) => `/tenancy/organization/roles/${org.role.public_id}`,
+      target: (organization) => `/tenancy/organization/roles/${organization.role.public_id}`,
       body: {},
     },
     {
       label: 'role DELETE',
       method: 'DELETE',
-      target: (org) => `/tenancy/organization/roles/${org.role.public_id}`,
+      target: (organization) => `/tenancy/organization/roles/${organization.role.public_id}`,
     },
     {
       label: 'notification policy PATCH',
       method: 'PATCH',
-      target: (org) => `/tenancy/organization/notification-policies/${org.policy.public_id}`,
+      target: (organization) =>
+        `/tenancy/organization/notification-policies/${organization.policy.public_id}`,
       body: {},
     },
     {
       label: 'notification policy DELETE',
       method: 'DELETE',
-      target: (org) => `/tenancy/organization/notification-policies/${org.policy.public_id}`,
+      target: (organization) =>
+        `/tenancy/organization/notification-policies/${organization.policy.public_id}`,
     },
     {
       label: 'membership PATCH',
       method: 'PATCH',
-      target: (org) => `/tenancy/organization/memberships/${org.membership.public_id}`,
+      target: (organization) =>
+        `/tenancy/organization/memberships/${organization.membership.public_id}`,
       // membership update requires at least one mutable field (status/role_id);
-      // an empty body 400s at validation before the cross-org 404 check, so send
+      // an empty body 400s at validation before the cross-organization 404 check, so send
       // a valid body to exercise tenant isolation rather than body validation.
       body: { status: 'ACTIVE' },
     },
     {
       label: 'membership DELETE',
       method: 'DELETE',
-      target: (org) => `/tenancy/organization/memberships/${org.membership.public_id}`,
+      target: (organization) =>
+        `/tenancy/organization/memberships/${organization.membership.public_id}`,
     },
     {
       label: 'invitation DELETE',
       method: 'DELETE',
-      target: (org) => `/tenancy/organization/invitations/${org.invitation.public_id}`,
+      target: (organization) =>
+        `/tenancy/organization/invitations/${organization.invitation.public_id}`,
     },
     {
       label: 'invitation resend',
       method: 'POST',
-      target: (org) => `/tenancy/organization/invitations/${org.invitation.public_id}/resend`,
+      target: (organization) =>
+        `/tenancy/organization/invitations/${organization.invitation.public_id}/resend`,
       body: {},
     },
   ];
 
   it.each(mutationCases)(
-    'member of org A $label on an org B resource → 404 (no cross-org write)',
+    'member of organization A $label on an organization B resource → 404 (no cross-organization write)',
     async ({ method, target, body }) => {
-      const orgA = await orgWithResources();
-      const orgB = await orgWithResources();
+      const organizationA = await organizationWithResources();
+      const organizationB = await organizationWithResources();
       const res = await injectAuthenticated(app, {
         method,
-        url: testApiPath(target(orgB)),
-        token: orgA.memberToken,
+        url: testApiPath(target(organizationB)),
+        token: organizationA.memberToken,
         extraHeaders: { 'x-idempotency-key': randomUUID() },
         ...(body ? { payload: body } : {}),
       });
@@ -231,9 +238,9 @@ describe('Security: cross-organization mutation isolation (model: org — writes
   );
 
   // Subscriptions live in the billing domain and need a real (active) plan for
-  // change-plan; they use the dedicated two-org-with-subscriptions fixture. The
-  // acting member is org A's owner (who holds subscription:manage); the target
-  // is org B's subscription. cancel/resume/change-plan are idempotency-required.
+  // change-plan; they use the dedicated two-organization-with-subscriptions fixture. The
+  // acting member is organization A's owner (who holds subscription:manage); the target
+  // is organization B's subscription. cancel/resume/change-plan are idempotency-required.
   const subscriptionCases: ReadonlyArray<{
     label: string;
     method: 'PATCH' | 'POST';
@@ -247,7 +254,7 @@ describe('Security: cross-organization mutation isolation (model: org — writes
   ];
 
   it.each(subscriptionCases)(
-    "member of org A $label org B's subscription → 404 (no cross-org write)",
+    "member of organization A $label organization B's subscription → 404 (no cross-organization write)",
     async ({ method, suffix, usesPlan }) => {
       const fixture = await seedTwoOrganizationsWithSubscriptions();
       const tokenScopedToOrgA = await generateTestToken({
@@ -256,7 +263,7 @@ describe('Security: cross-organization mutation isolation (model: org — writes
       });
       // change-plan resolves the (real, active) plan before the subscription, so
       // pass the fixture's real plan id — the resulting 404 is then the
-      // subscription scoped-lookup miss, proving cross-org isolation.
+      // subscription scoped-lookup miss, proving cross-organization isolation.
       const payload = usesPlan ? { plan_id: fixture.plan.public_id } : {};
       const res = await injectAuthenticated(app, {
         method,

@@ -12,7 +12,7 @@ Per-user feature toggles and presentation preferences (locale override, theme, d
 
 - **Default-on semantics**: a missing row implies the platform default, never "feature disabled".
 - **One row per user**: `user_id` is unique; writes upsert.
-- **Settings are user-private**: nothing here is org-scoped or visible to other users.
+- **Settings are user-private**: nothing here is organization-scoped or visible to other users.
 - **Locale override is the auth source for i18n**: when set, it overrides `Accept-Language` for response translation.
 
 ## Lifecycle

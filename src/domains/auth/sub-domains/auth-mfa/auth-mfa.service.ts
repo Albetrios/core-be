@@ -15,7 +15,6 @@ import { env } from '@/shared/config/env.config.js';
 import { signAccessToken } from '@/shared/utils/security/jwt.util.js';
 import { resolveDefaultActiveOrganizationPublicId } from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { AuthMethodService } from '@/domains/auth/sub-domains/auth-method/auth-method.service.js';
 import type { AuthSessionService } from '@/domains/auth/sub-domains/auth-session/auth-session.service.js';
@@ -50,6 +49,10 @@ import {
   invalidateAllUnusedRecoveryCodesForUser,
 } from './auth-mfa-recovery-code.repository.js';
 import { generateMfaRecoveryCodes } from './auth-mfa-recovery-code.util.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const ERROR_KEY_MFA_USER_NOT_FOUND = 'errors:mfaUserNotFound';
 const ERROR_KEY_MFA_INVALID_OR_EXPIRED_CODE = 'errors:mfaInvalidOrExpiredCode';
@@ -142,8 +145,9 @@ export class MfaService {
       await this.consumeMfaVerificationAttempt(user.id);
       // auth.auth_methods is FORCE RLS (audit #7); pin the owner context for every credential
       // read/write — the MFA session already authenticated this user.
-      const totpMethod = await withUserDatabaseContext(user.public_id, () =>
-        this.authMethodService.findTotpByUserId(user.id),
+      const totpMethod = await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+        () => this.authMethodService.findTotpByUserId(user.id),
       );
       if (!totpMethod?.encrypted_secret) {
         throw new UnauthorizedError('errors:mfaNotEnabled');
@@ -158,16 +162,17 @@ export class MfaService {
         throw new UnauthorizedError(ERROR_KEY_MFA_INVALID_OR_EXPIRED_CODE);
       }
       await this.rejectReplayedTotpCode(user.id, parsed.totp_code);
-      await withUserDatabaseContext(user.public_id, () =>
+      await withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }), () =>
         this.authMethodService.updateAuthMethodLastUsedAt(totpMethod.id, user.id),
       );
       verified = true;
     } else if (parsed.recovery_code) {
-      // auth.mfa_recovery_codes is FORCE RLS keyed on app.current_user_id; the MFA session already
+      // auth.mfa_recovery_codes is FORCE RLS keyed on app.current_user_public_id; the MFA session already
       // identifies the user, so consume the single-use code inside that user's context.
       const recoveryCode = parsed.recovery_code;
-      const consumed = await withUserDatabaseContext(user.public_id, () =>
-        consumeMfaRecoveryCode(user.id, recoveryCode),
+      const consumed = await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+        () => consumeMfaRecoveryCode(user.id, recoveryCode),
       );
       if (!consumed) {
         // reaudit-#3: a wrong recovery code does NOT increment the TOTP lockout counter,
@@ -253,8 +258,8 @@ export class MfaService {
     userAgent?: string,
   ): Promise<{ access_token: string; session_public_id: string; session_refresh_secret: string }> {
     // Bake the active-organization `org` claim into the token, mirroring the first-factor path
-    // (`complete-first-factor-auth.ts`). Without this an MFA login mints an org-less token and the
-    // user is locked out of every org-scoped route (which resolve the active org from the claim
+    // (`complete-first-factor-auth.ts`). Without this an MFA login mints an organization-less token and the
+    // user is locked out of every organization-scoped route (which resolve the active organization from the claim
     // post-flatten) until they call a switch endpoint — a regression that hit MFA-enforcing tenants.
     const organizationPublicId = await resolveDefaultActiveOrganizationPublicId(user.id);
     const jsonWebToken = await signAccessToken({
@@ -266,13 +271,13 @@ export class MfaService {
       }),
       organizationPublicId,
     });
-    const tokenHash = createHash('sha256').update(jsonWebToken).digest('hex');
+    const sessionTokenHash = createHash('sha256').update(jsonWebToken).digest('hex');
     const sessionMaxAgeDays = env.AUTH_SESSION_MAX_AGE_DAYS;
     const expiresAt = new Date(Date.now() + sessionMaxAgeDays * MILLISECONDS_PER_DAY);
     const authSession = await this.authSessionService.createSessionForUser(
       user.public_id,
       omitUndefined({
-        token_hash: tokenHash,
+        token_hash: sessionTokenHash,
         ip_address: ipAddress,
         user_agent: userAgent,
         expires_at: expiresAt,
@@ -293,8 +298,9 @@ export class MfaService {
     // audit-#12 / route-audit-#4: atomically count this attempt up-front and reject once the
     // per-user budget is exhausted — concurrent guesses can no longer overspend it.
     await this.consumeMfaVerificationAttempt(user.id);
-    const totpMethod = await withUserDatabaseContext(user.public_id, () =>
-      this.authMethodService.findTotpByUserId(user.id),
+    const totpMethod = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+      () => this.authMethodService.findTotpByUserId(user.id),
     );
     if (!totpMethod?.encrypted_secret) {
       throw new UnauthorizedError('errors:mfaNotEnabled');
@@ -311,7 +317,7 @@ export class MfaService {
     await this.rejectReplayedTotpCode(user.id, parsed.code);
     // audit-#12: successful step-up clears the failure counter.
     await this.clearMfaVerificationFailures(user.id);
-    await withUserDatabaseContext(user.public_id, () =>
+    await withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }), () =>
       this.authMethodService.updateAuthMethodLastUsedAt(totpMethod.id, user.id),
     );
     return { verified: true };
@@ -420,49 +426,52 @@ export class MfaService {
     const plaintextRecoveryCodes = generateMfaRecoveryCodes(MFA_RECOVERY_CODE_COUNT);
     const recoveryCodeHashes = plaintextRecoveryCodes.map(hashMfaRecoveryCode);
 
-    const record = await withUserDatabaseContext(user.public_id, async () => {
-      // Serialize against every other credential mutation for this user (deleteMfa takes the same
-      // lock) so the revoke-old → insert-new → flip-is_mfa_enabled sequence can't interleave with a
-      // concurrent enroll/delete under READ COMMITTED and leave is_mfa_enabled inconsistent with the
-      // actual method rows (route-audit D3 — the lock was previously only half-deployed).
-      await this.authMethodService.acquireCredentialMutationLock(user.id);
-      // sec-re-04: a re-enrollment (lost device, new phone) must replace the
-      // previous TOTP factor — not silently add a second active one. Without
-      // this dedup, two active MFA_TOTP rows existed and login picked an
-      // arbitrary one via `findTotpByUserId(.limit(1))`, frequently rejecting
-      // the user's codes against a stale secret. Revoking old factors AND
-      // invalidating unused recovery codes BEFORE inserting the new ones keeps
-      // the whole transition inside one `withUserDatabaseContext` transaction
-      // — a crash partway through rolls everything back and the user can
-      // simply restart the enroll-confirm flow.
-      const existingMfaMethods = await this.authMethodService.listMfaMethodsByUserId(user.id);
-      for (const existing of existingMfaMethods) {
-        if (existing.method_type === 'MFA_TOTP') {
-          await this.authMethodService.revokeAuthMethod(existing.id, user.id);
+    const record = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+      async () => {
+        // Serialize against every other credential mutation for this user (deleteMfa takes the same
+        // lock) so the revoke-old → insert-new → flip-is_mfa_enabled sequence can't interleave with a
+        // concurrent enroll/delete under READ COMMITTED and leave is_mfa_enabled inconsistent with the
+        // actual method rows (route-audit D3 — the lock was previously only half-deployed).
+        await this.authMethodService.acquireCredentialMutationLock(user.id);
+        // sec-re-04: a re-enrollment (lost device, new phone) must replace the
+        // previous TOTP factor — not silently add a second active one. Without
+        // this dedup, two active MFA_TOTP rows existed and login picked an
+        // arbitrary one via `findTotpByUserId(.limit(1))`, frequently rejecting
+        // the user's codes against a stale secret. Revoking old factors AND
+        // invalidating unused recovery codes BEFORE inserting the new ones keeps
+        // the whole transition inside one `withAppDatabaseContext (user scope)` transaction
+        // — a crash partway through rolls everything back and the user can
+        // simply restart the enroll-confirm flow.
+        const existingMfaMethods = await this.authMethodService.listMfaMethodsByUserId(user.id);
+        for (const existing of existingMfaMethods) {
+          if (existing.method_type === 'MFA_TOTP') {
+            await this.authMethodService.revokeAuthMethod(existing.id, user.id);
+          }
         }
-      }
-      await invalidateAllUnusedRecoveryCodesForUser(user.id);
+        await invalidateAllUnusedRecoveryCodesForUser(user.id);
 
-      const created = await this.authMethodService.createAuthMethodRecord({
-        user_id: user.id,
-        method_type: 'MFA_TOTP',
-        encrypted_secret: encryptFieldSecret(secret),
-        is_primary: false,
-        created_by_user_id: user.id,
-      });
-      await insertMfaRecoveryCodes(user.id, recoveryCodeHashes);
-      // sec-re-06: flip is_mfa_enabled INSIDE the same withUserDatabaseContext
-      // callback so it is part of the same transaction as the auth_methods insert
-      // and recovery-codes insert. Previously it ran AFTER commit on a separate
-      // connection; a crash / pool timeout between commit and the flip left the
-      // user with valid TOTP + recovery codes but is_mfa_enabled = false, so the
-      // next login skipped the MFA challenge entirely.
-      // The nested withUserDatabaseContext call reuses the already-pinned handle
-      // (the outer callback is still inside the same transaction), so no separate
-      // transaction is opened — all three writes still commit atomically.
-      await this.userService.updateMfaEnabled(user.public_id, true);
-      return created;
-    });
+        const created = await this.authMethodService.createAuthMethodRecord({
+          user_id: user.id,
+          method_type: 'MFA_TOTP',
+          encrypted_secret: encryptFieldSecret(secret),
+          is_primary: false,
+          created_by_user_id: user.id,
+        });
+        await insertMfaRecoveryCodes(user.id, recoveryCodeHashes);
+        // sec-re-06: flip is_mfa_enabled INSIDE the same withAppDatabaseContext (user scope)
+        // callback so it is part of the same transaction as the auth_methods insert
+        // and recovery-codes insert. Previously it ran AFTER commit on a separate
+        // connection; a crash / pool timeout between commit and the flip left the
+        // user with valid TOTP + recovery codes but is_mfa_enabled = false, so the
+        // next login skipped the MFA challenge entirely.
+        // The nested withAppDatabaseContext (user scope) call reuses the already-pinned handle
+        // (the outer callback is still inside the same transaction), so no separate
+        // transaction is opened — all three writes still commit atomically.
+        await this.userService.updateMfaEnabled(user.public_id, true);
+        return created;
+      },
+    );
 
     return {
       recovery_codes: plaintextRecoveryCodes,
@@ -477,60 +486,63 @@ export class MfaService {
    * Refuses with `ForbiddenError('errors:lastMfaRequiredByOrganization')` when removing
    * the method would leave the user with zero MFA factors AND any organization the user
    * belongs to has `organization_settings.require_mfa = true` (sec-A4). Without this
-   * guard, a member of an MFA-required org could silently downgrade themselves to
-   * password-only authentication in direct contradiction of org policy. The check
+   * guard, a member of an MFA-required organization could silently downgrade themselves to
+   * password-only authentication in direct contradiction of organization policy. The check
    * pre-computes the remaining-count by listing first, so the revoke does NOT execute
    * when the policy would be violated. Non-last deletions and users in MFA-non-required
-   * orgs are unaffected.
+   * organizations are unaffected.
    */
   async deleteMfa(userPublicId: string, mfaMethodPublicId: string): Promise<void> {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new UnauthorizedError(ERROR_KEY_MFA_USER_NOT_FOUND);
-    await withUserDatabaseContext(user.public_id, async () => {
-      // route-audit C1 (deleteMfa sibling): serialize concurrent credential mutations for this user
-      // so the "would this remove the last MFA factor?" count + revoke cannot interleave with a
-      // sibling delete and strip the user to zero factors in an MFA-required org.
-      await this.authMethodService.acquireCredentialMutationLock(user.id);
-      // route-#10: resolve by opaque public id (not the leaked sequential id); the resolved row
-      // still yields its numeric id for the user-scoped revoke below.
-      const found = await this.authMethodService.findAuthMethodByPublicIdForUser(
-        mfaMethodPublicId,
-        user.id,
-      );
-      if (!found) throw new UnauthorizedError('errors:mfaMethodNotFound');
-      if (found.method_type !== 'MFA_TOTP') {
-        throw new UnauthorizedError('errors:mfaNotTotpMethod');
-      }
-      // Pre-check: would this revoke leave zero MFA methods? If yes AND any of the user's
-      // orgs requires MFA, refuse BEFORE executing the revoke (sec-A4).
-      const currentMethods = await this.authMethodService.listMfaMethodsByUserId(user.id);
-      const wouldBeLastRemoval = currentMethods.length <= 1;
-      if (wouldBeLastRemoval && this.organizationSettingsService) {
-        const requiresMfa = await this.organizationSettingsService.userHasOrganizationRequiringMfa(
+    await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+      async () => {
+        // route-audit C1 (deleteMfa sibling): serialize concurrent credential mutations for this user
+        // so the "would this remove the last MFA factor?" count + revoke cannot interleave with a
+        // sibling delete and strip the user to zero factors in an MFA-required organization.
+        await this.authMethodService.acquireCredentialMutationLock(user.id);
+        // route-#10: resolve by opaque public id (not the leaked sequential id); the resolved row
+        // still yields its numeric id for the user-scoped revoke below.
+        const found = await this.authMethodService.findAuthMethodByPublicIdForUser(
+          mfaMethodPublicId,
           user.id,
         );
-        if (requiresMfa) {
-          throw new ForbiddenError('errors:lastMfaRequiredByOrganization');
+        if (!found) throw new UnauthorizedError('errors:mfaMethodNotFound');
+        if (found.method_type !== 'MFA_TOTP') {
+          throw new UnauthorizedError('errors:mfaNotTotpMethod');
         }
-      }
-      await this.authMethodService.revokeAuthMethod(found.id, user.id);
-      const remaining = await this.authMethodService.listMfaMethodsByUserId(user.id);
-      // sec-new-A4: flip is_mfa_enabled INSIDE the same withUserDatabaseContext
-      // transaction as the revoke so there is no TOCTOU window where a concurrent
-      // enroll could set is_mfa_enabled = true between the delete and the flag flip.
-      // The nested withUserDatabaseContext call reuses the already-pinned handle.
-      if (remaining.length === 0) {
-        await this.userService.updateMfaEnabled(user.public_id, false);
-      }
-    });
+        // Pre-check: would this revoke leave zero MFA methods? If yes AND any of the user's
+        // organizations requires MFA, refuse BEFORE executing the revoke (sec-A4).
+        const currentMethods = await this.authMethodService.listMfaMethodsByUserId(user.id);
+        const wouldBeLastRemoval = currentMethods.length <= 1;
+        if (wouldBeLastRemoval && this.organizationSettingsService) {
+          const requiresMfa =
+            await this.organizationSettingsService.userHasOrganizationRequiringMfa(user.id);
+          if (requiresMfa) {
+            throw new ForbiddenError('errors:lastMfaRequiredByOrganization');
+          }
+        }
+        await this.authMethodService.revokeAuthMethod(found.id, user.id);
+        const remaining = await this.authMethodService.listMfaMethodsByUserId(user.id);
+        // sec-new-A4: flip is_mfa_enabled INSIDE the same withAppDatabaseContext (user scope)
+        // transaction as the revoke so there is no TOCTOU window where a concurrent
+        // enroll could set is_mfa_enabled = true between the delete and the flag flip.
+        // The nested withAppDatabaseContext (user scope) call reuses the already-pinned handle.
+        if (remaining.length === 0) {
+          await this.userService.updateMfaEnabled(user.public_id, false);
+        }
+      },
+    );
   }
 
   /** List MFA methods for the current user. */
   async listMfaMethods(userPublicId: string) {
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     if (!user) throw new UnauthorizedError(ERROR_KEY_MFA_USER_NOT_FOUND);
-    const methods = await withUserDatabaseContext(user.public_id, () =>
-      this.authMethodService.listMfaMethodsByUserId(user.id),
+    const methods = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+      () => this.authMethodService.listMfaMethodsByUserId(user.id),
     );
     return methods.map((method) => ({
       // route-#10: expose the opaque public id (not the sequential DB id); DELETE /mfa/:mfa_method_id

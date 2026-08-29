@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { and, count, eq, isNull } from 'drizzle-orm';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { runFullSeed } from '@/scripts/seed/full.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { users } from '@/domains/user/user.schema.js';
@@ -70,7 +70,7 @@ describe('Full seed — integration', () => {
     await runFullSeed();
     const second = await resolveDemoSeed();
 
-    // Stable public ids across runs → the demo user + org were upserted, not re-created.
+    // Stable public ids across runs → the demo user + organization were upserted, not re-created.
     expect(second.user?.public_id).toBe(first.user?.public_id);
     expect(second.organization?.public_id).toBe(first.organization?.public_id);
 

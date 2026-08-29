@@ -2,7 +2,7 @@
  * Billing plan seed — default plans (Free, Starter, Pro).
  * Domain-owned; used by scripts/seed orchestration.
  */
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { plans } from '@/domains/billing/sub-domains/plan/plan.schema.js';
 

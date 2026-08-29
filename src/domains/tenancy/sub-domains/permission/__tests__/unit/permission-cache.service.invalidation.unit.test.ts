@@ -30,7 +30,7 @@ describe('permission-cache service invalidation', () => {
     vi.clearAllMocks();
   });
 
-  it('invalidateOrganizationPermissions bumps the org version + refreshes its TTL via one Lua', async () => {
+  it('invalidateOrganizationPermissions bumps the organization version + refreshes its TTL via one Lua', async () => {
     vi.mocked(redisConnection.eval).mockResolvedValue(1 as never);
     await invalidateOrganizationPermissions('org_public_id');
     expect(redisConnection.eval).toHaveBeenCalledTimes(1);
@@ -61,7 +61,7 @@ describe('permission-cache service invalidation', () => {
     expect(Number(callArgs[3]) >= 300).toBe(true);
   });
 
-  it('invalidatePermissions deletes the user+org cache key and recompute lock (closest equivalent to invalidateUserPermissions — the source exposes per-user+org invalidation; cross-org sweep is provided via invalidateOrganizationPermissions)', async () => {
+  it('invalidatePermissions deletes the user+organization cache key and recompute lock (closest equivalent to invalidateUserPermissions — the source exposes per-user+organization invalidation; cross-organization sweep is provided via invalidateOrganizationPermissions)', async () => {
     vi.mocked(redisConnection.get).mockResolvedValue('7');
     vi.mocked(redisConnection.del).mockResolvedValue(2);
     await invalidatePermissions('user_public_id', 'org_public_id');
@@ -135,10 +135,10 @@ describe('permission-cache service invalidation', () => {
     expect(recompute).toHaveBeenCalledTimes(1);
   });
 
-  it('commit binds to the org version captured BEFORE recompute, so an org-wide invalidation mid-recompute orphans the stale commit (audit-#H1)', async () => {
+  it('commit binds to the organization version captured BEFORE recompute, so an organization-wide invalidation mid-recompute orphans the stale commit (audit-#H1)', async () => {
     mockedRedisSet(redisConnection.set).mockResolvedValue('OK');
     vi.mocked(redisConnection.eval).mockResolvedValue(1 as never);
-    // The org version is 0 when the recompute starts; a concurrent org-wide invalidation bumps
+    // The organization version is 0 when the recompute starts; a concurrent organization-wide invalidation bumps
     // it to 1 while the recompute runs. The commit must still target the CAPTURED version 0.
     let versionBumpedMidRecompute = false;
     vi.mocked(redisConnection.get).mockImplementation(async (key) => {
@@ -166,7 +166,7 @@ describe('permission-cache service invalidation', () => {
     expect(commitCall?.[3]).toBe('perm:0:user_public_id:org_public_id');
   });
 
-  it('invalidatePermissions surfaces a Redis failure to Sentry and bumps the org version as a backstop (audit-#T0/#T1)', async () => {
+  it('invalidatePermissions surfaces a Redis failure to Sentry and bumps the organization version as a backstop (audit-#T0/#T1)', async () => {
     vi.mocked(redisConnection.get).mockResolvedValue('4');
     vi.mocked(redisConnection.del).mockRejectedValue(new Error('redis blip'));
     vi.mocked(redisConnection.eval).mockResolvedValue(2 as never);
@@ -175,7 +175,7 @@ describe('permission-cache service invalidation', () => {
 
     // The failure is not swallowed as success: Sentry fires…
     expect(captureException).toHaveBeenCalledTimes(1);
-    // …and the backstop over-invalidates the org so the stale entry cannot survive to its TTL.
+    // …and the backstop over-invalidates the organization so the stale entry cannot survive to its TTL.
     expect(redisConnection.eval).toHaveBeenCalledTimes(1);
     const backstopArgs = vi.mocked(redisConnection.eval).mock.calls[0]!;
     expect(String(backstopArgs[0])).toContain("redis.call('INCR'");
@@ -191,7 +191,7 @@ describe('permission-cache service invalidation', () => {
     expect(redisConnection.set).not.toHaveBeenCalled();
   });
 
-  it('getCachedPermissions degrades to a cache-miss (null) when the org version value is CORRUPT (audit-#T0)', async () => {
+  it('getCachedPermissions degrades to a cache-miss (null) when the organization version value is CORRUPT (audit-#T0)', async () => {
     // Distinct from a Redis outage (covered above): a non-integer version value must also not
     // masquerade as version 0. getOrganizationCacheVersion throws, and the read path catches it
     // and returns null so the caller re-resolves from the database under a safe cache-miss.
@@ -200,9 +200,9 @@ describe('permission-cache service invalidation', () => {
     expect(result).toBeNull();
   });
 
-  it('invalidatePermissions treats a CORRUPT org version as a failure — Sentry + org-wide backstop bump (audit-#T0/#T1)', async () => {
+  it('invalidatePermissions treats a CORRUPT organization version as a failure — Sentry + organization-wide backstop bump (audit-#T0/#T1)', async () => {
     // A corrupt version cannot target the user's key safely, so invalidation must not silently
-    // succeed: it surfaces to Sentry and over-invalidates the whole org (version bump) so the
+    // succeed: it surfaces to Sentry and over-invalidates the whole organization (version bump) so the
     // stale per-user entry cannot survive to its TTL. `del` is never reached (the throw happens
     // during the version read), distinguishing this from the del-rejects case above.
     vi.mocked(redisConnection.get).mockResolvedValue('garbage-version');

@@ -39,23 +39,40 @@ vi.mock('@/shared/utils/security/anti-enumeration.util.js', () => ({
   enforceMinimumDuration: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
 // resetPassword now runs inside withTransaction + runWithPinnedDatabaseHandle; invoke the
 // callbacks directly so the unit test exercises the flow without a real database/transaction.
 vi.mock('@/infrastructure/database/transaction.js', () => ({
   withTransaction: vi.fn((callback: (transaction: unknown) => unknown) => callback({})),
 }));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  runWithPinnedDatabaseHandle: vi.fn((_handle: unknown, callback: () => unknown) => callback()),
-  getRequestDatabase: vi.fn(() => ({})),
-  setLocalDatabaseConfig: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      runWithPinnedDatabaseHandle: vi.fn((_handle: unknown, callback: () => unknown) => callback()),
+      getRequestDatabase: vi.fn(() => ({})),
+      setLocalDatabaseConfig: vi.fn().mockResolvedValue(undefined),
+    };
+  },
+);
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = {
   id: 1,

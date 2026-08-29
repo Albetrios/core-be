@@ -12,7 +12,7 @@ S3-compatible object storage client. Owns the AWS SDK v3 client instance, presig
 - **S3-compatible by default**: `S3_ENDPOINT` env lets ops point at MinIO, R2, or any S3-compatible service. Production uses AWS S3 directly.
 - **Presigned URLs for both upload and download**: we never proxy bytes through the API process. Upload uses `createPresignedPost` (browser-friendly form fields); download uses `getSignedUrl` for the GET.
 - **Per-call timeouts** on HEAD-object so the upload-confirm flow can't hang on a slow S3 region.
-- **No PII in object keys**: keys are deterministic from public ids; never include email or org slug.
+- **No PII in object keys**: keys are deterministic from public ids; never include email or organization slug.
 
 ## Operational concerns
 

@@ -29,7 +29,7 @@ export const callApiInputSchema = z.object({
     .optional()
     .describe(
       'Optional headers (e.g. Authorization: Bearer <token>). The active organization comes ' +
-        `from the token's signed org claim — not a header. Read ${MCP_CLIENT_GUIDE_RESOURCE_URI} for the auth flow.`,
+        `from the token's signed organization claim — not a header. Read ${MCP_CLIENT_GUIDE_RESOURCE_URI} for the auth flow.`,
     ),
 });
 
@@ -122,7 +122,7 @@ export const MCP_RESOURCES: readonly McpResourceDefinition[] = [
     uri: MCP_CLIENT_GUIDE_RESOURCE_URI,
     title: `${PROJECT_DISPLAY_NAME} client integration guide`,
     description:
-      'How a frontend/client should authenticate (login, refresh, MFA), carry the active organization (the signed org JWT claim — not a path or header), switch organizations, and call the flat org-scoped routes. Read this first when wiring up auth or any org-scoped call.',
+      'How a frontend/client should authenticate (login, refresh, MFA), carry the active organization (the signed organization JWT claim — not a path or header), switch organizations, and call the flat organization-scoped routes. Read this first when wiring up auth or any organization-scoped call.',
     mimeType: 'text/markdown',
   },
 ] as const;
@@ -132,7 +132,7 @@ export const MCP_TOOLS: readonly McpToolDefinition[] = [
   {
     name: 'call_api',
     title: `Call ${PROJECT_DISPLAY_NAME} API`,
-    description: `Call any ${PROJECT_DISPLAY_NAME} REST API endpoint. Path must start with /api/v1/. Pass Authorization: Bearer <token> for authenticated calls; the active organization comes from the token's signed org claim (switch via POST /api/v1/auth/switch-to-organization or /auth/switch-to-personal), NOT a header. Read ${MCP_CLIENT_GUIDE_RESOURCE_URI} for the auth flow, and ${MCP_OPENAPI_RESOURCE_URI} / ${MCP_ROUTES_RESOURCE_URI} to discover endpoints.`,
+    description: `Call any ${PROJECT_DISPLAY_NAME} REST API endpoint. Path must start with /api/v1/. Pass Authorization: Bearer <token> for authenticated calls; the active organization comes from the token's signed organization claim (switch via POST /api/v1/auth/switch-to-organization or /auth/switch-to-personal), NOT a header. Read ${MCP_CLIENT_GUIDE_RESOURCE_URI} for the auth flow, and ${MCP_OPENAPI_RESOURCE_URI} / ${MCP_ROUTES_RESOURCE_URI} to discover endpoints.`,
     inputSchema: callApiInputSchema,
   },
 ] as const;

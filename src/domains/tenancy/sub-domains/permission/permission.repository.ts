@@ -4,7 +4,7 @@ import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.sc
 import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { DEFAULT_REPOSITORY_LIST_LIMIT } from '@/shared/constants/query-limits.constants.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { eq, and, isNull, sql as drizzleSql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
@@ -22,11 +22,11 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
  * The membership owner is resolved from `public_id` to internal id via the
  * `auth.resolve_user_id_by_public_id` SECURITY DEFINER function rather than a
  * direct `auth.users` join: permission resolution runs under ORG-only context
- * (`app.current_organization_id` is set, but `app.current_user_id` is not), and
+ * (`app.current_organization_public_id` is set, but `app.current_user_public_id` is not), and
  * `auth.users` is FORCE-RLS protected by an owner policy keyed on
- * `app.current_user_id`. A direct join would therefore return zero rows under
+ * `app.current_user_public_id`. A direct join would therefore return zero rows under
  * the non-superuser `core_be_app` role and silently strip every permission
- * (403 on all org PERM-gated routes). The resolver also filters
+ * (403 on all organization PERM-gated routes). The resolver also filters
  * `deleted_at IS NULL`, so a soft-deleted user resolves to `null` → empty set.
  */
 export class PermissionRepository {

@@ -11,7 +11,7 @@ import {
  * Regression guard for the batch user-public-id resolver used by the membership serializer.
  *
  * The membership list/get serializer must emit user PUBLIC ids, but those reads run under
- * ORG-only context (no `app.current_user_id`), and `auth.users` is FORCE RLS self-scoped. A plain
+ * ORG-only context (no `app.current_user_public_id`), and `auth.users` is FORCE RLS self-scoped. A plain
  * join would therefore match ZERO rows under the non-superuser `core_be_app` role (invisible under
  * the local/CI superuser). `auth.resolve_user_public_ids_by_ids` is a SECURITY DEFINER batch
  * resolver that bypasses RLS by ownership. This test runs as `core_be_app` precisely because the

@@ -1,7 +1,7 @@
 import { baseTemplate } from './base.template.js';
 import { escapeHtml } from './escape-html.util.js';
 
-/** Template variables for {@link invitationTemplate} — inviter, target org, accept URL, and TTL. */
+/** Template variables for {@link invitationTemplate} — inviter, target organization, accept URL, and TTL. */
 export interface InvitationTemplateData {
   inviterName: string;
   organizationName: string;

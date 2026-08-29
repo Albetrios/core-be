@@ -74,7 +74,7 @@ describe('User Data Export Sub-Domain — Integration', () => {
       await getAuthenticatedUserReady(app, bearerToken);
 
       const organizationOwner = await createTestUser({
-        email: `user-data-export-org-owner-${authenticatedUser.public_id}@test.com`,
+        email: `user-data-export-organization-owner-${authenticatedUser.public_id}@test.com`,
       });
       const organization = await createTestOrganization({ ownerUserId: organizationOwner.id });
       const membershipRole = await createRoleWithPermissions({

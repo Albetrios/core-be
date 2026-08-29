@@ -58,7 +58,7 @@ describe('Tenancy team-only route guards — Integration', () => {
 
   /**
    * Builds an organization of the requested type with the caller as owner and full tenancy
-   * permissions. A user may hold only one PERSONAL org (`idx_organizations_personal_owner`), so
+   * permissions. A user may hold only one PERSONAL organization (`idx_organizations_personal_owner`), so
    * each case creates its own user.
    */
   async function createOwnedOrganization(type: 'PERSONAL' | 'TEAM') {
@@ -113,7 +113,7 @@ describe('Tenancy team-only route guards — Integration', () => {
 
     it('leaves the PERSONAL organization readable after the refused delete', async () => {
       // A 422 that had already marked the row deleted would still read as a clean refusal at the
-      // response layer — assert the org survives.
+      // response layer — assert the organization survives.
       const { token } = await createOwnedOrganization('PERSONAL');
       await injectAuthenticatedOrganizationMutation(app, {
         method: 'DELETE',
@@ -164,8 +164,8 @@ describe('Tenancy team-only route guards — Integration', () => {
     });
 
     it('runs the PERSONAL guard before the owner check — a non-owner also gets 422, not 403', async () => {
-      // Ordering matters: the type guard is evaluated first, so a PERSONAL org never leaks
-      // "you are not the owner" (which would confirm the org exists and has a different owner).
+      // Ordering matters: the type guard is evaluated first, so a PERSONAL organization never leaks
+      // "you are not the owner" (which would confirm the organization exists and has a different owner).
       const personal = await createOwnedOrganization('PERSONAL');
       const outsider = await addSecondMember(personal.organization.id, personal.role.id);
       const outsiderToken = await generateTestToken({

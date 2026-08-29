@@ -1,4 +1,3 @@
-import { withSystemTableWorkerContext } from '@/infrastructure/database/contexts/worker-database.context.js';
 import {
   findDeadLetterJobsForAutoRetry,
   markDeadLetterJobAutoRetryResolved,
@@ -15,6 +14,10 @@ import {
 } from '@/infrastructure/queue/dlq/dlq-replay.util.js';
 import { env } from '@/shared/config/env.config.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Outcome counters for one DLQ auto-retry sweeper pass.
@@ -57,7 +60,9 @@ export async function runDlqAutoRetryJob(): Promise<DlqAutoRetryJobResult> {
     };
   }
 
-  return withSystemTableWorkerContext(() => runDlqAutoRetryJobInner());
+  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, () =>
+    runDlqAutoRetryJobInner(),
+  );
 }
 
 async function runDlqAutoRetryJobInner(): Promise<DlqAutoRetryJobResult> {

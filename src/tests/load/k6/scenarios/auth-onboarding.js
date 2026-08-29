@@ -17,7 +17,7 @@ export const options = {
     ...THRESHOLDS,
     'http_req_duration{name:auth-login}': ['p(95)<800', 'p(99)<1200'],
     'http_req_duration{name:auth-users-me}': ['p(95)<500', 'p(99)<1000'],
-    'http_req_duration{name:auth-list-orgs}': ['p(95)<500', 'p(99)<1000'],
+    'http_req_duration{name:auth-list-organizations}': ['p(95)<500', 'p(99)<1000'],
   },
 };
 

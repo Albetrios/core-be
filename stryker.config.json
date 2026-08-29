@@ -40,7 +40,6 @@
     "src/domains/user/sub-domains/user-settings/user-settings.service.ts",
     "src/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.service.ts",
     "src/shared/middlewares/core/auth.middleware.ts",
-    "src/shared/middlewares/tenant/tenant.middleware.ts",
     "src/shared/middlewares/core/idempotency.middleware.ts",
     "src/shared/middlewares/security/api-key-auth.middleware.ts",
     "src/shared/middlewares/core/error-handler.middleware.ts",

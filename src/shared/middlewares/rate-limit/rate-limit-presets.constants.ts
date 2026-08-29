@@ -19,13 +19,13 @@ function buildRateLimitKeyFromIpAddress(request: FastifyRequest): string {
 
 /**
  * Shared `onExceeding` observer wired into every preset below so a throttled per-email / per-user /
- * per-org request surfaces its bucket key. Emits the same structured `rate_limit.exceeded` warning
+ * per-organization request surfaces its bucket key. Emits the same structured `rate_limit.exceeded` warning
  * as the global limiter plus a warning-level Sentry breadcrumb for trace context. Observe-only — it
  * never changes throttling behavior. Matches the `onExceeding` signature `(request, key)`.
  */
 function recordRouteRateLimitExceeded(request: FastifyRequest, key: string): void {
   // Throttle the WARN + Sentry breadcrumb per key (see rate-limit-telemetry-throttle.ts) so a
-  // hot per-user / per-org bucket cannot flood logs and Sentry under load.
+  // hot per-user / per-organization bucket cannot flood logs and Sentry under load.
   if (!shouldEmitRateLimitTelemetry(key)) {
     return;
   }
@@ -103,17 +103,17 @@ function buildRateLimitKeyFromAuthenticatedUserOrIpAddress(request: FastifyReque
  * can only ever consume its OWN bucket within that namespace, never the shared bucket of
  * the victim org's real members (audit #14). It also isolates one member from exhausting
  * the quota of other members in the same organization. Falls back to the actor alone (no
- * verified org context yet) and finally to the caller IP for unauthenticated edge cases.
+ * verified organization context yet) and finally to the caller IP for unauthenticated edge cases.
  */
 function buildRateLimitKeyFromOrganizationActorOrIpAddress(request: FastifyRequest): string {
   // Resolve the actor via the principal union so an API-key caller keys on its key public id
   // (`actor:<apiKeyPublicId>`) instead of collapsing to `ip:` — the old `userId ?? apiKeyPublicId`
   // returned the empty-string user sentinel for API keys, defeating per-actor isolation.
   const actorId = request.auth ? getAuthenticatedActorId(request.auth) : undefined;
-  // Prefer the signed `org` token claim (the active org for both user and API-key principals) over
-  // the legacy `X-Organization-Id` header, which flat-route clients no longer send. Without this the
+  // Prefer the signed `org` token claim (the active organization for both user and API-key principals) over
+  // the claim-derived request decoration. Without this the
   // per-(organization, actor) bucket would collapse to per-actor post-flatten, so one actor's spend
-  // in one org would throttle them everywhere instead of isolating quota by active organization.
+  // in one organization would throttle them everywhere instead of isolating quota by active organization.
   const requestWithOrganization = request as FastifyRequest & {
     organizationId?: string | null;
   };

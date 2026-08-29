@@ -32,50 +32,55 @@ const RUNTIME_COVERAGE: Readonly<Record<string, string>> = {
   'POST /api/v1/uploads/:upload_id/confirm': 'object-ownership: uploads',
   'GET /api/v1/users/me/data-export/:data_export_id': 'object-ownership: data exports',
 
-  // ── model: org — cross-org reads (cross-org-resource.security.test.ts) ─────
+  // ── model: organization — cross-organization reads (cross-organization-resource.security.test.ts) ─────
   'GET /api/v1/billing/subscriptions/:subscription_id':
-    'object-ownership: subscriptions (cross-org)',
+    'object-ownership: subscriptions (cross-organization)',
   'GET /api/v1/billing/subscriptions/:subscription_id/payment-setup':
-    'object-ownership: subscription payment-setup (cross-org)',
-  'GET /api/v1/notify/webhooks/:webhook_id': 'cross-org-resource: webhook',
+    'object-ownership: subscription payment-setup (cross-organization)',
+  'GET /api/v1/notify/webhooks/:webhook_id': 'cross-organization-resource: webhook',
   'GET /api/v1/notify/webhooks/:webhook_id/delivery-attempts':
-    'cross-org-resource: webhook delivery-attempts',
-  'GET /api/v1/tenancy/organization/api-keys/:api_key_id': 'cross-org-resource: API key',
-  'GET /api/v1/tenancy/organization/memberships/:membership_id': 'cross-org-resource: membership',
+    'cross-organization-resource: webhook delivery-attempts',
+  'GET /api/v1/tenancy/organization/api-keys/:api_key_id': 'cross-organization-resource: API key',
+  'GET /api/v1/tenancy/organization/memberships/:membership_id':
+    'cross-organization-resource: membership',
   'GET /api/v1/tenancy/organization/memberships/:membership_id/permissions':
-    'cross-org-resource: membership permissions',
+    'cross-organization-resource: membership permissions',
   'GET /api/v1/tenancy/organization/notification-policies/:notification_policy_id':
-    'cross-org-resource: notification policy',
-  'GET /api/v1/tenancy/organization/roles/:role_id': 'cross-org-resource: role',
+    'cross-organization-resource: notification policy',
+  'GET /api/v1/tenancy/organization/roles/:role_id': 'cross-organization-resource: role',
   'GET /api/v1/tenancy/organization/roles/:role_id/permissions':
-    'cross-org-resource: role permissions',
-  'GET /api/v1/tenancy/organizations/by-slug/:slug': 'cross-org-resource: organization by-slug',
+    'cross-organization-resource: role permissions',
+  'GET /api/v1/tenancy/organizations/by-slug/:slug':
+    'cross-organization-resource: organization by-slug',
 
-  // ── model: org — cross-org writes (cross-org-mutation.security.test.ts) ────
-  'PATCH /api/v1/billing/subscriptions/:subscription_id': 'cross-org-mutation: subscription PATCH',
+  // ── model: organization — cross-organization writes (cross-organization-mutation.security.test.ts) ────
+  'PATCH /api/v1/billing/subscriptions/:subscription_id':
+    'cross-organization-mutation: subscription PATCH',
   'POST /api/v1/billing/subscriptions/:subscription_id/cancel':
-    'cross-org-mutation: subscription cancel',
+    'cross-organization-mutation: subscription cancel',
   'POST /api/v1/billing/subscriptions/:subscription_id/change-plan':
-    'cross-org-mutation: subscription change-plan',
+    'cross-organization-mutation: subscription change-plan',
   'POST /api/v1/billing/subscriptions/:subscription_id/resume':
-    'cross-org-mutation: subscription resume',
-  'PATCH /api/v1/notify/webhooks/:webhook_id': 'cross-org-mutation: webhook PATCH',
-  'POST /api/v1/notify/webhooks/:webhook_id/test': 'cross-org-mutation: webhook test',
-  'PATCH /api/v1/tenancy/organization/api-keys/:api_key_id': 'cross-org-mutation: API key PATCH',
-  'DELETE /api/v1/tenancy/organization/api-keys/:api_key_id': 'cross-org-mutation: API key DELETE',
+    'cross-organization-mutation: subscription resume',
+  'PATCH /api/v1/notify/webhooks/:webhook_id': 'cross-organization-mutation: webhook PATCH',
+  'POST /api/v1/notify/webhooks/:webhook_id/test': 'cross-organization-mutation: webhook test',
+  'PATCH /api/v1/tenancy/organization/api-keys/:api_key_id':
+    'cross-organization-mutation: API key PATCH',
+  'DELETE /api/v1/tenancy/organization/api-keys/:api_key_id':
+    'cross-organization-mutation: API key DELETE',
   'POST /api/v1/tenancy/organization/api-keys/:api_key_id/rotate':
-    'cross-org-mutation: API key rotate',
-  'DELETE /api/v1/notify/webhooks/:webhook_id': 'cross-org-mutation: webhook DELETE',
+    'cross-organization-mutation: API key rotate',
+  'DELETE /api/v1/notify/webhooks/:webhook_id': 'cross-organization-mutation: webhook DELETE',
   'PATCH /api/v1/tenancy/organization/notification-policies/:notification_policy_id':
-    'cross-org-mutation: notification policy PATCH',
+    'cross-organization-mutation: notification policy PATCH',
   'DELETE /api/v1/tenancy/organization/notification-policies/:notification_policy_id':
-    'cross-org-mutation: notification policy DELETE',
-  'PATCH /api/v1/tenancy/organization/roles/:role_id': 'cross-org-mutation: role PATCH',
-  'DELETE /api/v1/tenancy/organization/roles/:role_id': 'cross-org-mutation: role DELETE',
+    'cross-organization-mutation: notification policy DELETE',
+  'PATCH /api/v1/tenancy/organization/roles/:role_id': 'cross-organization-mutation: role PATCH',
+  'DELETE /api/v1/tenancy/organization/roles/:role_id': 'cross-organization-mutation: role DELETE',
   'DELETE /api/v1/tenancy/organization/invitations/:invitation_id':
-    'cross-org-mutation: invitation DELETE',
+    'cross-organization-mutation: invitation DELETE',
   'POST /api/v1/tenancy/organization/invitations/:invitation_id/resend':
-    'cross-org-mutation: invitation resend',
+    'cross-organization-mutation: invitation resend',
 
   // ── model: tier:owner (tier-and-grant.security.test.ts) ────────────────────
   'POST /api/v1/tenancy/organization/transfer-ownership':

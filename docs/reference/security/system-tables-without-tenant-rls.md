@@ -27,7 +27,7 @@ Tenant isolation still relies on application query boundaries; these policies pr
 ## Invariants
 
 1. **No HTTP routes** return raw rows from these tables.
-2. Workers pass explicit identifiers (`organizationId`, event ids) in repository queries — do not rely on `app.current_organization_id`.
+2. Workers pass explicit identifiers (`organizationId`, event ids) in repository queries — do not rely on `app.current_organization_public_id`.
 3. Application DB role (`core_be_app`) should have **minimal** privileges on these tables (insert/update/select only where required).
 
 ---
@@ -36,5 +36,5 @@ Tenant isolation still relies on application query boundaries; these policies pr
 
 - Tenant RLS overview: [domains-and-public-api-design.md](../architecture/domains-and-public-api-design.md)
 - Production audit: [production-audit-2026-05-18.md](../../reviews/production-audit-2026-05-18.md) (system tables section)
-- [`src/PATTERNS.md`](../../../src/PATTERNS.md) § Tenant Isolation, § RLS Context — how the `app.current_organization_id` GUC is set and the four RLS context wrappers
+- [`src/PATTERNS.md`](../../../src/PATTERNS.md) § Tenant Isolation, § RLS Context — how the `app.current_organization_public_id` GUC is set and the four RLS context wrappers
 - [`src/infrastructure/database/database.overview.md`](../../../src/infrastructure/database/database.overview.md) — context family, force-RLS table list, connection budget

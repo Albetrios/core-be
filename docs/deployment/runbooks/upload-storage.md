@@ -36,7 +36,7 @@ Applied in [src/domains/upload/upload.validator.ts](../../../src/domains/upload/
 | Filename extension     | Must match the declared content type via `CONTENT_TYPE_TO_EXTENSIONS` (e.g. `image/png` → `.png`). Filenames without an extension are allowed. Prevents misleading filenames such as `evil.exe` paired with `content_type: image/png`. |
 | File size              | Must be `> 0` and `<= UPLOAD_PURPOSE_CONFIG[purpose].maxSize`.                                                                                                                                                                        |
 | Ownership              | `for: 'user'` rejects `organization_id`; `for: 'organization'` requires `organization_id` and `upload:manage` permission on that organization.                                                                                          |
-| Per-user PENDING quota | Enforced **atomically** in `UploadService.reservePendingUploadSlot`: inside one `withUserDatabaseContext` transaction it takes a per-user `pg_advisory_xact_lock` (namespace `UPLOAD_PENDING_QUOTA_ADVISORY_LOCK_NAMESPACE` + user internal id), checks `countPendingByUserId(user.id) < UPLOAD_MAX_PENDING_PER_USER` (default 100), then inserts the PENDING row. The presigned URL is minted **only after** the slot commits, so concurrent create-upload requests can never over-provision presigned slots beyond the quota. Stops a single authed user from looping create-without-confirm and exhausting storage. Reconciled by the sweeper (see below). |
+| Per-user PENDING quota | Enforced **atomically** in `UploadService.reservePendingUploadSlot`: inside one user-scoped `withAppDatabaseContext` transaction it takes a per-user `pg_advisory_xact_lock` (namespace `UPLOAD_PENDING_QUOTA_ADVISORY_LOCK_NAMESPACE` + user internal id), checks `countPendingByUserId(user.id) < UPLOAD_MAX_PENDING_PER_USER` (default 100), then inserts the PENDING row. The presigned URL is minted **only after** the slot commits, so concurrent create-upload requests can never over-provision presigned slots beyond the quota. Stops a single authed user from looping create-without-confirm and exhausting storage. Reconciled by the sweeper (see below). |
 
 ## Presigned PUT vs presigned POST
 
@@ -79,7 +79,7 @@ Log lines for ops:
 - `upload-pending-sweep.s3DeleteFailed` — best-effort S3 delete on an orphan returned `false`; the DB row is still hard-deleted.
 - `upload-pending-sweep.completed` — final counts (`scannedCount`, `autoConfirmedCount`, `failedCount`, `deletedCount`).
 
-Worker context: runs under `withGlobalRetentionCleanupDatabaseContext`, so the RLS tenant policy on `upload.uploads` is satisfied without per-tenant fan-out.
+Worker context: runs under `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP)`, so the RLS tenant policy on `upload.uploads` is satisfied without per-tenant fan-out.
 
 ## S3 bucket lifecycle policy (defense in depth)
 

@@ -5,7 +5,7 @@
  * Codes must match domain permission constants (e.g. tenancy.permissions.ts,
  * billing.permissions.ts) and docs/routes.txt — routes enforce these exact strings.
  */
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { permissions } from '@/domains/tenancy/sub-domains/permission/permission.schema.js';
 
 /**

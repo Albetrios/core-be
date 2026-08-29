@@ -2,15 +2,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/shared/errors/index.js';
 import { assertCallerCanGrantPermissionCodes } from '@/domains/tenancy/sub-domains/permission/assert-grantable-permissions.util.js';
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: (_organizationPublicId: string, callback: () => unknown) =>
-    callback(),
-}));
-
 // The grant-permission guard has its own tests; here it is a no-op so we focus on lifecycle flow.
 vi.mock('@/domains/tenancy/sub-domains/permission/assert-grantable-permissions.util.js', () => ({
   assertCallerCanGrantPermissionCodes: vi.fn().mockResolvedValue(undefined),
 }));
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 // Passthrough serializer (its own no-secret unit test covers shaping); keep the focus on the service.
 vi.mock(
@@ -24,6 +35,10 @@ vi.mock(
 );
 
 import { OrganizationApiKeyService } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const ORG = { id: 1, public_id: 'org_public' };
 const KEY_ROW = {
@@ -44,9 +59,9 @@ function buildService() {
     findByPublicId: vi.fn().mockResolvedValue(KEY_ROW),
     // sec-r5-followup-ratelimit-dos-1: create() now consults this guard
     // before insert. Default to 0 so existing tests still reach the create
-    // path; the cap regression lives in `per-org-row-caps.unit.test.ts`.
+    // path; the cap regression lives in `per-organization-row-caps.unit.test.ts`.
     countActiveByOrganization: vi.fn().mockResolvedValue(0),
-    // audit-#8: per-org creation quota advisory lock (no-op in unit tests).
+    // audit-#8: per-organization creation quota advisory lock (no-op in unit tests).
     acquireCreationQuotaLock: vi.fn().mockResolvedValue(undefined),
     create: vi.fn().mockResolvedValue(KEY_ROW),
     update: vi.fn().mockResolvedValue({ ...KEY_ROW, name: 'Renamed' }),
@@ -61,6 +76,11 @@ function buildService() {
   return { service, organizationRepository, apiKeyRepository };
 }
 
+const asScope = (organizationPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    organizationPublicId,
+  }) as OrganizationPrincipalDatabaseScope;
+
 describe('OrganizationApiKeyService lifecycle', () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -68,12 +88,12 @@ describe('OrganizationApiKeyService lifecycle', () => {
     it('throws NotFoundError when the organization is missing', async () => {
       const { service, organizationRepository } = buildService();
       organizationRepository.findByPublicId.mockResolvedValueOnce(null);
-      await expect(service.list('org_public', {})).rejects.toBeInstanceOf(NotFoundError);
+      await expect(service.list(asScope('org_public'), {})).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('returns serialized items for the organization', async () => {
       const { service, apiKeyRepository } = buildService();
-      const result = await service.list('org_public', {});
+      const result = await service.list(asScope('org_public'), {});
       expect(apiKeyRepository.findByOrganizationId).toHaveBeenCalledWith(ORG.id, expect.anything());
       expect(result.items).toHaveLength(1);
       expect(result.items[0]).toMatchObject({ id: 'apikey_public' });
@@ -84,22 +104,22 @@ describe('OrganizationApiKeyService lifecycle', () => {
     it('throws NotFoundError when the organization is missing', async () => {
       const { service, organizationRepository } = buildService();
       organizationRepository.findByPublicId.mockResolvedValueOnce(null);
-      await expect(service.getByPublicId('org_public', 'apikey_public')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.getByPublicId(asScope('org_public'), 'apikey_public'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('throws NotFoundError when the key is missing', async () => {
       const { service, apiKeyRepository } = buildService();
       apiKeyRepository.findByPublicId.mockResolvedValueOnce(null);
-      await expect(service.getByPublicId('org_public', 'missing')).rejects.toBeInstanceOf(
+      await expect(service.getByPublicId(asScope('org_public'), 'missing')).rejects.toBeInstanceOf(
         NotFoundError,
       );
     });
 
     it('returns the serialized key', async () => {
       const { service } = buildService();
-      const result = await service.getByPublicId('org_public', 'apikey_public');
+      const result = await service.getByPublicId(asScope('org_public'), 'apikey_public');
       expect(result).toMatchObject({ id: 'apikey_public' });
     });
   });
@@ -110,9 +130,9 @@ describe('OrganizationApiKeyService lifecycle', () => {
     it('throws NotFoundError when the organization is missing', async () => {
       const { service, organizationRepository } = buildService();
       organizationRepository.findByPublicId.mockResolvedValueOnce(null);
-      await expect(service.create('org_public', body, 'user_public')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.create(asScope('org_public'), body, 'user_public'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('sec-T1: blocks create (and mints no key) when the scope-grant guard denies escalation', async () => {
@@ -126,7 +146,7 @@ describe('OrganizationApiKeyService lifecycle', () => {
 
       await expect(
         service.create(
-          'org_public',
+          asScope('org_public'),
           { name: 'Escalation Key', scopes: ['organization:delete'] },
           'user_public',
         ),
@@ -136,7 +156,7 @@ describe('OrganizationApiKeyService lifecycle', () => {
 
     it('generates a one-time raw key, hashes it, and persists hash+prefix (no expiry by default)', async () => {
       const { service, apiKeyRepository } = buildService();
-      const result = await service.create('org_public', body, 'user_public');
+      const result = await service.create(asScope('org_public'), body, 'user_public');
 
       expect(result.raw_key).toMatch(/^ak_[0-9a-f]+$/);
       const createArg = apiKeyRepository.create.mock.calls[0]![0] as Record<string, unknown>;
@@ -149,7 +169,7 @@ describe('OrganizationApiKeyService lifecycle', () => {
 
     it('sets an expiry roughly expires_in_days in the future when provided', async () => {
       const { service, apiKeyRepository } = buildService();
-      await service.create('org_public', { ...body, expires_in_days: 30 }, 'user_public');
+      await service.create(asScope('org_public'), { ...body, expires_in_days: 30 }, 'user_public');
       const createArg = apiKeyRepository.create.mock.calls[0]![0] as { expires_at: Date | null };
       expect(createArg.expires_at).toBeInstanceOf(Date);
       const daysOut = (createArg.expires_at!.getTime() - Date.now()) / 86_400_000;
@@ -163,7 +183,7 @@ describe('OrganizationApiKeyService lifecycle', () => {
       const { service, organizationRepository } = buildService();
       organizationRepository.findByPublicId.mockResolvedValueOnce(null);
       await expect(
-        service.update('org_public', 'apikey_public', { name: 'X' }, 'user_public'),
+        service.update(asScope('org_public'), 'apikey_public', { name: 'X' }, 'user_public'),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
 
@@ -171,7 +191,7 @@ describe('OrganizationApiKeyService lifecycle', () => {
       const { service, apiKeyRepository } = buildService();
       apiKeyRepository.findByPublicId.mockResolvedValueOnce(null);
       await expect(
-        service.update('org_public', 'missing', { name: 'X' }, 'user_public'),
+        service.update(asScope('org_public'), 'missing', { name: 'X' }, 'user_public'),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
 
@@ -179,13 +199,18 @@ describe('OrganizationApiKeyService lifecycle', () => {
       const { service, apiKeyRepository } = buildService();
       apiKeyRepository.update.mockResolvedValueOnce(null);
       await expect(
-        service.update('org_public', 'apikey_public', { name: 'X' }, 'user_public'),
+        service.update(asScope('org_public'), 'apikey_public', { name: 'X' }, 'user_public'),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('returns the serialized updated key', async () => {
       const { service } = buildService();
-      const result = await service.update('org_public', 'apikey_public', { name: 'X' }, 'user_pub');
+      const result = await service.update(
+        asScope('org_public'),
+        'apikey_public',
+        { name: 'X' },
+        'user_pub',
+      );
       expect(result).toMatchObject({ name: 'Renamed' });
     });
   });
@@ -194,7 +219,7 @@ describe('OrganizationApiKeyService lifecycle', () => {
     it('throws NotFoundError when the organization is missing', async () => {
       const { service, organizationRepository } = buildService();
       organizationRepository.findByPublicId.mockResolvedValueOnce(null);
-      await expect(service.delete('org_public', 'apikey_public')).rejects.toBeInstanceOf(
+      await expect(service.delete(asScope('org_public'), 'apikey_public')).rejects.toBeInstanceOf(
         NotFoundError,
       );
     });
@@ -202,14 +227,14 @@ describe('OrganizationApiKeyService lifecycle', () => {
     it('throws NotFoundError when the soft-delete matches no row', async () => {
       const { service, apiKeyRepository } = buildService();
       apiKeyRepository.softDelete.mockResolvedValueOnce(null);
-      await expect(service.delete('org_public', 'apikey_public')).rejects.toBeInstanceOf(
+      await expect(service.delete(asScope('org_public'), 'apikey_public')).rejects.toBeInstanceOf(
         NotFoundError,
       );
     });
 
     it('soft-deletes the key', async () => {
       const { service, apiKeyRepository } = buildService();
-      await expect(service.delete('org_public', 'apikey_public')).resolves.toBeUndefined();
+      await expect(service.delete(asScope('org_public'), 'apikey_public')).resolves.toBeUndefined();
       expect(apiKeyRepository.softDelete).toHaveBeenCalledWith('apikey_public', ORG.id);
     });
   });
@@ -219,30 +244,30 @@ describe('OrganizationApiKeyService lifecycle', () => {
       const { service, organizationRepository } = buildService();
       organizationRepository.findByPublicId.mockResolvedValueOnce(null);
       await expect(
-        service.rotate('org_public', 'apikey_public', 'user_public'),
+        service.rotate(asScope('org_public'), 'apikey_public', 'user_public'),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('throws NotFoundError when the key to rotate is missing', async () => {
       const { service, apiKeyRepository } = buildService();
       apiKeyRepository.findByPublicId.mockResolvedValueOnce(null);
-      await expect(service.rotate('org_public', 'missing', 'user_public')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.rotate(asScope('org_public'), 'missing', 'user_public'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('throws ConflictError when a concurrent rotate already retired the key', async () => {
       const { service, apiKeyRepository } = buildService();
       apiKeyRepository.softDelete.mockResolvedValueOnce(null);
       await expect(
-        service.rotate('org_public', 'apikey_public', 'user_public'),
+        service.rotate(asScope('org_public'), 'apikey_public', 'user_public'),
       ).rejects.toBeInstanceOf(ConflictError);
       expect(apiKeyRepository.create).not.toHaveBeenCalled();
     });
 
     it('retires the old key and mints exactly one replacement', async () => {
       const { service, apiKeyRepository } = buildService();
-      const result = await service.rotate('org_public', 'apikey_public', 'user_public');
+      const result = await service.rotate(asScope('org_public'), 'apikey_public', 'user_public');
       expect(apiKeyRepository.softDelete).toHaveBeenCalledWith('apikey_public', ORG.id);
       expect(apiKeyRepository.create).toHaveBeenCalledTimes(1);
       expect(result.raw_key).toMatch(/^ak_/);
@@ -256,7 +281,7 @@ describe('OrganizationApiKeyService lifecycle', () => {
         expires_at: originalExpiry,
       });
 
-      await service.rotate('org_public', 'apikey_public', 'user_public');
+      await service.rotate(asScope('org_public'), 'apikey_public', 'user_public');
 
       const createArg = apiKeyRepository.create.mock.calls[0]![0] as { expires_at: Date | null };
       expect(createArg.expires_at).toEqual(originalExpiry);
@@ -266,7 +291,7 @@ describe('OrganizationApiKeyService lifecycle', () => {
       const { service, apiKeyRepository } = buildService();
       apiKeyRepository.findByPublicId.mockResolvedValueOnce({ ...KEY_ROW, expires_at: null });
 
-      await service.rotate('org_public', 'apikey_public', 'user_public');
+      await service.rotate(asScope('org_public'), 'apikey_public', 'user_public');
 
       const createArg = apiKeyRepository.create.mock.calls[0]![0] as { expires_at: Date | null };
       expect(createArg.expires_at).toBeNull();

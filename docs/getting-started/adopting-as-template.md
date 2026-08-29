@@ -43,7 +43,7 @@ pnpm init:project
 It prompts for each value, pre-filled with the current one. To run it non-interactively:
 
 ```bash
-pnpm init:project --yes --name acme-api --display-name "Acme API" --repository acme-org/acme-api
+pnpm init:project --yes --name acme-api --display-name "Acme API" --repository acme-organization/acme-api
 ```
 
 Preview without writing anything:

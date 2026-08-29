@@ -89,7 +89,7 @@ try {
   );
 }
 
-// 4 + 5. captcha fail-open (login → token) + org-scoped read works
+// 4 + 5. captcha fail-open (login → token) + organization-scoped read works
 if (serverUp && pool.length) {
   let usable = 0;
   let scopedReadOk = false;
@@ -117,11 +117,11 @@ if (serverUp && pool.length) {
       }
       usable += 1;
       if (!scopedReadOk) {
-        if (c.orgPublicId) {
+        if (c.organizationPublicId) {
           const sr = await fetch(`${API}/auth/switch-to-organization`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ organization_id: c.orgPublicId }),
+            body: JSON.stringify({ organization_id: c.organizationPublicId }),
           });
           t = (await sr.json())?.data?.access_token || t;
         }
@@ -147,7 +147,7 @@ if (serverUp && pool.length) {
       : fail(
           'org-scoped read',
           'org read not 200',
-          'Check switch-to-organization + org membership',
+          'Check switch-to-organization + organization membership',
         );
     const estUsable = Math.round((usable / Math.min(30, pool.length)) * pool.length);
     if (estUsable < TARGET_VUS)
@@ -199,10 +199,10 @@ if (dbUrl) {
       )[0].m,
     );
     maxRoles < cap * 0.7
-      ? ok('role-cap headroom', `max ${maxRoles} roles/org < cap ${cap}`)
+      ? ok('role-cap headroom', `max ${maxRoles} roles/organization < cap ${cap}`)
       : fail(
           'role-cap headroom',
-          `max ${maxRoles} roles/org near cap ${cap} (leaks?)`,
+          `max ${maxRoles} roles/organization near cap ${cap} (leaks?)`,
           'Clean leaked roles — see COMPREHENSIVE-JOURNEY.md §3',
         );
   } catch (e) {

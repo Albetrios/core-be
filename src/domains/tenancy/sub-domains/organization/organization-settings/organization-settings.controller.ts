@@ -3,8 +3,8 @@ import { successResponse } from '@/shared/utils/http/response.util.js';
 import {
   getActingUserPublicId,
   getRequestIdentifier,
+  requireOrganizationScope,
   requirePrincipal,
-  resolveActiveOrganizationId,
 } from '@/shared/utils/http/request.util.js';
 import type { OrganizationSettingsService } from './organization-settings.service.js';
 
@@ -16,14 +16,14 @@ import type { OrganizationSettingsService } from './organization-settings.servic
 export function createOrganizationSettingsController(service: OrganizationSettingsService) {
   return {
     getSettings: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const organizationId = resolveActiveOrganizationId(request);
-      const data = await service.get(organizationId);
+      const scope = requireOrganizationScope(request);
+      const data = await service.get(scope);
       return successResponse(data, getRequestIdentifier(request));
     },
     updateSettings: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const organizationId = resolveActiveOrganizationId(request);
-      const data = await service.update(organizationId, request.body, getActingUserPublicId(auth));
+      const scope = requireOrganizationScope(request);
+      const data = await service.update(scope, request.body, getActingUserPublicId(auth));
       return successResponse(data, getRequestIdentifier(request));
     },
   };

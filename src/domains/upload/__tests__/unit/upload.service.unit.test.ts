@@ -10,6 +10,24 @@ import type { OrganizationService } from '@/domains/tenancy/sub-domains/organiza
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 
+// UploadService now wraps repository work in the real principal wrapper, which
+// opens a `database.transaction()` — passthrough so this stays a pure unit test.
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
 vi.mock('@/shared/config/env.config.js', () => ({
   getEnv: vi.fn(() => ({
     S3_BUCKET: 'test-bucket',
@@ -25,20 +43,6 @@ vi.mock('@/shared/config/env.config.js', () => ({
     UPLOAD_MAX_PENDING_PER_USER: 100,
     UPLOAD_MAX_PENDING_PER_ORGANIZATION: 2_000,
   },
-}));
-
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  // sec-r7/M4: org-scoped uploads now reserve their PENDING slot under organization RLS
-  // context. The unit test just runs the callback (RLS is exercised in the security suite).
-  withOrganizationDatabaseContext: vi.fn(
-    (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
 }));
 
 const userPublicId = generatePublicId('user');
@@ -78,7 +82,7 @@ describe('UploadService', () => {
     countPendingByUserId: vi.fn().mockResolvedValue(0),
     countPendingByOrganizationId: vi.fn().mockResolvedValue(0),
     acquirePendingUploadQuotaLock: vi.fn().mockResolvedValue(undefined),
-    // audit-#7: org-scoped pending-upload quota lock (no-op in unit tests).
+    // audit-#7: organization-scoped pending-upload quota lock (no-op in unit tests).
     acquirePendingOrganizationQuotaLock: vi.fn().mockResolvedValue(undefined),
   } as unknown as UploadRepository;
 
@@ -199,7 +203,7 @@ describe('UploadService', () => {
     expect(repository.softDeleteByPublicId).toHaveBeenCalled();
   });
 
-  it('deleteUpload allows org managers to delete teammate-created organization uploads', async () => {
+  it('deleteUpload allows organization managers to delete teammate-created organization uploads', async () => {
     vi.mocked(repository.findByPublicId).mockResolvedValue({
       ...uploadRow,
       user_id: 99,
@@ -226,7 +230,7 @@ describe('UploadService', () => {
     expect(repository.softDeleteByPublicId).not.toHaveBeenCalled();
   });
 
-  it('deleteUpload rejects org-scoped upload when caller lacks upload:manage', async () => {
+  it('deleteUpload rejects organization-scoped upload when caller lacks upload:manage', async () => {
     vi.mocked(repository.findByPublicId).mockResolvedValue({
       ...uploadRow,
       organization_id: 10,
@@ -240,14 +244,14 @@ describe('UploadService', () => {
     expect(repository.softDeleteByPublicId).not.toHaveBeenCalled();
   });
 
-  it('deleteUpload 404s an org-scoped upload whose organization is undiscoverable (not 403 / not 500)', async () => {
+  it('deleteUpload 404s an organization-scoped upload whose organization is undiscoverable (not 403 / not 500)', async () => {
     vi.mocked(repository.findByPublicId).mockResolvedValueOnce({
       ...uploadRow,
       organization_id: 10,
     } as never);
     // The organization row is gone (hard-deleted / undiscoverable). Access resolution must 404
     // BEFORE the permission check — never a 403 (which would imply the resource exists) and never
-    // a 500 from dereferencing a null org. `Once` so this null does not leak to later tests
+    // a 500 from dereferencing a null organization. `Once` so this null does not leak to later tests
     // (`beforeEach` clears call history but does not re-stub `findOrganizationByInternalId`).
     vi.mocked(organizationService.findOrganizationByInternalId).mockResolvedValueOnce(
       null as never,
@@ -318,8 +322,8 @@ describe('UploadService', () => {
   it('tombstoneAllByOrganizationId removes S3 objects in bounded batches before the DB tombstone (sec-UP8)', async () => {
     vi.mocked(repository.findActiveByOrganizationIdAfter)
       .mockResolvedValueOnce([
-        { id: 1, file_key: 'organization-files/org/aaa.pdf' },
-        { id: 2, file_key: 'organization-files/org/bbb.pdf' },
+        { id: 1, file_key: 'organization-files/organization/aaa.pdf' },
+        { id: 2, file_key: 'organization-files/organization/bbb.pdf' },
       ] as never)
       .mockResolvedValueOnce([] as never);
     vi.mocked(objectStorage.deleteObject).mockResolvedValue(true);
@@ -329,8 +333,12 @@ describe('UploadService', () => {
 
     expect(count).toBe(2);
     expect(objectStorage.deleteObject).toHaveBeenCalledTimes(2);
-    expect(objectStorage.deleteObject).toHaveBeenCalledWith('organization-files/org/aaa.pdf');
-    expect(objectStorage.deleteObject).toHaveBeenCalledWith('organization-files/org/bbb.pdf');
+    expect(objectStorage.deleteObject).toHaveBeenCalledWith(
+      'organization-files/organization/aaa.pdf',
+    );
+    expect(objectStorage.deleteObject).toHaveBeenCalledWith(
+      'organization-files/organization/bbb.pdf',
+    );
   });
 
   const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
@@ -529,7 +537,7 @@ describe('UploadService', () => {
     expect(result.key).not.toMatch(/^pending\//);
   });
 
-  it('confirmUpload allows org managers to confirm teammate-created organization uploads', async () => {
+  it('confirmUpload allows organization managers to confirm teammate-created organization uploads', async () => {
     // sec-UP1: must be pending-keyed.
     const finalKey = uploadRow.file_key;
     const pendingKey = `pending/${finalKey}`;

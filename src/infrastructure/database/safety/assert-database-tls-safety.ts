@@ -24,29 +24,39 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
  *   `sslrootcert`) so both the certificate chain and hostname are validated.
  */
 export function assertDatabaseTlsVerification(): void {
-  const sslMode = parseSslMode(env.DATABASE_URL);
+  assertUrlTlsVerification('DATABASE_URL', env.DATABASE_URL);
+  // The optional maintenance pool carries the same bypass-context traffic and must meet
+  // the same TLS bar — checked here (not in a separate boot step) so the two URLs can
+  // never drift in posture.
+  if (env.DATABASE_MAINTENANCE_URL) {
+    assertUrlTlsVerification('DATABASE_MAINTENANCE_URL', env.DATABASE_MAINTENANCE_URL);
+  }
+}
+
+function assertUrlTlsVerification(label: string, databaseUrl: string): void {
+  const sslMode = parseSslMode(databaseUrl);
   const strictVerification = isStrictDatabaseTlsVerification({
-    databaseUrl: env.DATABASE_URL,
+    databaseUrl,
     rejectUnauthorizedOverride: env.DATABASE_SSL_REJECT_UNAUTHORIZED,
   });
 
   if (strictVerification) {
-    logger.info({ sslMode }, 'database.tls_safety.ok');
+    logger.info({ sslMode, url: label }, 'database.tls_safety.ok');
     return;
   }
 
   if (env.DATABASE_TLS_ENFORCED) {
     throw new Error(
-      `database.tls_safety.unverified: DATABASE_URL uses sslmode=${sslMode ?? 'unset'} which does ` +
+      `database.tls_safety.unverified: ${label} uses sslmode=${sslMode ?? 'unset'} which does ` +
         'not verify the Postgres server certificate, exposing the connection to man-in-the-middle ' +
-        'attacks. In hosted deployments set DATABASE_URL with ?sslmode=verify-full (plus the ' +
+        `attacks. In hosted deployments set ${label} with ?sslmode=verify-full (plus the ` +
         'provider CA bundle) or set DATABASE_SSL_REJECT_UNAUTHORIZED=true. ' +
         'See docs/deployment/runbooks/resource-limits.md.',
     );
   }
 
   logger.warn(
-    { sslMode },
+    { sslMode, url: label },
     'database.tls_safety.unverified_local: Postgres TLS certificate verification is off on a ' +
       'non-hosted deployment. Acceptable for local docker-compose / CI plaintext databases; ' +
       'fail-closed in hosted deployments.',

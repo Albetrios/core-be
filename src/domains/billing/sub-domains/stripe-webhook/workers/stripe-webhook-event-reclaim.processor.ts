@@ -1,9 +1,12 @@
-import { withSystemTableWorkerContext } from '@/infrastructure/database/contexts/worker-database.context.js';
 import { enqueueStripeWebhookByEventIdForReclaim } from '@/domains/billing/sub-domains/stripe-webhook/queues/stripe-webhook.queue.js';
 import { StripeWebhookEventRepository } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook-event.repository.js';
 import { setStripeWebhookEventsFailedCount } from '@/infrastructure/observability/metrics/prometheus-metrics.js';
 import { env } from '@/shared/config/env.config.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Per-run counters returned by {@link runStripeWebhookEventReclaimJob}:
@@ -30,7 +33,7 @@ export type StripeWebhookEventReclaimJobResult = {
  * retry them.
  *
  * @remarks
- * - **Algorithm:** Within {@link withSystemTableWorkerContext}, asks
+ * - **Algorithm:** Within {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)}, asks
  *   {@link StripeWebhookEventRepository.sweepReclaimableEvents} for up to
  *   `env.STRIPE_WEBHOOK_EVENT_RECLAIM_BATCH_SIZE` candidate ids — a pure read,
  *   no row mutation (sec-re-02). For each candidate the processor enqueues a
@@ -53,7 +56,9 @@ export type StripeWebhookEventReclaimJobResult = {
 export async function runStripeWebhookEventReclaimJob(
   repository: StripeWebhookEventRepository = new StripeWebhookEventRepository(),
 ): Promise<StripeWebhookEventReclaimJobResult> {
-  return withSystemTableWorkerContext(() => runStripeWebhookEventReclaimJobInner(repository));
+  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, () =>
+    runStripeWebhookEventReclaimJobInner(repository),
+  );
 }
 
 async function runStripeWebhookEventReclaimJobInner(

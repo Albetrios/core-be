@@ -27,7 +27,7 @@ describe('Security: Path traversal', () => {
   let app: FastifyInstance;
   // Bearer scoped to a real organization via the JWT `org` claim — flat tenancy
   // routes resolve the tenant from the claim, so the traversal payload exercises
-  // a resource-id path param (`role_id`) rather than the org segment.
+  // a resource-id path param (`role_id`) rather than the organization segment.
   let token: string;
 
   beforeAll(async () => {
@@ -66,7 +66,7 @@ describe('Security: Path traversal', () => {
   }
 
   it('rejects an unauthenticated request to the flat organization route with 401', async () => {
-    // The organization path segment is gone (org comes from the token claim);
+    // The organization path segment is gone (organization comes from the token claim);
     // an unauthenticated caller is rejected before any tenant resolution.
     const response = await injectUnauthenticated(app, {
       method: 'GET',

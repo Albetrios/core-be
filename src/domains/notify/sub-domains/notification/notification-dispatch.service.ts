@@ -31,7 +31,7 @@ export type NotificationDispatch = {
  * {@link configureNotificationDispatch} in the notify container).
  *
  * @remarks
- * - **Algorithm:** resolves `organization_public_id` first so a missing org fails fast before any
+ * - **Algorithm:** resolves `organization_public_id` first so a missing organization fails fast before any
  *   write; inserts the row; on commit, enqueues `enqueueNotification(id, organization_public_id)`.
  * - **Failure modes:** lookup or insert errors propagate to the caller; enqueue errors are
  *   deferred to post-commit and bubble through the event-bus failure path.

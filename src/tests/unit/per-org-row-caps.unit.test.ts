@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 /**
- * sec-r5-followup-ratelimit-dos-1/2/3 regression — every per-org row that the
+ * sec-r5-followup-ratelimit-dos-1/2/3 regression — every per-organization row that the
  * API can create at a tenant's pace (API keys, custom roles, notification
  * policies) MUST be capped by a `*_MAX_PER_ORG` env-driven count. Mirrors the
  * existing `WEBHOOK_MAX_PER_ORG` invariant on `webhook.service.create` (sec-N4).
@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
  * by `member-role-permission.repository.bound.policy.unit.test.ts` and the
  * `*-routes-rate-limit.policy.unit.test.ts` files).
  */
-describe('per-org row caps (sec-r5-followup-ratelimit-dos-1/2/3)', () => {
+describe('per-organization row caps (sec-r5-followup-ratelimit-dos-1/2/3)', () => {
   function readService(...relativePathSegments: string[]): string {
     return readFileSync(join(process.cwd(), ...relativePathSegments), 'utf8');
   }

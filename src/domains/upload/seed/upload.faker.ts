@@ -25,7 +25,7 @@ const PERSONAL_PURPOSES: readonly UploadPurpose[] = [
   UPLOAD_PURPOSES.USER_FILE,
 ];
 
-/** Lifecycle states a bulk upload can land in, mixed across the per-org pool. */
+/** Lifecycle states a bulk upload can land in, mixed across the per-organization pool. */
 const STATUSES: readonly UploadStatus[] = [
   UPLOAD_STATUS.PENDING,
   UPLOAD_STATUS.UPLOADED,
@@ -36,7 +36,7 @@ const STATUSES: readonly UploadStatus[] = [
 export interface BulkUploadProfile {
   /** Functional purpose, drives key prefix + allowed MIME types. */
   purpose: UploadPurpose;
-  /** Whether this upload is org-scoped (`organization_id` set) or personal (NULL org). */
+  /** Whether this upload is organization-scoped (`organization_id` set) or personal (NULL organization). */
   isOrganizationScoped: boolean;
   /** Lifecycle status (`PENDING` / `UPLOADED` / `FAILED`). */
   status: UploadStatus;
@@ -50,8 +50,8 @@ export interface BulkUploadProfile {
 
 /**
  * Builds one fake upload profile for the given slot. The slot index drives a deterministic
- * mix: org-scoped vs personal alternates so every org has both, and the status cycles
- * through `PENDING` / `UPLOADED` / `FAILED` so the per-org pool always spans all states.
+ * mix: organization-scoped vs personal alternates so every organization has both, and the status cycles
+ * through `PENDING` / `UPLOADED` / `FAILED` so the per-organization pool always spans all states.
  */
 export function generateBulkUpload(faker: Faker, slot: number): BulkUploadProfile {
   const isOrganizationScoped = slot % 2 === 0;

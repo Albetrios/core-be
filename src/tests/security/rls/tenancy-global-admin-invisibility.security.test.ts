@@ -11,7 +11,7 @@ import { grantCoreBeAppRoleForTests } from '@/tests/helpers/rls-matrix.helper.js
  * tables.**
  *
  * The `auth.*` and `audit.logs` policies carry an `app.global_admin` arm; the tenancy ones do not.
- * Three separate bugs shipped from assuming otherwise (failed org provisioning, active-org reads
+ * Three separate bugs shipped from assuming otherwise (failed organization provisioning, active-organization reads
  * returning zero rows, silently skipped permission-cache purges).
  *
  * The companion static guard (`no-global-admin-in-tenancy.global.test.ts`) stops tenancy code from
@@ -26,7 +26,7 @@ function rowCount(result: unknown): number {
   return (Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? [])).length;
 }
 
-/** Runs `callback` as `core_be_app` with ONLY `app.global_admin` set — no org, no user GUC. */
+/** Runs `callback` as `core_be_app` with ONLY `app.global_admin` set — no organization, no user GUC. */
 async function executeAsGlobalAdminOnly<T>(
   callback: (transaction: typeof database) => Promise<T>,
 ): Promise<T> {
@@ -48,7 +48,7 @@ describe('Security: app.global_admin does not expose tenancy tables', () => {
 
   it('cannot read tenancy.organizations or tenancy.memberships under global-admin alone', async () => {
     const owner = await createTestUser();
-    // Provisioning writes org + Owner role + grants + ACTIVE membership in one transaction, so both
+    // Provisioning writes organization + Owner role + grants + ACTIVE membership in one transaction, so both
     // tables genuinely hold rows — otherwise the zero-row assertions below would pass vacuously.
     await provisionPersonalOrganization(owner.id);
 

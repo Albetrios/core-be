@@ -1,7 +1,6 @@
 import { ConfigurationError, NotFoundError } from '@/shared/errors/index.js';
 import { isPostgresUniqueViolation } from '@/shared/utils/infrastructure/postgres-error.util.js';
 import type { WorkerDatabaseHandle } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { createWorkerUserDataExportRepository } from '@/domains/user/sub-domains/user-data-export/user-data-export.repository.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { GDPR_EXPORT_MAX_ROWS_PER_TABLE } from '@/shared/constants/query-limits.constants.js';
@@ -29,6 +28,11 @@ import type { AuthSessionService } from '@/domains/auth/sub-domains/auth-session
 import type { MembershipService } from '@/domains/tenancy/sub-domains/membership/membership.service.js';
 import type { NotificationService } from '@/domains/notify/sub-domains/notification/notification.service.js';
 import type { AuditService } from '@/domains/audit/audit.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 function buildExportS3Key(userPublicId: string, exportPublicId: string): string {
   return `${USER_DATA_EXPORT_S3_PREFIX}/${userPublicId}/${exportPublicId}.json.gz`;
@@ -126,13 +130,14 @@ export class UserDataExportService {
   }
 
   async requestExport(
-    userPublicId: string,
+    scope: UserPrincipalDatabaseScope,
     options?: { requestId?: string },
   ): Promise<UserDataExportOutput> {
+    const userPublicId = scope.userPublicId;
     const user = await this.userService.findUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
 
-    const existingPending = await withUserDatabaseContext(userPublicId, () =>
+    const existingPending = await withAppDatabaseContext(scope, () =>
       this.exportRepository.findPendingOrProcessingByUserId(user.id),
     );
     if (existingPending) {
@@ -147,11 +152,11 @@ export class UserDataExportService {
     const s3Key = buildExportS3Key(userPublicId, exportPublicId);
     const expiresAt = computeArtifactExpiresAt();
 
-    // auth.user_data_exports is FORCE RLS keyed on app.current_user_id — insert inside the user
+    // auth.user_data_exports is FORCE RLS keyed on app.current_user_public_id — insert inside the user
     // context so the row passes the owner-access policy in default scoped-RLS mode.
     let row: Awaited<ReturnType<UserDataExportRepository['create']>>;
     try {
-      row = await withUserDatabaseContext(userPublicId, () =>
+      row = await withAppDatabaseContext(scope, () =>
         this.exportRepository.create({
           public_id: exportPublicId,
           user_id: user.id,
@@ -164,7 +169,7 @@ export class UserDataExportService {
       if (!isPostgresUniqueViolation(error)) {
         throw error;
       }
-      const existingAfterRace = await withUserDatabaseContext(userPublicId, () =>
+      const existingAfterRace = await withAppDatabaseContext(scope, () =>
         this.exportRepository.findPendingOrProcessingByUserId(user.id),
       );
       if (existingAfterRace) {
@@ -193,13 +198,14 @@ export class UserDataExportService {
   }
 
   async getExportStatus(
-    userPublicId: string,
+    scope: UserPrincipalDatabaseScope,
     exportPublicId: string,
   ): Promise<UserDataExportOutput> {
+    const userPublicId = scope.userPublicId;
     const user = await this.userService.findUserRecordByPublicId(userPublicId);
     if (!user) throw new NotFoundError('User');
 
-    const row = await withUserDatabaseContext(userPublicId, () =>
+    const row = await withAppDatabaseContext(scope, () =>
       this.exportRepository.findByPublicIdAndUserId(exportPublicId, user.id),
     );
     if (!row) throw new NotFoundError('User data export');
@@ -278,8 +284,8 @@ export class UserDataExportService {
     userPublicId: string;
     body: Buffer;
   }): Promise<void> {
-    const s3Key = await withUserDatabaseContext(
-      options.userPublicId,
+    const s3Key = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: options.userPublicId }),
       async (scopedDatabaseHandle) =>
         this.resolveExportArtifactS3Key(
           {
@@ -302,16 +308,19 @@ export class UserDataExportService {
     });
 
     try {
-      await withUserDatabaseContext(options.userPublicId, async (scopedDatabaseHandle) => {
-        await this.finalizeExportAfterUpload(
-          {
-            exportPublicId: options.exportPublicId,
-            userInternalId: options.userInternalId,
-            userPublicId: options.userPublicId,
-          },
-          scopedDatabaseHandle,
-        );
-      });
+      await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: options.userPublicId }),
+        async (scopedDatabaseHandle) => {
+          await this.finalizeExportAfterUpload(
+            {
+              exportPublicId: options.exportPublicId,
+              userInternalId: options.userInternalId,
+              userPublicId: options.userPublicId,
+            },
+            scopedDatabaseHandle,
+          );
+        },
+      );
     } catch (error) {
       await this.bestEffortDeleteUploadedExportArtifact(s3Key, {
         exportPublicId: options.exportPublicId,
@@ -411,7 +420,7 @@ export class UserDataExportService {
   }
 
   async deleteAllExportsForUser(userInternalId: number, userPublicId: string): Promise<void> {
-    // auth.user_data_exports is FORCE RLS keyed on app.current_user_id. Offboarding can be initiated
+    // auth.user_data_exports is FORCE RLS keyed on app.current_user_public_id. Offboarding can be initiated
     // by an admin, so pin the context to the TARGET user (not the caller) so the owner-access policy
     // matches and the rows are actually removed in default scoped-RLS mode.
     //
@@ -423,12 +432,14 @@ export class UserDataExportService {
     // domain's `tombstoneAllByUserId` offboarding pattern.
     let afterId = 0;
     for (;;) {
-      const rows = await withUserDatabaseContext(userPublicId, () =>
-        this.exportRepository.findS3KeysByUserIdAfter(
-          userInternalId,
-          afterId,
-          USER_DATA_EXPORT_OFFBOARDING_DELETE_BATCH_SIZE,
-        ),
+      const rows = await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+        () =>
+          this.exportRepository.findS3KeysByUserIdAfter(
+            userInternalId,
+            afterId,
+            USER_DATA_EXPORT_OFFBOARDING_DELETE_BATCH_SIZE,
+          ),
       );
       if (rows.length === 0) {
         break;
@@ -442,8 +453,9 @@ export class UserDataExportService {
         break;
       }
     }
-    const deletedCount = await withUserDatabaseContext(userPublicId, () =>
-      this.exportRepository.deleteAllByUserId(userInternalId),
+    const deletedCount = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+      () => this.exportRepository.deleteAllByUserId(userInternalId),
     );
     if (deletedCount > 0) {
       logger.info({ userInternalId, deletedCount }, 'user-data-export.offboarding.deleted');

@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    async (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 vi.mock(
   '@/domains/notify/sub-domains/webhook/webhook-delivery/events/webhook-delivery-emit.js',
@@ -26,6 +36,10 @@ vi.mock('@/shared/utils/security/field-secret-encryption.util.js', async () => (
 
 import { ConflictError } from '@/shared/errors/index.js';
 import { WebhookService } from '@/domains/notify/sub-domains/webhook/webhook.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { WebhookRepository } from '@/domains/notify/sub-domains/webhook/webhook.repository.js';
 import type { WebhookDeliveryAttemptRepository } from '@/domains/notify/sub-domains/webhook/webhook-delivery/webhook-delivery-attempt.repository.js';
@@ -46,6 +60,11 @@ import type { WebhookDeliveryAttemptRepository } from '@/domains/notify/sub-doma
  */
 describe('WebhookService.create — per-organization cap (sec-N4)', () => {
   const organization = { id: 1, public_id: 'org_public' };
+  const scope = PRINCIPAL_SCOPE.REQUEST({
+    userPublicId: 'user_public',
+    organizationPublicId: 'org_public',
+  }) as OrganizationPrincipalDatabaseScope;
+
   const webhook = {
     id: 2,
     public_id: 'webhook_public',
@@ -66,7 +85,7 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
   const webhookRepository = {
     create: vi.fn().mockResolvedValue(webhook),
     countActiveByOrganization: vi.fn().mockResolvedValue(0),
-    // audit-#8: per-org creation quota advisory lock (no-op in unit tests).
+    // audit-#8: per-organization creation quota advisory lock (no-op in unit tests).
     acquireCreationQuotaLock: vi.fn().mockResolvedValue(undefined),
   } as unknown as WebhookRepository;
 
@@ -83,10 +102,10 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockReset();
   });
 
-  it('allows create when the org is below the cap', async () => {
+  it('allows create when the organization is below the cap', async () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockResolvedValue(5);
     await service.create(
-      'org_public',
+      scope,
       {
         url: 'https://example.com/hook',
         events: ['subscription.updated'],
@@ -97,11 +116,11 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
     expect(webhookRepository.create).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects create when the org is at the cap (default 25)', async () => {
+  it('rejects create when the organization is at the cap (default 25)', async () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockResolvedValue(25);
     await expect(
       service.create(
-        'org_public',
+        scope,
         {
           url: 'https://example.com/hook',
           events: ['subscription.updated'],
@@ -113,11 +132,11 @@ describe('WebhookService.create — per-organization cap (sec-N4)', () => {
     expect(webhookRepository.create).not.toHaveBeenCalled();
   });
 
-  it('rejects create when the org is over the cap (defensive)', async () => {
+  it('rejects create when the organization is over the cap (defensive)', async () => {
     vi.mocked(webhookRepository.countActiveByOrganization).mockResolvedValue(30);
     await expect(
       service.create(
-        'org_public',
+        scope,
         {
           url: 'https://example.com/hook',
           events: ['subscription.updated'],

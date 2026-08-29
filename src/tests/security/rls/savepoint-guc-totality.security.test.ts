@@ -28,16 +28,16 @@ describe('Security: savepoints do not restore session settings', () => {
   it('RELEASE SAVEPOINT keeps a GUC set inside the savepoint (the trap)', async () => {
     const leaked = await database.transaction(async (transaction) => {
       await transaction.execute(
-        drizzleSql`SELECT set_config('app.current_organization_id', 'org_outer', true)`,
+        drizzleSql`SELECT set_config('app.current_organization_public_id', 'org_outer', true)`,
       );
       await transaction.execute(drizzleSql`SAVEPOINT s`);
       await transaction.execute(
-        drizzleSql`SELECT set_config('app.current_organization_id', 'org_inner', true)`,
+        drizzleSql`SELECT set_config('app.current_organization_public_id', 'org_inner', true)`,
       );
       await transaction.execute(drizzleSql`RELEASE SAVEPOINT s`);
       return scalar(
         await transaction.execute(
-          drizzleSql`SELECT current_setting('app.current_organization_id', true) AS value`,
+          drizzleSql`SELECT current_setting('app.current_organization_public_id', true) AS value`,
         ),
       );
     });
@@ -49,16 +49,16 @@ describe('Security: savepoints do not restore session settings', () => {
   it('ROLLBACK TO SAVEPOINT does restore it', async () => {
     const restored = await database.transaction(async (transaction) => {
       await transaction.execute(
-        drizzleSql`SELECT set_config('app.current_organization_id', 'org_outer', true)`,
+        drizzleSql`SELECT set_config('app.current_organization_public_id', 'org_outer', true)`,
       );
       await transaction.execute(drizzleSql`SAVEPOINT s`);
       await transaction.execute(
-        drizzleSql`SELECT set_config('app.current_organization_id', 'org_inner', true)`,
+        drizzleSql`SELECT set_config('app.current_organization_public_id', 'org_inner', true)`,
       );
       await transaction.execute(drizzleSql`ROLLBACK TO SAVEPOINT s`);
       return scalar(
         await transaction.execute(
-          drizzleSql`SELECT current_setting('app.current_organization_id', true) AS value`,
+          drizzleSql`SELECT current_setting('app.current_organization_public_id', true) AS value`,
         ),
       );
     });
@@ -73,7 +73,7 @@ describe('Security: savepoints do not restore session settings', () => {
       for (const organizationPublicId of [null, 'org_B'] as const) {
         await transaction.execute(drizzleSql`SAVEPOINT row_scope`);
         await transaction.execute(
-          drizzleSql`SELECT set_config('app.current_organization_id', ${organizationPublicId ?? ''}, true)`,
+          drizzleSql`SELECT set_config('app.current_organization_public_id', ${organizationPublicId ?? ''}, true)`,
         );
         await transaction.execute(
           drizzleSql`SELECT set_config('app.system_audit_insert', ${organizationPublicId === null ? 'true' : 'false'}, true)`,
@@ -81,7 +81,7 @@ describe('Security: savepoints do not restore session settings', () => {
         seen.push({
           organization: scalar(
             await transaction.execute(
-              drizzleSql`SELECT current_setting('app.current_organization_id', true) AS value`,
+              drizzleSql`SELECT current_setting('app.current_organization_public_id', true) AS value`,
             ),
           ),
           systemArm: scalar(

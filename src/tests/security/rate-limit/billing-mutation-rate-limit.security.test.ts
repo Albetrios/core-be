@@ -36,7 +36,7 @@ describe('Security: billing rate limits reach 429 and isolate buckets', () => {
   /**
    * Isolated app carrying one preset's `keyGenerator` at a reproducible cap. When
    * `principalHeader` is set, an `onRequest` hook promotes a request header into `request.auth`
-   * + `request.organizationId` so the org-scoped key generator sees a real principal — Fastify's
+   * + `request.organizationId` so the organization-scoped key generator sees a real principal — Fastify's
    * `inject` never runs the app's own `authenticate` decorator.
    */
   async function createPresetBurstApp(options: {
@@ -100,7 +100,7 @@ describe('Security: billing rate limits reach 429 and isolate buckets', () => {
   it('one exhausted organization does not throttle a different organization or a different member', async () => {
     // The cross-tenant half of the guarantee: keying on the organization alone would let an
     // attacker probing another org's mutations exhaust that org's shared bucket, and keying on
-    // the actor alone would let one member's spend throttle them across every org they belong
+    // the actor alone would let one member's spend throttle them across every organization they belong
     // to. Only `organization:<id>:actor:<id>` isolates both directions.
     const app = await createPresetBurstApp({
       max: 1,

@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { env } from '@/shared/config/env.config.js';
 import { sql } from '@/infrastructure/database/connection.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Production hardening item 2: when many concurrent requests use scoped
- * `withOrganizationDatabaseContext` blocks (rather than full-request transaction pinning),
+ * `withAppDatabaseContext` blocks (rather than full-request transaction pinning),
  * external network I/O — simulated here as `pg_sleep` — must run OUTSIDE the context so a
  * burst of slow external calls cannot drain the pool. The chaos invariant: at least one
  * additional autocommit query keeps succeeding throughout the burst.
@@ -21,15 +24,18 @@ describe('Chaos resilience: database pool stays available under bursty scoped-co
     const burstSize = Math.max(poolMax * 2, 20);
 
     const scopedUnitsOfWork = Array.from({ length: burstSize }, (_, index) =>
-      withOrganizationDatabaseContext(organizationPublicId, async (databaseHandle) => {
-        const rows = await databaseHandle.execute<{ value: number }>(
-          drizzleSql`SELECT ${index}::int AS value`,
-        );
-        const result = Array.isArray(rows)
-          ? rows
-          : ((rows as { rows?: { value: number }[] }).rows ?? []);
-        return result[0]?.value ?? -1;
-      }),
+      withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId }),
+        async (databaseHandle) => {
+          const rows = await databaseHandle.execute<{ value: number }>(
+            drizzleSql`SELECT ${index}::int AS value`,
+          );
+          const result = Array.isArray(rows)
+            ? rows
+            : ((rows as { rows?: { value: number }[] }).rows ?? []);
+          return result[0]?.value ?? -1;
+        },
+      ),
     );
 
     const autocommitProbes = Array.from(

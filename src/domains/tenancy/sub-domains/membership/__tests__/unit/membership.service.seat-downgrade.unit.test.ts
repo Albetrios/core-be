@@ -1,17 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: (_organizationPublicId: string, callback: () => unknown) =>
-    callback(),
-}));
-
 const invalidatePermissionsMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', () => ({
   invalidatePermissions: invalidatePermissionsMock,
   invalidateOrganizationPermissions: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
 import { MembershipService } from '@/domains/tenancy/sub-domains/membership/membership.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * `suspendExcessActiveMembersToFitCeiling` (REQ-4 F2) is billing's post-downgrade entry point: when
@@ -20,6 +35,11 @@ import { MembershipService } from '@/domains/tenancy/sub-domains/membership/memb
  * OWNER is never suspended (self-lockout), and each suspended member's permission cache is purged —
  * were entirely unasserted, so a bug could silently over/under-suspend or lock the owner out.
  */
+const _asScope = (organizationPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    organizationPublicId,
+  }) as OrganizationPrincipalDatabaseScope;
+
 describe('MembershipService.suspendExcessActiveMembersToFitCeiling (F2 downgrade enforcement)', () => {
   const organizationRecord = { id: 1, public_id: 'org_public', owner_user_id: 99 };
   const requireOrganizationRecordByPublicId = vi.fn().mockResolvedValue(organizationRecord);

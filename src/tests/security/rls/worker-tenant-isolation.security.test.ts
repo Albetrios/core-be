@@ -17,7 +17,7 @@ vi.mock('@/shared/utils/security/webhook-url.util.js', () => ({
 }));
 
 /**
- * Workers run without HTTP tenant middleware — job payloads must scope repository reads.
+ * Workers run without the HTTP auth/scope middleware — job payloads must scope repository reads.
  */
 describe('Security: Worker tenant isolation', () => {
   it('does not dispatch a notification when organizationPublicId does not match the row', async () => {

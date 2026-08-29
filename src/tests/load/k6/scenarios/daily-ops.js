@@ -31,8 +31,8 @@ export function dailyOps() {
     return;
   }
 
-  // TEST_TOKEN must be minted scoped to TEST_ORG_ID — the active org rides the
-  // token's `org` claim, so the flat memberships route carries no org path segment.
+  // TEST_TOKEN must be minted scoped to TEST_ORG_ID — the active organization rides the
+  // token's `org` claim, so the flat memberships route carries no organization path segment.
   const headers = authHeaders(token).headers;
 
   // Notifications

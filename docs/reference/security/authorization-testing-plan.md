@@ -41,11 +41,11 @@ Broken Object Level Authorization (**BOLA**, OWASP `API1:2023`) is the #1 API se
 | --------- | -------------------- | ----- |
 | **Anonymous** | none | untrusted |
 | **Authenticated user** | JWT (RS256), `userId` = `user.public_id` claim | trusted as *themselves only* |
-| **Org member (role R)** | JWT + active `org` claim + role-derived permission set | trusted for *that org*, *those permissions* |
-| **Org owner** | member whose `user_id == organization.owner_user_id` | highest org tier; protected |
+| **Org member (role R)** | JWT + active `org` claim + role-derived permission set | trusted for *that organization*, *those permissions* |
+| **Org owner** | member whose `user_id == organization.owner_user_id` | highest organization tier; protected |
 | **Global admin / super_admin** | JWT `role` claim | platform-wide; `ROLE:`-gated routes only |
-| **API-key principal** | `X-Api-Key` (no acting user) | org-scoped, **no** permission-grant capability (fail-closed) |
-| **Attacker variants** | another user *same org*; a member of *another org*; a lower-tier member; a token with a forged/foreign `org` claim | the test adversaries |
+| **API-key principal** | `X-Api-Key` (no acting user) | organization-scoped, **no** permission-grant capability (fail-closed) |
+| **Attacker variants** | another user *same organization*; a member of *another organization*; a lower-tier member; a token with a forged/foreign `org` claim | the test adversaries |
 
 ### 2.2 Trust boundaries and structural defenses
 
@@ -56,7 +56,7 @@ flowchart TB
   end
   subgraph authd [Authenticated]
     U1[User A]
-    U2[User B same org]
+    U2[User B same organization]
     U3[Member of Org Z]
   end
   subgraph guards [Structural defenses]
@@ -72,14 +72,14 @@ flowchart TB
     R3[Invitation\nemail-targeted]
   end
   A -->|reject| G4
-  U3 -->|foreign org id| G2 --> R1
+  U3 -->|foreign organization id| G2 --> R1
   U2 -->|foreign user id| G3 --> R2
   U1 --> G1
   U1 --> G5 --> R1
   U2 -->|email mismatch| G5 --> R3
 ```
 
-**Defense-in-depth summary:** three structural layers already close the *naive* attack surface — (1) public ids are unguessable (`generatePublicId`), so ID-increment IDOR is impossible; (2) org-scoped RLS makes cross-tenant rows invisible at the DB layer; (3) user-scoped RLS + `(public_id, user_id)` filters scope user-owned resources. Permission middleware + domain guards add function-level and invariant enforcement. **This plan tests that all five layers hold and stay holding.**
+**Defense-in-depth summary:** three structural layers already close the *naive* attack surface — (1) public ids are unguessable (`generatePublicId`), so ID-increment IDOR is impossible; (2) organization-scoped RLS makes cross-tenant rows invisible at the DB layer; (3) user-scoped RLS + `(public_id, user_id)` filters scope user-owned resources. Permission middleware + domain guards add function-level and invariant enforcement. **This plan tests that all five layers hold and stay holding.**
 
 ---
 
@@ -90,15 +90,15 @@ Each row is a real attack pattern, its applicability here, the structural defens
 | # | Attack pattern (real world) | core-be applicability | Structural defense | Test residual to assert |
 | - | --------------------------- | --------------------- | ------------------ | ----------------------- |
 | 1 | **Sequential ID increment** (`/trips/5501→5502`) | None — ids are `prefix_<21 rand>` | Non-enumerable public ids | N/A (assert no integer ids leak in serializers) |
-| 2 | **Cross-tenant object read** (org A reads org B) | All org-owned by-id routes | Org RLS → 404 | Foreign-org id under attacker's claim → `404` |
-| 3 | **Cross-user object read/write, same org** (user B reads user A's upload/notification/session/export) | All user-owned by-id routes | User RLS + `(public_id,user_id)` filter | User B → user A's object → `404`; **write verified no state change** |
+| 2 | **Cross-tenant object read** (organization A reads organization B) | All organization-owned by-id routes | Org RLS → 404 | Foreign-organization id under attacker's claim → `404` |
+| 3 | **Cross-user object read/write, same organization** (user B reads user A's upload/notification/session/export) | All user-owned by-id routes | User RLS + `(public_id,user_id)` filter | User B → user A's object → `404`; **write verified no state change** |
 | 4 | **Mass assignment / privilege via body** (`PATCH /users/me {role:"admin"}`) | `PATCH /users/me`, membership/role bodies | Strict DTOs (unknown key → 400) | Inject privileged field → ignored / `400`; role unchanged in DB |
 | 5 | **Stateful workflow abuse** (own cart at step 1, foreign at step 3) | upload create→confirm; subscription create→cancel; invitation create→accept | per-step ownership re-check | Cross-principal id at *each* step → reject |
 | 6 | **Nested-object exposure** (authorized parent leaks unauthorized children) | list/detail serializers with nested arrays | serializer scoping | Nested ids belong only to caller's scope |
 | 7 | **Function-level escalation** (member calls admin function) | every `PERM:` and `ROLE:` route | permission middleware | Without perm → `403`; with perm → not `403` |
 | 8 | **Vertical tier violation** (admin suspends/removes the **owner**) | `PATCH`/`DELETE /memberships/:id`, `leave`, `transfer-ownership` | domain guards | `ownerMembershipCannotBeModified` / `ownerCannotBeRemoved` / `onlyOwnerCanTransfer` / `ownerCannotLeave` → `403` |
 | 9 | **Grant-what-you-don't-hold** (role:manage grants `organization:delete` they lack) | `PUT roles/:id/permissions`, `POST roles`, `POST memberships`, api-key scopes | `assertCallerCanGrantPermissionCodes` | Over-grant → `403 cannotGrantPermissionNotHeld`; union (add+remove) enforced |
-| 10 | **Token / claim forgery** (mint token with foreign `org`) | all org-scoped routes | membership re-check on `org` claim | Foreign `org` claim → `403` (no membership) |
+| 10 | **Token / claim forgery** (mint token with foreign `org`) | all organization-scoped routes | membership re-check on `org` claim | Foreign `org` claim → `403` (no membership) |
 | 11 | **JWT tampering / alg confusion** | all authed routes | RS256 verify | Tampered/`alg:none`/wrong-key → `401` |
 | 12 | **Email-targeted resource hijack** (accept an invite addressed to someone else) | `POST invitations/:id/accept` | email-match guard | Caller email ≠ invite email → `403` |
 | 13 | **API-key escalation** (key grants perms) | api-key principal on grant paths | fail-closed (no acting user) | Key cannot grant → `403` |
@@ -114,7 +114,7 @@ The audit confirms a mature posture. This baseline **builds on** it; it does not
 | Defense | Mechanism | Evidence |
 | ------- | --------- | -------- |
 | Non-enumerable ids | `generatePublicId(entity)` → `prefix_<21 [a-z0-9]>` | `shared/utils/identity/public-id.util.ts` |
-| Org isolation | FORCE RLS on `app.current_organization_id`; org resolved from JWT `org` claim only | `migrations/00000000000000_init.sql`, tenant middleware |
+| Org isolation | FORCE RLS on `app.current_organization_public_id`; organization resolved from JWT `org` claim only | `migrations/00000000000000_init.sql`, auth middleware scope attach |
 | User isolation | `withUserDatabaseContext` (`app.current_user_id`) + `(public_id, user_id)` repo filters | `auth-method`, `auth-mfa`, `notification`, `upload`, `user-data-export` services |
 | Function gating | permission middleware on every `PERM:` route | `shared/middlewares/` + route registration |
 | Tier guards | `ownerMembershipCannotBeModified`, `ownerCannotBeRemoved`, `ownerCannotLeave`, `onlyOwnerCanTransfer` | `membership.service.ts` (tagged `sec-new-T1`) |
@@ -128,14 +128,14 @@ The audit confirms a mature posture. This baseline **builds on** it; it does not
 | Cross-tenant BOLA (by-id) | `security/rls/bola-cross-tenant.security.test.ts` |
 | Tenant isolation / RLS matrix | `security/rls/{tenant-isolation,rls-matrix,worker-tenant-isolation}.security.test.ts` |
 | BFLA function gating (auto-loaded from catalog) | `security/infrastructure/permission-route-matrix.security.test.ts` |
-| Privilege escalation (no-perm, cross-org, super_admin) | `security/auth/privilege-escalation.security.test.ts` |
+| Privilege escalation (no-perm, cross-organization, super_admin) | `security/auth/privilege-escalation.security.test.ts` |
 | Grant-grantability | `tenancy/.../membership.service.grantable-permissions.unit.test.ts` |
 | Mass assignment (BOPLA write) | `security/input/mass-assignment.security.test.ts` |
 | Field leakage (BOPLA read) | `security/infrastructure/sensitive-field-leakage.security.test.ts` |
 | Auth / JWT / session | `security/auth/{jwt-attacks,jwt-security,auth-enforcement,session-invalidation,mfa-security}.security.test.ts` |
 | Upload user isolation (repo) | `upload/__tests__/unit/upload.repository.user-isolation.db.unit.test.ts` |
 
-**Coverage characterization:** layers 1–2 (cross-org BOLA, function gating) are *systematically* covered (the permission matrix is auto-loaded from `docs/routes.txt`). Layer 3 (cross-user BOLA, tier/grant invariants) is covered by **hand-written unit/integration tests** — excellent, but their *existence per route is not enforced*, and most assert at the service layer rather than end-to-end through the HTTP route.
+**Coverage characterization:** layers 1–2 (cross-organization BOLA, function gating) are *systematically* covered (the permission matrix is auto-loaded from `docs/routes.txt`). Layer 3 (cross-user BOLA, tier/grant invariants) is covered by **hand-written unit/integration tests** — excellent, but their *existence per route is not enforced*, and most assert at the service layer rather than end-to-end through the HTTP route.
 
 ---
 
@@ -163,7 +163,7 @@ A global test banning the unscoped `findByPublicId` from user-scoped service cod
 
 ## 6. Coverage matrix — route × attacker → expected
 
-`✅` covered today · `🟡` partial (service-layer only) · `➕` to add in this baseline. Owner model: `user` = user-scoped · `org` = org-scoped · `email` = invite email-match · `tier` = owner-tier · `grant` = grant-grantability.
+`✅` covered today · `🟡` partial (service-layer only) · `➕` to add in this baseline. Owner model: `user` = user-scoped · `organization` = organization-scoped · `email` = invite email-match · `tier` = owner-tier · `grant` = grant-grantability.
 
 ### 6.1 Class A — user-owned object ownership (Delta A)
 
@@ -194,9 +194,9 @@ A global test banning the unscoped `findByPublicId` from user-scoped service cod
 | `POST /tenancy/organization/memberships` | grant | add member with role > caller holds | 403 | grant-grantability | 🟡→➕ e2e |
 | `POST` / `PATCH /tenancy/organization/api-keys[/:api_key_id]` | grant | key scope > caller holds | 403 | grant-grantability | 🟡→➕ e2e |
 
-### 6.3 Class C — cross-org BOLA (already systematic; assert breadth)
+### 6.3 Class C — cross-organization BOLA (already systematic; assert breadth)
 
-All `PERM:` by-id routes (`role`, `membership`, `webhook`, `subscription`, `api_key`, `notification-policy`): org B's id under attacker's org-A claim → `404`/`403`. ✅ pattern proven in `bola-cross-tenant`; matrix extends to **every** by-id `PERM:` route via the catalog.
+All `PERM:` by-id routes (`role`, `membership`, `webhook`, `subscription`, `api_key`, `notification-policy`): organization B's id under attacker's organization-A claim → `404`/`403`. ✅ pattern proven in `bola-cross-tenant`; matrix extends to **every** by-id `PERM:` route via the catalog.
 
 ### 6.4 Class D / E / F — already covered (regression-guard only)
 
@@ -230,11 +230,11 @@ tooling/openapi/route-catalog/route-authorization-model.json   ← NEW: per-rout
 
 | Model | Setup | Attack | Verify |
 | ----- | ----- | ------ | ------ |
-| `user` | create resource owned by **User A** | inject as **User B** (same org + a member of another org) | row still present / unchanged |
+| `user` | create resource owned by **User A** | inject as **User B** (same organization + a member of another organization) | row still present / unchanged |
 | `email` | create invite for `a@x.com` | inject as `b@x.com` | no membership created |
-| `tier:owner` | org with owner O + admin Adm (`membership:manage`) | Adm attacks O / O attacks self-leave | owner row + `owner_user_id` unchanged |
+| `tier:owner` | organization with owner O + admin Adm (`membership:manage`) | Adm attacks O / O attacks self-leave | owner row + `owner_user_id` unchanged |
 | `grant` | caller with `role:manage` but **missing** code C | attempt to grant C | role permission set unchanged |
-| `org` (Class C) | resource in org B | attacker scoped to org A claim | n/a (404) |
+| `organization` (Class C) | resource in organization B | attacker scoped to organization A claim | n/a (404) |
 
 ### 7.3 File layout
 
@@ -286,7 +286,7 @@ Reuses existing helpers: `createTestUser`, `createTestOrganization`, `createMemb
 | ----- | ----------- | ------------- |
 | **0 — Audit sign-off** | confirm ownership enforcement on all by-id/mutating routes incl. billing + notify sweep | every route classified; zero unexplained gaps |
 | **1 — Engine + model file** | `route-authorization-model.json`, loader, `validate:route-authorization-model` | gate green; 100% routes modelled |
-| **2 — Class A (BOLA)** | `object-ownership.security.test.ts` + matrix cases | all 12 user-owned routes assert cross-user + cross-org |
+| **2 — Class A (BOLA)** | `object-ownership.security.test.ts` + matrix cases | all 12 user-owned routes assert cross-user + cross-organization |
 | **3 — Class B (tier/grant)** | `tier-and-grant.security.test.ts` e2e | owner-tier + grant-grantability asserted end-to-end |
 | **4 — Enforcement** | coverage ratchet budget + `findByPublicId` static gate | uncovered budget = 0; static gate green |
 
@@ -297,9 +297,9 @@ Phases 0–4 are the **day‑0 enterprise baseline**.
 ## 11. Definition of done
 
 - [ ] Every mutating / by-id route in `docs/routes.txt` has a `route-authorization-model.json` entry (CI-enforced).
-- [ ] Every Class A route asserts cross-user **and** cross-org isolation end-to-end; writes verify no state change.
+- [ ] Every Class A route asserts cross-user **and** cross-organization isolation end-to-end; writes verify no state change.
 - [ ] Every Class B route asserts its tier / grant invariant end-to-end.
-- [ ] `permission-route-matrix` (BFLA) and `bola-cross-tenant` (cross-org) remain green and now extend to **all** `PERM:` by-id routes.
+- [ ] `permission-route-matrix` (BFLA) and `bola-cross-tenant` (cross-organization) remain green and now extend to **all** `PERM:` by-id routes.
 - [ ] Uncovered-route budget = `0`; static `findByPublicId` ban green.
 - [ ] Adding a new route without a model + assertion **fails CI** (verified with a deliberate red test).
 - [ ] Plan wired into `docs/README.md` index; `src/tests/security/security.overview.md` updated (via `docs-maintainer` / `overview-doc-maintainer`).

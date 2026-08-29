@@ -1,6 +1,9 @@
 import { Queue } from 'bullmq';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { eq } from 'drizzle-orm';
-import { database } from '@/infrastructure/database/connection.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import { users } from '@/domains/user/user.schema.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
@@ -15,7 +18,6 @@ import { NOTIFICATION_QUEUE_NAME } from '@/domains/notify/sub-domains/notificati
 import { STRIPE_WEBHOOK_QUEUE_NAME } from '@/domains/billing/sub-domains/stripe-webhook/queues/stripe-webhook.queue.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
-import { withSystemAuditInsertContext } from '@/infrastructure/database/contexts/system-audit-insert-database.context.js';
 
 /**
  * Source queues whose DLQ payloads {@link buildReplayJobPayload} knows how to reconstruct.
@@ -121,7 +123,7 @@ export function buildReplayJobPayload(data: DeadLetterJobData): Record<string, u
     case NOTIFICATION_QUEUE_NAME: {
       const notificationId = summary.notification_id;
       if (typeof notificationId !== 'number') return null;
-      // Notification jobs carry a nullable org scope; preserve null (global notifications)
+      // Notification jobs carry a nullable organization scope; preserve null (global notifications)
       // and only forward a concrete public id when present.
       const organizationPublicId = summary.organization_public_id;
       basePayload = {
@@ -160,11 +162,19 @@ export async function recordDlqReplayAuditEntry(input: {
   deadLetterJobId: string;
   data: DeadLetterJobData;
 }): Promise<void> {
-  const [actorRow] = await database
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.public_id, input.actorUserPublicId))
-    .limit(1);
+  // The actor lookup needs an explicit RLS context: with no GUC set, both arms of
+  // users_self_or_admin_access evaluate false under the RLS-subject application role
+  // and the lookup returned zero rows — every manual DLQ replay failed at this
+  // pre-condition. global_admin is the cross-user read arm the users policy grants.
+  const [actorRow] = await withMaintenanceDatabaseContext(
+    MAINTENANCE_SCOPE.GLOBAL_ADMIN,
+    (databaseHandle) =>
+      databaseHandle
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.public_id, input.actorUserPublicId))
+        .limit(1),
+  );
 
   if (!actorRow) {
     throw new Error(`Unknown actor user public id: ${input.actorUserPublicId}`);
@@ -175,21 +185,24 @@ export async function recordDlqReplayAuditEntry(input: {
   // here is rejected by RLS. Use the system-audit-insert context (gated on
   // `organization_id IS NULL`, so it cannot impersonate a tenant) to write
   // the row.
-  await withSystemAuditInsertContext(async (databaseHandle) => {
-    await databaseHandle.insert(logs).values({
-      actor_user_id: actorRow.id,
-      action: 'queue.dlq.replayed',
-      resource_type: 'bullmq_dead_letter_job',
-      severity: 'INFO',
-      metadata: {
-        dead_letter_queue: input.deadLetterQueueName,
-        dead_letter_job_id: input.deadLetterJobId,
-        original_queue: input.data.original_queue,
-        original_job_id: input.data.original_job_id,
-        replay_attempt: input.data.replay_attempt ?? 0,
-      },
-    });
-  });
+  await withMaintenanceDatabaseContext(
+    MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT,
+    async (databaseHandle) => {
+      await databaseHandle.insert(logs).values({
+        actor_user_id: actorRow.id,
+        action: 'queue.dlq.replayed',
+        resource_type: 'bullmq_dead_letter_job',
+        severity: 'INFO',
+        metadata: {
+          dead_letter_queue: input.deadLetterQueueName,
+          dead_letter_job_id: input.deadLetterJobId,
+          original_queue: input.data.original_queue,
+          original_job_id: input.data.original_job_id,
+          replay_attempt: input.data.replay_attempt ?? 0,
+        },
+      });
+    },
+  );
 }
 
 /**
@@ -238,20 +251,23 @@ export async function recordDlqAutoRetryAuditEntry(input: {
   // were re-selected at the head forever (head-of-line starvation for the
   // entire DLQ auto-retry subsystem). The system-audit-insert context fires
   // the new policy arm gated on `organization_id IS NULL`.
-  await withSystemAuditInsertContext(async (databaseHandle) => {
-    await databaseHandle.insert(logs).values({
-      actor_user_id: null,
-      action: 'queue.dlq.auto_retried',
-      resource_type: 'bullmq_dead_letter_job',
-      severity: 'INFO',
-      metadata: {
-        dead_letter_job_id: input.deadLetterJobId,
-        original_queue: input.sourceQueue,
-        original_job_id: input.originalJobId,
-        auto_retry_count: input.autoRetryCount,
-      },
-    });
-  });
+  await withMaintenanceDatabaseContext(
+    MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT,
+    async (databaseHandle) => {
+      await databaseHandle.insert(logs).values({
+        actor_user_id: null,
+        action: 'queue.dlq.auto_retried',
+        resource_type: 'bullmq_dead_letter_job',
+        severity: 'INFO',
+        metadata: {
+          dead_letter_job_id: input.deadLetterJobId,
+          original_queue: input.sourceQueue,
+          original_job_id: input.originalJobId,
+          auto_retry_count: input.autoRetryCount,
+        },
+      });
+    },
+  );
 }
 
 /**

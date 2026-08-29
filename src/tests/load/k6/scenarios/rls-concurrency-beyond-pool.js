@@ -8,9 +8,9 @@ import { authHeaders, switchToOrganization } from '../helpers/auth.js';
  * RLS concurrency-beyond-pool scenario.
  *
  * Validates production-readiness audit item #5 (per-request RLS transaction pinning):
- * with DATABASE_RLS_SCOPED_CONTEXTS=true, an org-scoped (RLS) endpoint must sustain
+ * with DATABASE_RLS_SCOPED_CONTEXTS=true, an organization-scoped (RLS) endpoint must sustain
  * concurrency well above DATABASE_POOL_MAX without failures. Under the legacy
- * request-pinned model each in-flight org request held a pooled checkout for its whole
+ * request-pinned model each in-flight organization request held a pooled checkout for its whole
  * lifetime, so the API saturated at ~DATABASE_POOL_MAX concurrent requests. With scoped
  * contexts the checkout is only held for the actual unit-of-work, so the same pool should
  * absorb several multiples of concurrent requests.
@@ -53,7 +53,7 @@ export function rlsConcurrencyBeyondPool() {
   const organizationPublicId = __ENV.TEST_ORG_ID;
   if (!(token && organizationPublicId)) return;
 
-  // The active org rides the token's `org` claim — scope the token to TEST_ORG_ID
+  // The active organization rides the token's `org` claim — scope the token to TEST_ORG_ID
   // so the flat RLS route resolves the right organization.
   token = switchToOrganization(token, organizationPublicId) || token;
 

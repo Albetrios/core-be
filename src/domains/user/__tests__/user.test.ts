@@ -63,7 +63,7 @@ describe('User Domain — flows', () => {
 
   beforeEach(async () => {
     await cleanupDatabase();
-    // GET /users/me self-heals a missing personal org (provisions on read when personal is
+    // GET /users/me self-heals a missing personal organization (provisions on read when personal is
     // enabled); provisioning grants the owner role every permission code, so the full catalog
     // must exist or the role_permissions → permissions FK fails. Seed it so the self-heal
     // succeeds and personal_organization_id is reliably non-null (mirrors the tenancy suites).
@@ -81,7 +81,7 @@ describe('User Domain — flows', () => {
           personal_organization_id: string | null;
         };
       };
-      // Self-heal: a bare createTestUser has no personal org, but with personal enabled
+      // Self-heal: a bare createTestUser has no personal organization, but with personal enabled
       // getMe provisions one on demand so personal_organization_id is reliably non-null
       // (a user can never dead-end onboarding for lack of a personal workspace).
       expect(body.data.personal_organization_id).toMatch(/^org_[a-z0-9]{21}$/);

@@ -110,6 +110,7 @@ Grouped index: **[deployment/README.md](deployment/README.md)** (`setup/`, `ci-c
 | [deployment/github-production-environment.md](deployment/github-production-environment.md)                     | GitHub production Environment protection and required reviewers.                                  |
 | [deployment/restore-drill.md](deployment/restore-drill.md)                                                   | Backup restore drill procedure and RTO evidence.                                                 |
 | [deployment/runbooks/stripe-subscription-reconciliation.md](deployment/runbooks/stripe-subscription-reconciliation.md) | Reconcile Stripe subscriptions against the local ledger.                               |
+| [deployment/runbooks/maintenance-database-role.md](deployment/runbooks/maintenance-database-role.md)         | Provisioning the dedicated maintenance database role and connection.                             |
 | [deployment/runbooks/worker-scaling.md](deployment/runbooks/worker-scaling.md)                               | Scaling BullMQ worker processes and concurrency.                                                 |
 
 ---
@@ -147,9 +148,9 @@ Grouped index: **[deployment/README.md](deployment/README.md)** (`setup/`, `ci-c
 | [reference/architecture/production-audit-decisions.md](reference/architecture/production-audit-decisions.md) | Audit decisions: seat-entitlement policy, `updated_at` triggers, ops-polish, scale milestones. |
 | [reference/api/api-versioning.md](reference/api/api-versioning.md)                                                 | `/api/v1` major-version path prefix, `API-Version` header.                             |
 | [reference/api/response-codes.md](reference/api/response-codes.md)                                                 | Method→status policy, when to use each error code, error envelope.                     |
-| [reference/api/route-consistency-and-org-model.md](reference/api/route-consistency-and-org-model.md)               | One route surface for personal/team orgs, the `capabilities` object + 422 backstop, route-catalog S/I/O columns, `/auth/me/*` vs login flow. |
-| [reference/api/frontend-auth-guide.md](reference/api/frontend-auth-guide.md)                                       | Frontend SPA auth: Bearer + reactive refresh, headers per route, org switching.        |
-| [reference/api/frontend-endpoint-mapping.md](reference/api/frontend-endpoint-mapping.md)                           | FE calls → real routes: passkeys, notifications, prefs, webhooks, MFA, sessions, org logo, billing gating. |
+| [reference/api/route-consistency-and-organization-model.md](reference/api/route-consistency-and-organization-model.md)               | One route surface for personal/team organizations, the `capabilities` object + 422 backstop, route-catalog S/I/O columns, `/auth/me/*` vs login flow. |
+| [reference/api/frontend-auth-guide.md](reference/api/frontend-auth-guide.md)                                       | Frontend SPA auth: Bearer + reactive refresh, headers per route, organization switching.        |
+| [reference/api/frontend-endpoint-mapping.md](reference/api/frontend-endpoint-mapping.md)                           | FE calls → real routes: passkeys, notifications, prefs, webhooks, MFA, sessions, organization logo, billing gating. |
 | [reference/api/api-documentation.md](reference/api/api-documentation.md) | OpenAPI / Postman / Scalar generation and hosting. |
 | [reference/data/data-lifecycle-deletion.md](reference/data/data-lifecycle-deletion.md)                             | Soft-delete, retention, Drizzle table inventory.                                       |
 | [reference/data/user-data-export.md](reference/data/user-data-export.md)                                           | Async GDPR export to S3, presigned download, offboarding cleanup.                      |
@@ -161,6 +162,8 @@ Grouped index: **[deployment/README.md](deployment/README.md)** (`setup/`, `ci-c
 | [reference/security/secrets-management.md](reference/security/secrets-management.md) | Secret storage, encryption key, and rotation. |
 | [reference/security/data-classification.md](reference/security/data-classification.md) | Data sensitivity tiers and handling rules. |
 | [reference/security/audit-logs.md](reference/security/audit-logs.md) | Audit log model and retention. |
+| [reference/security/rls-architecture.md](reference/security/rls-architecture.md) | RLS scopes, layers, GUC catalog, and the old→new wrapper evolution. |
+| [reference/security/rls-lock-inventory.md](reference/security/rls-lock-inventory.md) | Every automated lock pinning the RLS / database-context architecture. |
 | [reference/security/audit-export.md](reference/security/audit-export.md) | Audit log export workflow. |
 | [reference/security/system-tables-without-tenant-rls.md](reference/security/system-tables-without-tenant-rls.md) | System/shared tables intentionally outside tenant RLS. |
 | [reference/security/authorization-matrix-review.md](reference/security/authorization-matrix-review.md) | Authorization matrix review. |

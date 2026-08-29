@@ -164,6 +164,14 @@ k6 scenarios and helpers live in `src/tests/load/k6/` (`.js` files, not Vitest).
 
 ### 1. Pure layers (unit)
 
+- [ ] Suite touches services that enter database contexts → mock the context module with
+      `mockDatabaseContexts(actual)` from `@/tests/helpers/database-context-mock.helper.js`
+      (stubs ALL three wrappers — a partial `...actual` spread leaves siblings REAL and
+      opens Postgres, which CI's unit lane does not have)
+- [ ] Controller suite builds fake requests → wrap the factory return in
+      `attachPrincipalScope(...)` from
+      `@/tests/helpers/principal-scope.helper.js` so `request.principalScope`
+      exercises the REAL request minters
 - [ ] New/changed **validator** → unit tests under `src/domains/<domain>/__tests__/unit/` (or sub-domain `__tests__/unit/`)
 - [ ] New/changed **serializer** → same layout as validators
 - [ ] New/changed **shared util** → unit tests under `src/tests/unit/utils/`

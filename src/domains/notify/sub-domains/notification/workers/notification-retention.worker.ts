@@ -1,4 +1,8 @@
 import { Worker } from 'bullmq';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import {
   getRetentionWorkerOptions,
@@ -8,7 +12,6 @@ import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
 import { NOTIFICATION_RETENTION_QUEUE_NAME } from '@/domains/notify/sub-domains/notification/workers/notification-retention.constants.js';
 import { runNotificationRetentionJob } from '@/domains/notify/sub-domains/notification/workers/notification-retention.processor.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 
 /**
@@ -17,7 +20,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
  *
  * @remarks
  * - **Algorithm:** wraps {@link runNotificationRetentionJob} in
- *   `withGlobalRetentionCleanupDatabaseContext` so the BullMQ processor sees cross-tenant rows.
+ *   `withMaintenanceDatabaseContext` so the BullMQ processor sees cross-tenant rows.
  * - **Failure modes:** stalled jobs are logged via the `stalled` listener; processor errors
  *   propagate through BullMQ retries and the queue DLQ.
  * - **Side effects:** registers a `Worker` against Redis with retention-tuned options
@@ -29,7 +32,7 @@ export function createNotificationRetentionWorker(): WorkerHandle {
   const worker = new Worker(
     NOTIFICATION_RETENTION_QUEUE_NAME,
     async () =>
-      withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, (databaseHandle) =>
         runNotificationRetentionJob(databaseHandle),
       ),
     {

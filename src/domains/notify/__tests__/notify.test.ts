@@ -81,7 +81,7 @@ describe('Notify Domain — Integration', () => {
     });
     // Flat webhook routes resolve the organization from the JWT `org` claim, so
     // the bearer must embed `organizationPublicId` to reach (and pass) the
-    // webhook permission preHandler and the org-scoped controller.
+    // webhook permission preHandler and the organization-scoped controller.
     const token = await generateTestToken({
       userId: user.public_id,
       organizationPublicId: organization.public_id,
@@ -100,8 +100,10 @@ describe('Notify Domain — Integration', () => {
     });
 
     it('should return notifications for authenticated user', async () => {
-      const user = await createTestUser();
-      const token = await generateTestToken({ userId: user.public_id });
+      // Personal/team-organization invariant: every real bearer carries an `org`
+      // claim, and the principal scope minter rejects organization-less (stale) tokens.
+      const { user, token } = await createAuthorizedNotifyContext();
+      void user;
       const response = await injectAuthenticated(app, {
         url: testApiPath('/notify/notifications'),
         token,
@@ -148,8 +150,7 @@ describe('Notify Domain — Integration', () => {
     });
 
     it('should return unread count for authenticated user', async () => {
-      const user = await createTestUser();
-      const token = await generateTestToken({ userId: user.public_id });
+      const { token } = await createAuthorizedNotifyContext();
       const response = await injectAuthenticated(app, {
         url: testApiPath('/notify/notifications/unread-count'),
         token,
@@ -181,7 +182,7 @@ describe('Notify Domain — Integration', () => {
     it('should return 403 without webhook read permission', async () => {
       const { organization } = await createAuthorizedNotifyContext();
       const user = await createTestUser({ email: 'noperm@test.com' });
-      // Scope the bearer to the org via the `org` claim so the request reaches
+      // Scope the bearer to the organization via the `org` claim so the request reaches
       // the webhook permission check; the user has no membership → 403.
       const token = await generateTestToken({
         userId: user.public_id,

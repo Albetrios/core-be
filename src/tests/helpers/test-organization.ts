@@ -17,7 +17,7 @@ import { getEnv } from '@/shared/config/env.config.js';
 
 /**
  * Generate a test organization public ID for use in tests.
- * When used with X-Organization-Id header.
+ * Legacy header helper — the X-Organization-Id header was removed; kept only where a suite deliberately sends an inert header.
  */
 export function generateTestOrganizationId(): string {
   return generatePublicId('organization');
@@ -50,8 +50,8 @@ export interface TwoOrganizationSubscriptionFixture {
 }
 
 /**
- * Seeds two organizations (A, B), two users (one owner per org), billing subscriptions in each org,
- * and grants subscription + upload permissions in the home org only.
+ * Seeds two organizations (A, B), two users (one owner per organization), billing subscriptions in each organization,
+ * and grants subscription + upload permissions in the home organization only.
  */
 export async function seedTwoOrganizationsWithSubscriptions(options?: {
   billingPermissionCodes?: string[];

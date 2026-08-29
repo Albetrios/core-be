@@ -3,9 +3,10 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ForbiddenError, ValidationError } from '@/shared/errors/index.js';
 import { createMembershipController } from '@/domains/tenancy/sub-domains/membership/membership.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScope({
     auth: { kind: 'user' as const, userId: generatePublicId('user'), role: 'USER' },
     params: {},
     body: {},
@@ -13,7 +14,7 @@ function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {
@@ -144,14 +145,14 @@ describe('createMembershipController', () => {
   });
 
   it('rejects missing organization id on validated handlers with ForbiddenError', async () => {
-    // No organization_id path param and no auth.organizationPublicId claim → no org in scope.
+    // No organization_id path param and no auth.organizationPublicId claim → no organization in scope.
     await expect(
       controller.listMemberships(mockRequest({ params: {} }), mockReply()),
     ).rejects.toBeInstanceOf(ForbiddenError);
     await expect(
       controller.createMembership(mockRequest({ params: {}, body: {} }), mockReply()),
     ).rejects.toBeInstanceOf(ForbiddenError);
-    // Empty-string organization_id also resolves to "no org in scope".
+    // Empty-string organization_id also resolves to "no organization in scope".
     await expect(
       controller.createMembership(
         mockRequest({ params: { organization_id: '' }, body: {} }),
@@ -166,26 +167,24 @@ describe('createMembershipController', () => {
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('rejects malformed organization id on validated handlers with ValidationError', async () => {
-    const invalidId = 'not-a-public-id';
-    await expect(
-      controller.listMemberships(
-        mockRequest({ params: { organization_id: invalidId } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.leaveOrganization(
-        mockRequest({ params: { organization_id: invalidId } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.transferOwnership(
-        mockRequest({ params: { organization_id: 'bad' }, body: {} }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
+  it('ignores organization path params on validated handlers — the signed claim decides', async () => {
+    vi.mocked(service.list).mockClear();
+    await controller.listMemberships(
+      mockRequest({
+        auth: {
+          kind: 'user' as const,
+          userId: generatePublicId('user'),
+          role: 'user',
+          organizationPublicId,
+        },
+        params: { organization_id: 'not-a-public-id' },
+      }),
+      mockReply(),
+    );
+    expect(service.list).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId }),
+      expect.anything(),
+    );
   });
 
   it('getMembershipPermissions delegates to service with valid params', async () => {
@@ -195,7 +194,10 @@ describe('createMembershipController', () => {
       }),
       mockReply(),
     );
-    expect(service.getPermissions).toHaveBeenCalledWith(organizationPublicId, membershipPublicId);
+    expect(service.getPermissions).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      membershipPublicId,
+    );
   });
 
   it('createMembership returns 200 with valid organization id', async () => {
@@ -229,7 +231,7 @@ describe('createMembershipController', () => {
     // forwarded to the service (which would then fail elsewhere with unbounded
     // cardinality on the observability path). sec-re-18 binds at the boundary so
     // the request is rejected before the service is reached. With no organization_id
-    // path param and no auth.organizationPublicId claim, the org is out of scope and
+    // path param and no auth.organizationPublicId claim, the organization is out of scope and
     // resolveActiveOrganizationId throws ForbiddenError.
     vi.mocked(service.update).mockClear();
     vi.mocked(service.delete).mockClear();
@@ -249,7 +251,7 @@ describe('createMembershipController', () => {
     expect(service.delete).not.toHaveBeenCalled();
   });
 
-  it('sec-re-18: every membership handler that takes path params rejects undefined params (no org in scope) with ForbiddenError', async () => {
+  it('sec-re-18: every membership handler that takes path params rejects undefined params (no organization in scope) with ForbiddenError', async () => {
     vi.mocked(service.getByPublicId).mockClear();
     vi.mocked(service.update).mockClear();
     vi.mocked(service.delete).mockClear();

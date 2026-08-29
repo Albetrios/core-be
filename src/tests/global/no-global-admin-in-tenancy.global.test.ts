@@ -7,15 +7,15 @@ import { describe, expect, it } from 'vitest';
  * global-admin escape hatch.**
  *
  * `tenancy.organizations` and `tenancy.memberships` are FORCE RLS, and their policies honor only
- * `app.current_organization_id` (`organizations_tenant_isolation`) and `app.current_user_id`
+ * `app.current_organization_public_id` (`organizations_tenant_isolation`) and `app.current_user_public_id`
  * (`organizations_user_discovery` / `memberships_user_self_discovery`). Unlike the `auth.*` and
  * `audit.logs` policies, **none of them carries an `app.global_admin` arm** — so
- * `withGlobalAdminDatabaseContext` grants exactly nothing on tenancy tables while looking like it
+ * `withMaintenanceDatabaseContext` grants exactly nothing on tenancy tables while looking like it
  * grants everything.
  *
  * That mismatch shipped three times:
- * - `provisionOrganization` — the org INSERT failed its WITH CHECK with SQLSTATE 42501.
- * - `resolve-active-organization` — every active-org read returned zero rows, so users logged in
+ * - `provisionOrganization` — the organization INSERT failed its WITH CHECK with SQLSTATE 42501.
+ * - `resolve-active-organization` — every active-organization read returned zero rows, so users logged in
  *   with no `org` claim, no permissions, and a "you don't have permission" dashboard.
  * - `OrganizationRepository`'s user-id resolvers — silently returned `null`, skipping the
  *   permission-cache purge on role change and nulling `created_by_user_id` attribution.
@@ -31,12 +31,11 @@ describe('Global: tenancy code never uses the global-admin RLS escape hatch', ()
   const SKIP_DIRECTORIES = new Set<string>(['__tests__', '__snapshots__', 'node_modules', 'dist']);
 
   /**
-   * Matches an actual import of the hatch, not prose. Both a named import and a namespace/default
-   * import of the context module count; a `withGlobalAdminDatabaseContext` mention inside a `//` or
-   * `/** *\/` comment does not.
+   * Matches an actual use of the global-admin maintenance scope, not prose: the
+   * `MAINTENANCE_SCOPE.GLOBAL_ADMIN` singleton is the only way to enter the hatch
+   * since the family unification, so referencing it outside a comment IS the use.
    */
-  const GLOBAL_ADMIN_IMPORT =
-    /^\s*import\s[\s\S]*?from\s+['"][^'"]*global-admin-database\.context\.js['"]/gm;
+  const GLOBAL_ADMIN_USE = /^(?!\s*(?:\/\/|\*|\/\*)).*MAINTENANCE_SCOPE\.global_admin/gm;
 
   async function* walkTypeScriptFiles(root: string): AsyncGenerator<string> {
     const entries = await fs.readdir(root, { withFileTypes: true });
@@ -54,15 +53,15 @@ describe('Global: tenancy code never uses the global-admin RLS escape hatch', ()
     }
   }
 
-  it('no file under src/domains/tenancy imports withGlobalAdminDatabaseContext', async () => {
+  it('no file under src/domains/tenancy uses MAINTENANCE_SCOPE.GLOBAL_ADMIN', async () => {
     const repositoryRoot = process.cwd();
     const tenancyRoot = join(repositoryRoot, 'src', 'domains', 'tenancy');
 
     const violations: string[] = [];
     for await (const filePath of walkTypeScriptFiles(tenancyRoot)) {
       const source = await fs.readFile(filePath, 'utf8');
-      GLOBAL_ADMIN_IMPORT.lastIndex = 0;
-      if (GLOBAL_ADMIN_IMPORT.test(source)) {
+      GLOBAL_ADMIN_USE.lastIndex = 0;
+      if (GLOBAL_ADMIN_USE.test(source)) {
         violations.push(relative(repositoryRoot, filePath));
       }
     }
@@ -70,8 +69,8 @@ describe('Global: tenancy code never uses the global-admin RLS escape hatch', ()
     expect(
       violations,
       'Tenancy RLS policies do not honor app.global_admin — the hatch reads/writes ZERO rows there.\n' +
-        'Use withUserDatabaseContext (app.current_user_id), withOrganizationDatabaseContext\n' +
-        '(app.current_organization_id), or an auth.* SECURITY DEFINER resolver instead.\n' +
+        'Use withAppDatabaseContext (user scope) (app.current_user_public_id), withAppDatabaseContext\n' +
+        '(app.current_organization_public_id), or an auth.* SECURITY DEFINER resolver instead.\n' +
         `Offending file(s):\n  ${violations.join('\n  ')}`,
     ).toEqual([]);
   });
