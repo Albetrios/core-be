@@ -20,7 +20,7 @@ The single most failure-prone, security-critical surface in core-be: a missed `F
   - `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP)` → `app.global_retention_cleanup = 'true'`
   - `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP)` → `app.session_retention_cleanup = 'true'`
   - Every bypass kind lives in the `MAINTENANCE_CONTEXTS` registry (`database-context.ts`); usage is per-path allowlisted by `maintenance-context-confinement.policy.unit.test.ts`.
-  - Job runners wrap these: `runTenantScopedWorkerJob` (reads `organizationPublicId`), `runUserScopedWorkerJob` (reads `userPublicId`), `runGlobalRetentionWorkerJob` — in `src/infrastructure/queue/worker-runtime/worker-processor.util.ts`.
+  - Job runners wrap these: `runOrganizationScopedWorkerJob` (reads `organizationPublicId`), `runUserScopedWorkerJob` (reads `userPublicId`), `runGlobalRetentionWorkerJob` — in `src/infrastructure/queue/worker-runtime/worker-processor.util.ts`.
 - **Fail-closed guards:** `getRequestDatabase()` (`database-context-runtime.ts`) **throws `WorkerDatabaseContextError`** in worker runtime if no handle is pinned (instead of silently returning the GUC-less pool). `assertWorkerRlsGucSet` verifies the live `current_setting` matches the expected context. `assert-database-rls-safety.ts` (boot, hosted) throws if `DATABASE_URL` connects as a superuser / `BYPASSRLS` role — Postgres skips even FORCE RLS for those. Intended role: `core_be_app`.
 
 ## When this guard triggers

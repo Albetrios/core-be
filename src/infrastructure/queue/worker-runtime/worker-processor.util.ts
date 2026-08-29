@@ -15,7 +15,7 @@ export type WorkerDatabaseHandle = WorkerContextDatabaseHandle;
 
 /**
  * Decorates a per-queue job payload `TJob` with the `organizationPublicId` discriminator
- * required by {@link runTenantScopedWorkerJob} so the processor can re-enter Postgres
+ * required by {@link runOrganizationScopedWorkerJob} so the processor can re-enter Postgres
  * inside the job-scope principal context (sets `app.current_organization_public_id` for RLS).
  */
 export type TenantScopedWorkerJob<TJob> = TJob & {
@@ -42,7 +42,7 @@ export type UserScopedWorkerJob<TJob> = TJob & {
 /**
  * Runs a tenant-scoped BullMQ job handler with RLS organization context and a pinned database handle.
  */
-export async function runTenantScopedWorkerJob<TJob, TResult>(
+export async function runOrganizationScopedWorkerJob<TJob, TResult>(
   job: TenantScopedWorkerJob<TJob>,
   processor: (databaseHandle: WorkerDatabaseHandle, job: TJob) => Promise<TResult>,
 ): Promise<TResult> {
@@ -94,8 +94,9 @@ export function createTenantScopedBullMQWorker<TJobData extends TenantScopedJobD
     queueName,
     async (job) => {
       const { organizationPublicId, ...jobPayload } = job.data;
-      return runTenantScopedWorkerJob({ organizationPublicId, ...jobPayload }, (databaseHandle) =>
-        handler(databaseHandle, job),
+      return runOrganizationScopedWorkerJob(
+        { organizationPublicId, ...jobPayload },
+        (databaseHandle) => handler(databaseHandle, job),
       );
     },
     workerOptions,

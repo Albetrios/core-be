@@ -21,7 +21,7 @@ What it does not own: identity proof (lives in [auth](src/domains/auth/)), user 
 - **Permission cache invalidation on every write**: any change to a user's role / permissions / membership invalidates the per-`(user, organization)` cache key in Redis before the response is returned.
 - **Public-id only at the API boundary**: every URL and JSON payload uses the URL-safe public id. The internal numeric id never leaves the database layer.
 - **Invitation tokens are one-shot**: atomic `UPDATE ... RETURNING` consumes the invitation on accept; second attempt sees `status=accepted`.
-- **No cross-organization membership reads from the wrong context**: workers must use `runTenantScopedWorkerJob` (with `organizationPublicId` in the job payload) and the proper RLS context; HTTP code goes through `tenant.middleware`.
+- **No cross-organization membership reads from the wrong context**: workers must use `runOrganizationScopedWorkerJob` (with `organizationPublicId` in the job payload) and the proper RLS context; HTTP code goes through `tenant.middleware`.
 
 ## Sub-domains
 

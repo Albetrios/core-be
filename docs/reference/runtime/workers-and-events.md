@@ -125,7 +125,7 @@ HTTP requests set `app.current_organization_public_id` via tenant middleware and
 
 | Context wrapper                                                             | GUC / purpose                                                            |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `withAppDatabaseContext` (organization job scope) / `runTenantScopedWorkerJob` | `app.current_organization_public_id` — tenant mutations and reads               |
+| `withAppDatabaseContext` (organization job scope) / `runOrganizationScopedWorkerJob` | `app.current_organization_public_id` — tenant mutations and reads               |
 | `MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP` / `runGlobalRetentionWorkerJob` | `app.global_retention_cleanup` — cross-tenant tombstone retention       |
 | `withAppDatabaseContext` (user job scope) / `runUserScopedWorkerJob`  | `app.current_user_public_id` — GDPR export                                      |
 | `MAINTENANCE_SCOPE.SESSION_RETENTION_CLEANUP`                               | `app.session_retention_cleanup` — session cleanup worker                 |

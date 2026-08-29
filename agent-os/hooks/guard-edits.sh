@@ -70,7 +70,7 @@ esac
 case "$FILE" in
   *.worker.ts | *.processor.ts)
     if printf '%s' "$CONTENT" | grep -Eq 'getRequestDatabase'; then
-      deny "Workers/processors must not call getRequestDatabase() (RLS — it returns the GUC-less pool). Bind a handle via a context wrapper — withAppDatabaseContext / runTenantScopedWorkerJob (CLAUDE.md → Organization context / RLS; enforced by global tests)."
+      deny "Workers/processors must not call getRequestDatabase() (RLS — it returns the GUC-less pool). Bind a handle via a context wrapper — withAppDatabaseContext / runOrganizationScopedWorkerJob (CLAUDE.md → Organization context / RLS; enforced by global tests)."
     fi ;;
 esac
 

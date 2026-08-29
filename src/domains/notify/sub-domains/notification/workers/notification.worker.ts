@@ -26,7 +26,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { getWorkerConcurrencyNotify } from '@/shared/config/worker-concurrency.util.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
 import {
-  runTenantScopedWorkerJob,
+  runOrganizationScopedWorkerJob,
   type WorkerDatabaseHandle,
 } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
@@ -268,7 +268,7 @@ async function processTenantScopedNotificationJob(
  *
  * @remarks
  * - **Algorithm:** for each job, branch on `organizationPublicId`: tenant-scoped jobs run inside
- *   `runTenantScopedWorkerJob` (`withAppDatabaseContext`) so RLS pins reads to the organization;
+ *   `runOrganizationScopedWorkerJob` (`withAppDatabaseContext`) so RLS pins reads to the organization;
  *   tenant-less notifications delegate directly to {@link processNotificationDispatchJob}
  *   which then enters its own `loadNotificationForScope` flow — resolving the recipient
  *   public id under `withMaintenanceDatabaseContext` and pinning `withAppDatabaseContext (user scope)`
@@ -311,7 +311,7 @@ export function createNotificationWorker(): WorkerHandle {
           );
         }
 
-        return runTenantScopedWorkerJob(
+        return runOrganizationScopedWorkerJob(
           { organizationPublicId, notificationId, requestId },
           (databaseHandle) => processTenantScopedNotificationJob(databaseHandle, job),
         );

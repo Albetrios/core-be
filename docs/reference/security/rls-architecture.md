@@ -419,7 +419,7 @@ route preHandler: [app.authenticate, requireOrganizationPermission(…)]
 ```text
 enqueue (inside a scoped context) → payload carries organizationPublicId / userPublicId
 src/worker.ts → queue/bootstrap.ts → domains/**/workers/<x>.worker.ts
- └─ runTenantScopedWorkerJob / runUserScopedWorkerJob   worker-runtime/worker-processor.util.ts
+ └─ runOrganizationScopedWorkerJob / runUserScopedWorkerJob   worker-runtime/worker-processor.util.ts
       zod-validate payload → PRINCIPAL_SCOPE.JOB({ ids }) → withAppDatabaseContext(scope, cb)
       createWorker*Repository(databaseHandle) + assertWorkerRlsGucSet (live tripwire)
       (getRequestDatabase() without a pinned context THROWS in worker runtime)
