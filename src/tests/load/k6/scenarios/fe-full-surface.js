@@ -917,10 +917,14 @@ export function feFullJourney() {
 
   const sw = step(
     '21-switch-org',
-    http.post(`${API}/auth/switch-to-organization`, JSON.stringify({ organization_id: organizationId }), {
-      headers: auth,
-      tags: { name: '21-switch-org' },
-    }),
+    http.post(
+      `${API}/auth/switch-to-organization`,
+      JSON.stringify({ organization_id: organizationId }),
+      {
+        headers: auth,
+        tags: { name: '21-switch-org' },
+      },
+    ),
     [200],
   );
   const scoped = sw.status === 200 ? body(sw).access_token : null;
