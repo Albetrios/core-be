@@ -7,11 +7,9 @@ import { USER_DATA_EXPORT_STATUSES } from '@/domains/user/sub-domains/user-data-
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import type { CommitDispatchTask } from '@/infrastructure/queue/commit-dispatch/commit-dispatch.types.js';
 import {
+  MAINTENANCE_SCOPE,
   PRINCIPAL_SCOPE,
   withAppDatabaseContext,
-} from '@/infrastructure/database/contexts/database-context.js';
-import {
-  MAINTENANCE_SCOPE,
   withMaintenanceDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 

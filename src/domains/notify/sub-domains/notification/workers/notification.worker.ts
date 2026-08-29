@@ -1,7 +1,8 @@
 import { Worker, type Job } from 'bullmq';
 import {
-  PRINCIPAL_SCOPE,
   MAINTENANCE_SCOPE,
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
   withMaintenanceDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
@@ -14,7 +15,10 @@ import {
   NOTIFICATION_QUEUE_NAME,
   type NotificationJobData,
 } from '@/domains/notify/sub-domains/notification/queues/notification.queue.js';
-import { createWorkerNotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
+import {
+  type NotificationRepository,
+  createWorkerNotificationRepository,
+} from '@/domains/notify/sub-domains/notification/notification.repository.js';
 import { dispatchOutboxEmail, recordOutboxEmail } from '@/infrastructure/mail/queues/mail.queue.js';
 import { isMailConfigured } from '@/infrastructure/mail/mail.service.js';
 import { buildNotificationEmailHtml } from './notification-email-content.js';
@@ -30,9 +34,6 @@ import {
   type WorkerDatabaseHandle,
 } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
-
 type NotificationDispatchData = {
   channels?: ('email' | 'in_app')[];
   email?: string;

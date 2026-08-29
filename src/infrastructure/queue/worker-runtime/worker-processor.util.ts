@@ -1,12 +1,14 @@
 import { Worker, type Job, type WorkerOptions } from 'bullmq';
 import {
-  PRINCIPAL_SCOPE,
   MAINTENANCE_SCOPE,
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
   withMaintenanceDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
-import type { WorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
-import { brandWorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
+import {
+  type WorkerContextDatabaseHandle,
+  brandWorkerContextDatabaseHandle,
+} from '@/infrastructure/database/utils/database-handle.types.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
 

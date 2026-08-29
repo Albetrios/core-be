@@ -1,7 +1,8 @@
 import type { AuditRepository } from './audit.repository.js';
 import {
-  PRINCIPAL_SCOPE,
   MAINTENANCE_SCOPE,
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
   withMaintenanceDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { AuditLogFilters, AuditLogRecordInput } from './audit.types.js';
@@ -11,8 +12,6 @@ import type { OrganizationService } from '@/domains/tenancy/sub-domains/organiza
 import type { UserService } from '@/domains/user/user.service.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withAppDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-
 /**
  * Collects the distinct internal user ids (actor + target) and organization ids referenced by a
  * page of audit-log rows, so {@link AuditService.list} can batch-resolve them to public ids in two

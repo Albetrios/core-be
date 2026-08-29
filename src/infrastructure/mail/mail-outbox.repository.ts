@@ -1,8 +1,8 @@
 import { and, asc, count, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm';
-import { resolveRepositoryDatabaseHandle } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   assertWorkerDatabaseContext,
   isWorkerRuntime,
+  resolveRepositoryDatabaseHandle,
 } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { mail_outbox } from '@/infrastructure/mail/mail-outbox.schema.js';
 import type { MailEnqueueInput } from '@/infrastructure/mail/queues/mail.queue.js';

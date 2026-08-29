@@ -1,8 +1,10 @@
 import { and, asc, eq, inArray, lt, sql as drizzleSql } from 'drizzle-orm';
 import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
-import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
-import { assertWorkerRlsGucSet } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import {
+  type RequestScopedPostgresDatabase,
+  assertWorkerRlsGucSet,
+  getRequestDatabase,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { audit_outbox, type AuditOutboxRow } from './audit-outbox.schema.js';
 
 /**

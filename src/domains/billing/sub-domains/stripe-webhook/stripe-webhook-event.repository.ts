@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, lt, or, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   assertWorkerDatabaseContext,
+  getRequestDatabase,
   isWorkerRuntime,
 } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {

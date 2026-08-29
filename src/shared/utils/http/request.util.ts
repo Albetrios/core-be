@@ -137,6 +137,6 @@ export function requireOrganizationScope(
  */
 export function requireUserScope(request: FastifyRequest): UserPrincipalDatabaseScope {
   const scope = request.principalScope as PrincipalDatabaseScope | undefined;
-  if (!scope || scope.userPublicId === undefined) throw new UnauthorizedError();
+  if (scope?.userPublicId === undefined) throw new UnauthorizedError();
   return scope as UserPrincipalDatabaseScope;
 }
