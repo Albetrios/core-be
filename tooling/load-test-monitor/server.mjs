@@ -848,7 +848,7 @@ function renderCommand(){
 
   el.innerHTML='<span class="p">$</span> <span class="e">BASE_URL=http://localhost:${PORT}</span> '+
     '<span class="e">VUS='+vus+'</span> <span class="e">'+mode+'</span> \\\\\\n'+
-    '    k6 run src/tests/load/k6/scenarios/fe-user-journey.js\\n'+
+    '    k6 run src/tests/load/k6/scenarios/fe-login-to-org.js\\n'+
     (journeys
       ? '<span class="c"># '+journeys+' journey(s), '+api.length+' API call(s), peak concurrency '+vus+'</span>'
       : '<span class="c"># '+api.length+' API call(s) recorded &mdash; no journey traffic yet</span>')+

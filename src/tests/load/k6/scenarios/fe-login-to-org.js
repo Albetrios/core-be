@@ -58,8 +58,8 @@ import { credentialPool } from '../helpers/pool.js';
  * REQUIRES the API with TEST_MODE=true (the OTP echo lets a VU complete its own signup).
  *
  * Usage:
- *   VUS=1  k6 run fe-user-journey.js       # 1 user,  16 calls
- *   VUS=50 k6 run fe-user-journey.js       # 50 users, 800 calls, 50 signups + 50 orgs
+ *   VUS=1  k6 run fe-login-to-org.js       # 1 user,  16 calls
+ *   VUS=50 k6 run fe-login-to-org.js       # 50 users, 800 calls, 50 signups + 50 orgs
  */
 
 const VUS = Number(__ENV.VUS || 1);
@@ -174,7 +174,7 @@ export function setup() {
   http.post(
     `${__ENV.BASE_URL || ''}/__monitor/run`,
     JSON.stringify({
-      command: `BASE_URL=${__ENV.BASE_URL || 'http://localhost:3000'} VUS=${VUS} \\\n    k6 run src/tests/load/k6/scenarios/fe-user-journey.js`,
+      command: `BASE_URL=${__ENV.BASE_URL || 'http://localhost:3000'} VUS=${VUS} \\\n    k6 run src/tests/load/k6/scenarios/fe-login-to-org.js`,
       vus: VUS,
       mode: `${VUS} users x 1 pass x ${STEPS.length} routes (auth: ${AUTH})`,
       stepsPerJourney: STEPS.length,

@@ -67,13 +67,13 @@ import { SharedArray } from 'k6/data';
  *
  * Run:
  *   TEST_MODE=true AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED=true pnpm dev
- *   BASE_URL=http://localhost:3000 VUS=20 k6 run src/tests/load/k6/scenarios/fe-full-journey.js
+ *   BASE_URL=http://localhost:3000 VUS=20 k6 run src/tests/load/k6/scenarios/fe-full-surface.js
  *
  *   # include the step-up cluster (adds a 60s wait per VU, in parallel):
- *   BASE_URL=http://localhost:3000 VUS=20 STEP_UP=true k6 run src/tests/load/k6/scenarios/fe-full-journey.js
+ *   BASE_URL=http://localhost:3000 VUS=20 STEP_UP=true k6 run src/tests/load/k6/scenarios/fe-full-surface.js
  *
  *   # re-running within 5 minutes? DELETE /organization is 5 per 5 min per user — move along the pool:
- *   BASE_URL=http://localhost:3000 VUS=20 USER_OFFSET=20 k6 run src/tests/load/k6/scenarios/fe-full-journey.js
+ *   BASE_URL=http://localhost:3000 VUS=20 USER_OFFSET=20 k6 run src/tests/load/k6/scenarios/fe-full-surface.js
  */
 
 const BASE = __ENV.BASE_URL || 'http://localhost:3000';
@@ -820,7 +820,7 @@ export function setup() {
   http.post(
     `${BASE}/__monitor/run`,
     JSON.stringify({
-      command: `BASE_URL=${BASE} VUS=${VUS}${USER_OFFSET ? ` USER_OFFSET=${USER_OFFSET}` : ''}${STEP_UP ? ' STEP_UP=true' : ''} \\\n    k6 run src/tests/load/k6/scenarios/fe-full-journey.js`,
+      command: `BASE_URL=${BASE} VUS=${VUS}${USER_OFFSET ? ` USER_OFFSET=${USER_OFFSET}` : ''}${STEP_UP ? ' STEP_UP=true' : ''} \\\n    k6 run src/tests/load/k6/scenarios/fe-full-surface.js`,
       vus: VUS,
       mode: `${VUS} users x 1 pass x ${STEP_UP ? STEPS.length : STEPS.length - 3} core-fe calls`,
       stepsPerJourney: STEP_UP ? STEPS.length : STEPS.length - 3,
