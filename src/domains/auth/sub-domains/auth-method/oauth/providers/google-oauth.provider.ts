@@ -11,9 +11,11 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
 
 function getGoogleRedirectUri(): string {
+  // The redirect URI is the SPA's provider-specific /callback/google page: the browser
+  // lands there with `code`+`state`, and the SPA forwards them to this API's
+  // GET /api/v1/auth/oauth/google/callback for the token exchange.
   return (
-    env.OAUTH_GOOGLE_REDIRECT_URI ??
-    `${env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL}/auth/oauth/google/callback`
+    env.OAUTH_GOOGLE_REDIRECT_URI ?? `${env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL}/callback/google`
   );
 }
 
