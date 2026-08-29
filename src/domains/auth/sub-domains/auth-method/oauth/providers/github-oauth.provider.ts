@@ -12,9 +12,11 @@ const GITHUB_USER_URL = 'https://api.github.com/user';
 const GITHUB_EMAILS_URL = 'https://api.github.com/user/emails';
 
 function getGitHubRedirectUri(): string {
+  // The redirect URI is the SPA's provider-specific /callback/github page: the browser
+  // lands there with `code`+`state`, and the SPA forwards them to this API's
+  // GET /api/v1/auth/oauth/github/callback for the token exchange.
   return (
-    env.OAUTH_GITHUB_REDIRECT_URI ??
-    `${env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL}/auth/oauth/github/callback`
+    env.OAUTH_GITHUB_REDIRECT_URI ?? `${env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL}/callback/github`
   );
 }
 
