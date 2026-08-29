@@ -70,6 +70,27 @@ compose superuser is needed ONLY for a fresh clone's very first `pnpm db:migrate
 (before the roles exist) and is otherwise used by nothing. `DATABASE_OPERATOR_URL` is
 NEVER set in hosted environments.
 
+## Fresh database / recreate provisioning (disaster or reset)
+
+Migrations are the complete source of truth from zero — schemas, tables, every
+FORCE-RLS policy, the five roles, ownership, and grants all materialize from one
+cold `pnpm db:migrate` (proven by the local scratch rebuild and the nightly CI
+canary). A deleted-and-recreated database therefore needs exactly three steps:
+
+1. **Bootstrap migrate** — `DATABASE_MIGRATION_URL` must point at the provider's
+   elevated user for the FIRST run (`core_be_migrator` does not exist until the
+   migrations create it). On Neon a recreated database usually means a new host:
+   update `DATABASE_URL` / `DATABASE_MIGRATION_URL` secrets (direct host, no
+   `-pooler`, for the migration URL).
+2. **Re-enable logins** — migrations create every role `NOLOGIN` (passwords are
+   per-environment secrets, never in committed SQL). Re-run the `ALTER ROLE …
+   LOGIN PASSWORD` steps above for whichever roles the environment's URLs use,
+   then `pnpm github:sync` any changed secrets.
+3. **Data** — reference data returns via `pnpm db:seed`; tenant/billing rows do
+   not, and external state (e.g. Stripe customers pointing at vanished internal
+   rows) needs reconciliation. Treat recreate as a provisioning event, not a
+   redeploy.
+
 ## Nightly CI parity canary
 
 `.github/workflows/scheduled-rls-parity.yml` re-runs the DB suites every night with this
