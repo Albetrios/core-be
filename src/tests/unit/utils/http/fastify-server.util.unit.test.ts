@@ -154,7 +154,16 @@ describe('fastify-server.util', () => {
     const { buildFastifyServerOptions: buildHopCountOptions } = await import(
       '@/shared/utils/http/fastify-server.util.js'
     );
-    expect(buildHopCountOptions().trustProxy).toBe(2);
+    const trustProxy = buildHopCountOptions().trustProxy as (
+      address: string,
+      hopIndex: number,
+    ) => boolean;
+    expect(typeof trustProxy).toBe('function');
+    // env TRUST_PROXY=2 compiles to "trust the first two hops" (fastify@5.12
+    // dropped the number form from the type; semantics preserved).
+    expect(trustProxy('10.0.0.1', 0)).toBe(true);
+    expect(trustProxy('10.0.0.1', 1)).toBe(true);
+    expect(trustProxy('10.0.0.1', 2)).toBe(false);
     envState.TRUST_PROXY = false;
     vi.resetModules();
   });
