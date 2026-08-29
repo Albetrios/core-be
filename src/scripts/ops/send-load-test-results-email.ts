@@ -85,9 +85,9 @@ async function main(): Promise<void> {
   let testToken = '';
   let testOrgId = '';
   const tokenMatch = credsResult.stdout.match(/export TEST_TOKEN="([^"]+)"/);
-  const orgMatch = credsResult.stdout.match(/export TEST_ORG_ID="([^"]+)"/);
+  const organizationMatch = credsResult.stdout.match(/export TEST_ORG_ID="([^"]+)"/);
   if (tokenMatch) testToken = tokenMatch[1] ?? '';
-  if (orgMatch) testOrgId = orgMatch[1] ?? '';
+  if (organizationMatch) testOrgId = organizationMatch[1] ?? '';
 
   let apiResult = { stdout: '', stderr: '', exitCode: -1 };
   if (testToken && testOrgId) {

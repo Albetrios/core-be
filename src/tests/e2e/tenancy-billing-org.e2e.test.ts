@@ -51,7 +51,7 @@ describe('Cross-domain e2e: tenancy + billing organization', () => {
     });
     expect(createResponse.statusCode).toBe(200);
     const created = createResponse.json() as { data: { id: string } };
-    const orgToken = await generateTestToken({
+    const organizationToken = await generateTestToken({
       userId: user.public_id,
       organizationPublicId: created.data.id,
     });
@@ -59,14 +59,14 @@ describe('Cross-domain e2e: tenancy + billing organization', () => {
     const plansResponse = await injectAuthenticated(app, {
       method: 'GET',
       url: testApiPath('/billing/plans'),
-      token: orgToken,
+      token: organizationToken,
     });
     expect(plansResponse.statusCode).toBe(200);
 
     const subscriptionsResponse = await injectAuthenticated(app, {
       method: 'GET',
       url: testApiPath('/billing/subscriptions'),
-      token: orgToken,
+      token: organizationToken,
     });
     expect(subscriptionsResponse.statusCode).toBe(200);
   });

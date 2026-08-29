@@ -1,12 +1,12 @@
 import { and, eq } from 'drizzle-orm';
 import {
-  getRequestDatabase,
   type RequestScopedPostgresDatabase,
-} from '@/infrastructure/database/contexts/request-database.context.js';
+  assertWorkerDatabaseContext,
+  getRequestDatabase,
+  resolveRepositoryDatabaseHandle,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { WorkerDatabaseHandle } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
-import { resolveRepositoryDatabaseHandle } from '@/infrastructure/database/contexts/worker-database-guard.util.js';
-import { assertWorkerDatabaseContext } from '@/infrastructure/database/contexts/worker-database.context.js';
 import {
   webhook_delivery_attempts,
   webhooks,
@@ -227,7 +227,7 @@ export async function createPendingWebhookDeliveryAttempt(input: {
   return rows[0]!.id;
 }
 
-/** Worker-only — requires an explicit handle from `withOrganizationContext`. */
+/** Worker-only — requires an explicit handle from `withAppDatabaseContext`. */
 export function createWorkerWebhookDeliveryQueries(databaseHandle: WorkerDatabaseHandle) {
   assertWorkerDatabaseContext(['organization']);
   return {

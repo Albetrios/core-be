@@ -1,6 +1,9 @@
 import { env } from '@/shared/config/env.config.js';
 import { ConflictError, NotFoundError } from '@/shared/errors/index.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  withAppDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { OrganizationNotificationPolicyRepository } from './organization-notification-policy.repository.js';
 import type { OrganizationNotificationPolicyOutput } from './organization-notification-policy.types.js';
@@ -16,7 +19,7 @@ import { serializeOrganizationNotificationPolicy } from './organization-notifica
  *
  * @remarks
  * - **Algorithm:** every operation is wrapped in
- *   `withOrganizationDatabaseContext` so RLS (`app.current_organization_id`)
+ *   `withAppDatabaseContext` so RLS (`app.current_organization_public_id`)
  *   matches the resource. Create defers to the repository's upsert which
  *   resurrects soft-deleted rows on `(organization_id, notification_type,
  *   channel)` conflicts. Update copies only defined fields and converts
@@ -37,8 +40,11 @@ export class OrganizationNotificationPolicyService {
     private readonly policyRepository: OrganizationNotificationPolicyRepository,
   ) {}
 
-  async list(organization_public_id: string): Promise<OrganizationNotificationPolicyOutput[]> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async list(
+    scope: OrganizationPrincipalDatabaseScope,
+  ): Promise<OrganizationNotificationPolicyOutput[]> {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const rows = await this.policyRepository.findByOrganizationId(organization.id);
@@ -49,10 +55,11 @@ export class OrganizationNotificationPolicyService {
   }
 
   async getByPublicId(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     policy_public_id: string,
   ): Promise<OrganizationNotificationPolicyOutput> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.policyRepository.findByPublicId(policy_public_id, organization.id);
@@ -62,15 +69,16 @@ export class OrganizationNotificationPolicyService {
   }
 
   async create(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     created_by_user_public_id: string | undefined,
   ): Promise<OrganizationNotificationPolicyOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateCreateOrganizationNotificationPolicy(body);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
-      // sec-r5-followup-ratelimit-dos-3 + audit-#8: serialize the per-org count + insert with a
+      // sec-r5-followup-ratelimit-dos-3 + audit-#8: serialize the per-organization count + insert with a
       // transaction-scoped advisory lock so concurrent creates cannot both pass the same count
       // and overshoot ORGANIZATION_NOTIFICATION_POLICY_MAX_PER_ORG. The lock auto-releases at commit.
       await this.policyRepository.acquireCreationQuotaLock(organization.id);
@@ -97,13 +105,14 @@ export class OrganizationNotificationPolicyService {
   }
 
   async update(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     policy_public_id: string,
     body: unknown,
     updated_by_user_public_id: string | undefined,
   ): Promise<OrganizationNotificationPolicyOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateOrganizationNotificationPolicy(body);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const userId =
@@ -129,8 +138,9 @@ export class OrganizationNotificationPolicyService {
     });
   }
 
-  async delete(organization_public_id: string, policy_public_id: string): Promise<void> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async delete(scope: OrganizationPrincipalDatabaseScope, policy_public_id: string): Promise<void> {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const deleted = await this.policyRepository.softDelete(policy_public_id, organization.id);

@@ -1,5 +1,5 @@
 import { and, desc, eq, gt, inArray, ne, or, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   RESOURCE_QUOTA_LOCK_NAMESPACE,
   acquireResourceQuotaLock,
@@ -102,27 +102,27 @@ export class AuthSessionRepository {
    * Called on `/auth/refresh` so that `revokeByTokenHash(currentBearerToken)` (logout)
    * keeps working after a JWT rotation; otherwise the hash drifts and logout silently fails.
    */
-  async rotateTokenHash(publicId: string, tokenHash: string) {
+  async rotateTokenHash(publicId: string, sessionTokenHash: string) {
     await getRequestDatabase()
       .update(sessions)
-      .set({ token_hash: tokenHash, last_active_at: databaseNowTimestamp })
+      .set({ token_hash: sessionTokenHash, last_active_at: databaseNowTimestamp })
       .where(eq(sessions.public_id, publicId));
   }
 
   /**
    * Rotate the session's access-token hash AND persist the active organization
-   * (audit-#3) so `/auth/refresh` can preserve the org the caller switched to
+   * (audit-#3) so `/auth/refresh` can preserve the organization the caller switched to
    * instead of recomputing the default. Used by the organization-switch path.
    */
   async rotateTokenHashAndOrganization(
     publicId: string,
-    tokenHash: string,
+    sessionTokenHash: string,
     organizationId: number,
   ) {
     await getRequestDatabase()
       .update(sessions)
       .set({
-        token_hash: tokenHash,
+        token_hash: sessionTokenHash,
         organization_id: organizationId,
         last_active_at: databaseNowTimestamp,
       })
@@ -171,23 +171,23 @@ export class AuthSessionRepository {
     return rows[0] ?? null;
   }
 
-  async findByTokenHash(tokenHash: string) {
+  async findByTokenHash(sessionTokenHash: string) {
     const rows = await getRequestDatabase()
       .select()
       .from(sessions)
-      .where(and(eq(sessions.token_hash, tokenHash), eq(sessions.is_revoked, false)))
+      .where(and(eq(sessions.token_hash, sessionTokenHash), eq(sessions.is_revoked, false)))
       .limit(1);
     return rows[0] ?? null;
   }
 
   /** Active session for bearer validation (not revoked, not expired). */
-  async findActiveByTokenHash(tokenHash: string) {
+  async findActiveByTokenHash(sessionTokenHash: string) {
     const rows = await getRequestDatabase()
       .select()
       .from(sessions)
       .where(
         and(
-          eq(sessions.token_hash, tokenHash),
+          eq(sessions.token_hash, sessionTokenHash),
           eq(sessions.is_revoked, false),
           gt(sessions.expires_at, databaseNowTimestamp),
         ),
@@ -205,11 +205,11 @@ export class AuthSessionRepository {
     return rows[0] ?? null;
   }
 
-  async revokeByTokenHash(tokenHash: string) {
+  async revokeByTokenHash(sessionTokenHash: string) {
     const rows = await getRequestDatabase()
       .update(sessions)
       .set({ is_revoked: true })
-      .where(eq(sessions.token_hash, tokenHash))
+      .where(eq(sessions.token_hash, sessionTokenHash))
       .returning();
     return rows[0] ?? null;
   }

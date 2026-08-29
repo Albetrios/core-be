@@ -35,18 +35,19 @@ const {
   };
 });
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getRequestDatabase: vi.fn(() => ({ insert: insertMock, select: selectMock })),
-  setLocalDatabaseConfig: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('@/infrastructure/database/contexts/worker-database.context.js', () => ({
-  assertWorkerDatabaseContext: vi.fn(),
-}));
-
-vi.mock('@/infrastructure/database/contexts/worker-database-guard.util.js', () => ({
-  resolveRepositoryDatabaseHandle: vi.fn((handle) => handle ?? { insert: insertMock }),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getRequestDatabase: vi.fn(() => ({ insert: insertMock, select: selectMock })),
+      setLocalDatabaseConfig: vi.fn().mockResolvedValue(undefined),
+      assertWorkerDatabaseContext: vi.fn(),
+      resolveRepositoryDatabaseHandle: vi.fn((handle) => handle ?? { insert: insertMock }),
+    };
+  },
+);
 
 import { createPendingWebhookDeliveryAttempt } from '@/domains/notify/sub-domains/webhook/webhook-delivery/webhook-delivery.repository.js';
 

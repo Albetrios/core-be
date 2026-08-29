@@ -6,7 +6,7 @@ import { subscriptionSeatSyncJobDataSchema } from '@/domains/billing/sub-domains
  * though both parse **untrusted payloads read back off Redis** at the worker boundary via
  * `parseJobDataOrDeadLetter`. A payload that fails here is dead-lettered; one that wrongly
  * passes reaches `processSubscriptionSeatSyncJob`, which uses `organizationPublicId` to
- * re-enter the org RLS context — so this schema is the tenant boundary for the seat-sync worker.
+ * re-enter the organization RLS context — so this schema is the tenant boundary for the seat-sync worker.
  */
 describe('subscription-seat-sync.job.schema', () => {
   it('accepts a minimal tenant-scoped payload', () => {
@@ -35,7 +35,7 @@ describe('subscription-seat-sync.job.schema', () => {
   });
 
   it('rejects a payload with no organizationPublicId', () => {
-    // Without the org id the worker has no tenant to enter — the job MUST be dead-lettered
+    // Without the organization id the worker has no tenant to enter — the job MUST be dead-lettered
     // rather than run against whatever RLS context the connection happens to carry.
     expect(subscriptionSeatSyncJobDataSchema.safeParse({ requestId: 'req-abc' }).success).toBe(
       false,

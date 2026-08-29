@@ -4,8 +4,8 @@ import {
   getActingUserPublicId,
   getRequestIdentifier,
   requireAuth,
+  requireOrganizationScope,
   requirePrincipal,
-  resolveActiveOrganizationId,
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
 import type { MembershipService } from './membership.service.js';
@@ -19,8 +19,9 @@ import type { MembershipService } from './membership.service.js';
 export function createMembershipController(service: MembershipService) {
   return {
     listMemberships: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const organizationId = resolveActiveOrganizationId(request);
-      const result = await service.list(organizationId, request.query);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
+      const result = await service.list(scope, request.query);
       return paginatedResponse(result.items, getRequestIdentifier(request), {
         per_page: result.limit,
         next: result.next_cursor,
@@ -35,17 +36,19 @@ export function createMembershipController(service: MembershipService) {
       // sec-re-18 (sec-B10 class): bind path params at the boundary so an
       // attacker-supplied string never flows into Sentry breadcrumbs, log
       // payloads, or metric labels with unbounded cardinality.
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
       const membershipId = validatePublicIdParam(rawParams.membership_id ?? '', 'membership_id');
-      const data = await service.getByPublicId(organizationId, membershipId);
+      const data = await service.getByPublicId(scope, membershipId);
       return successResponse(data, getRequestIdentifier(request));
     },
     createMembership: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
       // REQ-1: "Add member" — the raw invitation token is delivered ONLY via email, never returned;
       // the response carries the created INVITED membership (with its embedded invitation ref).
-      const data = await service.create(organizationId, request.body, getActingUserPublicId(auth), {
+      const data = await service.create(scope, request.body, getActingUserPublicId(auth), {
         requestId: getRequestIdentifier(request),
       });
       return successResponse(data, getRequestIdentifier(request));
@@ -58,10 +61,11 @@ export function createMembershipController(service: MembershipService) {
       // sec-re-18 (sec-B10 class): bind path params at the boundary so an
       // attacker-supplied string never flows into Sentry breadcrumbs, log
       // payloads, or metric labels with unbounded cardinality.
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
       const membershipId = validatePublicIdParam(rawParams.membership_id ?? '', 'membership_id');
       const data = await service.update(
-        organizationId,
+        scope,
         membershipId,
         request.body,
         getActingUserPublicId(auth),
@@ -76,9 +80,10 @@ export function createMembershipController(service: MembershipService) {
       // sec-re-18 (sec-B10 class): bind path params at the boundary so an
       // attacker-supplied string never flows into Sentry breadcrumbs, log
       // payloads, or metric labels with unbounded cardinality.
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
       const membershipId = validatePublicIdParam(rawParams.membership_id ?? '', 'membership_id');
-      await service.delete(organizationId, membershipId);
+      await service.delete(scope, membershipId);
       return reply.code(204).send();
     },
     getMembershipPermissions: async (request: FastifyRequest, _reply: FastifyReply) => {
@@ -88,21 +93,24 @@ export function createMembershipController(service: MembershipService) {
       // sec-re-18 (sec-B10 class): bind path params at the boundary so an
       // attacker-supplied string never flows into Sentry breadcrumbs, log
       // payloads, or metric labels with unbounded cardinality.
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
       const membershipId = validatePublicIdParam(rawParams.membership_id ?? '', 'membership_id');
-      const data = await service.getPermissions(organizationId, membershipId);
+      const data = await service.getPermissions(scope, membershipId);
       return successResponse(data, getRequestIdentifier(request));
     },
     leaveOrganization: async (request: FastifyRequest, reply: FastifyReply) => {
       const auth = requireAuth(request);
-      const organizationId = resolveActiveOrganizationId(request);
-      await service.leaveOrganization(organizationId, auth.userId);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
+      await service.leaveOrganization(scope, auth.userId);
       return reply.code(204).send();
     },
     transferOwnership: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requireAuth(request);
-      const organizationId = resolveActiveOrganizationId(request);
-      const data = await service.transferOwnership(organizationId, request.body, auth.userId);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
+      const data = await service.transferOwnership(scope, request.body, auth.userId);
       return successResponse(data, getRequestIdentifier(request));
     },
   };

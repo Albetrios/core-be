@@ -64,7 +64,7 @@ src/domains/<domain>/
         <sub-domain>.faker.ts
       __tests__/
         unit/                 # *.validator.unit.test.ts, *.serializer.unit.test.ts
-        <sub-domain>.test.ts  # Optional dedicated e2e (tenancy org children)
+        <sub-domain>.test.ts  # Optional dedicated e2e (tenancy organization children)
       events/                 # Optional
         __tests__/            # event-handler / emit unit tests
         *.events.ts

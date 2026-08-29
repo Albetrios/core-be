@@ -45,10 +45,10 @@ rejected. So the proxy signs in as a demo user to get one:
 - **Credentials:** `DEMO_EMAIL` / `DEMO_PASSWORD` env, default **`demo@example.com` / `DemoPassword123!`**
   (read identically by `proxy.mjs` and the seed below — keep the defaults in sync).
 - **Super_admin:** the email must be listed in `GLOBAL_ADMIN_EMAILS` (super_admin is global,
-  not org-scoped). `dashboards:up` warns if it isn't.
+  not organization-scoped). `dashboards:up` warns if it isn't.
 - **Ensured at startup:** `dashboards:up` runs **`pnpm db:seed:demo-admin`** after `db:migrate`
   ([`src/scripts/seed/ensure-demo-admin.ts`](../../../src/scripts/seed/ensure-demo-admin.ts)) —
-  idempotent, creates the demo user + org + Admin role + membership, and **resets the password**
+  idempotent, creates the demo user + organization + Admin role + membership, and **resets the password**
   so a fresh DB (or one left with only faker users by `db:seed:bulk`) still authenticates. Run it
   by hand any time Bull Board 502s: `pnpm db:seed:demo-admin`.
 

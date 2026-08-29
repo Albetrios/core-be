@@ -7,11 +7,6 @@ import type { UserService } from '@/domains/user/user.service.js';
 import type { WebauthnCredentialRepository } from '@/domains/auth/sub-domains/auth-webauthn/webauthn-credential.repository.js';
 
 // Run the registration verify without a real DB transaction.
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
 
 // Stub the challenge consume so the test never touches Redis.
 vi.mock('@/domains/auth/sub-domains/auth-webauthn/webauthn-challenge.js', () => ({
@@ -51,6 +46,22 @@ vi.mock('@simplewebauthn/server', () => ({
   generateRegistrationOptions: vi.fn(),
   generateAuthenticationOptions: vi.fn(),
 }));
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = { id: 7, public_id: 'usr_abcdefghijklmnopqrstu', status: 'ACTIVE', deleted_at: null };
 

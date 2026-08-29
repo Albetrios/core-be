@@ -8,9 +8,15 @@ indexNote: route params / public-ids / method→status policy / header matrix �
 
 # API contract guard
 
+> **Compact wire literals are intentional (do not "fix" them):** the `org_` public-id
+> prefix is a 3-letter id prefix by design, and the JWT claim keys `org` / `sv` follow
+> the JWT compact-claim convention (`iss`/`sub`/`aud`) — they ride on every request, so
+> brevity is a deliberate wire-size choice. The full-names-only rule applies to
+> identifiers and prose, never to these wire keys. (Decided during PR #1127.)
+
 ## Route params — snake_case, semantic, entity-typed
 
-- Every path param is snake_case and semantic: `{plan_id}`, `{subscription_id}`, `{session_id}`, `{upload_id}`, `{auth_method_id}`, … — never `{id}` or camelCase. The active organization is NOT a path param — it is carried by the signed `org` JWT claim; the active-org resource is the singular `/tenancy/organization` (sub-resources like settings/memberships/roles/api-keys nest under it).
+- Every path param is snake_case and semantic: `{plan_id}`, `{subscription_id}`, `{session_id}`, `{upload_id}`, `{auth_method_id}`, … — never `{id}` or camelCase. The active organization is NOT a path param — it is carried by the signed `org` JWT claim; the active-organization resource is the singular `/tenancy/organization` (sub-resources like settings/memberships/roles/api-keys nest under it).
 - Entity-id param names must exist in `PARAM_NAME_TO_ENTITY` (src/shared/utils/identity/public-id.util.ts) so validators, test materializers, and OpenAPI docs derive the entity automatically. The only non-entity params are `{provider}` (OAuth provider name) and `{slug}` (organization slug) — unregistered by design.
 - Zod params-DTO object keys must equal the route param name exactly.
 
@@ -41,14 +47,14 @@ The policy is enforced centrally in `method-status-policy.middleware.ts`; declar
 
 - **400** request shape invalid (body/param/query fails Zod, malformed JSON, webhook signature) — per-field `details`; documented on every POST/PATCH/PUT; only a param-less, query-less GET/DELETE documents **no 400** at all.
 - **401** missing/expired/revoked access token — message must tell the developer how to recover (login → `Authorization: Bearer <ACCESS_TOKEN>`).
-- **403** authenticated but lacking permission/role. **404** id or route doesn't exist (incl. other-org ids — no existence leak).
+- **403** authenticated but lacking permission/role. **404** id or route doesn't exist (incl. other-organization ids — no existence leak).
 - **406** MCP only (Accept negotiation).
 - **409** mutating only — state conflict: duplicate resource, bad state transition, in-flight duplicate X-Idempotency-Key.
 - **413 / 415** POST/PATCH/PUT only — body too large / wrong Content-Type.
 - **422** mutating only — business-rule rejection (incl. a capability unavailable for an **immutable resource type**, e.g. a personal organization that cannot gain members/roles/ownership-transfer/deletion/billing — enforced by the shared `assertTeamOrganization(...)` guard, **not** 409), or X-Idempotency-Key reused with a different payload.
 - **429** every route — with `Retry-After` + `X-RateLimit-*` headers.
 - **500** never intentional — the never-5xx fuzz gate fails CI on any 5xx from malformed input.
-- Rules of thumb: 400 = malformed shape, 422 = valid shape wrong meaning; 409 = conflicts with current state, 422 = payload logic always wrong (incl. a capability blocked by an immutable resource type — personal vs team org). Never invent a status outside this list.
+- Rules of thumb: 400 = malformed shape, 422 = valid shape wrong meaning; 409 = conflicts with current state, 422 = payload logic always wrong (incl. a capability blocked by an immutable resource type — personal vs team organization). Never invent a status outside this list.
 
 ## Machine-readable `error.reason` (stable branch signal, not human copy)
 
@@ -65,13 +71,13 @@ additive, surfaced on 4xx only (masked on 5xx), and is the ONLY dependable branc
 ## Personal vs team organizations (one route surface, discoverable capabilities)
 
 - The route surface is identical for personal and team organizations — there are **no** personal-only or team-only paths.
-- Team-only capabilities (invite/manage members, manage roles, transfer ownership, delete the org, manage billing) reject a **personal** organization with **422** via `assertTeamOrganization(organization, capability)` (`src/domains/tenancy/sub-domains/organization/organization-capability.ts`).
-- Every serialized organization carries a `capabilities` object (`can_invite_members`, `can_manage_members`, `can_manage_roles`, `can_transfer_ownership`, `can_delete`, `can_manage_billing`) describing the **org type's** capability (not the caller's permission), so clients discover this without probing for a 422.
-- The route catalog encodes this as the `O` column (`both` | `team`), kept in sync with `tooling/openapi/route-catalog/route-org-scope.json` by `pnpm validate:route-org-scope`.
+- Team-only capabilities (invite/manage members, manage roles, transfer ownership, delete the organization, manage billing) reject a **personal** organization with **422** via `assertTeamOrganization(organization, capability)` (`src/domains/tenancy/sub-domains/organization/organization-capability.ts`).
+- Every serialized organization carries a `capabilities` object (`can_invite_members`, `can_manage_members`, `can_manage_roles`, `can_transfer_ownership`, `can_delete`, `can_manage_billing`) describing the **organization type's** capability (not the caller's permission), so clients discover this without probing for a 422.
+- The route catalog encodes this as the `O` column (`both` | `team`), kept in sync with `tooling/openapi/route-catalog/route-organization-scope.json` by `pnpm validate:route-organization-scope`.
 
 ## List endpoints — common search / sort / pagination method
 
-Every org-scoped list endpoint uses the **shared** helpers in `src/shared/utils/http/list-query.util.ts` — do **not** hand-roll keyset / cursor / filter-binding per repository:
+Every organization-scoped list endpoint uses the **shared** helpers in `src/shared/utils/http/list-query.util.ts` — do **not** hand-roll keyset / cursor / filter-binding per repository:
 
 - **DTO**: build the query schema with `listSearchSortSchema([...sortFields] as const)` (adds `q`, `sort`, `order` to `cursorPaginationSchema`, `.strict()`). For a search-only list (no sortable columns), extend `cursorPaginationSchema` with just `q`. Register the DTO in `tooling/openapi/query-schema-map.ts` so OpenAPI documents `after`/`limit`/`q`/`sort`/`order`.
 - **Repository**: `resolveKeysetSort({ columns, idColumn, defaultSort, sort, order, q, after })` → `orderBy` / `cursorCondition` / `sortValueFor` / `filterFingerprint`; `buildSearchCondition(columns, q)` for the `ILIKE`; `finishKeysetPage(rows, { limit, sortValueFor, filterFingerprint })` (fetch `limit + 1`). Escape user `ILIKE` terms with `buildContainsLikePattern(q)` — never interpolate a raw term.
@@ -82,21 +88,21 @@ Every org-scoped list endpoint uses the **shared** helpers in `src/shared/utils/
 
 **External-provider lists (Stripe, etc.) are a cursor passthrough, not a DB keyset** — they do NOT use the helpers above. Expose the provider's own cursor: pass `limit` + `starting_after` (a provider id), return `{ data, has_more }` from the client, and shape the same `paginatedResponse` envelope with `next` = the last row's provider id when `has_more`. See `GET /billing/invoices` (`listStripeInvoices`).
 
-**Searching a column that lives on a FORCE-RLS joined table** (e.g. member email/name in `auth.users`) can't use a plain join under org-only context — it needs a SECURITY DEFINER resolver. See `rls-tenant-isolation-guard` (member-search example, `tenancy.search_organization_membership_ids`).
+**Searching a column that lives on a FORCE-RLS joined table** (e.g. member email/name in `auth.users`) can't use a plain join under organization-only context — it needs a SECURITY DEFINER resolver. See `rls-tenant-isolation-guard` (member-search example, `tenancy.search_organization_membership_ids`).
 
 ## Header matrix (client-sent)
 
 - `Authorization: Bearer <ACCESS_TOKEN>` — every authed route (OpenAPI security scheme; Postman collection-level bearer `{{ACCESS_TOKEN}}`).
 - `Content-Type: application/json` — any body.
-- `X-Organization-Id` — legacy header read directly by a few consumers (e.g. the upload domain); org-scoped routes resolve the active organization from the signed `org` JWT claim, NOT this header. Switch the active org via `/auth/switch-to-personal` / `/auth/switch-to-organization` (which re-mint the access token).
-- `X-Idempotency-Key` — all mutating routes (optional, auto-generate in clients); REQUIRED on the 13 writes registered with `config.idempotencyRequired: true` (org create, memberships, transfer-ownership, subscription create/change-plan/cancel/resume, payment-method setup, webhooks, api-keys, notification-policies, roles, uploads). Live list = the `I` (`req`) column in `docs/routes.txt`.
+- `X-Organization-Id` — **removed**. Organization-scoped routes resolve the active organization from the signed `org` JWT claim only; switch it via `/auth/switch-to-personal` / `/auth/switch-to-organization` (which re-mint the access token). Never reintroduce an organization header.
+- `X-Idempotency-Key` — all mutating routes (optional, auto-generate in clients); REQUIRED on the 13 writes registered with `config.idempotencyRequired: true` (organization create, memberships, transfer-ownership, subscription create/change-plan/cancel/resume, payment-method setup, webhooks, api-keys, notification-policies, roles, uploads). Live list = the `I` (`req`) column in `docs/routes.txt`.
 - `X-Captcha-Token` — public auth forms only (login, email verification-code send + login, password forgot/reset, mfa/login, webauthn authenticate options, oauth authorize).
 - `X-CSRF-Token` — POST /auth/refresh only (double-submit of the csrf_token cookie). Keeps the X- form (frontend-framework default).
 - `Stripe-Signature` — sent BY Stripe to the webhook routes; the app never sends it.
 
 ## Headers kept in X- form (ecosystem standards)
 
-`X-Request-Id`, `X-Client-Request-Id`, `X-Api-Key`, `X-CSRF-Token`, `X-RateLimit-*` (server-emitted with `Retry-After` on 429), Helmet's security headers, `X-Forwarded-For`, `X-Requested-With` (CORS-allowlisted in `cors.middleware.ts` so browser/XHR-library preflights pass — the app reads no meaning from it). Custom headers use the X- form for visual consistency with the infrastructure headers: `X-Organization-Id`, `X-Idempotency-Key`, `X-Idempotency-Replay` (response marker), `X-Captcha-Token`. Standards keep their fixed names: `Authorization`, `Stripe-Signature`, `Retry-After`.
+`X-Request-Id`, `X-Client-Request-Id`, `X-Api-Key`, `X-CSRF-Token`, `X-RateLimit-*` (server-emitted with `Retry-After` on 429), Helmet's security headers, `X-Forwarded-For`, `X-Requested-With` (CORS-allowlisted in `cors.middleware.ts` so browser/XHR-library preflights pass — the app reads no meaning from it). Custom headers use the X- form for visual consistency with the infrastructure headers: `X-Idempotency-Key`, `X-Idempotency-Replay` (response marker), `X-Captcha-Token`. Standards keep their fixed names: `Authorization`, `Stripe-Signature`, `Retry-After`.
 
 ## Sync checklist when touching any of the above
 

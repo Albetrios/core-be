@@ -20,15 +20,15 @@ import { NOTIFY_PERMISSIONS } from '@/domains/notify/notify.permissions.js';
 import { generateTestToken } from '@/tests/helpers/test-auth.js';
 
 /**
- * Cross-organization isolation matrix — model `org` in
+ * Cross-organization isolation matrix — model `organization` in
  * route-authorization-model.json. A member of organization A — holding the
- * relevant read permission IN their own org — must never resolve organization
- * B's resources: every cross-org GET returns 404 (RLS scopes the lookup to the
- * active org from the JWT claim), while the identical same-org GET succeeds.
- * Covers the org-scoped resources across the tenancy and notify domains.
+ * relevant read permission IN their own organization — must never resolve organization
+ * B's resources: every cross-organization GET returns 404 (RLS scopes the lookup to the
+ * active organization from the JWT claim), while the identical same-organization GET succeeds.
+ * Covers the organization-scoped resources across the tenancy and notify domains.
  * e2e — runs in CI (Postgres + Redis required).
  */
-describe('Security: cross-organization resource isolation (model: org)', () => {
+describe('Security: cross-organization resource isolation (model: organization)', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -44,8 +44,8 @@ describe('Security: cross-organization resource isolation (model: org)', () => {
     await cleanupDatabase();
   });
 
-  // Read permissions for every org-scoped resource exercised below. The member
-  // holds these in their OWN org, so a cross-org 404 proves tenant scoping — not a
+  // Read permissions for every organization-scoped resource exercised below. The member
+  // holds these in their OWN organization, so a cross-organization 404 proves tenant scoping — not a
   // missing permission (which would surface as 403).
   const READER_PERMISSION_CODES = [
     TENANCY_PERMISSIONS.API_KEY_READ,
@@ -55,9 +55,9 @@ describe('Security: cross-organization resource isolation (model: org)', () => {
     NOTIFY_PERMISSIONS.WEBHOOK_READ,
   ];
 
-  // An org with a non-owner member who can read every resource type, plus one of
-  // each org-scoped resource. The member token carries the org via its JWT claim.
-  async function orgWithResources() {
+  // An organization with a non-owner member who can read every resource type, plus one of
+  // each organization-scoped resource. The member token carries the organization via its JWT claim.
+  async function organizationWithResources() {
     await seedPermissions(READER_PERMISSION_CODES);
     const owner = await createTestUser();
     const member = await createTestUser();
@@ -91,54 +91,74 @@ describe('Security: cross-organization resource isolation (model: org)', () => {
     return { organization, member, memberToken, role, membership, apiKey, policy, webhook };
   }
 
-  type OrgFixture = Awaited<ReturnType<typeof orgWithResources>>;
+  type OrgFixture = Awaited<ReturnType<typeof organizationWithResources>>;
 
-  const resourceCases: ReadonlyArray<{ label: string; path: (org: OrgFixture) => string }> = [
-    { label: 'API key', path: (org) => `/tenancy/organization/api-keys/${org.apiKey.public_id}` },
+  const resourceCases: ReadonlyArray<{
+    label: string;
+    path: (organization: OrgFixture) => string;
+  }> = [
+    {
+      label: 'API key',
+      path: (organization) => `/tenancy/organization/api-keys/${organization.apiKey.public_id}`,
+    },
     {
       label: 'notification policy',
-      path: (org) => `/tenancy/organization/notification-policies/${org.policy.public_id}`,
+      path: (organization) =>
+        `/tenancy/organization/notification-policies/${organization.policy.public_id}`,
     },
-    { label: 'role', path: (org) => `/tenancy/organization/roles/${org.role.public_id}` },
+    {
+      label: 'role',
+      path: (organization) => `/tenancy/organization/roles/${organization.role.public_id}`,
+    },
     {
       label: 'membership',
-      path: (org) => `/tenancy/organization/memberships/${org.membership.public_id}`,
+      path: (organization) =>
+        `/tenancy/organization/memberships/${organization.membership.public_id}`,
     },
-    { label: 'webhook', path: (org) => `/notify/webhooks/${org.webhook.public_id}` },
+    {
+      label: 'webhook',
+      path: (organization) => `/notify/webhooks/${organization.webhook.public_id}`,
+    },
     {
       label: 'webhook delivery-attempts',
-      path: (org) => `/notify/webhooks/${org.webhook.public_id}/delivery-attempts`,
+      path: (organization) =>
+        `/notify/webhooks/${organization.webhook.public_id}/delivery-attempts`,
     },
     {
       label: 'membership permissions',
-      path: (org) => `/tenancy/organization/memberships/${org.membership.public_id}/permissions`,
+      path: (organization) =>
+        `/tenancy/organization/memberships/${organization.membership.public_id}/permissions`,
     },
     {
       label: 'role permissions',
-      path: (org) => `/tenancy/organization/roles/${org.role.public_id}/permissions`,
+      path: (organization) =>
+        `/tenancy/organization/roles/${organization.role.public_id}/permissions`,
     },
   ];
 
-  describe('cross-org reads are scoped out (404)', () => {
-    it.each(resourceCases)('member of org A GET org B $label → 404', async ({ path }) => {
-      const orgA = await orgWithResources();
-      const orgB = await orgWithResources();
-      const res = await injectAuthenticated(app, {
-        method: 'GET',
-        url: testApiPath(path(orgB)),
-        token: orgA.memberToken,
-      });
-      expect(res.statusCode).toBe(404);
-    });
+  describe('cross-organization reads are scoped out (404)', () => {
+    it.each(resourceCases)(
+      'member of organization A GET organization B $label → 404',
+      async ({ path }) => {
+        const organizationA = await organizationWithResources();
+        const organizationB = await organizationWithResources();
+        const res = await injectAuthenticated(app, {
+          method: 'GET',
+          url: testApiPath(path(organizationB)),
+          token: organizationA.memberToken,
+        });
+        expect(res.statusCode).toBe(404);
+      },
+    );
   });
 
-  describe('same-org reads succeed (200) — proves the 404 is scoping, not a missing permission', () => {
-    it.each(resourceCases)('member GET own org $label → 200', async ({ path }) => {
-      const org = await orgWithResources();
+  describe('same-organization reads succeed (200) — proves the 404 is scoping, not a missing permission', () => {
+    it.each(resourceCases)('member GET own organization $label → 200', async ({ path }) => {
+      const organization = await organizationWithResources();
       const res = await injectAuthenticated(app, {
         method: 'GET',
-        url: testApiPath(path(org)),
-        token: org.memberToken,
+        url: testApiPath(path(organization)),
+        token: organization.memberToken,
       });
       expect(res.statusCode).toBe(200);
     });
@@ -148,8 +168,8 @@ describe('Security: cross-organization resource isolation (model: org)', () => {
   // non-member with 404. Driven separately from the by-id cases above with an
   // explicit, route-valid slug (the auto-generated factory slug can violate the
   // stricter SLUG_REGEX the :slug param enforces).
-  describe('organization by-slug is org-scoped', () => {
-    async function orgWithMemberAndSlug(slug: string) {
+  describe('organization by-slug is organization-scoped', () => {
+    async function organizationWithMemberAndSlug(slug: string) {
       await seedPermissions(READER_PERMISSION_CODES);
       const owner = await createTestUser();
       const member = await createTestUser();
@@ -172,23 +192,23 @@ describe('Security: cross-organization resource isolation (model: org)', () => {
     }
     const uniqueSlug = () => `authz-slug-${randomUUID().slice(0, 8)}`;
 
-    it("member of org A GET org B's organization by-slug → 404", async () => {
-      const orgA = await orgWithMemberAndSlug(uniqueSlug());
-      const orgB = await orgWithMemberAndSlug(uniqueSlug());
+    it("member of organization A GET organization B's organization by-slug → 404", async () => {
+      const organizationA = await organizationWithMemberAndSlug(uniqueSlug());
+      const organizationB = await organizationWithMemberAndSlug(uniqueSlug());
       const res = await injectAuthenticated(app, {
         method: 'GET',
-        url: testApiPath(`/tenancy/organizations/by-slug/${orgB.organization.slug}`),
-        token: orgA.memberToken,
+        url: testApiPath(`/tenancy/organizations/by-slug/${organizationB.organization.slug}`),
+        token: organizationA.memberToken,
       });
       expect(res.statusCode).toBe(404);
     });
 
     it('baseline: member GET own organization by-slug → 200', async () => {
-      const org = await orgWithMemberAndSlug(uniqueSlug());
+      const organization = await organizationWithMemberAndSlug(uniqueSlug());
       const res = await injectAuthenticated(app, {
         method: 'GET',
-        url: testApiPath(`/tenancy/organizations/by-slug/${org.organization.slug}`),
-        token: org.memberToken,
+        url: testApiPath(`/tenancy/organizations/by-slug/${organization.organization.slug}`),
+        token: organization.memberToken,
       });
       expect(res.statusCode).toBe(200);
     });

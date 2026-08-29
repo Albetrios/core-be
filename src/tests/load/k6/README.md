@@ -5,18 +5,18 @@ Load tests for the core-be API. Keep this doc in sync with [docs/reference/testi
 ## Prerequisites
 
 - **Server**: `RATE_LIMIT_MAX=10000 pnpm dev` — raises the per-IP limit for load testing; plain `pnpm dev` 429s at high VU counts.
-- **Postgres + Redis**: Required for auth and org-dependent scenarios (`docker compose up -d` or your own).
+- **Postgres + Redis**: Required for auth and organization-dependent scenarios (`docker compose up -d` or your own).
 - **Database**: `pnpm db:migrate` then choose a seed tier:
   - Single-user scenarios (`api-stress`, `daily-ops`, etc.): `pnpm db:seed:full` (demo user `demo@example.com` / `DemoPassword123!`)
-  - Per-VU multi-user scenario (`user-journey`): `pnpm db:seed:loadtest` — seeds 12 orgs × 10 users with full domain data and writes `src/tests/load/k6/data/credential-pool.json` (gitignored; contains passwords)
+  - Per-VU multi-user scenario (`user-journey`): `pnpm db:seed:loadtest` — seeds 12 organizations × 10 users with full domain data and writes `src/tests/load/k6/data/credential-pool.json` (gitignored; contains passwords)
 - **k6**: [Install k6](https://k6.io/docs/get-started/installation/).
 
 ## Organization scoping (flat routes)
 
 Org-scoped routes are flat — they carry **no** `/organizations/{organization_id}` path segment and **no** organization id header. The active organization rides the access token's signed `org` claim.
 
-- To run an org-scoped scenario, `TEST_TOKEN` must be scoped to `TEST_ORG_ID`: either mint it already-scoped, or the scenario calls `switchToOrganization(token, TEST_ORG_ID)` for you (the tenancy/billing/permission/idempotency scenarios do this in-flow).
-- `helpers/auth.js` exposes the scoping helpers: `switchToOrganization(token, organizationPublicId)`, `switchToPersonal(token)`, and `loginScopedToOrganization(email, password, organizationPublicId)` (login + switch in one call). `authHeaders(token)` returns `Authorization` + `Content-Type` only — no org header.
+- To run an organization-scoped scenario, `TEST_TOKEN` must be scoped to `TEST_ORG_ID`: either mint it already-scoped, or the scenario calls `switchToOrganization(token, TEST_ORG_ID)` for you (the tenancy/billing/permission/idempotency scenarios do this in-flow).
+- `helpers/auth.js` exposes the scoping helpers: `switchToOrganization(token, organizationPublicId)`, `switchToPersonal(token)`, and `loginScopedToOrganization(email, password, organizationPublicId)` (login + switch in one call). `authHeaders(token)` returns `Authorization` + `Content-Type` only — no organization header.
 
 ## Quick runs (no auth)
 

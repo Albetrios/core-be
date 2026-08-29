@@ -216,7 +216,7 @@ export function explainPlanBlocker(message: string): string {
     message,
     '',
     'Hint: repository rulesets require GitHub Pro / Team / Enterprise on private repos.',
-    'Either upgrade the account/org plan, or make the repository public.',
+    'Either upgrade the account/organization plan, or make the repository public.',
   ].join('\n');
 }
 

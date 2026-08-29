@@ -58,8 +58,8 @@ import { credentialPool } from '../helpers/pool.js';
  * REQUIRES the API with TEST_MODE=true (the OTP echo lets a VU complete its own signup).
  *
  * Usage:
- *   VUS=1  k6 run fe-login-to-org.js       # 1 user,  16 calls
- *   VUS=50 k6 run fe-login-to-org.js       # 50 users, 800 calls, 50 signups + 50 orgs
+ *   VUS=1  k6 run fe-login-to-organization.js       # 1 user,  16 calls
+ *   VUS=50 k6 run fe-login-to-organization.js       # 50 users, 800 calls, 50 signups + 50 organizations
  */
 
 const VUS = Number(__ENV.VUS || 1);
@@ -128,10 +128,10 @@ const STEPS = [
   ['08-switch-org', 'POST', '/auth/switch-to-organization'],
   ['09-me-context-2', 'GET', '/auth/me/context'],
   ['10-list-orgs', 'GET', '/tenancy/organizations'],
-  ['11-org-by-slug', 'GET', '/tenancy/organizations/by-slug/:slug'],
+  ['11-organization-by-slug', 'GET', '/tenancy/organizations/by-slug/:slug'],
   ['12-unread-count', 'GET', '/notify/notifications/unread-count'],
   ['13-notifications', 'GET', '/notify/notifications'],
-  ['14-org-detail', 'GET', '/tenancy/organization'],
+  ['14-organization-detail', 'GET', '/tenancy/organization'],
   ['15-refresh-authed', 'POST', '/auth/refresh'],
   ['16-logout', 'POST', '/auth/logout'],
 ];
@@ -174,7 +174,7 @@ export function setup() {
   http.post(
     `${__ENV.BASE_URL || ''}/__monitor/run`,
     JSON.stringify({
-      command: `BASE_URL=${__ENV.BASE_URL || 'http://localhost:3000'} VUS=${VUS} \\\n    k6 run src/tests/load/k6/scenarios/fe-login-to-org.js`,
+      command: `BASE_URL=${__ENV.BASE_URL || 'http://localhost:3000'} VUS=${VUS} \\\n    k6 run src/tests/load/k6/scenarios/fe-login-to-organization.js`,
       vus: VUS,
       mode: `${VUS} users x 1 pass x ${STEPS.length} routes (auth: ${AUTH})`,
       stepsPerJourney: STEPS.length,
@@ -325,14 +325,14 @@ export function feJourney() {
   );
 
   // 06 — create the workspace. Requires X-Idempotency-Key or the API answers 422.
-  const slug = `k6-org-${unique}`.toLowerCase().slice(0, 48);
+  const slug = `k6-organization-${unique}`.toLowerCase().slice(0, 48);
   const createOrg = http.post(
     `${API_PREFIX}/tenancy/organizations`,
     JSON.stringify({ name: `K6 Org ${unique}`, slug }),
     { headers: { ...auth, 'X-Idempotency-Key': idemKey() }, tags: { name: '06-create-org' } },
   );
-  const orgOk = record('06-create-org', createOrg, [200, 201]);
-  const orgId = orgOk ? JSON.parse(createOrg.body).data?.id : null;
+  const organizationOk = record('06-create-org', createOrg, [200, 201]);
+  const organizationId = organizationOk ? JSON.parse(createOrg.body).data?.id : null;
 
   // 07 — stamp the flag BEFORE the context re-read, or the resolver bounces the user
   // straight back into onboarding.
@@ -354,10 +354,10 @@ export function feJourney() {
   // straight into its query cache (`setQueryData`) rather than refetching. An earlier revision
   // of this scenario re-read the context here, which measured a request the real app never
   // makes and made me/context the heaviest route in the report purely as an artifact.
-  if (orgId) {
+  if (organizationId) {
     const sw = http.post(
       `${API_PREFIX}/auth/switch-to-organization`,
-      JSON.stringify({ organization_id: orgId }),
+      JSON.stringify({ organization_id: organizationId }),
       { headers: auth, tags: { name: '08-switch-org' } },
     );
     if (record('08-switch-org', sw, [200])) {
@@ -367,7 +367,7 @@ export function feJourney() {
   }
 
   // 09 — context re-read after the switch. NOTE: core-fe does NOT make this call —
-  // switch-to-organization already returns the active-org context inline and the client writes it
+  // switch-to-organization already returns the active-organization context inline and the client writes it
   // straight into its cache (setQueryData). It is measured here on purpose, as the benchmark for
   // the "repeat /auth/me/context" path: of its four reads only `my_permissions` is Redis-cached
   // today, so this step is what any caching work on the other three has to beat.
@@ -377,15 +377,15 @@ export function feJourney() {
     [200],
   );
 
-  let allOk = orgOk;
+  let allOk = organizationOk;
 
   // 10-14 — workspace and dashboard reads.
   const reads = [
     ['10-list-orgs', '/tenancy/organizations'],
-    ['11-org-by-slug', `/tenancy/organizations/by-slug/${slug}`],
+    ['11-organization-by-slug', `/tenancy/organizations/by-slug/${slug}`],
     ['12-unread-count', '/notify/notifications/unread-count'],
     ['13-notifications', '/notify/notifications'],
-    ['14-org-detail', '/tenancy/organization'],
+    ['14-organization-detail', '/tenancy/organization'],
   ];
   for (const [name, path] of reads) {
     if (!record(name, http.get(`${API_PREFIX}${path}`, { headers: auth, tags: { name } }), [200])) {

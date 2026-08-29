@@ -1,10 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OrganizationApiKeyService } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: (_organizationPublicId: string, callback: () => unknown) =>
-    callback(),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
+const _asScope = (organizationPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    organizationPublicId,
+  }) as OrganizationPrincipalDatabaseScope;
 
 describe('OrganizationApiKeyService.authenticate', () => {
   const organizationRepository = {
@@ -52,7 +72,7 @@ describe('OrganizationApiKeyService.authenticate', () => {
     });
     expect(hashCompare).toHaveBeenCalledWith('stored-hash', 'candidate-hash');
     expect(apiKeyRepository.touchLastUsedAt).toHaveBeenCalledWith('apikey_public_abc');
-    // The resolver already returned the org public id, so we never read it back via the repo.
+    // The resolver already returned the organization public id, so we never read it back via the repo.
     expect(organizationRepository.findById).not.toHaveBeenCalled();
   });
 

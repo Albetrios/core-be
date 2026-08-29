@@ -6,6 +6,7 @@
  * Usage: pnpm db:seed
  */
 import '@/shared/config/load-env-files.js';
+import '@/scripts/seed/seed-runtime-url.js';
 import { closeDatabase } from './helpers.js';
 import { seedPermissions } from '@/domains/tenancy/sub-domains/permission/seed/permission.reference.seed.js';
 import { seedPlans } from '@/domains/billing/sub-domains/plan/seed/plan.reference.seed.js';

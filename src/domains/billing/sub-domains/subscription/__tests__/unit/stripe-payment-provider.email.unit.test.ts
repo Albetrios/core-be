@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
  * sec-B11: the Stripe customer email used to be derived from the tenant-
- * controlled `organization.slug` — `billing@${slug}.com` — so an org with
+ * controlled `organization.slug` — `billing@${slug}.com` — so an organization with
  * slug `google` would be registered with Stripe as `billing@google.com`,
  * routing every Stripe-originated email (receipts, dunning, dispute
  * notifications) to a third-party domain. Bounces accumulated, deliverability

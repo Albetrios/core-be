@@ -95,7 +95,7 @@ export function composeContributions(
 ```
 
 Each domain/sub-domain seeds **only its own tables**. It reads parent refs
-(orgs/users) from `registry` and appends the entities it creates back to
+(organizations/users) from `registry` and appends the entities it creates back to
 `registry` for downstream domains. This preserves the "no cross-domain insert
 logic inside domains" rule — cross-domain wiring lives only in the
 orchestrator/context.
@@ -141,26 +141,26 @@ in `dependsOn` order:
 
 1. **user** — user pool; per-user: settings, notification preferences, data
    exports, auth methods, WebAuthn credentials, auth sessions.
-2. **tenancy** (`dependsOn: ['user']`) — orgs (owner from `registry.users`),
+2. **tenancy** (`dependsOn: ['user']`) — organizations (owner from `registry.users`),
    memberships (ACTIVE / INVITED / SUSPENDED mix), Admin + custom roles with
-   varied permission subsets, role-permission wiring, member invitations, org
-   settings, notification policies, org API keys (hashed).
-3. **billing** (`dependsOn: ['tenancy']`) — subscriptions per org across every
+   varied permission subsets, role-permission wiring, member invitations, organization
+   settings, notification policies, organization API keys (hashed).
+3. **billing** (`dependsOn: ['tenancy']`) — subscriptions per organization across every
    status (active / trialing / past_due / canceled / incomplete).
-4. **notify** (`dependsOn: ['tenancy','user']`) — per-user notifications; org
+4. **notify** (`dependsOn: ['tenancy','user']`) — per-user notifications; organization
    webhooks + webhook-events (pending / delivered / failed).
-5. **upload** (`dependsOn: ['tenancy','user']`) — uploads per org/user in mixed
+5. **upload** (`dependsOn: ['tenancy','user']`) — uploads per organization/user in mixed
    states (pending / confirmed / failed).
-6. **audit** (`dependsOn: ['tenancy','user']`) — audit logs per org, time-
+6. **audit** (`dependsOn: ['tenancy','user']`) — audit logs per organization, time-
    distributed `created_at` across `auditMonths`.
 
 ### 3.5 Config model — `bulk-config.ts`
 
 - **Profiles**: `demo`, `edge`, `load` — each a base `ResolvedCounts`. Targets:
-  `demo` ≈ 10 orgs / ~50 users; `edge` ≈ 25 orgs with every boundary state;
-  `load` ≈ **1,000 orgs / ~10,000 users / ~100,000 audit rows**.
+  `demo` ≈ 10 organizations / ~50 users; `edge` ≈ 25 organizations with every boundary state;
+  `load` ≈ **1,000 organizations / ~10,000 users / ~100,000 audit rows**.
 - **`SCALE`** env multiplier (default `1`) scales volume-bearing counts
-  (organizations, audit rows). The resolver applies a **hard cap** (≈ 5,000 orgs /
+  (organizations, audit rows). The resolver applies a **hard cap** (≈ 5,000 organizations /
   ≈ 500,000 audit rows) so a run stays within the tens-of-thousands-per-table band
   where idempotent upserts + light batching remain viable; exceeding the cap is a
   fatal config error pointing at the COPY-based path as out of scope.

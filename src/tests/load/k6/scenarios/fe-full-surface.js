@@ -904,9 +904,9 @@ export function feFullJourney() {
       tags: { name: '20-create-org' },
     },
   );
-  const orgOk = record('20-create-org', createdOrg, [200, 201]);
-  const orgId = orgOk ? (body(createdOrg).id ?? null) : null;
-  if (!orgId) {
+  const organizationOk = record('20-create-org', createdOrg, [200, 201]);
+  const organizationId = organizationOk ? (body(createdOrg).id ?? null) : null;
+  if (!organizationId) {
     // Without an organization nothing below can run. Everything after is SKIPPED rather than
     // failed: those steps were never attempted, and a fail count would misattribute one 409.
     state.ok = false;
@@ -917,10 +917,14 @@ export function feFullJourney() {
 
   const sw = step(
     '21-switch-org',
-    http.post(`${API}/auth/switch-to-organization`, JSON.stringify({ organization_id: orgId }), {
-      headers: auth,
-      tags: { name: '21-switch-org' },
-    }),
+    http.post(
+      `${API}/auth/switch-to-organization`,
+      JSON.stringify({ organization_id: organizationId }),
+      {
+        headers: auth,
+        tags: { name: '21-switch-org' },
+      },
+    ),
     [200],
   );
   const scoped = sw.status === 200 ? body(sw).access_token : null;

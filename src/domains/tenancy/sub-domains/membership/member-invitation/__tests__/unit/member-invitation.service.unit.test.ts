@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    async (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
-
 vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', () => ({
   invalidatePermissions: vi.fn().mockResolvedValue(undefined),
 }));
@@ -23,6 +17,22 @@ vi.mock('@/core/events/event-bus.js', () => ({
   }),
 }));
 
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
 vi.mock(
   '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.token.js',
   () => ({
@@ -38,6 +48,10 @@ import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organ
 import type { MembershipRepository } from '@/domains/tenancy/sub-domains/membership/membership.repository.js';
 import type { MemberInvitationRepository } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const now = new Date('2026-06-01T00:00:00.000Z');
 const futureDate = new Date('2026-06-15T00:00:00.000Z');
@@ -59,6 +73,11 @@ function makeInvitationRow(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+const asScope = (organizationPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    organizationPublicId,
+  }) as OrganizationPrincipalDatabaseScope;
 
 describe('MemberInvitationService', () => {
   const organizationRepository = {
@@ -84,7 +103,7 @@ describe('MemberInvitationService', () => {
       membership_public_id: 'mem_public_xyz',
     }),
     create: vi.fn().mockResolvedValue(makeInvitationRow()),
-    // item #E: createForMembership takes the per-org pending-invitation quota lock + count before insert.
+    // item #E: createForMembership takes the per-organization pending-invitation quota lock + count before insert.
     acquireCreationQuotaLock: vi.fn().mockResolvedValue(undefined),
     countPendingByOrganization: vi.fn().mockResolvedValue(0),
     accept: vi.fn().mockResolvedValue(makeInvitationRow({ accepted_at: now })),
@@ -180,13 +199,13 @@ describe('MemberInvitationService', () => {
       expect((result as unknown as Record<string, unknown>).token).toBeUndefined();
     });
 
-    it('throws ConflictError and does not insert when the org is at the pending-invitation cap', async () => {
+    it('throws ConflictError and does not insert when the organization is at the pending-invitation cap', async () => {
       // Well above any configured INVITATION_MAX_PENDING_PER_ORG (max 1000) so the cap always trips.
       vi.mocked(invitationRepository.countPendingByOrganization).mockResolvedValueOnce(100_000);
       await expect(service.createForMembership(params)).rejects.toMatchObject({
         name: 'ConflictError',
       });
-      // The advisory lock is taken (keyed by the org id) before the count, and no row is inserted.
+      // The advisory lock is taken (keyed by the organization id) before the count, and no row is inserted.
       expect(invitationRepository.acquireCreationQuotaLock).toHaveBeenCalledWith(1);
       expect(invitationRepository.create).not.toHaveBeenCalled();
     });
@@ -274,34 +293,34 @@ describe('MemberInvitationService', () => {
 
   describe('revoke', () => {
     it('revokes the invitation', async () => {
-      await service.revoke('org_public_abc', 'inv_public_123');
+      await service.revoke(asScope('org_public_abc'), 'inv_public_123');
       expect(invitationRepository.revoke).toHaveBeenCalledWith('inv_public_123');
     });
 
     it('soft-deletes the auto-created INVITED membership so no ghost invitee remains (REQ-1)', async () => {
-      await service.revoke('org_public_abc', 'inv_public_123');
+      await service.revoke(asScope('org_public_abc'), 'inv_public_123');
       expect(membershipRepository.softDelete).toHaveBeenCalledWith('mem_public_xyz', 1);
     });
 
     it('throws NotFoundError when organization is missing', async () => {
       vi.mocked(organizationRepository.findByPublicId).mockResolvedValue(null);
-      await expect(service.revoke('org_public_abc', 'inv_public_123')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.revoke(asScope('org_public_abc'), 'inv_public_123'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('throws NotFoundError when invitation is missing', async () => {
       vi.mocked(invitationRepository.findByPublicId).mockResolvedValue(null);
-      await expect(service.revoke('org_public_abc', 'inv_public_123')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.revoke(asScope('org_public_abc'), 'inv_public_123'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('throws NotFoundError when revoke returns null', async () => {
       vi.mocked(invitationRepository.revoke).mockResolvedValue(null);
-      await expect(service.revoke('org_public_abc', 'inv_public_123')).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.revoke(asScope('org_public_abc'), 'inv_public_123'),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 
@@ -309,7 +328,7 @@ describe('MemberInvitationService', () => {
     const body = { expires_in_days: 7 };
 
     it('resends invitation with a new token via strict event, without returning it (R1/R2)', async () => {
-      const result = await service.resend('org_public_abc', 'inv_public_123', body);
+      const result = await service.resend(asScope('org_public_abc'), 'inv_public_123', body);
       expect(invitationRepository.resend).toHaveBeenCalled();
       expect(eventBus.emitStrict).toHaveBeenCalledOnce();
       expect(eventBus.emit).not.toHaveBeenCalled();
@@ -319,36 +338,36 @@ describe('MemberInvitationService', () => {
 
     it('throws NotFoundError when invitation is missing', async () => {
       vi.mocked(invitationRepository.findByPublicId).mockResolvedValue(null);
-      await expect(service.resend('org_public_abc', 'inv_public_123', body)).rejects.toBeInstanceOf(
-        NotFoundError,
-      );
+      await expect(
+        service.resend(asScope('org_public_abc'), 'inv_public_123', body),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
 
     it('throws ValidationError when invitation is already accepted', async () => {
       vi.mocked(invitationRepository.findByPublicId).mockResolvedValue(
         makeInvitationRow({ accepted_at: now }) as never,
       );
-      await expect(service.resend('org_public_abc', 'inv_public_123', body)).rejects.toBeInstanceOf(
-        ValidationError,
-      );
+      await expect(
+        service.resend(asScope('org_public_abc'), 'inv_public_123', body),
+      ).rejects.toBeInstanceOf(ValidationError);
     });
 
     it('throws ValidationError when invitation is revoked', async () => {
       vi.mocked(invitationRepository.findByPublicId).mockResolvedValue(
         makeInvitationRow({ revoked_at: now }) as never,
       );
-      await expect(service.resend('org_public_abc', 'inv_public_123', body)).rejects.toBeInstanceOf(
-        ValidationError,
-      );
+      await expect(
+        service.resend(asScope('org_public_abc'), 'inv_public_123', body),
+      ).rejects.toBeInstanceOf(ValidationError);
     });
 
     it('throws ValidationError and neither rotates the token nor emits when the invitation is expired', async () => {
       vi.mocked(invitationRepository.findByPublicId).mockResolvedValue(
         makeInvitationRow({ expires_at: new Date('2020-01-01T00:00:00.000Z') }) as never,
       );
-      await expect(service.resend('org_public_abc', 'inv_public_123', body)).rejects.toBeInstanceOf(
-        ValidationError,
-      );
+      await expect(
+        service.resend(asScope('org_public_abc'), 'inv_public_123', body),
+      ).rejects.toBeInstanceOf(ValidationError);
       // The expiry guard must fire BEFORE the destructive token rotation: `resend` overwrites the
       // token_hash in place, so rotating for an already-expired invite would invalidate the
       // invitee's link while still refusing the operation. No rotation, no outbox event.

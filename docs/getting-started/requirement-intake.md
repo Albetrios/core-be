@@ -30,7 +30,7 @@ The AI fills these unless your message says otherwise. List overrides in your fi
 | **Access** | `authenticated` (use `public` only for auth flows, webhooks, health, or explicit public API) |
 | **Pagination** | Cursor-based (`PAGINATION.DEFAULT_LIMIT`) on list routes |
 | **Soft-delete** | ON for tenant-owned resources; OFF for system tables, audit, immutable billing ledgers |
-| **Tenancy** | Scoped by `X-Organization-Id` / organization context unless marked global |
+| **Tenancy** | Scoped by the signed `org` claim / organization context unless marked global |
 | **Tests** | Sub-domain unit tests + bundled domain e2e in `src/domains/<domain>/__tests__/<domain>.test.ts` |
 | **i18n** | All user-facing strings use translation keys (`errors.*`, `success.*`) |
 | **Logging** | `logger` from `@/shared/utils/infrastructure/logger.util.js`; no `console.log` |

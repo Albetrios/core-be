@@ -1,6 +1,6 @@
 import { count, sql, type SQL } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
-import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { LIST_TOTAL_COUNT_CAP } from '@/shared/constants/pagination.constants.js';
 
 /** Inputs for {@link countWithCap}. */

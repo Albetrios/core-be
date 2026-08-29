@@ -17,6 +17,10 @@ import {
   seedPermissions,
 } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
 import { createTestSubscription } from '@/domains/billing/__tests__/factories/subscription.factory.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { PlanService } from '@/domains/billing/sub-domains/plan/plan.service.js';
@@ -42,6 +46,11 @@ const BILLING_PERMISSIONS = ['subscription:read', 'subscription:manage'] as cons
 
 /** Rows in the "large" list. Big enough that an N+1 is unmistakable, small enough to seed fast. */
 const LARGE_LIST_ROW_COUNT = 25;
+
+const budgetScope = PRINCIPAL_SCOPE.REQUEST({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_budget',
+}) as OrganizationPrincipalDatabaseScope;
 
 describe('Performance: billing list routes stay O(1) in cross-domain work', () => {
   let app: FastifyInstance;
@@ -91,8 +100,8 @@ describe('Performance: billing list routes stay O(1) in cross-domain work', () =
     const single = buildCountingService(1);
     const large = buildCountingService(LARGE_LIST_ROW_COUNT);
 
-    const singleResult = await single.service.list('org_budget');
-    const largeResult = await large.service.list('org_budget');
+    const singleResult = await single.service.list(budgetScope);
+    const largeResult = await large.service.list(budgetScope);
 
     expect(singleResult).toHaveLength(1);
     expect(largeResult).toHaveLength(LARGE_LIST_ROW_COUNT);
@@ -158,7 +167,7 @@ describe('Performance: billing list routes stay O(1) in cross-domain work', () =
     expect(elapsedMs).toBeLessThan(2_000);
   });
 
-  /** Team org with billing permissions holding `subscriptionCount` subscriptions. */
+  /** Team organization with billing permissions holding `subscriptionCount` subscriptions. */
   async function createListContext(subscriptionCount: number) {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });
@@ -167,7 +176,7 @@ describe('Performance: billing list routes stay O(1) in cross-domain work', () =
       await createTestSubscription({
         organizationId: organization.id,
         planId: plan.id,
-        // Only one subscription may be non-terminal per org (partial unique index), so the
+        // Only one subscription may be non-terminal per organization (partial unique index), so the
         // filler rows are CANCELED — they still exercise the join + per-row decoration.
         status: index === 0 ? 'ACTIVE' : 'CANCELED',
         providerSubscriptionId: null,

@@ -21,7 +21,7 @@ OAuth provider `fetch` calls (Google/GitHub) are **not** circuit-wrapped today.
 
 ## External calls and database transactions
 
-With `DATABASE_RLS_SCOPED_CONTEXTS=true` (default), HTTP handlers do **not** pin a Postgres checkout for the full request. Still avoid awaiting Stripe / S3 / Resend inside `withOrganizationDatabaseContext` / `withTransaction` callbacks — network latency should not run while a DB transaction is open.
+With `DATABASE_RLS_SCOPED_CONTEXTS=true` (default), HTTP handlers do **not** pin a Postgres checkout for the full request. Still avoid awaiting Stripe / S3 / Resend inside `withAppDatabaseContext` / `withTransaction` callbacks — network latency should not run while a DB transaction is open.
 
 **CI guard:** `pnpm test:global` runs [`rls-context-network-isolation.global.test.ts`](../../../src/tests/global/rls-context-network-isolation.global.test.ts) — fails when outbound network calls appear inside database context callbacks under `src/domains/`.
 

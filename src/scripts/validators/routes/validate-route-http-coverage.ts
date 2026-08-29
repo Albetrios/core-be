@@ -8,7 +8,7 @@
  * | **A — domain smoke** | `loadRoutesForDomain('<domain>')` in `*-route-smoke.integration.test.ts` | Route's domain has domain-level smoke (unauthenticated / public probe per catalog route) |
  * | **B — sub-domain integration** | `sub-domains/<resource>/__tests__/integration/*.integration.test.ts` exists | Required for every sub-domain `*.routes.ts` and listed without-routes HTTP handlers |
  * | **C — route literal** | Catalog `path` appears quoted in HTTP test sources | Direct reference in integration, e2e, or security tests |
- * | **D — forbidden (403)** | Domain HTTP tests include `403` or `assertRouteSmokeForbidden` | Required when catalog lists org-permission / global-role routes |
+ * | **D — forbidden (403)** | Domain HTTP tests include `403` or `assertRouteSmokeForbidden` | Required when catalog lists organization-permission / global-role routes |
  * | **E — validation (400/422)** | Domain HTTP tests include `400`, `422`, or validation assertions | Required for domains with mutating routes (except health/mcp) |
  *
  * A route passes tier C when **A or C** holds (and is not allowlisted).

@@ -21,7 +21,7 @@ export function billingSubscriptionsRlsOps() {
   const subscriptionPublicId = __ENV.TEST_SUBSCRIPTION_ID;
   if (!(token && organizationPublicId)) return;
 
-  // The active org rides the token's `org` claim — scope the token to TEST_ORG_ID
+  // The active organization rides the token's `org` claim — scope the token to TEST_ORG_ID
   // so the flat RLS route resolves the right organization.
   token = switchToOrganization(token, organizationPublicId) || token;
   const headers = authHeaders(token).headers;

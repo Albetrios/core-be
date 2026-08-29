@@ -23,8 +23,8 @@ export function login(email, password) {
 
 /**
  * Re-mint the access token scoped to a specific team organization the user belongs to
- * (`POST /auth/switch-to-organization`). Use the returned token for subsequent org-scoped calls —
- * the active org rides its `org` claim. Returns the new token, or null on failure.
+ * (`POST /auth/switch-to-organization`). Use the returned token for subsequent organization-scoped calls —
+ * the active organization rides its `org` claim. Returns the new token, or null on failure.
  */
 export function switchToOrganization(token, organizationPublicId) {
   const response = http.post(
@@ -56,8 +56,8 @@ export function switchToPersonal(token) {
 
 /**
  * Convenience: log in, then switch the active organization so the returned token is scoped to
- * `organizationPublicId`. Falls back to the plain login token when no org is given or the switch
- * fails. Returns the (org-scoped) token, or null when login itself fails.
+ * `organizationPublicId`. Falls back to the plain login token when no organization is given or the switch
+ * fails. Returns the (organization-scoped) token, or null when login itself fails.
  */
 export function loginScopedToOrganization(email, password, organizationPublicId) {
   const token = login(email, password);
@@ -69,7 +69,7 @@ export function loginScopedToOrganization(email, password, organizationPublicId)
  * Build authorization headers for authenticated requests.
  *
  * The active organization comes from the token's `org` claim — do NOT add an organization id
- * header for org-scoped routes (it is ignored by the flat routes; only the upload domain reads it).
+ * header for organization-scoped routes (it is ignored by the flat routes; only the upload domain reads it).
  */
 export function authHeaders(token) {
   return {

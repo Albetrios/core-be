@@ -1,19 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
-import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
 import {
-  withGlobalRetentionCleanupDatabaseContext,
-  withSystemTableRetentionContext,
-} from '@/infrastructure/database/contexts/retention-database.context.js';
-import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/worker-database.context.error.js';
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
+import { WorkerDatabaseContextError } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   assertWorkerDatabaseContext,
   assertWorkerForceRlsTableAccess,
   getWorkerDatabaseContext,
   isWorkerRuntime,
   runWithWorkerDatabaseContext,
-  withSystemTableWorkerContext,
-} from '@/infrastructure/database/contexts/worker-database.context.js';
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 
 const mockExecute = vi.fn().mockResolvedValue(undefined);
 const mockTransactionHandle = { execute: mockExecute, tag: 'transaction-handle' };
@@ -53,24 +55,27 @@ describe('worker database context', () => {
     expect(() => getRequestDatabase()).toThrow(WorkerDatabaseContextError);
   });
 
-  it('withOrganizationContext sets organization worker context kind', async () => {
+  it('withAppDatabaseContext sets organization worker context kind', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
-    await withOrganizationContext('org_public_test', async () => {
+    const scope = PRINCIPAL_SCOPE.JOB({
+      organizationPublicId: 'org_public_test',
+    });
+    await withAppDatabaseContext(scope, async () => {
       expect(getWorkerDatabaseContext()?.kind).toBe('organization');
       expect(getWorkerDatabaseContext()?.organizationPublicId).toBe('org_public_test');
     });
   });
 
-  it('withGlobalRetentionCleanupDatabaseContext sets global_retention_cleanup kind', async () => {
+  it('withMaintenanceDatabaseContext sets global_retention_cleanup kind', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
-    await withGlobalRetentionCleanupDatabaseContext(async () => {
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, async () => {
       expect(getWorkerDatabaseContext()?.kind).toBe('global_retention_cleanup');
     });
   });
 
-  it('withSystemTableWorkerContext sets system_table kind in worker runtime', async () => {
+  it('MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER sets system_table kind in worker runtime', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
-    await withSystemTableWorkerContext(async () => {
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, async () => {
       expect(getWorkerDatabaseContext()?.kind).toBe('system_table');
       expect(() => getRequestDatabase()).not.toThrow();
     });
@@ -87,26 +92,29 @@ describe('worker database context', () => {
 
   it('assertWorkerForceRlsTableAccess allows organization context for tenant tables', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
-    await withOrganizationContext('org_public_test', async () => {
+    const scope = PRINCIPAL_SCOPE.JOB({
+      organizationPublicId: 'org_public_test',
+    });
+    await withAppDatabaseContext(scope, async () => {
       expect(() =>
         assertWorkerForceRlsTableAccess({ schemaName: 'billing', tableName: 'subscriptions' }),
       ).not.toThrow();
     });
   });
 
-  it('sec-new-Q4: withSystemTableRetentionContext sets system_table kind in worker runtime', async () => {
+  it('sec-new-Q4: MAINTENANCE_SCOPE.SYSTEM_TABLE_RETENTION sets system_table kind in worker runtime', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
-    await withSystemTableRetentionContext(async () => {
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_RETENTION, async () => {
       expect(getWorkerDatabaseContext()?.kind).toBe('system_table');
       expect(() => getRequestDatabase()).not.toThrow();
     });
   });
 
-  it('sec-new-Q4: withSystemTableRetentionContext opens a transaction and applies statement timeout', async () => {
+  it('sec-new-Q4: system_table_retention opens a transaction and applies statement timeout', async () => {
     process.env.CORE_BE_RUNTIME = 'worker';
     const { database: mockedDatabase } = await import('@/infrastructure/database/connection.js');
     mockExecute.mockClear();
-    await withSystemTableRetentionContext(async () => {
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_RETENTION, async () => {
       /* pure-DB callback */
     });
     // A transaction must be opened (so SET LOCAL statement_timeout takes effect)

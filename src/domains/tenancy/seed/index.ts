@@ -37,7 +37,7 @@ const bulkContribution = composeContributions(
   memberInvitationSeedContribution,
 );
 
-/** The tenancy domain's seed module: permission reference data + org/member/role bulk graph + extras. */
+/** The tenancy domain's seed module: permission reference data + organization/member/role bulk graph + extras. */
 export const tenancySeedModule: DomainSeedModule = {
   name: 'tenancy',
   dependsOn: ['user'],

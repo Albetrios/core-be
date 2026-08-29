@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import {
   UserDataExportRepository,
   createWorkerUserDataExportRepository,
 } from '@/domains/user/sub-domains/user-data-export/user-data-export.repository.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * The last repository in the user domain without a database test. Its reads are all scoped by
@@ -81,10 +84,13 @@ describe('UserDataExportRepository (database)', () => {
     const user = await createTestUser();
     const created = await repository.create(exportRow(user.id));
 
-    const found = await withUserDatabaseContext(user.public_id, async (databaseHandle) => {
-      const workerRepository = createWorkerUserDataExportRepository(databaseHandle);
-      return workerRepository.findByPublicIdAndUserId(created.public_id, user.id);
-    });
+    const found = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+      async (databaseHandle) => {
+        const workerRepository = createWorkerUserDataExportRepository(databaseHandle);
+        return workerRepository.findByPublicIdAndUserId(created.public_id, user.id);
+      },
+    );
 
     expect(found?.public_id).toBe(created.public_id);
   });

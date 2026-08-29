@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { database } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import {
   grantCoreBeAppRoleForTests,
@@ -15,7 +18,7 @@ import {
 /**
  * Regression for sec-U3 (High): `audit.logs` was RLS-isolated with a single
  * `FOR ALL` policy whose USING predicate doubled as the write predicate. Any
- * caller with the correct `app.current_organization_id` GUC could UPDATE or
+ * caller with the correct `app.current_organization_public_id` GUC could UPDATE or
  * DELETE audit rows for their own organization through the standard
  * `core_be_app` role. Append-only was convention, not invariant.
  *
@@ -30,7 +33,7 @@ import {
  *
  * Together these make audit tampering visible at the DB layer: an UPDATE
  * throws, a non-retention DELETE silently affects zero rows (still in place),
- * and only the retention worker (`withGlobalRetentionCleanupDatabaseContext`)
+ * and only the retention worker (`withMaintenanceDatabaseContext`)
  * can purge old rows.
  */
 async function isPolicySplitMigrationApplied(): Promise<boolean> {
@@ -135,7 +138,8 @@ describe('Security: audit.logs is append-only at the DB layer (sec-U3)', () => {
     const organization = await createTestOrganization({ ownerUserId: owner.id });
     const rowId = await seedAuditRowForOrganization(organization.id);
 
-    await withGlobalRetentionCleanupDatabaseContext(
+    await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
       async (databaseHandle) => {
         await databaseHandle.execute(drizzleSql`DELETE FROM audit.logs WHERE id = ${rowId}`);
       },

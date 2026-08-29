@@ -65,7 +65,7 @@ describe('Webhook Sub-Domain — Integration', () => {
     });
     // Flat webhook routes resolve the organization from the JWT `org` claim, so
     // the bearer must embed `organizationPublicId` to reach (and pass) the
-    // webhook permission preHandler and the org-scoped controller.
+    // webhook permission preHandler and the organization-scoped controller.
     const token = await generateTestToken({
       userId: user.public_id,
       organizationPublicId: organization.public_id,
@@ -86,7 +86,7 @@ describe('Webhook Sub-Domain — Integration', () => {
       const owner = await createTestUser();
       const organization = await createTestOrganization({ ownerUserId: owner.id });
       const user = await createTestUser({ email: 'no-webhook@test.com' });
-      // Scope the bearer to the org via the `org` claim so the request reaches
+      // Scope the bearer to the organization via the `org` claim so the request reaches
       // the webhook permission check; the user has no membership → 403.
       const token = await generateTestToken({
         userId: user.public_id,
@@ -482,7 +482,7 @@ describe('Webhook Sub-Domain — Integration', () => {
       // Seeding the in-flight placeholder is the deterministic way to drive this branch —
       // racing two real requests would be inherently flaky. Same approach as
       // `src/tests/integration/runtime/idempotency-in-flight-409.integration.test.ts`.
-      // The cache key is scoped by the active org (the signed `org` JWT claim), not just the user.
+      // The cache key is scoped by the active organization (the signed `org` JWT claim), not just the user.
       const cacheKey = buildIdempotencyCacheKey(idempotencyKey, {
         userId: user.public_id,
         organizationId: organization.public_id,

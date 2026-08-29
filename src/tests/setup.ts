@@ -19,6 +19,18 @@ function isLocalDatabaseUrl(value: string | undefined): boolean {
 
 function forceLocalDatabaseForNonCiTestRun(): void {
   if (process.env.CI === 'true' || process.env.ALLOW_HOSTED_TEST_DATABASE === 'true') return;
+
+  // Local↔live parity: the local env file's DATABASE_URL is the RLS-subject
+  // `core_be_app` login (like production), which the harness's cross-tenant fixtures
+  // and TRUNCATE cleanup cannot run under. The elevated fixture connection is
+  // `core_be_operator` via DATABASE_OPERATOR_URL — prefer it whenever provisioned.
+  const operatorUrl = process.env.DATABASE_OPERATOR_URL;
+  if (operatorUrl && isLocalDatabaseUrl(operatorUrl)) {
+    process.env.DATABASE_URL = operatorUrl;
+    process.env.DATABASE_MIGRATION_URL ??= LOCAL_TEST_DATABASE_URL;
+    return;
+  }
+
   if (isLocalDatabaseUrl(process.env.DATABASE_URL)) return;
 
   process.env.DATABASE_URL = LOCAL_TEST_DATABASE_URL;
@@ -80,8 +92,8 @@ process.env.DATABASE_SSL_ENABLED = 'false';
  * `false` for the legacy request-pinned RLS transaction mode used by `pnpm dev`, but that mode
  * commits the per-request transaction in an `onResponse` hook — i.e. AFTER `fastify.inject()`
  * resolves. Tests that assert a DB side effect (e.g. an audit row) immediately after an
- * authenticated org request then race the deferred commit and flake. Forcing the scoped-context
- * mode (inline `withOrganizationDatabaseContext` commits) makes local runs deterministic and
+ * authenticated organization request then race the deferred commit and flake. Forcing the scoped-context
+ * mode (inline `withAppDatabaseContext` commits) makes local runs deterministic and
  * match CI, the source of truth.
  */
 /**

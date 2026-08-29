@@ -7,7 +7,7 @@ import { permissionRoutes } from './sub-domains/permission/permission.routes.js'
 /**
  * Top-level tenancy domain plugin — registers the organization, membership,
  * member-role, and permission sub-domain route trees against
- * `app.tenancyDomain` (and `app.auditDomain` for org audit-log listings).
+ * `app.tenancyDomain` (and `app.auditDomain` for organization audit-log listings).
  * Mounted by `src/routes.ts` under the public API prefix.
  */
 export const tenancyRoutesPlugin: FastifyPluginAsync = async (app) => {

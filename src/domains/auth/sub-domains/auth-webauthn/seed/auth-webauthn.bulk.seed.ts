@@ -8,7 +8,7 @@
  */
 import { createHash } from 'node:crypto';
 import { inArray } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { webauthn_credentials } from '@/domains/auth/sub-domains/auth-webauthn/webauthn-credential.schema.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';

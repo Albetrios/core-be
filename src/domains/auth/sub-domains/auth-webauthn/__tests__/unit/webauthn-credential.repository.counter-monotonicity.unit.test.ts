@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * authenticators (Apple Passkeys / Windows Hello) the no-op `0 → 0` write.
  *
  * The repository uses `getRequestDatabase()` and the WebAuthn schema is FORCE
- * RLS keyed on `app.current_user_id`, so a real-DB exercise of `updateCounter`
+ * RLS keyed on `app.current_user_public_id`, so a real-DB exercise of `updateCounter`
  * would need the full user-context plumbing. This suite instead spies on the
  * Drizzle operators imported by the repository and asserts the monotonicity
  * operator (`lt` vs `eq`) is chosen based on the new counter value.
@@ -41,11 +41,18 @@ const updateChain = {
   where: vi.fn().mockResolvedValue(undefined),
 };
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getRequestDatabase: () => ({
-    update: () => updateChain,
-  }),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getRequestDatabase: () => ({
+        update: () => updateChain,
+      }),
+    };
+  },
+);
 
 vi.mock('@/shared/utils/infrastructure/database-timestamp.util.js', () => ({
   databaseNowTimestamp: { __databaseNow: true },

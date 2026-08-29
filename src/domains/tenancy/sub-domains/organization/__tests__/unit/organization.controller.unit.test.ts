@@ -1,17 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { ForbiddenError, ValidationError } from '@/shared/errors/index.js';
+import { ForbiddenError } from '@/shared/errors/index.js';
 import { createOrganizationController } from '@/domains/tenancy/sub-domains/organization/organization.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { AuditService } from '@/domains/audit/audit.service.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 describe('createOrganizationController', () => {
   const organizationPublicId = generatePublicId('organization');
   const userPublicId = generatePublicId('user');
 
   function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-    return {
+    return attachPrincipalScope({
       auth: { kind: 'user' as const, userId: userPublicId, role: 'USER' },
       params: {},
       body: {},
@@ -19,7 +20,7 @@ describe('createOrganizationController', () => {
       headers: {},
       id: 'request-id',
       ...overrides,
-    } as FastifyRequest;
+    }) as FastifyRequest;
   }
 
   function mockReply(): FastifyReply {
@@ -131,7 +132,9 @@ describe('createOrganizationController', () => {
       mockRequest({ params: { organization_id: organizationPublicId } }),
       reply,
     );
-    expect(service.delete).toHaveBeenCalledWith(organizationPublicId);
+    expect(service.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+    );
     expect(reply.code).toHaveBeenCalledWith(204);
   });
 
@@ -170,46 +173,27 @@ describe('createOrganizationController', () => {
     });
   });
 
-  it('rejects a malformed organization id with ValidationError on each validated handler', async () => {
-    const invalidId = 'not-a-public-id';
-    await expect(
-      controller.getOrganization(
-        mockRequest({ params: { organization_id: invalidId } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.updateOrganization(
-        mockRequest({ params: { organization_id: invalidId }, body: { name: 'X' } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.deleteOrganization(
-        mockRequest({ params: { organization_id: invalidId } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.uploadLogo(
-        mockRequest({ params: { organization_id: invalidId }, body: { key: 'k' } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.deleteLogo(mockRequest({ params: { organization_id: invalidId } }), mockReply()),
-    ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      controller.listOrganizationAuditLogs(
-        mockRequest({ params: { organization_id: invalidId } }),
-        mockReply(),
-      ),
-    ).rejects.toBeInstanceOf(ValidationError);
+  it('ignores a malformed organization path param — the signed claim decides', async () => {
+    const organizationPublicId = generatePublicId('organization');
+    vi.mocked(service.getByPublicId).mockClear();
+    await controller.getOrganization(
+      mockRequest({
+        auth: {
+          kind: 'user' as const,
+          userId: userPublicId,
+          role: 'user',
+          organizationPublicId,
+        },
+        params: { organization_id: 'not-a-public-id' },
+      }),
+      mockReply(),
+    );
+    expect(service.getByPublicId).toHaveBeenCalledWith(organizationPublicId, userPublicId, 'user');
   });
 
   it('rejects a missing organization context with ForbiddenError on each validated handler', async () => {
     // No path param and no `org` token claim → "organization context required" (403), matching
-    // requireOrganizationPermission. On real flattened routes the active org arrives via the signed
+    // requireOrganizationPermission. On real flattened routes the active organization arrives via the signed
     // claim; the mock principal here carries none, and an empty path segment cannot reach a handler.
     await expect(
       controller.getOrganization(mockRequest({ params: {} }), mockReply()),

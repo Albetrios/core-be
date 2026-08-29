@@ -1,5 +1,8 @@
 import { Worker } from 'bullmq';
-import { withAuditOutboxDrainDatabaseContext } from '@/infrastructure/database/contexts/audit-outbox-drain-database.context.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
 import {
@@ -16,7 +19,7 @@ import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
  * the repeatable schedule registered in `src/infrastructure/queue/scheduler.ts`.
  *
  * @remarks
- * - **Algorithm:** each job opens {@link withAuditOutboxDrainDatabaseContext}
+ * - **Algorithm:** each job opens {@link withMaintenanceDatabaseContext}
  *   (transaction + `app.audit_outbox_drain = 'true'`) and delegates to
  *   {@link runAuditOutboxDrainJob}. Concurrency is bounded so two drain workers
  *   never race on the same batch — {@link runAuditOutboxDrainJob} also uses
@@ -35,7 +38,7 @@ export function createAuditOutboxDrainWorker(): WorkerHandle {
   const worker = new Worker(
     AUDIT_OUTBOX_DRAIN_QUEUE_NAME,
     async () =>
-      withAuditOutboxDrainDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN, (databaseHandle) =>
         runAuditOutboxDrainJob(databaseHandle),
       ),
     {

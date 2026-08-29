@@ -14,7 +14,7 @@ export const options = {
   },
   thresholds: {
     ...SMOKE_THRESHOLDS,
-    'http_req_duration{name:permission-cached-orgs}': ['p(95)<600', 'p(99)<1200'],
+    'http_req_duration{name:permission-cached-organizations}': ['p(95)<600', 'p(99)<1200'],
   },
 };
 
@@ -26,8 +26,8 @@ export function permissionCachedList() {
     return;
   }
 
-  // The active org rides the token's `org` claim — scope the token to TEST_ORG_ID
-  // so org-permission resolution warms the right organization's cache.
+  // The active organization rides the token's `org` claim — scope the token to TEST_ORG_ID
+  // so organization-permission resolution warms the right organization's cache.
   token = switchToOrganization(token, organizationPublicId) || token;
 
   const headers = {

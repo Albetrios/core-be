@@ -23,7 +23,7 @@ describe('team organization provisioning (database)', () => {
     ]);
   });
 
-  it('grants billing permissions to TEAM org owners', async () => {
+  it('grants billing permissions to TEAM organization owners', async () => {
     const user = await createTestUser();
 
     const result = await provisionOrganizationWithOwner({
@@ -47,7 +47,7 @@ describe('team organization provisioning (database)', () => {
     expect(granted).toContain(BILLING_PERMISSIONS.SUBSCRIPTION_MANAGE);
   });
 
-  it('does not grant billing permissions to PERSONAL org owners', async () => {
+  it('does not grant billing permissions to PERSONAL organization owners', async () => {
     const codes = ownerPermissionCodesForOrganizationType('PERSONAL');
     expect(codes).not.toContain(BILLING_PERMISSIONS.SUBSCRIPTION_READ);
     expect(codes).not.toContain(BILLING_PERMISSIONS.SUBSCRIPTION_MANAGE);
@@ -103,7 +103,7 @@ describe('team organization provisioning (database)', () => {
     }
   });
 
-  it('provisions only the Owner role for a PERSONAL org (no default team roles)', async () => {
+  it('provisions only the Owner role for a PERSONAL organization (no default team roles)', async () => {
     const user = await createTestUser();
 
     const result = await provisionOrganizationWithOwner({

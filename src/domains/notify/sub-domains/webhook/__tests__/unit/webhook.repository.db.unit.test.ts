@@ -315,7 +315,7 @@ describe('WebhookRepository (database)', () => {
         .set({ created_at: future, updated_at: future })
         .where(eq(webhooks.public_id, created.public_id));
 
-      // Re-add (same org+url) resurrects the row via onConflictDoUpdate. Pre-fix, updated_at =
+      // Re-add (same organization+url) resurrects the row via onConflictDoUpdate. Pre-fix, updated_at =
       // new Date() (JS clock) could be < the future created_at and violate chk_webhooks_updated;
       // greatest(created_at, now()) keeps it valid.
       const revived = await repository.create({

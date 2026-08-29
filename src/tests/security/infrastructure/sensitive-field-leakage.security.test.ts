@@ -22,7 +22,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
  *
  * No API response may serialize a secret/hash column. We assert the raw response
  * body (stringified) contains none of the forbidden field names, across the
- * endpoints that return user-, session-, and org-scoped resources. This is the
+ * endpoints that return user-, session-, and organization-scoped resources. This is the
  * regression guard against a serializer (or a missing serializer) leaking
  * credential material.
  */
@@ -124,7 +124,7 @@ describe('Security: sensitive-field leakage sweep', () => {
     expectNoSensitiveFields(response.body);
   });
 
-  it('GET org webhooks does not leak the encrypted secret', async () => {
+  it('GET organization webhooks does not leak the encrypted secret', async () => {
     const { user } = await userWithToken();
     const organization = await createTestOrganization({ ownerUserId: user.id });
     const role = await createRoleWithPermissions({
@@ -135,7 +135,7 @@ describe('Security: sensitive-field leakage sweep', () => {
     await createTestWebhook({ organizationId: organization.id });
 
     // Flat webhook route resolves the organization from the JWT `org` claim, so
-    // mint a bearer scoped to this org (the userWithToken bearer carries no claim).
+    // mint a bearer scoped to this organization (the userWithToken bearer carries no claim).
     const token = await generateTestToken({
       userId: user.public_id,
       organizationPublicId: organization.public_id,

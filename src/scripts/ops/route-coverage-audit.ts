@@ -141,7 +141,7 @@ function walkTestFiles(root: string): string[] {
  * tolerating typical path-parameter interpolations:
  *   - `${variable}` template literal
  *   - `${object.public_id}` template literal with member access
- *   - literal id (e.g. `"test-org-id"`)
+ *   - literal id (e.g. `"test-organization-id"`)
  *   - raw `:id` (when the test imports the URL pattern directly)
  *
  * Strategy: split the route into segments, then for each segment that's a

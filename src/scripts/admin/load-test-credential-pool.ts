@@ -18,11 +18,12 @@
  *   pnpm db:seed:loadtest                    (runs bulk seed then this script)
  */
 import '@/shared/config/load-env-files.js';
+import '@/scripts/seed/seed-runtime-url.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { and, eq, isNull, like, sql } from 'drizzle-orm';
 import { closeDatabase } from '@/infrastructure/database/connection.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { users } from '@/domains/user/user.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
@@ -31,7 +32,7 @@ import { assertBulkSeedAllowed } from '@/scripts/seed/production-guard.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 
 const BULK_EMAIL_PATTERN = 'bulk-user-%@seed.local';
-const BULK_ORG_SLUG_PATTERN = 'bulk-org-%';
+const BULK_ORG_SLUG_PATTERN = 'bulk-organization-%';
 const OUTPUT_PATH = join(process.cwd(), 'src/tests/load/k6/data/credential-pool.json');
 
 /** One row in the exported credential pool. */
@@ -40,8 +41,8 @@ export interface CredentialPoolEntry {
   email: string;
   /** Plaintext password stamped by this script — same value for all bulk users. */
   password: string;
-  /** Public id of the org this user is an active member of (for X-Organization-Id). */
-  orgPublicId: string;
+  /** Public id of the organization this user is an active member of (used to scope tokens). */
+  organizationPublicId: string;
   /** Public id of this user (for assertions in scenario checks). */
   userPublicId: string;
 }
@@ -65,9 +66,9 @@ async function run(env: NodeJS.ProcessEnv): Promise<void> {
 
   logger.info({ stamped: stamped.length }, 'load-test-credential-pool: password hash stamped');
 
-  // Step 2 — build pool: one entry per active bulk-org membership.
-  // A user round-robined into multiple orgs by the bulk seeder yields multiple entries,
-  // which is fine — k6 VUs that collide on the same user just share org context rather
+  // Step 2 — build pool: one entry per active bulk-organization membership.
+  // A user round-robined into multiple organizations by the bulk seeder yields multiple entries,
+  // which is fine — k6 VUs that collide on the same user just share organization context rather
   // than failing.
   //
   // MFA accounts are excluded, and the two exclusions below mirror `completeFirstFactorAuth`'s
@@ -82,7 +83,7 @@ async function run(env: NodeJS.ProcessEnv): Promise<void> {
     .select({
       email: users.email,
       userPublicId: users.public_id,
-      orgPublicId: organizations.public_id,
+      organizationPublicId: organizations.public_id,
     })
     .from(users)
     .innerJoin(memberships, eq(memberships.user_id, users.id))
@@ -109,7 +110,7 @@ async function run(env: NodeJS.ProcessEnv): Promise<void> {
   const pool: CredentialPoolEntry[] = rows.map((row) => ({
     email: row.email,
     password,
-    orgPublicId: row.orgPublicId,
+    organizationPublicId: row.organizationPublicId,
     userPublicId: row.userPublicId,
   }));
 

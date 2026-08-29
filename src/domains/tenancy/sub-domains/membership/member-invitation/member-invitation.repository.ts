@@ -1,6 +1,6 @@
 import { and, asc, count, eq, gt, isNull, type SQL } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { member_invitations } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.schema.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
@@ -21,7 +21,7 @@ import {
  * `tenancy.resolve_member_invitation_lookup_by_public_id` function. Used by
  * `MemberInvitationService.accept` so the caller can resolve the owning
  * organization without RLS context, then wrap the actual UPDATE in
- * `withOrganizationDatabaseContext`.
+ * `withAppDatabaseContext`.
  */
 export interface MemberInvitationOrganizationLookupRow {
   organization_public_id: string;
@@ -44,9 +44,9 @@ export interface MemberInvitationListPagination {
 /**
  * Drizzle data access for `tenancy.member_invitations`. Org-scoped reads
  * (listing, find-by-public-id, accept/revoke/resend updates) run under the
- * caller's RLS context; cross-org lookups by email or by invitation public id
+ * caller's RLS context; cross-organization lookups by email or by invitation public id
  * use SECURITY DEFINER SQL functions so the public accept flow can
- * resolve the owning organization without an org GUC set up front.
+ * resolve the owning organization without an organization GUC set up front.
  */
 export class MemberInvitationRepository {
   async findByOrganizationId(organization_id: number, pagination: MemberInvitationListPagination) {
@@ -135,7 +135,7 @@ export class MemberInvitationRepository {
   }
 
   /**
-   * audit-#8: transaction-scoped advisory lock serializing the per-org pending-invitation quota
+   * audit-#8: transaction-scoped advisory lock serializing the per-organization pending-invitation quota
    * check + insert so concurrent invites cannot both pass the same count and overshoot
    * `INVITATION_MAX_PENDING_PER_ORG`. Call inside the create transaction before
    * {@link MemberInvitationRepository.countPendingByOrganization}.
@@ -153,7 +153,7 @@ export class MemberInvitationRepository {
    * Bypasses tenant RLS via the SECURITY DEFINER function
    * `tenancy.resolve_member_invitation_lookup_by_public_id` so the public accept
    * route and the user-driven decline route can resolve the organization without
-   * having `app.current_organization_id` set up front.
+   * having `app.current_organization_public_id` set up front.
    */
   async lookupOrganizationByInvitationPublicId(
     invitation_public_id: string,

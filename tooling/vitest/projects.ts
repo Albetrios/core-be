@@ -213,7 +213,7 @@ export const vitestProjects = [
    * for the slow path even though the assertion would have passed. A
    * representative test (login → refresh → GET → verify) needs 30–40 s on
    * a cross-region Neon database, so the budget is set to 60 s with the
-   * same value for hooks (beforeAll/beforeEach create users and orgs).
+   * same value for hooks (beforeAll/beforeEach create users and organizations).
    */
   {
     extends: true,

@@ -12,6 +12,10 @@ import {
   UserDataExportCancelledError,
 } from '@/domains/user/sub-domains/user-data-export/user-data-export.types.js';
 import { USER_DATA_EXPORT_PRESIGNED_DOWNLOAD_EXPIRY_SECONDS } from '@/shared/constants/ttl.constants.js';
+import {
+  PRINCIPAL_SCOPE,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const { workerExportRepository } = vi.hoisted(() => ({
   workerExportRepository: {
@@ -27,9 +31,21 @@ vi.mock('@/domains/user/sub-domains/user-data-export/user-data-export.repository
   createWorkerUserDataExportRepository: () => workerExportRepository,
 }));
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: (_userPublicId: string, callback: () => unknown) => callback(),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const userRecord = {
   id: 1,
@@ -40,6 +56,12 @@ const userRecord = {
   deleted_at: null,
   created_at: new Date('2026-01-01T00:00:00.000Z'),
 };
+
+const asUserScope = (userPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    userPublicId,
+    organizationPublicId: 'org_scope_test',
+  }) as UserPrincipalDatabaseScope;
 
 describe('UserDataExportService', () => {
   const userService = {
@@ -108,7 +130,7 @@ describe('UserDataExportService', () => {
     });
 
     enterOnCommitScope();
-    const result = await service.requestExport('user_public');
+    const result = await service.requestExport(asUserScope('user_public'));
 
     expect(exportRepository.create).toHaveBeenCalled();
     expect(enqueueUserDataExport).not.toHaveBeenCalled();
@@ -135,7 +157,7 @@ describe('UserDataExportService', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(existingPending);
 
-    const result = await service.requestExport('user_public');
+    const result = await service.requestExport(asUserScope('user_public'));
 
     expect(result.export_id).toBe('exp_existing');
     expect(result.status).toBe(USER_DATA_EXPORT_STATUSES.PENDING);
@@ -159,7 +181,7 @@ describe('UserDataExportService', () => {
     });
     objectStorage.createPresignedDownloadUrl.mockResolvedValue('https://example.com/download');
 
-    await service.getExportStatus('user_public', 'exp_dl');
+    await service.getExportStatus(asUserScope('user_public'), 'exp_dl');
 
     expect(objectStorage.createPresignedDownloadUrl).toHaveBeenCalledWith({
       key: 'user-data-export/user/exp_dl.json.gz',

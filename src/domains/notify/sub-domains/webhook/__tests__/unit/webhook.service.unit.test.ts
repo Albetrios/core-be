@@ -5,11 +5,21 @@ const { mockPinnedFetch, createPinnedWebhookFetchMock } = vi.hoisted(() => ({
   createPinnedWebhookFetchMock: vi.fn(),
 }));
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    async (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 import {
   ConfigurationError,
@@ -18,6 +28,10 @@ import {
   ValidationError,
 } from '@/shared/errors/index.js';
 import { WebhookService } from '@/domains/notify/sub-domains/webhook/webhook.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { WebhookRepository } from '@/domains/notify/sub-domains/webhook/webhook.repository.js';
 import type { WebhookDeliveryAttemptRepository } from '@/domains/notify/sub-domains/webhook/webhook-delivery/webhook-delivery-attempt.repository.js';
@@ -45,6 +59,11 @@ vi.mock('@/shared/utils/security/field-secret-encryption.util.js', async (import
 }));
 
 const organization = { id: 1, public_id: 'org_public' };
+const scope = PRINCIPAL_SCOPE.REQUEST({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_public',
+}) as OrganizationPrincipalDatabaseScope;
+
 const webhook = {
   id: 2,
   public_id: 'webhook_public',
@@ -81,7 +100,7 @@ describe('WebhookService', () => {
     // sec-N4: service consults this before insert; default to 0 so existing
     // happy-path tests stay below the cap.
     countActiveByOrganization: vi.fn().mockResolvedValue(0),
-    // audit-#8: per-org creation quota advisory lock (no-op in unit tests).
+    // audit-#8: per-organization creation quota advisory lock (no-op in unit tests).
     acquireCreationQuotaLock: vi.fn().mockResolvedValue(undefined),
   } as unknown as WebhookRepository;
 
@@ -115,11 +134,11 @@ describe('WebhookService', () => {
   });
 
   it('lists, gets, creates, updates, and deletes webhooks', async () => {
-    const listed = await service.list({ organization_public_id: 'org_public' });
+    const listed = await service.list({ scope });
     expect(listed.items).toHaveLength(1);
-    await service.get('org_public', 'webhook_public');
+    await service.get(scope, 'webhook_public');
     await service.create(
-      'org_public',
+      scope,
       {
         url: 'https://example.com/hook',
         events: ['subscription.updated'],
@@ -127,14 +146,14 @@ describe('WebhookService', () => {
       },
       'user_public',
     );
-    await service.update('org_public', 'webhook_public', { is_enabled: false }, 'user_public');
-    await service.delete('org_public', 'webhook_public');
+    await service.update(scope, 'webhook_public', { is_enabled: false }, 'user_public');
+    await service.delete(scope, 'webhook_public');
     expect(webhookRepository.softDelete).toHaveBeenCalled();
   });
 
   it('listDeliveryAttempts resolves webhook id', async () => {
     await service.listDeliveryAttempts({
-      organization_public_id: 'org_public',
+      scope,
       webhook_public_id: 'webhook_public',
       limit: 10,
     });
@@ -148,7 +167,7 @@ describe('WebhookService', () => {
     vi.mocked(deliveryAttemptRepository.getWebhookId).mockResolvedValue(null);
     await expect(
       service.listDeliveryAttempts({
-        organization_public_id: 'org_public',
+        scope,
         webhook_public_id: 'missing',
         limit: 10,
       }),
@@ -159,7 +178,7 @@ describe('WebhookService', () => {
     mockPinnedFetch.mockResolvedValue({ ok: true, status: 200, text: async () => 'ok' });
 
     const result = await service.testWebhook({
-      organization_public_id: 'org_public',
+      scope,
       webhook_public_id: 'webhook_public',
     });
     expect(result.success).toBe(true);
@@ -172,7 +191,7 @@ describe('WebhookService', () => {
     mockPinnedFetch.mockResolvedValue({ ok: true, status: 200, text: async () => 'ok' });
 
     await service.testWebhook({
-      organization_public_id: 'org_public',
+      scope,
       webhook_public_id: 'webhook_public',
     });
 
@@ -198,7 +217,7 @@ describe('WebhookService', () => {
 
     await expect(
       service.testWebhook({
-        organization_public_id: 'org_public',
+        scope,
         webhook_public_id: 'webhook_public',
       }),
     ).rejects.toBeInstanceOf(ConfigurationError);
@@ -213,7 +232,7 @@ describe('WebhookService', () => {
 
     await expect(
       service.testWebhook({
-        organization_public_id: 'org_public',
+        scope,
         webhook_public_id: 'webhook_public',
       }),
     ).rejects.toBeInstanceOf(ValidationError);
@@ -226,7 +245,7 @@ describe('WebhookService', () => {
     mockPinnedFetch.mockResolvedValue({ ok: true, status: 200, text: async () => hugeBody });
 
     await service.testWebhook({
-      organization_public_id: 'org_public',
+      scope,
       webhook_public_id: 'webhook_public',
     });
 
@@ -240,7 +259,7 @@ describe('WebhookService', () => {
     mockPinnedFetch.mockRejectedValue(new Error('network error'));
 
     const result = await service.testWebhook({
-      organization_public_id: 'org_public',
+      scope,
       webhook_public_id: 'webhook_public',
     });
     expect(result.success).toBe(false);
@@ -248,23 +267,23 @@ describe('WebhookService', () => {
 
   it('get throws NotFound when webhook is missing', async () => {
     vi.mocked(webhookRepository.findByPublicId).mockResolvedValue(null);
-    await expect(service.get('org_public', 'missing')).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.get(scope, 'missing')).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('update and delete throw NotFound when webhook is missing', async () => {
     vi.mocked(webhookRepository.update).mockResolvedValue(null);
     vi.mocked(webhookRepository.softDelete).mockResolvedValue(null);
     await expect(
-      service.update('org_public', 'missing', { is_enabled: false }, 'user_public'),
+      service.update(scope, 'missing', { is_enabled: false }, 'user_public'),
     ).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service.delete('org_public', 'missing')).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.delete(scope, 'missing')).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('testWebhook throws NotFound when webhook is missing', async () => {
     vi.mocked(webhookRepository.findByPublicId).mockResolvedValue(null);
     await expect(
       service.testWebhook({
-        organization_public_id: 'org_public',
+        scope,
         webhook_public_id: 'missing',
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
@@ -279,7 +298,7 @@ describe('WebhookService', () => {
       },
     });
     const result = await service.testWebhook({
-      organization_public_id: 'org_public',
+      scope,
       webhook_public_id: 'webhook_public',
     });
     expect(result.success).toBe(true);
@@ -290,7 +309,7 @@ describe('WebhookService', () => {
     const longBody = 'x'.repeat(600);
     mockPinnedFetch.mockResolvedValue({ ok: true, status: 200, text: async () => longBody });
     const result = await service.testWebhook({
-      organization_public_id: 'org_public',
+      scope,
       webhook_public_id: 'webhook_public',
     });
     expect(result.response_body).toContain('[truncated]');
@@ -357,7 +376,7 @@ describe('WebhookService', () => {
 
   it('update encrypts secret when provided in body', async () => {
     await service.update(
-      'org_public',
+      scope,
       'webhook_public',
       { secret: 'new-signing-secret-value' },
       'user_public',
@@ -381,7 +400,7 @@ describe('WebhookService', () => {
       secret_rotated_at: new Date(Date.now() - 60 * 60 * 1000),
     } as never);
     await expect(
-      service.update('org_public', 'webhook_public', { secret: 'another-new-secret-value' }, 'u'),
+      service.update(scope, 'webhook_public', { secret: 'another-new-secret-value' }, 'u'),
     ).rejects.toBeInstanceOf(ConflictError);
     expect(webhookRepository.update).not.toHaveBeenCalled();
   });
@@ -400,7 +419,7 @@ describe('WebhookService', () => {
 
     await expect(
       service.update(
-        'org_public',
+        scope,
         'webhook_public',
         { secret: 'race-losing-secret-value' },
         'user_public',
@@ -418,7 +437,7 @@ describe('WebhookService', () => {
 
     await expect(
       service.update(
-        'org_public',
+        scope,
         'webhook_public',
         { secret: 'secret-for-vanished-hook' },
         'user_public',
@@ -432,7 +451,7 @@ describe('WebhookService', () => {
       secret_rotated_at: new Date(Date.now() - 48 * 60 * 60 * 1000), // past the 24h window
     } as never);
     await service.update(
-      'org_public',
+      scope,
       'webhook_public',
       { secret: 'another-new-secret-value' },
       'user_public',
@@ -444,7 +463,7 @@ describe('WebhookService', () => {
     vi.mocked(deliveryAttemptRepository.getWebhookId).mockResolvedValue(null);
     await expect(
       service.listDeliveryAttempts({
-        organization_public_id: 'org_public',
+        scope,
         webhook_public_id: 'webhook_public',
         limit: 10,
       }),
@@ -454,7 +473,7 @@ describe('WebhookService', () => {
   it('create passes undefined created_by_user_id when user cannot be resolved', async () => {
     vi.mocked(organizationService.resolveUserInternalIdByPublicId).mockResolvedValue(null);
     await service.create(
-      'org_public',
+      scope,
       { url: 'https://example.com/hook', events: ['subscription.updated'] },
       'unknown_user',
     );
@@ -470,7 +489,7 @@ describe('WebhookService', () => {
     // forgeable. encryptFieldSecret is the real impl in this suite (only decryptFieldSecret is
     // stubbed), so the stored ciphertext is genuine and can be reversed with the real decryptor.
     await service.create(
-      'org_public',
+      scope,
       { url: 'https://example.com/hook', events: ['subscription.updated'] },
       'user_public',
     );

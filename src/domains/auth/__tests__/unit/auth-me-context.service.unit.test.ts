@@ -5,15 +5,35 @@ import { describe, expect, it, vi } from 'vitest';
 // so it is mocked to run the callback inline, matching how authorization.service.unit.test.ts
 // mocks tenant-database.context. What is under test here is the ORDER of the reads, not the
 // context plumbing; the plumbing is covered by src/tests/security/rls.
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn(async <T>(_userPublicId: string, callback: () => Promise<T>) =>
-    callback(),
-  ),
-}));
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 import { AuthMeContextService } from '@/domains/auth/auth-me-context.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
+
+const meScope = PRINCIPAL_SCOPE.REQUEST({
+  userPublicId: 'usr_1',
+  organizationPublicId: 'org_active',
+}) as UserPrincipalDatabaseScope;
 
 describe('AuthMeContextService.getContext', () => {
-  it('aggregates the user, active organization, resolved permissions, and org list', async () => {
+  it('aggregates the user, active organization, resolved permissions, and organization list', async () => {
     const activeOrganization = { id: 'org_active', type: 'TEAM' };
     const userService = { getMe: vi.fn().mockResolvedValue({ id: 'usr_1', email: 'a@b.com' }) };
     const organizationService = {
@@ -32,12 +52,13 @@ describe('AuthMeContextService.getContext', () => {
     );
 
     const data = await service.getContext({
-      userPublicId: 'usr_1',
-      activeOrganizationPublicId: 'org_active',
+      scope: meScope,
       globalRole: undefined,
     });
 
-    expect(userService.getMe).toHaveBeenCalledWith('usr_1');
+    expect(userService.getMe).toHaveBeenCalledWith(
+      expect.objectContaining({ userPublicId: 'usr_1' }),
+    );
     expect(organizationService.getByPublicId).toHaveBeenCalledWith(
       'org_active',
       'usr_1',
@@ -56,10 +77,10 @@ describe('AuthMeContextService.getContext', () => {
   /**
    * The route's reads split by DATABASE CONTEXT, not by dependency.
    *
-   * `getMe`, `list` and `getByPublicId` all want `app.current_user_id` set to the same value, so
-   * they share one `withUserDatabaseContext` and therefore one pooled checkout — they serialize
+   * `getMe`, `list` and `getByPublicId` all want `app.current_user_public_id` set to the same value, so
+   * they share one `withAppDatabaseContext (user scope)` and therefore one pooled checkout — they serialize
    * on it deliberately, and asserting they run concurrently would pin the opposite of the design.
-   * `resolveUserOrganizationPermissions` drives `app.current_organization_id` instead, so it owns
+   * `resolveUserOrganizationPermissions` drives `app.current_organization_public_id` instead, so it owns
    * a separate transaction and MUST still overlap the user-scoped block; chaining it after would
    * add its latency to every page load for nothing. This pins that overlap.
    */
@@ -101,8 +122,7 @@ describe('AuthMeContextService.getContext', () => {
     );
 
     const data = await service.getContext({
-      userPublicId: 'usr_1',
-      activeOrganizationPublicId: 'org_active',
+      scope: meScope,
       globalRole: undefined,
     });
 
@@ -112,7 +132,7 @@ describe('AuthMeContextService.getContext', () => {
     expect(data.myPermissions).toEqual(['organization:read']);
   });
 
-  it('returns a null active organization and no permissions when no active org is in scope', async () => {
+  it('returns a null active organization and no permissions when no active organization is in scope', async () => {
     const userService = { getMe: vi.fn().mockResolvedValue({ id: 'usr_1' }) };
     const organizationService = {
       list: vi.fn().mockResolvedValue({ items: [] }),
@@ -125,9 +145,13 @@ describe('AuthMeContextService.getContext', () => {
       authorizationService as never,
     );
 
-    const data = await service.getContext({
+    // Org-less token = the /users/me self-heal transitional state: the active-organization
+    // slice is skipped rather than erroring.
+    const organizationLessScope = PRINCIPAL_SCOPE.REQUEST({
       userPublicId: 'usr_1',
-      activeOrganizationPublicId: undefined,
+    }) as UserPrincipalDatabaseScope;
+    const data = await service.getContext({
+      scope: organizationLessScope,
       globalRole: undefined,
     });
 
@@ -140,7 +164,7 @@ describe('AuthMeContextService.getContext', () => {
 });
 
 describe('AuthMeContextService.getActiveOrganizationContext', () => {
-  it('resolves only the active-org slice (org + permissions) without the user / org-list reads', async () => {
+  it('resolves only the active-organization slice (organization + permissions) without the user / organization-list reads', async () => {
     const activeOrganization = { id: 'org_active', type: 'TEAM' };
     const userService = { getMe: vi.fn() };
     const organizationService = {

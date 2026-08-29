@@ -86,7 +86,7 @@ describe('rate-limit.middleware', () => {
       allowList: (request: { url: string }) => boolean;
     };
     expect(options.global).toBe(true);
-    // Global cap is a fixed per-IP number; org/user quotas live in post-auth presets.
+    // Global cap is a fixed per-IP number; organization/user quotas live in post-auth presets.
     expect(options.max).toBe(100);
     expect(options.timeWindow).toBe(60_000);
     // Fail-open on Redis blip — a few seconds of unmetered traffic beats a blanket 5xx.
@@ -245,7 +245,7 @@ describe('rate-limit.middleware', () => {
       const options = rateLimitPlugin.mock.calls.at(-1)![1] as {
         keyGenerator: (request: { organizationId?: string; ip: string }) => string;
       };
-      // A forged/fresh or victim org id must not influence the global per-IP bucket.
+      // A forged/fresh or victim organization id must not influence the global per-IP bucket.
       expect(options.keyGenerator({ organizationId: 'org_public_1', ip: '1.2.3.4' })).toBe(
         '1.2.3.4',
       );

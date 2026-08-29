@@ -128,21 +128,21 @@ describe('rate-limit-presets', () => {
     const keyGenerator = ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT.config.rateLimit.keyGenerator;
     expect(keyGenerator).toBeDefined();
 
-    // An attacker and a real member hitting the SAME victim org resolve to DIFFERENT buckets,
+    // An attacker and a real member hitting the SAME victim organization resolve to DIFFERENT buckets,
     // so the attacker can never drain the member's quota.
     const attackerKey = await keyGenerator?.({
       ip: '203.0.113.7',
-      organizationId: 'victim-org',
+      organizationId: 'victim-organization',
       auth: { kind: 'user', userId: 'attacker-user' },
     } as never);
     const memberKey = await keyGenerator?.({
       ip: '198.51.100.4',
-      organizationId: 'victim-org',
+      organizationId: 'victim-organization',
       auth: { kind: 'user', userId: 'member-user' },
     } as never);
 
-    expect(attackerKey).toBe('organization:victim-org:actor:attacker-user');
-    expect(memberKey).toBe('organization:victim-org:actor:member-user');
+    expect(attackerKey).toBe('organization:victim-organization:actor:attacker-user');
+    expect(memberKey).toBe('organization:victim-organization:actor:member-user');
     expect(attackerKey).not.toBe(memberKey);
   });
 
@@ -157,10 +157,10 @@ describe('rate-limit-presets', () => {
     // bucket to `ip:` (finding D); the actor helper now resolves the api-key public id.
     const apiKeyActor = await keyGenerator?.({
       ip: '203.0.113.7',
-      organizationId: 'org-1',
+      organizationId: 'organization-1',
       auth: { kind: 'apiKey', apiKeyPublicId: 'apikey-1' },
     } as never);
-    expect(apiKeyActor).toBe('organization:org-1:actor:apikey-1');
+    expect(apiKeyActor).toBe('organization:organization-1:actor:apikey-1');
 
     const noOrgContext = await keyGenerator?.({
       ip: '203.0.113.7',

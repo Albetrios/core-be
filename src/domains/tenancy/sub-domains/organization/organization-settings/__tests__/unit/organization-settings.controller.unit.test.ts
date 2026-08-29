@@ -4,16 +4,17 @@ import { createOrganizationSettingsController } from '@/domains/tenancy/sub-doma
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { NotFoundError, UnauthorizedError } from '@/shared/errors/index.js';
 import type { OrganizationSettingsService } from '@/domains/tenancy/sub-domains/organization/organization-settings/organization-settings.service.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScope({
     auth: { kind: 'user', userId: generatePublicId('user'), role: 'user' },
     params: {},
     body: {},
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {
@@ -45,11 +46,13 @@ describe('createOrganizationSettingsController', () => {
       mockRequest({ params: { organization_id: organizationPublicId } }),
       mockReply(),
     );
-    expect(service.get).toHaveBeenCalledWith(organizationPublicId);
+    expect(service.get).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId, source: 'request' }),
+    );
     expect(response).toMatchObject({ data: settingsRow });
   });
 
-  it('getSettings propagates NotFoundError when org is missing', async () => {
+  it('getSettings propagates NotFoundError when organization is missing', async () => {
     vi.mocked(service.get).mockRejectedValueOnce(new NotFoundError('Organization'));
     await expect(
       controller.getSettings(
@@ -80,7 +83,11 @@ describe('createOrganizationSettingsController', () => {
       }),
       mockReply(),
     );
-    expect(service.update).toHaveBeenCalledWith(organizationPublicId, body, userId);
+    expect(service.update).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId, userPublicId: userId, source: 'request' }),
+      body,
+      userId,
+    );
     expect(response).toMatchObject({ data: settingsRow });
   });
 

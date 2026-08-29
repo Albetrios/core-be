@@ -16,8 +16,8 @@ function formatRouteLine(route: ParsedRoute): string {
     route.successStatus !== undefined ? String(route.successStatus) : '???'
   ).padEnd(3, ' ');
   const idempotencyColumn = (route.idempotencyRequired ? 'req' : '-').padEnd(3, ' ');
-  const orgScopeColumn = (route.orgScope ?? '???').padEnd(4, ' ');
-  return `  ${methodColumn} ${pathColumn}  ${statusColumn}  ${idempotencyColumn}  ${orgScopeColumn}  ${route.access}`;
+  const organizationScopeColumn = (route.organizationScope ?? '???').padEnd(4, ' ');
+  return `  ${methodColumn} ${pathColumn}  ${statusColumn}  ${idempotencyColumn}  ${organizationScopeColumn}  ${route.access}`;
 }
 
 function permissionDomainLabel(objectName: string): string {
@@ -110,7 +110,7 @@ export function buildCatalogContent(routes: ParsedRoute[]): string {
     '  ROLE    = Global role required (super_admin, admin, user)',
     '  PERM    = Organization-scoped permission required',
     '  TOKEN   = Credential enforced in-handler (non-JWT bearer token or session cookie)',
-    '  Columns after the path: S = success status · I = idempotency (req | -) · O = org scope (both | team-only, 422 on personal)',
+    '  Columns after the path: S = success status · I = idempotency (req | -) · O = organization scope (both | team-only, 422 on personal)',
     '',
   ];
 
@@ -151,7 +151,7 @@ export function buildCatalogContent(routes: ParsedRoute[]): string {
   const roleCount = sortedRoutes.filter((route) => route.access.startsWith('ROLE:')).length;
   const permCount = sortedRoutes.filter((route) => route.access.startsWith('PERM:')).length;
   const tokenCount = sortedRoutes.filter((route) => route.access.startsWith('TOKEN:')).length;
-  const teamScopedCount = sortedRoutes.filter((route) => route.orgScope === 'team').length;
+  const teamScopedCount = sortedRoutes.filter((route) => route.organizationScope === 'team').length;
 
   lines.push(
     SEPARATOR,

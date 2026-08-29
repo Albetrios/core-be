@@ -13,10 +13,13 @@ import { NotFoundError } from '@/shared/errors/index.js';
 import { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
 import { AuditRepository } from '@/domains/audit/audit.repository.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { sessions } from '@/domains/auth/sub-domains/auth-session/auth-session.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { createDomainContainers } from '@/worker-containers.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 describe('UserDataExportService (database)', () => {
   const service = createDomainContainers(createObjectStoragePortMock()).userDomain
@@ -65,8 +68,9 @@ describe('UserDataExportService (database)', () => {
       resource_id: user.id,
     });
 
-    const exported = await withUserDatabaseContext(user.public_id, () =>
-      service.buildExportPayload(user.public_id),
+    const exported = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+      () => service.buildExportPayload(user.public_id),
     );
 
     expect(exported.user.email).toBe('export@example.com');
@@ -84,7 +88,7 @@ describe('UserDataExportService (database)', () => {
 
   it('buildExportPayload throws when user is missing', async () => {
     await expect(
-      withUserDatabaseContext('missing_public_id', () =>
+      withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ userPublicId: 'missing_public_id' }), () =>
         service.buildExportPayload('missing_public_id'),
       ),
     ).rejects.toBeInstanceOf(NotFoundError);
@@ -100,8 +104,9 @@ describe('UserDataExportService (database)', () => {
       expires_at: new Date(Date.now() + 60_000),
     });
 
-    const exported = await withUserDatabaseContext(user.public_id, () =>
-      service.buildExportPayload(user.public_id),
+    const exported = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+      () => service.buildExportPayload(user.public_id),
     );
 
     expect(exported.sessions).toHaveLength(1);
@@ -115,8 +120,9 @@ describe('UserDataExportService (database)', () => {
       lastName: '',
     });
 
-    const exported = await withUserDatabaseContext(user.public_id, () =>
-      service.buildExportPayload(user.public_id),
+    const exported = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+      () => service.buildExportPayload(user.public_id),
     );
 
     expect(exported.user.full_name).toBeNull();

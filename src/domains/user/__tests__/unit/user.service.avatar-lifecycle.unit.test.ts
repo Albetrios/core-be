@@ -5,6 +5,23 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import { buildUserAvatarKeyPrefix } from '@/domains/upload/upload.constants.js';
 import { ValidationError, NotFoundError } from '@/shared/errors/index.js';
+import {
+  PRINCIPAL_SCOPE,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 /**
  * Avatar attach / replace / detach and the reclamation of the object left behind.
@@ -15,15 +32,6 @@ import { ValidationError, NotFoundError } from '@/shared/errors/index.js';
  * the caller's own prefix. None of those branches were covered: they were the single largest
  * cluster of surviving mutants in `user.service.ts`.
  */
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
-vi.mock('@/infrastructure/database/contexts/global-admin-database.context.js', () => ({
-  withGlobalAdminDatabaseContext: vi.fn((callback: () => Promise<unknown>) => callback()),
-}));
 
 vi.mock('@/shared/utils/infrastructure/postgres-error.util.js', () => ({
   runInsertWithPublicIdentifierRetry: async (operation: () => Promise<unknown>) => operation(),
@@ -70,6 +78,12 @@ function userRow(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+const asUserScope = (userPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    userPublicId,
+    organizationPublicId: 'org_scope_test',
+  }) as UserPrincipalDatabaseScope;
 
 describe('UserService — avatar lifecycle', () => {
   const repository = {
@@ -157,7 +171,7 @@ describe('UserService — avatar lifecycle', () => {
       userRow({ avatar_url: OLD_AVATAR_KEY }) as never,
     );
 
-    await service.updateMe(USER_PUBLIC_ID, {
+    await service.updateMe(asUserScope(USER_PUBLIC_ID), {
       first_name: 'Renamed',
       avatar_key: NEW_AVATAR_KEY,
     });
@@ -174,7 +188,7 @@ describe('UserService — avatar lifecycle', () => {
       userRow({ avatar_url: OLD_AVATAR_KEY }) as never,
     );
 
-    await service.updateMe(USER_PUBLIC_ID, { first_name: 'Renamed' });
+    await service.updateMe(asUserScope(USER_PUBLIC_ID), { first_name: 'Renamed' });
 
     expect(objectStorage.deleteObject).not.toHaveBeenCalled();
     // avatar_url must not be written at all — omitting the key means "leave it as it is".
@@ -189,7 +203,7 @@ describe('UserService — avatar lifecycle', () => {
       userRow({ avatar_url: NEW_AVATAR_KEY }) as never,
     );
 
-    await service.updateMe(USER_PUBLIC_ID, { avatar_key: NEW_AVATAR_KEY });
+    await service.updateMe(asUserScope(USER_PUBLIC_ID), { avatar_key: NEW_AVATAR_KEY });
 
     expect(objectStorage.deleteObject).not.toHaveBeenCalled();
   });

@@ -9,7 +9,7 @@
  */
 import { createHash } from 'node:crypto';
 import { inArray } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { sessions } from '@/domains/auth/sub-domains/auth-session/auth-session.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';
@@ -20,7 +20,7 @@ const SESSIONS_PER_USER = 2;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Deterministic 64-char session token hash for a given user + slot (idempotency marker). */
-function sessionTokenHash(userPublicId: string, slot: number): string {
+function buildSessionTokenHash(userPublicId: string, slot: number): string {
   return createHash('sha256').update(`seed-session:${userPublicId}:${slot}`).digest('hex');
 }
 
@@ -42,7 +42,9 @@ export async function seedAuthSessionsBulk(context: SeedContext): Promise<void> 
 
   const database = getRequestDatabase();
   const allHashes = users.flatMap((user) =>
-    Array.from({ length: SESSIONS_PER_USER }, (_, slot) => sessionTokenHash(user.public_id, slot)),
+    Array.from({ length: SESSIONS_PER_USER }, (_, slot) =>
+      buildSessionTokenHash(user.public_id, slot),
+    ),
   );
   const existingRows = await database
     .select({ token_hash: sessions.token_hash })
@@ -54,8 +56,8 @@ export async function seedAuthSessionsBulk(context: SeedContext): Promise<void> 
   let inserted = 0;
   for (const user of users) {
     for (let slot = 0; slot < SESSIONS_PER_USER; slot += 1) {
-      const tokenHash = sessionTokenHash(user.public_id, slot);
-      if (existingHashes.has(tokenHash)) continue;
+      const sessionTokenHash = buildSessionTokenHash(user.public_id, slot);
+      if (existingHashes.has(sessionTokenHash)) continue;
       const profile = generateBulkSession(context.faker);
       const isExpiredEdgeCase = context.counts.edgeCases && slot === SESSIONS_PER_USER - 1;
       const createdAt = isExpiredEdgeCase ? new Date(now - 30 * ONE_DAY_MS) : new Date(now);
@@ -67,7 +69,7 @@ export async function seedAuthSessionsBulk(context: SeedContext): Promise<void> 
         .values({
           public_id: generatePublicId('authSession'),
           user_id: user.id,
-          token_hash: tokenHash,
+          token_hash: sessionTokenHash,
           ip_address: profile.ip_address,
           user_agent: profile.user_agent,
           last_active_at: createdAt,

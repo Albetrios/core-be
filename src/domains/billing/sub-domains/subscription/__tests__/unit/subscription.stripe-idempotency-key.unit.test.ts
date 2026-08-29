@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildStripeIdempotencyKey } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 
-// audit #3: the client X-Idempotency-Key must be namespaced by org before reaching Stripe's
+// audit #3: the client X-Idempotency-Key must be namespaced by organization before reaching Stripe's
 // account-global idempotency space, so one tenant's chosen key cannot collide with another's.
 describe('buildStripeIdempotencyKey (audit #3)', () => {
   it('returns undefined when no client key was supplied', () => {
@@ -12,7 +12,7 @@ describe('buildStripeIdempotencyKey (audit #3)', () => {
     expect(buildStripeIdempotencyKey('sub-create', 'org_a', 'k1')).toBe('sub-create:org_a:k1');
   });
 
-  it('disjoint key spaces: same client key from two orgs maps to different Stripe keys', () => {
+  it('disjoint key spaces: same client key from two organizations maps to different Stripe keys', () => {
     const a = buildStripeIdempotencyKey('sub-create', 'org_a', 'same-key');
     const b = buildStripeIdempotencyKey('sub-create', 'org_b', 'same-key');
     expect(a).not.toBe(b);

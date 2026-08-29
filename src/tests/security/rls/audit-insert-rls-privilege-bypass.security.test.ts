@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { sql } from '@/infrastructure/database/connection.js';
 import { database } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import {
   grantCoreBeAppRoleForTests,
   executeAsCoreBeAppGlobalAdmin,
@@ -45,7 +48,7 @@ async function isPrivilegeBypassMigrationApplied(): Promise<boolean> {
  *
  * After migration 20260608040000 the INSERT policy accepts only a
  * tenant-scoped insert where `organization_id` matches
- * `current_setting('app.current_organization_id', true)`. Both the
+ * `current_setting('app.current_organization_public_id', true)`. Both the
  * `global_admin` and `global_retention_cleanup` paths must now be rejected.
  */
 describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec-r4-D1)', () => {
@@ -72,7 +75,7 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
     let caught: unknown;
     try {
       await executeAsCoreBeAppGlobalAdmin(async (transaction) => {
-        // No app.current_organization_id set — only global_admin is active.
+        // No app.current_organization_public_id set — only global_admin is active.
         // Before the fix this would succeed (global_admin bypassed WITH CHECK).
         // After the fix RLS rejects it.
         await transaction.execute(
@@ -97,9 +100,10 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
 
     let caught: unknown;
     try {
-      await withGlobalRetentionCleanupDatabaseContext(
+      await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
         async (databaseHandle) => {
-          // No app.current_organization_id set — only global_retention_cleanup
+          // No app.current_organization_public_id set — only global_retention_cleanup
           // is active. Before the fix this would succeed. After the fix, RLS
           // rejects it.
           await databaseHandle.execute(
@@ -124,11 +128,12 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
     const owner = await createTestUser({ email: 'audit-d1-tenant@example.com' });
     const organization = await createTestOrganization({ ownerUserId: owner.id });
 
-    // Verify the DB row for the org actually exists so the sub-select will resolve.
-    const orgRows = await database.execute(
+    // Verify the DB row for the organization actually exists so the sub-select will resolve.
+    const organizationRows = await database.execute(
       drizzleSql`SELECT id FROM tenancy.organizations WHERE id = ${organization.id}`,
     );
-    const resolvedOrg = ((orgRows as { rows?: unknown[] }).rows ?? orgRows) as Array<{
+    const resolvedOrg = ((organizationRows as { rows?: unknown[] }).rows ??
+      organizationRows) as Array<{
       id: number;
     }>;
     expect(resolvedOrg).toHaveLength(1);
@@ -138,7 +143,7 @@ describe('Security: audit.logs INSERT RLS rejects privilege-bypass contexts (sec
       await database.transaction(async (transaction) => {
         await transaction.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
         await transaction.execute(
-          drizzleSql`SELECT set_config('app.current_organization_id', ${organization.public_id}, true)`,
+          drizzleSql`SELECT set_config('app.current_organization_public_id', ${organization.public_id}, true)`,
         );
         await transaction.execute(
           drizzleSql`INSERT INTO audit.logs (organization_id, action, resource_type, ip_address, user_agent, metadata)

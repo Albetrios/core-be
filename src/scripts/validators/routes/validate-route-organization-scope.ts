@@ -1,43 +1,43 @@
 /**
  * Org-scope map sync gate.
  *
- * Verifies `tooling/openapi/route-catalog/route-org-scope.json` stays in exact
+ * Verifies `tooling/openapi/route-catalog/route-organization-scope.json` stays in exact
  * sync with `docs/routes.txt`:
- *   - every catalog route has exactly one declared org scope,
+ *   - every catalog route has exactly one declared organization scope,
  *   - no stale entries for routes that left the catalog,
  *   - every declared scope is `both` or `team`.
  *
- * The map drives the catalog's `O` column (`both` = works for any org; `team` =
- * rejects a personal org with 422). It is the source of truth — a `team` entry
+ * The map drives the catalog's `O` column (`both` = works for any organization; `team` =
+ * rejects a personal organization with 422). It is the source of truth — a `team` entry
  * should correspond to a route guarded by `assertTeamOrganization(...)`.
  *
- * Usage: `pnpm validate:route-org-scope`
+ * Usage: `pnpm validate:route-organization-scope`
  */
 import { loadRouteRegistryFromCatalog } from '@/tests/helpers/route-catalog-registry.js';
 import {
   ALLOWED_ORG_SCOPES,
   loadRouteOrgScopeMap,
   routeOrgScopeKey,
-} from '@/tests/helpers/route-org-scope.helper.js';
+} from '@/tests/helpers/route-organization-scope.helper.js';
 
 function main(): void {
   const registry = loadRouteRegistryFromCatalog();
-  const orgScopeMap = loadRouteOrgScopeMap();
+  const organizationScopeMap = loadRouteOrgScopeMap();
 
   const catalogKeys = new Set(registry.map((route) => routeOrgScopeKey(route)));
-  const mapKeys = new Set(Object.keys(orgScopeMap));
+  const mapKeys = new Set(Object.keys(organizationScopeMap));
 
   const missing = [...catalogKeys].filter((key) => !mapKeys.has(key)).sort();
   const stale = [...mapKeys].filter((key) => !catalogKeys.has(key)).sort();
-  const invalid = Object.entries(orgScopeMap)
+  const invalid = Object.entries(organizationScopeMap)
     .filter(([, scope]) => !ALLOWED_ORG_SCOPES.has(scope))
     .map(([key, scope]) => `${key} → ${scope}`)
     .sort();
 
   if (missing.length > 0 || stale.length > 0 || invalid.length > 0) {
-    console.error('validate-route-org-scope failed:\n');
+    console.error('validate-route-organization-scope failed:\n');
     if (missing.length > 0) {
-      console.error('Catalog routes missing a declared org scope:');
+      console.error('Catalog routes missing a declared organization scope:');
       for (const key of missing) console.error(`  - ${key}`);
       console.error('');
     }
@@ -52,12 +52,14 @@ function main(): void {
       console.error('');
     }
     console.error(
-      'Update tooling/openapi/route-catalog/route-org-scope.json (one entry per catalog route).',
+      'Update tooling/openapi/route-catalog/route-organization-scope.json (one entry per catalog route).',
     );
     process.exit(1);
   }
 
-  console.log(`✅ validate-route-org-scope passed (${registry.length} routes, all annotated)`);
+  console.log(
+    `✅ validate-route-organization-scope passed (${registry.length} routes, all annotated)`,
+  );
 }
 
 main();

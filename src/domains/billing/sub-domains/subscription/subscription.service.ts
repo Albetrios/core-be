@@ -11,7 +11,7 @@ import { addMonths } from './subscription-period.util.js';
 import { INACTIVE_SUBSCRIPTION_STATUSES } from './subscription.repository.js';
 
 /**
- * Per-org lock TTL (seconds) around subscription create (audit-#B4). Must exceed the worst-case
+ * Per-organization lock TTL (seconds) around subscription create (audit-#B4). Must exceed the worst-case
  * `paymentProvider.createSubscription` latency plus the surrounding DB work so the lock never lapses
  * mid-create; a crashed holder auto-releases at this TTL.
  */
@@ -36,7 +36,7 @@ const TERMINAL_STATUSES = new Set<string>(INACTIVE_SUBSCRIPTION_STATUSES);
 
 /**
  * Dunning subscription statuses — a payment has failed but the subscription has not yet been
- * canceled. The org keeps its full plan ceiling until `current_period_end + BILLING_DUNNING_GRACE_DAYS`
+ * canceled. The organization keeps its full plan ceiling until `current_period_end + BILLING_DUNNING_GRACE_DAYS`
  * (F4), after which its entitlement lapses to the Free-tier ceiling.
  */
 const DUNNING_STATUSES = new Set<string>(['PAST_DUE', 'UNPAID', 'INCOMPLETE']);
@@ -67,7 +67,7 @@ import {
  * - **Algorithm:** declared as a minimal structural interface rather than importing
  *   `MembershipService`, so billing can read the count without a hard import cycle
  *   (tenancy's membership service also depends on billing for the seat-limit check).
- * - **Failure modes:** the implementer runs inside the org RLS context and throws on a
+ * - **Failure modes:** the implementer runs inside the organization RLS context and throws on a
  *   missing organization.
  * - **Side effects:** none on this type — the implementer issues the COUNT query.
  * - **Notes:** satisfied structurally by `MembershipService.countActiveMembers`; wired in
@@ -99,7 +99,11 @@ import {
   validateUpdateSubscription,
 } from './subscription.validator.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { enqueueSubscriptionSeatSyncBestEffort } from './queues/subscription-seat-sync.queue.js';
 
 /**
@@ -108,7 +112,7 @@ import { enqueueSubscriptionSeatSyncBestEffort } from './queues/subscription-sea
  *
  * @remarks
  * Stripe idempotency keys are scoped per Stripe *account* (the whole platform), not per tenant, so
- * forwarding a bare client header lets a key chosen by org A collide with the same string from org B
+ * forwarding a bare client header lets a key chosen by organization A collide with the same string from organization B
  * at Stripe — leaking A's cached object to B, or erroring B's request (`idempotency_error`) as a
  * chosen-key cross-tenant DoS. Prefixing with `op:org` keeps each tenant's key space disjoint.
  * Returns `undefined` when no client key was supplied (the caller passes nothing to Stripe).
@@ -144,7 +148,7 @@ function assertProviderPriceForStripeBackedPlanChange(
  *
  * @remarks
  * - **Algorithm:** Each public method runs the database portion inside
- *   {@link withOrganizationDatabaseContext} so Postgres sees the org GUC for
+ *   {@link withAppDatabaseContext} so Postgres sees the organization GUC for
  *   RLS, then performs the Stripe API call (create / change-plan / cancel /
  *   resume) outside that context, then re-opens an organization context to
  *   write back the resulting row. Webhook-triggered methods
@@ -196,9 +200,9 @@ export class SubscriptionService {
    *   {@link MembershipSeatUsagePort}.
    * - **Failure modes:** when the membership port is not wired, `seats_used` defaults to 0 (and a
    *   warning is logged) so the response shape stays stable for minimal/worker harnesses.
-   * - **Side effects:** one cross-domain membership COUNT (under the org RLS context) per call.
+   * - **Side effects:** one cross-domain membership COUNT (under the organization RLS context) per call.
    * - **Notes:** the count is resolved ONCE per request and reused across every row (a list of an
-   *   org's subscriptions all share the same org seat usage).
+   *   org's subscriptions all share the same organization seat usage).
    */
   private async decorateWithSeatCounts<TRow extends SubscriptionRowWithSeatState>(
     organization_public_id: string,
@@ -236,7 +240,7 @@ export class SubscriptionService {
    *   organization DB context + transaction so the lock spans the subsequent membership insert.
    * - **Side effects:** acquires a `FOR UPDATE` row lock (released at the caller's COMMIT) when an
    *   active subscription exists. The Free-tier path has no subscription row to lock; the caller
-   *   ({@link MembershipService} add-member) takes a per-org advisory lock up front so the
+   *   ({@link MembershipService} add-member) takes a per-organization advisory lock up front so the
    *   count+insert is serialized on the free path too (audit-#M1) — the seat cap no longer depends
    *   on the free ceiling happening to be 1. See `docs/reference/architecture/production-audit-decisions.md`.
    * - **Notes:** this is the cross-domain entry point tenancy's `MembershipService` calls to
@@ -271,7 +275,7 @@ export class SubscriptionService {
   }
 
   /**
-   * Best-effort enqueue of a Stripe seat-quantity reconciliation for an org (REQ-4).
+   * Best-effort enqueue of a Stripe seat-quantity reconciliation for an organization (REQ-4).
    *
    * @remarks
    * - **Algorithm:** fire-and-forget enqueue onto the seat-sync queue. Each enqueue is a distinct
@@ -286,10 +290,10 @@ export class SubscriptionService {
     // audit #1: stamp a STABLE idempotency token so every RETRY of the same job reuses it — the
     // Stripe quantity update is then deduped at Stripe instead of re-issued (which, with
     // proration/usage billing, would post duplicate proration line items). The member add/remove hot
-    // path passes no key and gets an org-scoped random token (a fresh one per enqueue avoids a stale
+    // path passes no key and gets an organization-scoped random token (a fresh one per enqueue avoids a stale
     // idempotent replay on an N→M→N seat oscillation).
-    // sec-review: when the caller DOES supply a client key (`changePlan`), namespace it by org before
-    // it reaches Stripe as `${token}:qty:${n}` — otherwise two orgs reusing the same client-key string
+    // sec-review: when the caller DOES supply a client key (`changePlan`), namespace it by organization before
+    // it reaches Stripe as `${token}:qty:${n}` — otherwise two organizations reusing the same client-key string
     // with the same resulting seat count collide on ONE Stripe idempotency key across different
     // subscriptions (Stripe 400 param-mismatch → retries exhaust → seats never sync).
     const seatSyncToken =
@@ -307,9 +311,9 @@ export class SubscriptionService {
    * Reconciles the Stripe subscription quantity to the org's current member count (REQ-4).
    *
    * @remarks
-   * - **Algorithm:** phase 1 (org DB context) reads the active subscription; the Stripe quantity
+   * - **Algorithm:** phase 1 (organization DB context) reads the active subscription; the Stripe quantity
    *   update then runs OUTSIDE any DB context (no checkout held across the round trip — mirrors the
-   *   HTTP create/cancel/change-plan phasing); phase 2 (org DB context) persists `subscriptions.seats`
+   *   HTTP create/cancel/change-plan phasing); phase 2 (organization DB context) persists `subscriptions.seats`
    *   so reads reflect the synced quantity immediately (the `customer.subscription.updated` webhook
    *   also confirms it). Seat usage (ACTIVE + INVITED) comes from the injected membership port.
    * - **Failure modes:** a Stripe outage throws `ServiceUnavailableError` from the provider so the
@@ -330,8 +334,8 @@ export class SubscriptionService {
       );
       return;
     }
-    const { organization, subscription } = await withOrganizationDatabaseContext(
-      organization_public_id,
+    const { organization, subscription } = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
       async () => {
         const organization =
           await this.organizationService.requireOrganizationByPublicId(organization_public_id);
@@ -365,10 +369,12 @@ export class SubscriptionService {
       );
     }
 
-    await withOrganizationDatabaseContext(organization_public_id, async () =>
-      this.repository.update(subscription.public_id, organization.id, {
-        seats: quantity,
-      }),
+    await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
+      async () =>
+        this.repository.update(subscription.public_id, organization.id, {
+          seats: quantity,
+        }),
     );
   }
 
@@ -521,8 +527,9 @@ export class SubscriptionService {
     });
   }
 
-  async list(organization_public_id: string) {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async list(scope: OrganizationPrincipalDatabaseScope) {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const rows = await this.repository.listByOrganization(organization.id);
@@ -531,8 +538,9 @@ export class SubscriptionService {
     });
   }
 
-  async get(organization_public_id: string, subscription_public_id: string) {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async get(scope: OrganizationPrincipalDatabaseScope, subscription_public_id: string) {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const subscription = await this.repository.findByPublicId(
@@ -550,23 +558,21 @@ export class SubscriptionService {
    * Returns the Stripe PaymentIntent `client_secret` for an INCOMPLETE subscription so the
    * frontend can confirm the first payment. Stripe network I/O runs outside RLS context.
    */
-  async getPaymentSetup(organization_public_id: string, subscription_public_id: string) {
-    const providerSubscriptionId = await withOrganizationDatabaseContext(
-      organization_public_id,
-      async () => {
-        const organization =
-          await this.organizationService.requireOrganizationByPublicId(organization_public_id);
-        const subscription = await this.repository.findByPublicId(
-          subscription_public_id,
-          organization.id,
-        );
-        if (!subscription) throw new NotFoundError('Subscription');
-        if (subscription.status !== 'INCOMPLETE') {
-          return null;
-        }
-        return subscription.provider_subscription_id ?? null;
-      },
-    );
+  async getPaymentSetup(scope: OrganizationPrincipalDatabaseScope, subscription_public_id: string) {
+    const organization_public_id = scope.organizationPublicId;
+    const providerSubscriptionId = await withAppDatabaseContext(scope, async () => {
+      const organization =
+        await this.organizationService.requireOrganizationByPublicId(organization_public_id);
+      const subscription = await this.repository.findByPublicId(
+        subscription_public_id,
+        organization.id,
+      );
+      if (!subscription) throw new NotFoundError('Subscription');
+      if (subscription.status !== 'INCOMPLETE') {
+        return null;
+      }
+      return subscription.provider_subscription_id ?? null;
+    });
 
     if (!providerSubscriptionId) {
       return { client_secret: null as string | null };
@@ -585,24 +591,25 @@ export class SubscriptionService {
   }
 
   async create(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     created_by_user_public_id: string | undefined,
     idempotencyKey?: string,
   ) {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateCreateSubscription(body);
-    // B4: serialize concurrent creates for one org across the pre-check → Stripe create → insert
+    // B4: serialize concurrent creates for one organization across the pre-check → Stripe create → insert
     // window so two requests with distinct idempotency keys cannot each mint a Stripe subscription
     // (the loser was previously compensated via cancel). The partial unique index + compensating
     // cancel below remain the durable correctness backstop if the lock ever lapses.
     const runCreate = async () => {
-      const { organization, plan, createdByUserInternalId } = await withOrganizationDatabaseContext(
-        organization_public_id,
+      const { organization, plan, createdByUserInternalId } = await withAppDatabaseContext(
+        scope,
         async () => {
           const organization =
             await this.organizationService.requireOrganizationByPublicId(organization_public_id);
           // Personal organizations cannot manage billing (assertTeamOrganization → 422).
-          // Reject before the Stripe call so a personal org gets 422, not a churned provider call.
+          // Reject before the Stripe call so a personal organization gets 422, not a churned provider call.
           assertTeamOrganization(organization, 'BILLING');
           // Reject before the Stripe call when a non-terminal subscription already
           // exists, so a duplicate request never churns the payment provider.
@@ -631,7 +638,7 @@ export class SubscriptionService {
           organization,
           plan,
           billingCycle: parsed.billing_cycle,
-          // audit #3: namespace the client key by org before it reaches Stripe's global key space.
+          // audit #3: namespace the client key by organization before it reaches Stripe's global key space.
           idempotencyKey: buildStripeIdempotencyKey(
             'sub-create',
             organization_public_id,
@@ -641,7 +648,7 @@ export class SubscriptionService {
       );
 
       try {
-        const created = await withOrganizationDatabaseContext(organization_public_id, async () =>
+        const created = await withAppDatabaseContext(scope, async () =>
           this.repository.create(
             omitUndefined({
               organization_id: organization.id,
@@ -700,7 +707,7 @@ export class SubscriptionService {
       );
     } catch (error) {
       if (error instanceof RedisLockUnavailableError) {
-        // A concurrent create for this org held the lock past our wait — return a retryable 409
+        // A concurrent create for this organization held the lock past our wait — return a retryable 409
         // instead of minting a second Stripe subscription. By the time the wait elapses the winner
         // has usually committed, so a retry gets a clean `subscriptionAlreadyExists`.
         throw new ConflictError('errors:subscriptionCreateInProgress').withReason(
@@ -711,12 +718,17 @@ export class SubscriptionService {
     }
   }
 
-  async update(organization_public_id: string, subscription_public_id: string, body: unknown) {
+  async update(
+    scope: OrganizationPrincipalDatabaseScope,
+    subscription_public_id: string,
+    body: unknown,
+  ) {
+    const organization_public_id = scope.organizationPublicId;
     // sec-B1: validateUpdateSubscription enforces an empty-body DTO. Any client trying to
     // PATCH `cancel_at_period_end` (or other billing-state fields) is rejected with 422
     // and must use the dedicated /cancel and /resume routes (which DO call Stripe).
     validateUpdateSubscription(body);
-    const existing = await withOrganizationDatabaseContext(organization_public_id, async () => {
+    const existing = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       const found = await this.repository.findByPublicId(subscription_public_id, organization.id);
@@ -739,7 +751,7 @@ export class SubscriptionService {
    * - **Failure modes:** **best-effort** — a suspend failure is logged but never rethrown, because
    *   the plan change is already committed; throwing here would trip the Stripe-compensation catch
    *   and roll back the *price* while leaving the local plan changed (divergence). The add-member
-   *   ceiling check still blocks further growth until the org is back within its allowance.
+   *   ceiling check still blocks further growth until the organization is back within its allowance.
    * - **Side effects:** flips excess memberships to `SUSPENDED`. No-op when the new plan grants
    *   unlimited seats (`included_seats === null`) or the port is unwired (worker/test harnesses).
    * - **Notes:** suspended members re-consume a seat on reactivation and are re-checked against the
@@ -775,18 +787,20 @@ export class SubscriptionService {
   }
 
   async changePlan(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     subscription_public_id: string,
     body: unknown,
     idempotencyKey?: string,
   ) {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateChangePlan(body);
-    const { organization, plan, subscription, previousPlan } =
-      await withOrganizationDatabaseContext(organization_public_id, async () => {
+    const { organization, plan, subscription, previousPlan } = await withAppDatabaseContext(
+      scope,
+      async () => {
         const organization =
           await this.organizationService.requireOrganizationByPublicId(organization_public_id);
         // Personal organizations cannot manage billing — reject before the subscription
-        // lookup so a personal org gets 422 (capability unavailable), not 404.
+        // lookup so a personal organization gets 422 (capability unavailable), not 404.
         assertTeamOrganization(organization, 'BILLING');
         const plan = await this.planService.requireActivePlanByPublicId(parsed.plan_id);
         const subscription = await this.repository.findByPublicId(
@@ -802,7 +816,8 @@ export class SubscriptionService {
           subscription.plan_id,
         );
         return { organization, plan, subscription, previousPlan };
-      });
+      },
+    );
 
     const providerPriceId = this.paymentProvider.getProviderPriceId(
       plan,
@@ -834,7 +849,7 @@ export class SubscriptionService {
     const periodStart = new Date(subscription.current_period_start);
     const periodEnd = new Date(subscription.current_period_end);
     try {
-      const updated = await withOrganizationDatabaseContext(organization_public_id, async () =>
+      const updated = await withAppDatabaseContext(scope, async () =>
         this.repository.update(subscription_public_id, organization.id, {
           plan_id: plan.id,
           current_period_start: periodStart,
@@ -875,35 +890,33 @@ export class SubscriptionService {
   }
 
   async cancel(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     subscription_public_id: string,
     idempotencyKey?: string,
   ) {
-    const { organization, subscription } = await withOrganizationDatabaseContext(
-      organization_public_id,
-      async () => {
-        const organization =
-          await this.organizationService.requireOrganizationByPublicId(organization_public_id);
-        // Personal organizations cannot manage billing — reject before the subscription
-        // lookup so a personal org gets 422 (capability unavailable), not 404.
-        assertTeamOrganization(organization, 'BILLING');
-        const subscription = await this.repository.findByPublicId(
-          subscription_public_id,
-          organization.id,
-        );
-        if (!subscription) throw new NotFoundError('Subscription');
-        // sec-new-B1: terminal subscriptions cannot be canceled (they are already non-billable)
-        if (TERMINAL_STATUSES.has(subscription.status)) {
-          throw new UnprocessableEntityError('errors:subscriptionNotMutable');
-        }
-        return { organization, subscription };
-      },
-    );
+    const organization_public_id = scope.organizationPublicId;
+    const { organization, subscription } = await withAppDatabaseContext(scope, async () => {
+      const organization =
+        await this.organizationService.requireOrganizationByPublicId(organization_public_id);
+      // Personal organizations cannot manage billing — reject before the subscription
+      // lookup so a personal organization gets 422 (capability unavailable), not 404.
+      assertTeamOrganization(organization, 'BILLING');
+      const subscription = await this.repository.findByPublicId(
+        subscription_public_id,
+        organization.id,
+      );
+      if (!subscription) throw new NotFoundError('Subscription');
+      // sec-new-B1: terminal subscriptions cannot be canceled (they are already non-billable)
+      if (TERMINAL_STATUSES.has(subscription.status)) {
+        throw new UnprocessableEntityError('errors:subscriptionNotMutable');
+      }
+      return { organization, subscription };
+    });
 
     // reaudit-#6: a never-activated INCOMPLETE subscription has no active period, so
     // `cancel_at_period_end` is a no-op and the row would keep occupying the org's single
     // subscription slot until a Stripe `incomplete_expired` webhook arrives — if that webhook
-    // never lands, the org is permanently locked out of re-subscribing. Cancel it immediately
+    // never lands, the organization is permanently locked out of re-subscribing. Cancel it immediately
     // (at Stripe and locally) so the slot is freed now, giving a programmatic exit.
     if (subscription.status === 'INCOMPLETE') {
       if (subscription.provider_subscription_id) {
@@ -912,7 +925,7 @@ export class SubscriptionService {
           buildStripeIdempotencyKey('sub-cancel-now', organization_public_id, idempotencyKey),
         );
       }
-      const canceled = await withOrganizationDatabaseContext(organization_public_id, async () =>
+      const canceled = await withAppDatabaseContext(scope, async () =>
         this.repository.update(subscription_public_id, organization.id, {
           status: 'CANCELED',
           canceled_at: new Date(),
@@ -934,7 +947,7 @@ export class SubscriptionService {
       );
     }
 
-    const updated = await withOrganizationDatabaseContext(organization_public_id, async () =>
+    const updated = await withAppDatabaseContext(scope, async () =>
       this.repository.update(subscription_public_id, organization.id, {
         cancel_at_period_end: true,
         // sec-B3: stamp the watermark so a stale Stripe `updated` event arriving later
@@ -952,17 +965,17 @@ export class SubscriptionService {
    * (route-audit-#2). Idempotent: a no-op when there is no active subscription.
    *
    * @remarks
-   * - **Algorithm:** resolve the org + its active subscription; if one exists, cancel it at Stripe
-   *   NOW (not at period end — the org is going away) and set the local row `CANCELED`.
+   * - **Algorithm:** resolve the organization + its active subscription; if one exists, cancel it at Stripe
+   *   NOW (not at period end — the organization is going away) and set the local row `CANCELED`.
    * - **Failure modes:** a Stripe outage throws `ServiceUnavailableError` (propagated), so the
-   *   caller's organization delete aborts rather than soft-deleting an org that keeps billing.
+   *   caller's organization delete aborts rather than soft-deleting an organization that keeps billing.
    * - **Side effects:** Stripe cancel + a local `subscriptions` update.
-   * - **Notes:** deleting an org previously left its subscription billing forever — no offboarding
+   * - **Notes:** deleting an organization previously left its subscription billing forever — no offboarding
    *   path touched billing. Re-running after a partial failure finds no active sub → no-op.
    */
   async cancelActiveForOrganizationOffboarding(organization_public_id: string): Promise<void> {
-    const { organization, subscription } = await withOrganizationDatabaseContext(
-      organization_public_id,
+    const { organization, subscription } = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
       async () => {
         const organization =
           await this.organizationService.requireOrganizationByPublicId(organization_public_id);
@@ -974,7 +987,7 @@ export class SubscriptionService {
 
     // Stripe network call — outside any database context.
     if (subscription.provider_subscription_id) {
-      // audit L1: stamp a deterministic idempotency key so an org-delete retry
+      // audit L1: stamp a deterministic idempotency key so an organization-delete retry
       // re-issues the SAME cancel (Stripe dedups) instead of an un-keyed duplicate.
       // No client key exists on the offboarding path, so the provider subscription
       // id is the stable per-subscription discriminator.
@@ -987,40 +1000,40 @@ export class SubscriptionService {
         ),
       );
     }
-    await withOrganizationDatabaseContext(organization_public_id, async () =>
-      this.repository.update(subscription.public_id, organization.id, {
-        status: 'CANCELED',
-        canceled_at: new Date(),
-        last_stripe_event_created_at: new Date(),
-      }),
+    await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
+      async () =>
+        this.repository.update(subscription.public_id, organization.id, {
+          status: 'CANCELED',
+          canceled_at: new Date(),
+          last_stripe_event_created_at: new Date(),
+        }),
     );
   }
 
   async resume(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     subscription_public_id: string,
     idempotencyKey?: string,
   ) {
-    const { organization, subscription } = await withOrganizationDatabaseContext(
-      organization_public_id,
-      async () => {
-        const organization =
-          await this.organizationService.requireOrganizationByPublicId(organization_public_id);
-        // Personal organizations cannot manage billing — reject before the subscription
-        // lookup so a personal org gets 422 (capability unavailable), not 404.
-        assertTeamOrganization(organization, 'BILLING');
-        const subscription = await this.repository.findByPublicId(
-          subscription_public_id,
-          organization.id,
-        );
-        if (!subscription) throw new NotFoundError('Subscription');
-        // sec-new-B1: terminal subscriptions cannot be resumed (already non-billable)
-        if (TERMINAL_STATUSES.has(subscription.status)) {
-          throw new UnprocessableEntityError('errors:subscriptionNotMutable');
-        }
-        return { organization, subscription };
-      },
-    );
+    const organization_public_id = scope.organizationPublicId;
+    const { organization, subscription } = await withAppDatabaseContext(scope, async () => {
+      const organization =
+        await this.organizationService.requireOrganizationByPublicId(organization_public_id);
+      // Personal organizations cannot manage billing — reject before the subscription
+      // lookup so a personal organization gets 422 (capability unavailable), not 404.
+      assertTeamOrganization(organization, 'BILLING');
+      const subscription = await this.repository.findByPublicId(
+        subscription_public_id,
+        organization.id,
+      );
+      if (!subscription) throw new NotFoundError('Subscription');
+      // sec-new-B1: terminal subscriptions cannot be resumed (already non-billable)
+      if (TERMINAL_STATUSES.has(subscription.status)) {
+        throw new UnprocessableEntityError('errors:subscriptionNotMutable');
+      }
+      return { organization, subscription };
+    });
 
     // Stripe network call — outside any database context.
     if (subscription.provider_subscription_id) {
@@ -1030,7 +1043,7 @@ export class SubscriptionService {
       );
     }
 
-    const updated = await withOrganizationDatabaseContext(organization_public_id, async () =>
+    const updated = await withAppDatabaseContext(scope, async () =>
       this.repository.update(subscription_public_id, organization.id, {
         cancel_at_period_end: false,
         // sec-B4: do NOT force-write `status: 'ACTIVE'`. The Stripe webhook is the source
@@ -1058,11 +1071,11 @@ export class SubscriptionService {
    *   fetches one Stripe page via `starting_after` + `limit`, and returns the standard list envelope
    *   (`items`/`limit`/`has_more`/`next_cursor`). The next cursor is the last row's Stripe id when
    *   Stripe reports `has_more`; `total` is always `null` (Stripe exposes no count).
-   * - **Notes:** returns an empty page when Stripe is not configured or the org has no provider
+   * - **Notes:** returns an empty page when Stripe is not configured or the organization has no provider
    *   customer yet. Invoices live in Stripe, not our DB — this is a cursor passthrough, not a keyset
    *   query, so it does not use the DB list helpers.
    */
-  async listInvoices(organization_public_id: string, query: unknown) {
+  async listInvoices(scope: OrganizationPrincipalDatabaseScope, query: unknown) {
     const parsed = validateListInvoicesQuery(query);
     // `limit` is optional in the DTO (kept optional in OpenAPI) — apply the shared default here.
     const limit = parsed.limit ?? PAGINATION.DEFAULT_LIMIT;
@@ -1073,7 +1086,7 @@ export class SubscriptionService {
       has_more: false,
       next_cursor: null as string | null,
     };
-    const customerId = await this.resolveStripeCustomerId(organization_public_id);
+    const customerId = await this.resolveStripeCustomerId(scope);
     if (!(customerId && isStripeConfigured())) {
       return emptyPage;
     }
@@ -1095,8 +1108,8 @@ export class SubscriptionService {
   /**
    * Lists card payment methods on the organization's Stripe customer.
    */
-  async listPaymentMethods(organization_public_id: string) {
-    const customerId = await this.resolveStripeCustomerId(organization_public_id);
+  async listPaymentMethods(scope: OrganizationPrincipalDatabaseScope) {
+    const customerId = await this.resolveStripeCustomerId(scope);
     if (!(customerId && isStripeConfigured())) {
       return [];
     }
@@ -1110,8 +1123,12 @@ export class SubscriptionService {
   /**
    * Creates a SetupIntent `client_secret` so the frontend can add a card in-app.
    */
-  async createPaymentMethodSetup(organization_public_id: string, idempotencyKey?: string) {
-    const customerId = await this.resolveStripeCustomerId(organization_public_id);
+  async createPaymentMethodSetup(
+    scope: OrganizationPrincipalDatabaseScope,
+    idempotencyKey?: string,
+  ) {
+    const organization_public_id = scope.organizationPublicId;
+    const customerId = await this.resolveStripeCustomerId(scope);
     if (!customerId) {
       throw new UnprocessableEntityError('errors:subscriptionNotMutable');
     }
@@ -1130,8 +1147,11 @@ export class SubscriptionService {
   }
 
   /** Resolves the Stripe customer id from the org's active subscription row. */
-  private async resolveStripeCustomerId(organization_public_id: string): Promise<string | null> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  private async resolveStripeCustomerId(
+    scope: OrganizationPrincipalDatabaseScope,
+  ): Promise<string | null> {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationByPublicId(organization_public_id);
       assertTeamOrganization(organization, 'BILLING');

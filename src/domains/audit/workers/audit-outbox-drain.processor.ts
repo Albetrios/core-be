@@ -1,12 +1,11 @@
 import { inArray, sql as drizzleSql } from 'drizzle-orm';
+import { withMaintenanceDatabaseContext } from '@/infrastructure/database/contexts/database-context.js';
 import { createDrainAuditOutboxRepository } from '@/domains/audit/audit-outbox.repository.js';
 import type { AuditOutboxRow } from '@/domains/audit/audit-outbox.schema.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import { users } from '@/domains/user/user.schema.js';
-import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
-import { api_keys } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.schema.js';
-import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
-import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/request-database.context.js';
+import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { env } from '@/shared/config/env.config.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import {
@@ -40,30 +39,43 @@ export interface AuditOutboxDrainResult {
 
 interface ResolutionMaps {
   readonly userIdsByPublicId: ReadonlyMap<string, number>;
-  readonly orgIdsByPublicId: ReadonlyMap<string, number>;
+  readonly organizationIdsByPublicId: ReadonlyMap<string, number>;
   readonly apiKeyIdsByPublicId: ReadonlyMap<string, number>;
 }
 
 /** Collects the distinct user / organization / API-key public ids referenced by a drain batch. */
 function collectAuditOutboxPublicIds(batch: readonly AuditOutboxRow[]): {
   userPublicIds: Set<string>;
-  orgPublicIds: Set<string>;
+  organizationPublicIds: Set<string>;
   apiKeyPublicIds: Set<string>;
 } {
   const userPublicIds = new Set<string>();
-  const orgPublicIds = new Set<string>();
+  const organizationPublicIds = new Set<string>();
   const apiKeyPublicIds = new Set<string>();
   for (const row of batch) {
     if (row.actor_user_public_id) userPublicIds.add(row.actor_user_public_id);
     if (row.target_user_public_id) userPublicIds.add(row.target_user_public_id);
-    if (row.organization_public_id) orgPublicIds.add(row.organization_public_id);
+    if (row.organization_public_id) organizationPublicIds.add(row.organization_public_id);
     if (row.actor_api_key_public_id) apiKeyPublicIds.add(row.actor_api_key_public_id);
   }
-  return { userPublicIds, orgPublicIds, apiKeyPublicIds };
+  return { userPublicIds, organizationPublicIds, apiKeyPublicIds };
+}
+
+/** Runs one SECURITY DEFINER resolver query and normalizes the driver's row shape. */
+async function executeResolverFunction(
+  databaseHandle: RequestScopedPostgresDatabase,
+  statement: ReturnType<typeof drizzleSql>,
+): Promise<{ id: number | string; public_id: string }[]> {
+  const result = await databaseHandle.execute<{ id: number | string; public_id: string }>(
+    statement,
+  );
+  return Array.isArray(result)
+    ? (result as { id: number | string; public_id: string }[])
+    : ((result as { rows?: { id: number | string; public_id: string }[] }).rows ?? []);
 }
 
 /**
- * Pre-resolves every distinct actor / target / org / API-key public id in the batch
+ * Pre-resolves every distinct actor / target / organization / API-key public id in the batch
  * to its internal id in 3 round trips (one per table). Done UNDER `app.global_admin = true`
  * so a single drain pass can resolve identifiers across many tenants without per-row
  * RLS context switching. Returns lookup maps consumed by the per-row insert path.
@@ -82,7 +94,8 @@ async function buildResolutionMaps(
 ): Promise<ResolutionMaps> {
   await setLocalDatabaseConfig(databaseHandle, 'app.global_admin', 'true');
 
-  const { userPublicIds, orgPublicIds, apiKeyPublicIds } = collectAuditOutboxPublicIds(batch);
+  const { userPublicIds, organizationPublicIds, apiKeyPublicIds } =
+    collectAuditOutboxPublicIds(batch);
 
   const userIdsByPublicId = new Map<string, number>();
   if (userPublicIds.size > 0) {
@@ -93,25 +106,34 @@ async function buildResolutionMaps(
     for (const row of rows) userIdsByPublicId.set(row.public_id, row.id);
   }
 
-  const orgIdsByPublicId = new Map<string, number>();
-  if (orgPublicIds.size > 0) {
-    const rows = await databaseHandle
-      .select({ id: organizations.id, public_id: organizations.public_id })
-      .from(organizations)
-      .where(inArray(organizations.public_id, [...orgPublicIds]));
-    for (const row of rows) orgIdsByPublicId.set(row.public_id, row.id);
+  // Org and API-key ids resolve through SECURITY DEFINER functions (migration
+  // 20260827040000): app.global_admin grants NOTHING on tenancy.*, so plain
+  // selects here returned ZERO rows under the RLS-subject roles and every
+  // organization-scoped / api-key-actor outbox row was permanently discarded after max
+  // attempts. The functions are narrow id lookups, mirroring the existing
+  // billing.resolve_organization_public_id_for_stripe_subscription pattern.
+  const organizationIdsByPublicId = new Map<string, number>();
+  if (organizationPublicIds.size > 0) {
+    const rows = await executeResolverFunction(
+      databaseHandle,
+      // Bound as one comma-joined param + string_to_array: the driver's JS-array
+      // binding is not a reliable text[] literal, and public ids are [a-z0-9_] so
+      // the join is unambiguous.
+      drizzleSql`SELECT id, public_id FROM audit.resolve_organization_ids_for_public_ids(string_to_array(${[...organizationPublicIds].join(',')}, ','))`,
+    );
+    for (const row of rows) organizationIdsByPublicId.set(row.public_id, Number(row.id));
   }
 
   const apiKeyIdsByPublicId = new Map<string, number>();
   if (apiKeyPublicIds.size > 0) {
-    const rows = await databaseHandle
-      .select({ id: api_keys.id, public_id: api_keys.public_id })
-      .from(api_keys)
-      .where(inArray(api_keys.public_id, [...apiKeyPublicIds]));
-    for (const row of rows) apiKeyIdsByPublicId.set(row.public_id, row.id);
+    const rows = await executeResolverFunction(
+      databaseHandle,
+      drizzleSql`SELECT id, public_id FROM audit.resolve_api_key_ids_for_public_ids(string_to_array(${[...apiKeyPublicIds].join(',')}, ','))`,
+    );
+    for (const row of rows) apiKeyIdsByPublicId.set(row.public_id, Number(row.id));
   }
 
-  return { userIdsByPublicId, orgIdsByPublicId, apiKeyIdsByPublicId };
+  return { userIdsByPublicId, organizationIdsByPublicId, apiKeyIdsByPublicId };
 }
 
 interface ResolvedAuditLogInsertRow {
@@ -142,7 +164,7 @@ function resolveRowInserts(
     ? (maps.userIdsByPublicId.get(row.target_user_public_id) ?? null)
     : null;
   const organization_id = row.organization_public_id
-    ? (maps.orgIdsByPublicId.get(row.organization_public_id) ?? null)
+    ? (maps.organizationIdsByPublicId.get(row.organization_public_id) ?? null)
     : null;
 
   if (actor_user_id === null && actor_api_key_id === null) {
@@ -181,7 +203,7 @@ type DrainOutboxRowOutcome =
 
 /**
  * Drains one claimed `audit.outbox` row into `audit.logs`: resolves the row, sets the per-row
- * tenant GUC (org-scoped or system-audit), inserts, and on failure records a transient or terminal
+ * tenant GUC (organization-scoped or system-audit), inserts, and on failure records a transient or terminal
  * failure. Extracted from {@link runAuditOutboxDrainJob} so the batch loop stays within complexity
  * budget; the marking side effects happen here and the caller only tallies the returned outcome.
  */
@@ -220,7 +242,7 @@ async function drainOutboxRow(options: {
       // `RELEASE SAVEPOINT` KEEPS whatever the savepoint set — only `ROLLBACK TO SAVEPOINT`
       // restores it. So a value set for one row survives into the rest of the outer batch
       // transaction and is inherited by every later row. When these branches each set only their
-      // own GUC, a tenanted row left `app.current_organization_id` set for a following tenantless
+      // own GUC, a tenanted row left `app.current_organization_public_id` set for a following tenantless
       // row, and a tenantless row left `app.system_audit_insert='true'` set for every following
       // tenanted row — silently widening the `audit_logs_tenant_isolation_insert` policy for the
       // remainder of the batch. That is not exploitable today only because the policy selects its
@@ -229,7 +251,7 @@ async function drainOutboxRow(options: {
       // iteration makes each row's RLS identity total, so nothing is inherited.
       await setLocalDatabaseConfig(
         savepointHandle,
-        'app.current_organization_id',
+        'app.current_organization_public_id',
         row.organization_public_id ?? '',
       );
       // Tenantless audit (system events) need the system arm; `resolveRowInserts` guarantees such
@@ -268,12 +290,12 @@ async function drainOutboxRow(options: {
  * Drains a batch of PENDING `audit.outbox` rows into `audit.logs`.
  *
  * @remarks
- * Runs inside the drain transaction opened by {@link withAuditOutboxDrainDatabaseContext}.
+ * Runs inside the drain transaction opened by {@link withMaintenanceDatabaseContext}.
  * The job:
  *  1. Claims up to `batchSize` rows via FOR UPDATE SKIP LOCKED (concurrent drain instances
  *     never double-process — bumps `attempt_count` atomically on claim).
  *  2. Bulk-resolves every distinct public id with `app.global_admin = true`.
- *  3. Per row, switches `app.current_organization_id` (or `app.system_audit_insert` for
+ *  3. Per row, switches `app.current_organization_public_id` (or `app.system_audit_insert` for
  *     tenantless rows) so the `audit.logs` INSERT passes the tenant-isolation policy.
  *  4. Marks success rows PROCESSED, retryable failures' `last_error` updated (status
  *     stays PENDING), unresolvable / over-cap rows FAILED.
@@ -304,7 +326,7 @@ export async function runAuditOutboxDrainJob(
   let permanentlyFailed = 0;
 
   // Each row's tenant GUC is a `SET LOCAL` that persists until the next iteration replaces it;
-  // `drainOutboxRow` always re-sets the correct GUC (org-scoped or system-audit) per row.
+  // `drainOutboxRow` always re-sets the correct GUC (organization-scoped or system-audit) per row.
   for (const row of batch) {
     const outcome = await drainOutboxRow({
       databaseHandle,

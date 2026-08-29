@@ -4,12 +4,22 @@ import { UserDataExportCancelledError } from '@/domains/user/sub-domains/user-da
 
 const fakeDatabaseHandle = { __fake: true } as const;
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: async (
-    _userPublicId: string,
-    callback: (databaseHandle: unknown) => Promise<unknown>,
-  ) => callback(fakeDatabaseHandle),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: async (
+      _scope: unknown,
+      callback: (databaseHandle: unknown) => Promise<unknown>,
+    ) => callback(fakeDatabaseHandle),
+  };
+});
 
 const { loggerInfoMock, loggerErrorMock } = vi.hoisted(() => ({
   loggerInfoMock: vi.fn(),

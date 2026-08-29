@@ -20,7 +20,7 @@ type AuthSessionHandlersDependencies = Pick<
   'authService' | 'authSessionService' | 'authMeContextService'
 >;
 
-/** Builds the session-management Fastify handlers: `logout`, `refreshToken` (cookie + origin allowlist), `listSessions`, `revokeSession`, `revokeAllSessions`, and the active-org `switch-to-*` handlers. */
+/** Builds the session-management Fastify handlers: `logout`, `refreshToken` (cookie + origin allowlist), `listSessions`, `revokeSession`, `revokeAllSessions`, and the active-organization `switch-to-*` handlers. */
 export function createAuthSessionHandlers({
   authService,
   authSessionService,
@@ -113,7 +113,7 @@ export function createAuthSessionHandlers({
         sessionPublicId: auth.sessionPublicId,
       });
       // Post-gate read: the switch above re-minted the token (the membership/ownership gate ran in
-      // the service), so resolving the new active org + permissions here exposes only what the caller
+      // the service), so resolving the new active organization + permissions here exposes only what the caller
       // is already scoped to. Returned inline so the client skips a follow-up GET /auth/me/context.
       const context = await authMeContextService.getActiveOrganizationContext({
         userPublicId: auth.userId,
@@ -146,7 +146,7 @@ export function createAuthSessionHandlers({
         organizationPublicId: organizationId,
       });
       // Post-gate read: switchToOrganization validated active membership (403 otherwise) and re-minted
-      // the token, so resolving the new active org + permissions here is scoped to what the caller may
+      // the token, so resolving the new active organization + permissions here is scoped to what the caller may
       // already see. Returned inline so the client skips a follow-up GET /auth/me/context.
       const context = await authMeContextService.getActiveOrganizationContext({
         userPublicId: auth.userId,

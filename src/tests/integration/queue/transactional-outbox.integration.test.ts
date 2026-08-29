@@ -4,7 +4,7 @@ import { database } from '@/infrastructure/database/connection.js';
 import {
   organizationRequestDatabaseStorage,
   type RequestScopedPostgresDatabase,
-} from '@/infrastructure/database/contexts/request-database.context.js';
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { enterOnCommitScope, eventBus } from '@/core/events/event-bus.js';
 import { mail_outbox } from '@/infrastructure/mail/mail-outbox.schema.js';
 import { countPendingMailOutbox } from '@/infrastructure/mail/mail-outbox.repository.js';

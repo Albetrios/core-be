@@ -14,7 +14,10 @@ import type {
 } from './stripe-webhook-event.repository.js';
 import { enqueueStripeWebhook } from './queues/stripe-webhook.queue.js';
 import { runStripeWebhookHandlerWithOrganizationContext } from './stripe-webhook-organization.util.js';
-import { withSystemTableWorkerContext } from '@/infrastructure/database/contexts/worker-database.context.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /** Result row type from PlanRepository.findByStripePriceId; threaded through the sec-B9 fallback. */
 type MatchedPlanForCreate = Awaited<ReturnType<PlanRepository['findByStripePriceId']>>;
@@ -52,7 +55,7 @@ function resolveBillingCycleForStripePrice(
  *      to enforce at-least-once idempotency, 2) resolves tenancy scope via
  *      {@link runStripeWebhookHandlerWithOrganizationContext} (reads
  *      `organization_id` metadata or `billing.resolve_organization_public_id_for_stripe_subscription`)
- *      so RLS sees `app.current_organization_id`, 3) dispatches by event type
+ *      so RLS sees `app.current_organization_public_id`, 3) dispatches by event type
  *      and updates the local subscription row via a worker-scoped repository,
  *      and 4) marks the ledger row `processed`.
  * - **Failure modes:** Returns silently on `processed_duplicate`; throws
@@ -64,9 +67,9 @@ function resolveBillingCycleForStripePrice(
  * - **Side effects:** Writes to `billing.stripe_webhook_events` (always) and
  *   `billing.subscriptions` (on subscription lifecycle events). Logs each
  *   stage; unhandled event types are logged and skipped.
- * - **Notes:** Runs inside {@link withSystemTableWorkerContext} so the ledger
+ * - **Notes:** Runs inside {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)} so the ledger
  *   write happens without an organization GUC; the subscription write then
- *   switches into {@link withOrganizationContext} for RLS-safe mutation. The
+ *   switches into {@link withAppDatabaseContext} for RLS-safe mutation. The
  *   `customer.subscription.created` race that left a missing local row
  *   silently advancing to `processed` is now recovered by the sec-B9 fallback
  *   INSERT path; see `tryFallbackInsertForCreated`.
@@ -92,7 +95,7 @@ export class StripeWebhookService {
    * when the ledger transition was `claimed` or `reclaimed`. Returns the claim result.
    *
    * @remarks
-   * - **Algorithm:** claims the event id under {@link withSystemTableWorkerContext} (no org GUC),
+   * - **Algorithm:** claims the event id under {@link withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)} (no organization GUC),
    *   then enqueues on `claimed`/`reclaimed`. `processed_duplicate` (already terminal) and
    *   `still_processing_within_lease` (an in-flight worker will finish) skip the enqueue and log.
    * - **Failure modes:** an enqueue failure propagates so the caller returns non-2xx and Stripe
@@ -104,15 +107,17 @@ export class StripeWebhookService {
     event: Stripe.Event,
     context?: { requestId?: string },
   ): Promise<StripeWebhookEventClaimResult> {
-    const claimResult = await withSystemTableWorkerContext(() =>
-      this.stripeWebhookEventRepository.tryClaimEvent(
-        omitUndefined({
-          stripe_event_id: event.id,
-          event_type: event.type,
-          stripe_created_at: new Date(event.created * 1000),
-          request_id: context?.requestId,
-        }),
-      ),
+    const claimResult = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER,
+      () =>
+        this.stripeWebhookEventRepository.tryClaimEvent(
+          omitUndefined({
+            stripe_event_id: event.id,
+            event_type: event.type,
+            stripe_created_at: new Date(event.created * 1000),
+            request_id: context?.requestId,
+          }),
+        ),
     );
 
     if (claimResult === 'claimed' || claimResult === 'reclaimed') {
@@ -133,7 +138,7 @@ export class StripeWebhookService {
   async handleEvent(event: Stripe.Event, context?: { requestId?: string }): Promise<void> {
     const stripeEventCreatedAt = new Date(event.created * 1000);
 
-    await withSystemTableWorkerContext(async () => {
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, async () => {
       const claimResult = await this.stripeWebhookEventRepository.tryClaimEvent(
         omitUndefined({
           stripe_event_id: event.id,

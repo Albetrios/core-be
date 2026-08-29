@@ -7,7 +7,7 @@
  *
  * The active organization rides the signed `org` JWT claim (switched via
  * `/api/v1/auth/switch-to-organization` / `/auth/switch-to-personal`), NOT a
- * header — so no `X-Organization-Id` parameter is emitted on org-scoped routes.
+ * header — so no `X-Organization-Id` parameter is emitted on organization-scoped routes.
  * `Authorization: Bearer <ACCESS_TOKEN>` is expressed via the OpenAPI security
  * scheme, not a literal parameter.
  */

@@ -1,5 +1,8 @@
 import { and, isNotNull, isNull, lt } from 'drizzle-orm';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { users } from '@/domains/user/user.schema.js';
 import { captureException } from '@/infrastructure/observability/sentry/sentry.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
@@ -59,18 +62,20 @@ export async function runUserOffboardingReconcileJob(
     Date.now() - USER_OFFBOARDING_STUCK_AFTER_MINUTES * MILLISECONDS_PER_MINUTE,
   );
 
-  const stuck = await withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
-    databaseHandle
-      .select({ public_id: users.public_id })
-      .from(users)
-      .where(
-        and(
-          isNotNull(users.deletion_started_at),
-          isNull(users.deleted_at),
-          lt(users.deletion_started_at, cutoff),
-        ),
-      )
-      .limit(USER_OFFBOARDING_RECONCILE_BATCH),
+  const stuck = await withMaintenanceDatabaseContext(
+    MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
+    (databaseHandle) =>
+      databaseHandle
+        .select({ public_id: users.public_id })
+        .from(users)
+        .where(
+          and(
+            isNotNull(users.deletion_started_at),
+            isNull(users.deleted_at),
+            lt(users.deletion_started_at, cutoff),
+          ),
+        )
+        .limit(USER_OFFBOARDING_RECONCILE_BATCH),
   );
 
   let resumed = 0;

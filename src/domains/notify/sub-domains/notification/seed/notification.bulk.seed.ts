@@ -9,7 +9,7 @@
  * is a no-op. High-count inserts are batched in chunks of {@link INSERT_BATCH_SIZE}.
  */
 import { and, eq, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { notifications } from '@/domains/notify/sub-domains/notification/notification.schema.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';
@@ -64,7 +64,7 @@ function buildNotification(
  * @remarks
  * Parents read: `context.registry.users` (each {@link SeededUser}) and the first
  * `context.registry.organizations` entry (used as the notification's organization scope; the
- * column is nullable so an empty org registry still seeds). Algorithm: per user, count existing
+ * column is nullable so an empty organization registry still seeds). Algorithm: per user, count existing
  * marker-tagged rows and insert only the remaining `notificationsPerUser` in chunks of
  * {@link INSERT_BATCH_SIZE}. Side effects: inserts into `notify.notifications`. Failure modes:
  * warns and returns early if the user pool is empty; otherwise propagates DB errors.

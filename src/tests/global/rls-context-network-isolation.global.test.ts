@@ -10,10 +10,9 @@ const DOMAINS_ROOT = join(ROOT, 'src/domains');
  * duration (production-readiness finding #5).
  */
 const DATABASE_CONTEXT_WRAPPERS = [
-  'withOrganizationDatabaseContext',
-  'withOrganizationContext',
-  'withUserDatabaseContext',
-  'withGlobalAdminDatabaseContext',
+  'withAppDatabaseContext',
+  'withAppDatabaseContext',
+  'withMaintenanceDatabaseContext',
   'withTransaction',
 ] as const;
 

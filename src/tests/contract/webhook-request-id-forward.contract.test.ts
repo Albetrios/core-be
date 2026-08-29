@@ -7,6 +7,25 @@ import { NOTIFY_EVENT } from '@/domains/notify/sub-domains/webhook/events/notify
 import { registerWebhookDeliveryEventHandlers } from '@/domains/notify/sub-domains/webhook/webhook-delivery/events/webhook-delivery.event-handlers.js';
 import { processWebhookDeliveryAttempt } from '@/domains/notify/sub-domains/webhook/webhook-delivery/workers/webhook-delivery.worker.js';
 
+// The service paths under test run inside the real principal wrapper, which
+// opens a `database.transaction()` — passthrough so no Postgres is needed
+// (CI's unit/contract lanes run without a database service).
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
 const enqueueWebhookDeliveryByAttemptIdMock = vi.fn();
 const findOrganizationPublicIdByDeliveryAttemptIdMock = vi.fn();
 
@@ -53,13 +72,6 @@ vi.mock(
       findOrganizationPublicIdByDeliveryAttemptIdMock(...arguments_),
   }),
 );
-
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: async (
-    _organizationPublicId: string,
-    callback: (databaseHandle: never) => unknown,
-  ) => callback({} as never),
-}));
 
 vi.mock('@/shared/utils/security/field-secret-encryption.util.js', () => ({
   decryptFieldSecret: vi.fn(() => 'signing-secret'),

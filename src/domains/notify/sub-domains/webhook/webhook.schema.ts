@@ -80,12 +80,12 @@ export const webhooks = notifySchema
         to: 'public',
         using: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations
-            WHERE public_id = current_setting('app.current_organization_id', true)
+            WHERE public_id = current_setting('app.current_organization_public_id', true)
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
         withCheck: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations
-            WHERE public_id = current_setting('app.current_organization_id', true)
+            WHERE public_id = current_setting('app.current_organization_public_id', true)
           )`,
       }),
     ],
@@ -154,7 +154,7 @@ export const webhook_delivery_attempts = notifySchema
             SELECT id FROM notify.webhooks
             WHERE organization_id = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
@@ -162,7 +162,7 @@ export const webhook_delivery_attempts = notifySchema
             SELECT id FROM notify.webhooks
             WHERE organization_id = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )`,
       }),

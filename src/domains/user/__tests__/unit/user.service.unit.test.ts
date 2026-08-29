@@ -12,24 +12,32 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import { env } from '@/shared/config/env.config.js';
 import { ensurePersonalOrganizationPublicId } from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
+import {
+  PRINCIPAL_SCOPE,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 /**
- * UserService wraps repository calls in `withUserDatabaseContext` /
- * `withGlobalAdminDatabaseContext` (see `softDeleteUserWithOffboarding`, `updatePassword`,
+ * UserService wraps repository calls in `withAppDatabaseContext (user scope)` /
+ * `withMaintenanceDatabaseContext` (see `softDeleteUserWithOffboarding`, `updatePassword`,
  * `updateMfaEnabled`, admin listing). Those helpers open a real `database.transaction()` and would
  * hang in pure unit tests with mocked repositories. Run the inner callback directly so the test
  * exercises service logic without touching Postgres. Matches the pattern in
  * `src/domains/auth/__tests__/unit/auth.service.unit.test.ts`.
  */
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
-vi.mock('@/infrastructure/database/contexts/global-admin-database.context.js', () => ({
-  withGlobalAdminDatabaseContext: vi.fn((callback: () => Promise<unknown>) => callback()),
-}));
 
 vi.mock('@/shared/utils/infrastructure/postgres-error.util.js', () => ({
   runInsertWithPublicIdentifierRetry: async (operation: () => Promise<unknown>) => operation(),
@@ -42,7 +50,7 @@ vi.mock('@/domains/tenancy/sub-domains/organization/resolve-active-organization.
   resolveDefaultActiveOrganizationPublicId: vi.fn().mockResolvedValue(undefined),
   findUserActiveOrganizationPublicId: vi.fn().mockResolvedValue(undefined),
   // getMe now self-heals via ensurePersonalOrganizationPublicId (provisions on demand when
-  // personal is enabled and the org is missing); stub it so the pure unit test stays DB-free.
+  // personal is enabled and the organization is missing); stub it so the pure unit test stays DB-free.
   ensurePersonalOrganizationPublicId: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -69,6 +77,12 @@ const userRow = {
   created_at: new Date(),
   updated_at: new Date(),
 };
+
+const asUserScope = (userPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    userPublicId,
+    organizationPublicId: 'org_scope_test',
+  }) as UserPrincipalDatabaseScope;
 
 describe('UserService', () => {
   const repository = {
@@ -144,7 +158,7 @@ describe('UserService', () => {
     });
 
     it('mints a FRESH passwordless account when the email belongs to a soft-deleted (offboarded) user', async () => {
-      // A tombstoned account must NOT be resurrected into an active org membership with its old
+      // A tombstoned account must NOT be resurrected into an active organization membership with its old
       // public_id — that would re-attach an offboarded identity. The guard is `&& !existing.deleted_at`;
       // if it ever regressed to `if (existing) return existing`, the deleted row would be reused.
       vi.mocked(repository.findByEmail).mockResolvedValueOnce({
@@ -190,19 +204,19 @@ describe('UserService', () => {
   });
 
   it('getMe and updateMe return serialized user', async () => {
-    const me = await service.getMe(userRow.public_id);
+    const me = await service.getMe(asUserScope(userRow.public_id));
     expect(me.id).toBe(userRow.public_id);
-    await service.updateMe(userRow.public_id, { first_name: 'Updated' });
+    await service.updateMe(asUserScope(userRow.public_id), { first_name: 'Updated' });
     expect(repository.update).toHaveBeenCalled();
   });
 
-  it('getMe reports a null personal_organization_id and skips provisioning when personal orgs are disabled', async () => {
+  it('getMe reports a null personal_organization_id and skips provisioning when personal organizations are disabled', async () => {
     // The disabled branch must short-circuit — no on-demand provisioning — and report null, so a
-    // deployment with personal orgs off never dead-ends on a self-heal that cannot run.
+    // deployment with personal organizations off never dead-ends on a self-heal that cannot run.
     const original = env.PERSONAL_ORGANIZATION_ENABLED;
     env.PERSONAL_ORGANIZATION_ENABLED = false;
     try {
-      const me = await service.getMe(userRow.public_id);
+      const me = await service.getMe(asUserScope(userRow.public_id));
       expect(me.personal_organization_id).toBeNull();
       expect(ensurePersonalOrganizationPublicId).not.toHaveBeenCalled();
     } finally {
@@ -210,12 +224,12 @@ describe('UserService', () => {
     }
   });
 
-  it('getMe surfaces the on-demand provisioned personal_organization_id when personal orgs are enabled', async () => {
+  it('getMe surfaces the on-demand provisioned personal_organization_id when personal organizations are enabled', async () => {
     const original = env.PERSONAL_ORGANIZATION_ENABLED;
     env.PERSONAL_ORGANIZATION_ENABLED = true;
     try {
       vi.mocked(ensurePersonalOrganizationPublicId).mockResolvedValueOnce('org_personalxxxxxxxxxx');
-      const me = await service.getMe(userRow.public_id);
+      const me = await service.getMe(asUserScope(userRow.public_id));
       expect(me.personal_organization_id).toBe('org_personalxxxxxxxxxx');
       expect(ensurePersonalOrganizationPublicId).toHaveBeenCalledWith(userRow.id);
     } finally {
@@ -224,7 +238,7 @@ describe('UserService', () => {
   });
 
   it('completeOnboarding stamps the flag and returns the fresh self profile', async () => {
-    const me = await service.completeOnboarding(userRow.public_id);
+    const me = await service.completeOnboarding(asUserScope(userRow.public_id));
     expect(repository.markOnboardingComplete).toHaveBeenCalledWith(userRow.public_id);
     expect(me.id).toBe(userRow.public_id);
   });
@@ -462,7 +476,7 @@ describe('UserService', () => {
       ...userRow,
       avatar_url: avatarKey,
     } as never);
-    const result = await service.updateMe(userRow.public_id, {
+    const result = await service.updateMe(asUserScope(userRow.public_id), {
       avatar_key: avatarKey,
       first_name: 'New',
     });
@@ -472,7 +486,7 @@ describe('UserService', () => {
   it('updateMe throws when repository update returns null', async () => {
     vi.mocked(repository.update).mockResolvedValue(null);
     await expect(
-      service.updateMe(userRow.public_id, { first_name: 'Missing' }),
+      service.updateMe(asUserScope(userRow.public_id), { first_name: 'Missing' }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -502,7 +516,9 @@ describe('UserService', () => {
       ...userRow,
       deleted_at: new Date(),
     } as never);
-    await expect(service.getMe(userRow.public_id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.getMe(asUserScope(userRow.public_id))).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
   });
 
   it('adminUpdateUser and suspendUser throw when repository returns null', async () => {
@@ -624,7 +640,7 @@ describe('UserService', () => {
 
   it('updateMe rejects avatar keys outside the user prefix', async () => {
     await expect(
-      service.updateMe(userRow.public_id, { avatar_key: 'wrong/prefix.png' }),
+      service.updateMe(asUserScope(userRow.public_id), { avatar_key: 'wrong/prefix.png' }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 

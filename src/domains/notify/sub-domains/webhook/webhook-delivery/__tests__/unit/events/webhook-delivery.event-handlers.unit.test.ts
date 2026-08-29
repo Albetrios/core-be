@@ -73,7 +73,7 @@ describe('webhook delivery event handlers', () => {
   });
 
   it('does not enqueue an unscoped delivery when the attempt has no resolvable organization', async () => {
-    // The handler resolves the org so delivery is enqueued tenant-scoped. A null (attempt/org gone)
+    // The handler resolves the organization so delivery is enqueued tenant-scoped. A null (attempt/organization gone)
     // makes it throw `organization_not_found`, which the handler CATCHES and logs — it must never
     // enqueue an organization-less delivery, and the throw must not escape the event bus (a failing
     // handler must not fail the originating request).

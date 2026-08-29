@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { UnrecoverableError } from 'bullmq';
-import { withSystemTableWorkerContext } from '@/infrastructure/database/contexts/worker-database.context.js';
 import { CircuitBreakerOpenError } from '@/infrastructure/resilience/circuit-breaker.js';
 import { sendEmail } from '@/infrastructure/mail/mail.service.js';
 import { MAIL_QUEUE_MAX_ATTEMPTS } from '@/infrastructure/mail/queues/mail.queue.js';
@@ -16,6 +15,10 @@ import { mailJobDataSchema } from '@/infrastructure/mail/queues/mail.job.schema.
 import { parseBullMQJobData } from '@/shared/utils/validation/bullmq-job-validation.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const DEFAULT_MAIL_JOB_MAX_ATTEMPTS = MAIL_QUEUE_MAX_ATTEMPTS;
 
@@ -99,7 +102,9 @@ export async function processMailOutboxJob(
   jobData: MailJobData,
   options: ProcessMailOutboxJobOptions = {},
 ): Promise<ProcessMailOutboxJobResult> {
-  return withSystemTableWorkerContext(() => processMailOutboxJobInner(jobData, options));
+  return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, () =>
+    processMailOutboxJobInner(jobData, options),
+  );
 }
 
 async function processMailOutboxJobInner(

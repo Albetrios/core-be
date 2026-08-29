@@ -532,7 +532,7 @@ describe('idempotency middleware happy paths and conflicts', () => {
     expect(parsed.statusCode).toBeUndefined();
   });
 
-  it('claimPreHandler scopes cache keys using organization header', async () => {
+  it('claimPreHandler scopes cache keys using the organization claim', async () => {
     const organizationPublicId = generatePublicId('organization');
     mockRedisSet.mockResolvedValue('OK');
     const { claimPreHandler } = await registerIdempotencyHooks();
@@ -540,9 +540,8 @@ describe('idempotency middleware happy paths and conflicts', () => {
       method: 'POST',
       headers: {
         [IDEMPOTENCY_KEY_HEADER]: IDEMPOTENCY_TEST_KEY,
-        'x-organization-id': organizationPublicId,
       },
-      auth: { kind: 'user' as const, userId: TEST_USER_PUBLIC_ID },
+      auth: { kind: 'user' as const, userId: TEST_USER_PUBLIC_ID, organizationPublicId },
       _idempotencyKey: IDEMPOTENCY_TEST_KEY,
     } as unknown as FastifyRequest & { _idempotencyClaimed?: boolean };
 

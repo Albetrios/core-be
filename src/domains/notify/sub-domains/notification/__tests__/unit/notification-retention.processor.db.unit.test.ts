@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { eq, inArray } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
@@ -7,7 +11,6 @@ import { createTestOrganization } from '@/tests/factories/organization.factory.j
 import { createTestNotification } from '@/tests/factories/notification.factory.js';
 import { notifications } from '@/domains/notify/sub-domains/notification/notification.schema.js';
 import { runNotificationRetentionJob } from '@/domains/notify/sub-domains/notification/workers/notification-retention.processor.js';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
 import { env } from '@/shared/config/env.config.js';
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
@@ -36,8 +39,9 @@ describe('runNotificationRetentionJob (database)', () => {
   }
 
   async function runRetention() {
-    return withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
-      runNotificationRetentionJob(databaseHandle),
+    return withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
+      (databaseHandle) => runNotificationRetentionJob(databaseHandle),
     );
   }
 
@@ -153,7 +157,7 @@ describe('runNotificationRetentionJob (database)', () => {
   });
 
   it('purges across organizations under the global retention context', async () => {
-    // The job runs under withGlobalRetentionCleanupDatabaseContext precisely so it can see rows
+    // The job runs under withMaintenanceDatabaseContext precisely so it can see rows
     // from every tenant. If it were ever run with a request-scoped handle, RLS would hide most
     // rows and the purge would silently under-delete instead of failing.
     const firstUser = await createTestUser();

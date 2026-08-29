@@ -62,7 +62,7 @@ describe('audit routes rate-limit + authorization policy', () => {
   });
 
   /**
-   * `/logs` is the whole domain-owned HTTP surface. The org-scoped twin
+   * `/logs` is the whole domain-owned HTTP surface. The organization-scoped twin
    * (`GET /api/v1/tenancy/organization/audit-logs`) is deliberately registered in tenancy's route
    * file under `audit-log:read`, not here. A second registration appearing in this file is either
    * an un-capped new route or the tenancy twin being moved without its permission gate — both

@@ -1,11 +1,15 @@
 import { NotFoundError } from '@/shared/errors/index.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { UserSettingsRepository } from './user-settings.repository.js';
 import { serializeUserSettings } from './user-settings.serializer.js';
 import type { UserSettingsOutput } from './user-settings.types.js';
 import { validateUpdateUserSettings } from './user-settings.validator.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Read or merge the authenticated user's personalization toggles and locale preferences.
@@ -26,23 +30,58 @@ export class UserSettingsService {
     private readonly repository: UserSettingsRepository,
   ) {}
 
-  async get(user_public_id: string): Promise<UserSettingsOutput> {
+  async get(scope: UserPrincipalDatabaseScope): Promise<UserSettingsOutput> {
+    const user_public_id = scope.userPublicId;
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    // auth.user_settings is FORCE RLS keyed on app.current_user_id — read inside the user context.
-    const settings = await withUserDatabaseContext(user_public_id, () =>
+    // auth.user_settings is FORCE RLS keyed on app.current_user_public_id — read inside the user context.
+    const settings = await withAppDatabaseContext(scope, () =>
       this.repository.getByUserId(user.id),
     );
     return serializeUserSettings(settings);
   }
 
-  async update(user_public_id: string, body: unknown): Promise<UserSettingsOutput> {
+  async update(scope: UserPrincipalDatabaseScope, body: unknown): Promise<UserSettingsOutput> {
+    const user_public_id = scope.userPublicId;
     const parsed = validateUpdateUserSettings(body);
     const user = await this.userService.findUserRecordByPublicId(user_public_id);
     if (!user) throw new NotFoundError('User');
-    // auth.user_settings is FORCE RLS keyed on app.current_user_id — upsert inside the user context.
-    const result = await withUserDatabaseContext(user_public_id, () =>
+    // auth.user_settings is FORCE RLS keyed on app.current_user_public_id — upsert inside the user context.
+    const result = await withAppDatabaseContext(scope, () =>
       this.repository.upsert(user.id, omitUndefined(parsed)),
+    );
+    return serializeUserSettings(result);
+  }
+
+  /**
+   * Invite-flow port: reads the INVITED user's settings during membership
+   * creation — a cross-user read authorized by the invitation write path, where
+   * the request principal is the inviter, so no token scope for the invitee can
+   * exist. Stays on the user-context wrapper until the pre-token minter lands
+   * (Phase 6b of the principal campaign).
+   */
+  async getForInvitedUser(user_public_id: string): Promise<UserSettingsOutput> {
+    const user = await this.userService.findUserRecordByPublicId(user_public_id);
+    if (!user) throw new NotFoundError('User');
+    const settings = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
+      () => this.repository.getByUserId(user.id),
+    );
+    return serializeUserSettings(settings);
+  }
+
+  /**
+   * Invite-flow port: writes locale defaults onto the INVITED user's settings —
+   * see {@link UserSettingsService.getForInvitedUser} for why this cross-user
+   * write cannot carry a token scope (absorbed in Phase 6b).
+   */
+  async updateForInvitedUser(user_public_id: string, body: unknown): Promise<UserSettingsOutput> {
+    const parsed = validateUpdateUserSettings(body);
+    const user = await this.userService.findUserRecordByPublicId(user_public_id);
+    if (!user) throw new NotFoundError('User');
+    const result = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
+      () => this.repository.upsert(user.id, omitUndefined(parsed)),
     );
     return serializeUserSettings(result);
   }

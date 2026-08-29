@@ -16,12 +16,19 @@ const mockWhere = vi.fn(() => ({ limit: mockLimit }));
 const mockFrom = vi.fn(() => ({ where: mockWhere }));
 const mockSelect = vi.fn(() => ({ from: mockFrom }));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getRequestDatabase: () => ({
-    select: mockSelect,
-    insert: mockInsert,
-  }),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getRequestDatabase: () => ({
+        select: mockSelect,
+        insert: mockInsert,
+      }),
+    };
+  },
+);
 
 describe('UserSettingsRepository', () => {
   const repository = new UserSettingsRepository();

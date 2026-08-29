@@ -48,7 +48,7 @@ export const updateMembershipDto = z
  * are `.optional()` (a defaulted param serializes as `required`, a breaking contract change); the
  * repository defaults to `created_at` ascending to preserve the pre-sort ordering. Sorting by `name`
  * orders by the member's `auth.users` display name and is resolved through a SECURITY DEFINER
- * function (that table is FORCE RLS — a plain join under org-only context matches zero rows).
+ * function (that table is FORCE RLS — a plain join under organization-only context matches zero rows).
  */
 export const listMembershipsQueryDto = listSearchSortSchema(['name', 'created_at'] as const);
 

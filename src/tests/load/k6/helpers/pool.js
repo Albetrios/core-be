@@ -11,7 +11,7 @@
  *   }
  *
  *   export default function (tokenPool) {
- *     const { token, orgPublicId } = vuToken(tokenPool);
+ *     const { token, organizationPublicId } = vuToken(tokenPool);
  *     // use token for authenticated requests
  *   }
  *
@@ -54,11 +54,11 @@ export const credentialPool = new SharedArray('credential-pool', () => {
 
 /**
  * Mint a JWT for every entry in the pool. Call from setup() once before any VU runs.
- * Returns an array of {token, orgPublicId, userPublicId} — one per pool entry.
+ * Returns an array of {token, organizationPublicId, userPublicId} — one per pool entry.
  * Entries whose login fails (null token) are filtered out with a warning.
  *
- * @param {Array<{email: string, password: string, orgPublicId: string, userPublicId: string}>} pool
- * @returns {Array<{token: string, orgPublicId: string, userPublicId: string}>}
+ * @param {Array<{email: string, password: string, organizationPublicId: string, userPublicId: string}>} pool
+ * @returns {Array<{token: string, organizationPublicId: string, userPublicId: string}>}
  */
 export function mintTokenPool(pool) {
   const tokens = [];
@@ -68,7 +68,11 @@ export function mintTokenPool(pool) {
       console.warn(`mintTokenPool: login failed for ${cred.email} — entry skipped`);
       continue;
     }
-    tokens.push({ token, orgPublicId: cred.orgPublicId, userPublicId: cred.userPublicId });
+    tokens.push({
+      token,
+      organizationPublicId: cred.organizationPublicId,
+      userPublicId: cred.userPublicId,
+    });
   }
   if (tokens.length === 0) {
     console.error(
@@ -82,8 +86,8 @@ export function mintTokenPool(pool) {
  * Pick this VU's token entry from the pool minted in setup().
  * Uses round-robin by VU index so every VU gets a distinct identity when pool.length >= maxVUs.
  *
- * @param {Array<{token: string, orgPublicId: string, userPublicId: string}>} tokenPool
- * @returns {{token: string, orgPublicId: string, userPublicId: string}}
+ * @param {Array<{token: string, organizationPublicId: string, userPublicId: string}>} tokenPool
+ * @returns {{token: string, organizationPublicId: string, userPublicId: string}}
  */
 export function vuToken(tokenPool) {
   return tokenPool[(__VU - 1) % tokenPool.length];

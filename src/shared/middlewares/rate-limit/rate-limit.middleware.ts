@@ -54,9 +54,9 @@ const RATE_LIMIT_ALLOWLISTED_PATHS = new Set(['/livez', '/readyz']);
  *
  * This limiter runs in the `onRequest` phase, before route authentication (which happens
  * in a later `preHandler` via `app.authenticate`). The only tenant signal available here is
- * the request-asserted `X-Organization-Id` header/path, which is NOT yet verified against
+ * any request-asserted organization value, which is NOT verified against
  * the caller's membership. Keying on that value would let an unauthenticated client rotate a
- * fresh org id per request to mint a new bucket (bypassing the per-IP cap) or reuse a victim
+ * fresh organization id per request to mint a new bucket (bypassing the per-IP cap) or reuse a victim
  * org's id to burn its shared bucket (cross-tenant throttling). It is therefore IP-only.
  *
  * Org- and user-scoped quotas are applied per route in a post-auth `preHandler` via the

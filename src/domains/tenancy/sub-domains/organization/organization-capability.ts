@@ -29,7 +29,7 @@ const CAPABILITY_REJECTION_KEY: Record<OrganizationCapability, string> = {
  *
  * @param organization - The target organization (only `type` is read).
  * @param capability - The capability being attempted; selects the i18n key.
- * @throws UnprocessableEntityError When the organization is PERSONAL — the org
+ * @throws UnprocessableEntityError When the organization is PERSONAL — the organization
  *   `type` is immutable, so retrying the identical request can never succeed
  *   (422 `unprocessable_entity`, not 409).
  *

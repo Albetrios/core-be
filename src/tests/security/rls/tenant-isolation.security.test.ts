@@ -79,14 +79,14 @@ describe('Security: Tenant isolation', () => {
 
   it('should return 403 when accessing organization settings without membership', async () => {
     // Flat settings route resolves the organization from the `org` claim. An
-    // outsider scoped to org B (claim = B) but with no membership in B is denied
+    // outsider scoped to organization B (claim = B) but with no membership in B is denied
     // at the permission preHandler — isolation is enforced by membership, not by
     // an organization path segment.
-    const orgB = await createOrganizationWithMember(TENANCY_READ_PERMISSIONS);
+    const organizationB = await createOrganizationWithMember(TENANCY_READ_PERMISSIONS);
     const outsider = await createTestUser({ email: 'no-membership-settings@test.com' });
     const outsiderTokenScopedToB = await generateTestToken({
       userId: outsider.public_id,
-      organizationPublicId: orgB.organization.public_id,
+      organizationPublicId: organizationB.organization.public_id,
     });
 
     const response = await injectAuthenticated(app, {
@@ -99,13 +99,13 @@ describe('Security: Tenant isolation', () => {
   });
 
   it('should return 403 when listing memberships without membership', async () => {
-    // Same flat-route isolation as settings: an actor scoped to org B's claim
+    // Same flat-route isolation as settings: an actor scoped to organization B's claim
     // but holding no membership in B cannot list B's memberships.
-    const orgB = await createOrganizationWithMember(TENANCY_READ_PERMISSIONS);
+    const organizationB = await createOrganizationWithMember(TENANCY_READ_PERMISSIONS);
     const outsider = await createTestUser({ email: 'no-membership-memberships@test.com' });
     const outsiderTokenScopedToB = await generateTestToken({
       userId: outsider.public_id,
-      organizationPublicId: orgB.organization.public_id,
+      organizationPublicId: organizationB.organization.public_id,
     });
 
     const response = await injectAuthenticated(app, {
@@ -119,18 +119,18 @@ describe('Security: Tenant isolation', () => {
 
   it('returns 404 when reading a specific webhook in another organization', async () => {
     // Flat webhook routes resolve the organization from the JWT `org` claim, so
-    // an actor scoped to org A can only ever address org A's webhook collection
-    // — there is no path to "list org B's webhooks". Isolation is therefore a
-    // specific-resource concern: org A's actor (token scoped to A) puts org B's
-    // webhook id in the flat route; the RLS-scoped lookup runs in org A and B's
+    // an actor scoped to organization A can only ever address organization A's webhook collection
+    // — there is no path to "list organization B's webhooks". Isolation is therefore a
+    // specific-resource concern: organization A's actor (token scoped to A) puts organization B's
+    // webhook id in the flat route; the RLS-scoped lookup runs in organization A and B's
     // row is invisible (404).
-    const orgA = await createOrganizationWithMember([NOTIFY_PERMISSIONS.WEBHOOK_READ]);
-    const orgB = await createOrganizationWithMember([NOTIFY_PERMISSIONS.WEBHOOK_READ]);
-    const webhookInB = await createTestWebhook({ organizationId: orgB.organization.id });
+    const organizationA = await createOrganizationWithMember([NOTIFY_PERMISSIONS.WEBHOOK_READ]);
+    const organizationB = await createOrganizationWithMember([NOTIFY_PERMISSIONS.WEBHOOK_READ]);
+    const webhookInB = await createTestWebhook({ organizationId: organizationB.organization.id });
 
     const tokenScopedToA = await generateTestToken({
-      userId: orgA.user.public_id,
-      organizationPublicId: orgA.organization.public_id,
+      userId: organizationA.user.public_id,
+      organizationPublicId: organizationA.organization.public_id,
     });
 
     const response = await injectAuthenticated(app, {
@@ -156,13 +156,13 @@ describe('Security: Tenant isolation', () => {
   });
 
   it('should return 403 for user with no membership on an organization-scoped route', async () => {
-    // The outsider carries org B's claim but no membership in B; the flat
+    // The outsider carries organization B's claim but no membership in B; the flat
     // settings route resolves to B and the permission preHandler denies it.
-    const orgB = await createOrganizationWithMember(TENANCY_READ_PERMISSIONS);
+    const organizationB = await createOrganizationWithMember(TENANCY_READ_PERMISSIONS);
     const outsider = await createTestUser({ email: 'outsider-cross-tenant@test.com' });
     const outsiderTokenScopedToB = await generateTestToken({
       userId: outsider.public_id,
-      organizationPublicId: orgB.organization.public_id,
+      organizationPublicId: organizationB.organization.public_id,
     });
 
     const response = await injectAuthenticated(app, {
@@ -185,9 +185,9 @@ describe('Security: Tenant isolation', () => {
     /**
      * Flat subscription routes resolve the organization from the JWT `org`
      * claim — there is no longer an organization path param. Cross-tenant
-     * isolation is therefore expressed as: org A's actor (token scoped to A)
-     * cannot see or mutate org B's subscription because the RLS-scoped lookup
-     * runs in org A and B's row is invisible (404), not because the path
+     * isolation is therefore expressed as: organization A's actor (token scoped to A)
+     * cannot see or mutate organization B's subscription because the RLS-scoped lookup
+     * runs in organization A and B's row is invisible (404), not because the path
      * carries B's id.
      */
     async function mintOrganizationAScopedTokenA(
@@ -209,7 +209,7 @@ describe('Security: Tenant isolation', () => {
         token: tokenScopedToA,
       });
 
-      // Org A's actor only ever lists org A's subscriptions; B's row is invisible.
+      // Org A's actor only ever lists organization A's subscriptions; B's row is invisible.
       expect(response.statusCode).toBe(200);
       const body = response.json() as { data?: Array<{ id?: string }> };
       const visibleIds = (body.data ?? []).map((subscription) => subscription.id);
@@ -236,8 +236,8 @@ describe('Security: Tenant isolation', () => {
       const tokenScopedToA = await mintOrganizationAScopedTokenA(fixture);
 
       // Empty body passes UpdateSubscriptionDto (`.strict()` rejects unknown keys
-      // with a 400 before the org-scoped lookup runs) so the request reaches the
-      // isolation boundary and the lookup in org A cannot find B's row → 404.
+      // with a 400 before the organization-scoped lookup runs) so the request reaches the
+      // isolation boundary and the lookup in organization A cannot find B's row → 404.
       const response = await injectAuthenticated(app, {
         method: 'PATCH',
         url: testApiPath(`/billing/subscriptions/${fixture.subscriptionInB.public_id}`),
@@ -310,7 +310,7 @@ describe('Security: Tenant isolation', () => {
     });
   });
 
-  describe('tenancy org-scoped routes (HTTP cross-tenant)', () => {
+  describe('tenancy organization-scoped routes (HTTP cross-tenant)', () => {
     beforeEach(async () => {
       await seedPermissions([
         TENANCY_PERMISSIONS.NOTIFICATION_POLICY_READ,
@@ -322,19 +322,19 @@ describe('Security: Tenant isolation', () => {
 
     // Flat tenancy routes resolve the organization from the JWT `org` claim, so
     // an actor can only ever address its OWN active organization's collections —
-    // there is no path to "list org B's notification-policies/api-keys/roles".
-    // Cross-tenant isolation is therefore: an actor scoped to org B's claim but
+    // there is no path to "list organization B's notification-policies/api-keys/roles".
+    // Cross-tenant isolation is therefore: an actor scoped to organization B's claim but
     // holding NO membership in B is denied at the permission preHandler. A member
-    // of org A who tried to reach B would have to carry B's claim, at which point
+    // of organization A who tried to reach B would have to carry B's claim, at which point
     // its A-membership grants nothing in B — the same 403.
     it('returns 403 when listing notification policies without membership', async () => {
-      const orgB = await createOrganizationWithMember([
+      const organizationB = await createOrganizationWithMember([
         TENANCY_PERMISSIONS.NOTIFICATION_POLICY_READ,
       ]);
       const outsider = await createTestUser({ email: 'no-membership-policies@test.com' });
       const outsiderTokenScopedToB = await generateTestToken({
         userId: outsider.public_id,
-        organizationPublicId: orgB.organization.public_id,
+        organizationPublicId: organizationB.organization.public_id,
       });
 
       const response = await injectAuthenticated(app, {
@@ -347,11 +347,11 @@ describe('Security: Tenant isolation', () => {
     });
 
     it('returns 403 when listing API keys without membership', async () => {
-      const orgB = await createOrganizationWithMember([TENANCY_PERMISSIONS.API_KEY_READ]);
+      const organizationB = await createOrganizationWithMember([TENANCY_PERMISSIONS.API_KEY_READ]);
       const outsider = await createTestUser({ email: 'no-membership-api-keys@test.com' });
       const outsiderTokenScopedToB = await generateTestToken({
         userId: outsider.public_id,
-        organizationPublicId: orgB.organization.public_id,
+        organizationPublicId: organizationB.organization.public_id,
       });
 
       const response = await injectAuthenticated(app, {
@@ -364,11 +364,11 @@ describe('Security: Tenant isolation', () => {
     });
 
     it('returns 403 when listing roles without membership', async () => {
-      const orgB = await createOrganizationWithMember([TENANCY_PERMISSIONS.ROLE_READ]);
+      const organizationB = await createOrganizationWithMember([TENANCY_PERMISSIONS.ROLE_READ]);
       const outsider = await createTestUser({ email: 'no-membership-roles@test.com' });
       const outsiderTokenScopedToB = await generateTestToken({
         userId: outsider.public_id,
-        organizationPublicId: orgB.organization.public_id,
+        organizationPublicId: organizationB.organization.public_id,
       });
 
       const response = await injectAuthenticated(app, {
@@ -380,21 +380,21 @@ describe('Security: Tenant isolation', () => {
       expect(response.statusCode).toBe(403);
     });
 
-    it('lists only the claim org roles, never another organization rows', async () => {
-      // Positive cross-tenant list isolation: org A's member (token scoped to A)
-      // lists roles and sees ONLY org A's roles. Org B's role exists but is
-      // invisible because the org-scoped lookup runs under org A's RLS context.
-      const orgA = await createOrganizationWithMember([TENANCY_PERMISSIONS.ROLE_READ]);
-      const orgB = await createOrganizationWithMember([TENANCY_PERMISSIONS.ROLE_READ]);
+    it('lists only the claim organization roles, never another organization rows', async () => {
+      // Positive cross-tenant list isolation: organization A's member (token scoped to A)
+      // lists roles and sees ONLY organization A's roles. Org B's role exists but is
+      // invisible because the organization-scoped lookup runs under organization A's RLS context.
+      const organizationA = await createOrganizationWithMember([TENANCY_PERMISSIONS.ROLE_READ]);
+      const organizationB = await createOrganizationWithMember([TENANCY_PERMISSIONS.ROLE_READ]);
       const roleInB = await createRoleWithPermissions({
-        organizationId: orgB.organization.id,
+        organizationId: organizationB.organization.id,
         permissionCodes: [TENANCY_PERMISSIONS.ROLE_READ],
       });
 
       const response = await injectAuthenticated(app, {
         method: 'GET',
         url: testApiPath('/tenancy/organization/roles'),
-        token: orgA.token,
+        token: organizationA.token,
       });
 
       expect(response.statusCode).toBe(200);
@@ -403,17 +403,17 @@ describe('Security: Tenant isolation', () => {
       expect(visibleIds).not.toContain(roleInB.public_id);
     });
 
-    it('lets an org actor read the webhook-events catalog (static, not org data)', async () => {
+    it('lets an organization actor read the webhook-events catalog (static, not organization data)', async () => {
       // Webhook-events is a flat, static catalog of subscribable event types with
-      // no per-organization rows, so a cross-org variant is meaningless. With the
-      // organization resolved from the JWT `org` claim, an actor scoped to org A
+      // no per-organization rows, so a cross-organization variant is meaningless. With the
+      // organization resolved from the JWT `org` claim, an actor scoped to organization A
       // simply reads the catalog with WEBHOOK_READ — proving the flattened route is
-      // reachable and gated by permission, not by an org path param.
-      const orgA = await createOrganizationWithMember([NOTIFY_PERMISSIONS.WEBHOOK_READ]);
+      // reachable and gated by permission, not by an organization path param.
+      const organizationA = await createOrganizationWithMember([NOTIFY_PERMISSIONS.WEBHOOK_READ]);
 
       const tokenScopedToA = await generateTestToken({
-        userId: orgA.user.public_id,
-        organizationPublicId: orgA.organization.public_id,
+        userId: organizationA.user.public_id,
+        organizationPublicId: organizationA.organization.public_id,
       });
 
       const response = await injectAuthenticated(app, {

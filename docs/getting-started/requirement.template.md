@@ -49,16 +49,16 @@ it. Either way the final, approved document looks like the form below.
   # e.g. inv   ->  external id looks like inv_a1b2c3d4e5f6g7h8i9j0k
 - Relations / indexes: <FKs, composite/unique indexes | none>
   # e.g. index (organization_id, issued_at desc); unique (organization_id, number)
-- Tenancy / soft-delete / audit: <org-scoped? RLS? soft-delete? audit?>
-  # e.g. org-scoped, RLS on (USING + WITH CHECK app.current_organization_id) | soft-delete: no (immutable ledger) | audit: created_at only
+- Tenancy / soft-delete / audit: <organization-scoped? RLS? soft-delete? audit?>
+  # e.g. organization-scoped, RLS on (USING + WITH CHECK app.current_organization_public_id) | soft-delete: no (immutable ledger) | audit: created_at only
 
 ## 3. Public API
 - Endpoints: <METHOD /api/v1/<path> — purpose>  (snake_case semantic params like {invoice_id})
   # e.g. GET /api/v1/billing/invoices — list the org's invoices
   # e.g. GET /api/v1/billing/invoices/{invoice_id} — get one invoice
   # e.g. POST /api/v1/billing/invoices — create an invoice
-- Auth per route: <public | authenticated | org-permission:<code> | global-role:admin>
-  # e.g. org-permission:billing.read on GET, billing.write on POST
+- Auth per route: <public | authenticated | organization-permission:<code> | global-role:admin>
+  # e.g. organization-permission:billing.read on GET, billing.write on POST
 - Request body (snake_case + validation): <fields | none>
   # e.g. POST { amount_cents: integer > 0, currency: 'usd'|'eur', due_at?: ISO-8601 }
 - Response (serialized; external id is `id`): <fields>
@@ -95,7 +95,7 @@ it. Either way the final, approved document looks like the form below.
 - E2E (fastify.inject route tests) [yes]: <happy + edge cases>
   # e.g. list 200 paginated; get 200; another org's invoice 404; no permission 403; bad cursor 400
 - Smoke (live pnpm verify:base after seed) [yes]: <endpoints to hit>
-  # e.g. GET /api/v1/billing/invoices returns 200 with a seeded org token
+  # e.g. GET /api/v1/billing/invoices returns 200 with a seeded organization token
 - Contract (Stripe / Resend / S3 via nock) [yes if external calls]: <... | none>
   # e.g. none — no outbound calls
 - Chaos (Toxiproxy fault injection) [no]: <... | none>
@@ -105,9 +105,9 @@ it. Either way the final, approved document looks like the form below.
 - Observability: <logs / metrics / sentry>
   # e.g. log invoice.created with organization_id; counter invoices_created_total
 - Performance budget: <targets>
-  # e.g. list p95 < 100ms at 10k invoices per org
+  # e.g. list p95 < 100ms at 10k invoices per organization
 - Security: <tenant isolation / secrets / PII>
-  # e.g. RLS enforces org isolation; no PII beyond the org link; amounts are not secrets
+  # e.g. RLS enforces organization isolation; no PII beyond the organization link; amounts are not secrets
 
 ## 9. File structure & deliverables (the AI drafts this tree from your prompt — review it first)
 src/domains/<domain>/

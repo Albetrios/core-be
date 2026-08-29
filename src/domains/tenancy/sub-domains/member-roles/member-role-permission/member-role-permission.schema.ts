@@ -40,7 +40,7 @@ export const role_permissions = tenancySchema
             SELECT id FROM tenancy.roles
             WHERE organization_id = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
@@ -48,7 +48,7 @@ export const role_permissions = tenancySchema
             SELECT id FROM tenancy.roles
             WHERE organization_id = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )`,
       }),

@@ -27,7 +27,7 @@
       "why": "A new migration must run the migration maintainer."
     },
     {
-      "file": "src/infrastructure/database/contexts/tenant-database.context.ts",
+      "file": "src/infrastructure/database/contexts/database-context.ts",
       "expectSkills": ["rls-tenant-isolation-guard"],
       "why": "Changing a DB context wrapper must run the RLS / tenant-isolation guard."
     },

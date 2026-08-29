@@ -13,17 +13,21 @@ vi.mock('@/domains/auth/sub-domains/auth-session/session-token-cache.service.js'
   invalidateCachedSessionToken: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-  withSessionPublicIdDatabaseContext: vi.fn(
-    (_sessionPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-  withSessionTokenHashDatabaseContext: vi.fn(
-    (_tokenHash: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = {
   id: 1,

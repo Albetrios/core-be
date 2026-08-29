@@ -1,5 +1,10 @@
 import { and, isNotNull, isNull, lt, ne } from 'drizzle-orm';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import type { OrganizationPrincipalDatabaseScope } from '@/infrastructure/database/contexts/database-context.js';
+import {
+  PRINCIPAL_SCOPE,
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { captureException } from '@/infrastructure/observability/sentry/sentry.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
@@ -16,7 +21,7 @@ import {
  * on the one idempotent method it calls, keeping the processor unit-testable with a stub.
  */
 export interface OrganizationOffboardingReconcileService {
-  resumeOffboarding(public_id: string): Promise<void>;
+  resumeOffboarding(scope: OrganizationPrincipalDatabaseScope): Promise<void>;
 }
 
 /**
@@ -40,7 +45,7 @@ export interface OrganizationOffboardingReconcileResult {
  *   selects up to `ORGANIZATION_OFFBOARDING_RECONCILE_BATCH` non-PERSONAL rows where
  *   `deletion_started_at` is older than `ORGANIZATION_OFFBOARDING_STUCK_AFTER_MINUTES`
  *   and `deleted_at IS NULL`, then calls `resumeOffboarding` per row OUTSIDE that scan
- *   context (the service opens its own org transactions + does Stripe/S3 I/O). The
+ *   context (the service opens its own organization transactions + does Stripe/S3 I/O). The
  *   offboarding is idempotent, so a partial run resumes and completes (sets
  *   `deleted_at`), dropping out of the next scan.
  * - **Failure modes:** a per-row failure is counted, warn-logged, and reported to
@@ -58,26 +63,28 @@ export async function runOrganizationOffboardingReconcileJob(
     Date.now() - ORGANIZATION_OFFBOARDING_STUCK_AFTER_MINUTES * MILLISECONDS_PER_MINUTE,
   );
 
-  const stuck = await withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
-    databaseHandle
-      .select({ public_id: organizations.public_id })
-      .from(organizations)
-      .where(
-        and(
-          isNotNull(organizations.deletion_started_at),
-          isNull(organizations.deleted_at),
-          lt(organizations.deletion_started_at, cutoff),
-          ne(organizations.type, 'PERSONAL'),
-        ),
-      )
-      .limit(ORGANIZATION_OFFBOARDING_RECONCILE_BATCH),
+  const stuck = await withMaintenanceDatabaseContext(
+    MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
+    (databaseHandle) =>
+      databaseHandle
+        .select({ public_id: organizations.public_id })
+        .from(organizations)
+        .where(
+          and(
+            isNotNull(organizations.deletion_started_at),
+            isNull(organizations.deleted_at),
+            lt(organizations.deletion_started_at, cutoff),
+            ne(organizations.type, 'PERSONAL'),
+          ),
+        )
+        .limit(ORGANIZATION_OFFBOARDING_RECONCILE_BATCH),
   );
 
   let resumed = 0;
   let failed = 0;
   for (const { public_id } of stuck) {
     try {
-      await service.resumeOffboarding(public_id);
+      await service.resumeOffboarding(PRINCIPAL_SCOPE.JOB({ organizationPublicId: public_id }));
       resumed += 1;
     } catch (error) {
       failed += 1;

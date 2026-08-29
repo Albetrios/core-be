@@ -39,7 +39,7 @@ vi.mock('@/infrastructure/database/connection.js', () => {
     database: {
       insert: () => ({ values: vi.fn().mockResolvedValue(undefined) }),
       // sec-r5-async-queue-1: the audit-write paths now wrap in
-      // `withSystemAuditInsertContext` → `database.transaction(...)`. Stub the
+      // `withMaintenanceDatabaseContext` → `database.transaction(...)`. Stub the
       // transaction call to execute its callback against a handle that exposes
       // the same `insert(...).values(...)` shape.
       transaction: (callback: (h: typeof handle) => Promise<unknown>) => callback(handle),

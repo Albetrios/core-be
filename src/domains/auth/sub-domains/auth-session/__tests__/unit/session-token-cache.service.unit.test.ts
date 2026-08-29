@@ -31,7 +31,7 @@ describe('setCachedSessionTokenValid (bounded TTL)', () => {
       '@/domains/auth/sub-domains/auth-session/session-token-cache.service.js'
     );
     await setCachedSessionTokenValid({
-      tokenHash: 'hash-long',
+      sessionTokenHash: 'hash-long',
       sessionPublicId: 'sess_long',
       sessionExpiresAt: new Date(NOW + 60 * 60 * 1000),
     });
@@ -49,7 +49,7 @@ describe('setCachedSessionTokenValid (bounded TTL)', () => {
       '@/domains/auth/sub-domains/auth-session/session-token-cache.service.js'
     );
     await setCachedSessionTokenValid({
-      tokenHash: 'hash-short',
+      sessionTokenHash: 'hash-short',
       sessionPublicId: 'sess_short',
       sessionExpiresAt: new Date(NOW + 10_000),
     });
@@ -61,7 +61,7 @@ describe('setCachedSessionTokenValid (bounded TTL)', () => {
       '@/domains/auth/sub-domains/auth-session/session-token-cache.service.js'
     );
     await setCachedSessionTokenValid({
-      tokenHash: 'hash-expired',
+      sessionTokenHash: 'hash-expired',
       sessionPublicId: 'sess_expired',
       sessionExpiresAt: new Date(NOW - 1_000),
     });
@@ -73,7 +73,7 @@ describe('setCachedSessionTokenValid (bounded TTL)', () => {
       '@/domains/auth/sub-domains/auth-session/session-token-cache.service.js'
     );
     await setCachedSessionTokenValid({
-      tokenHash: 'hash-sub-second',
+      sessionTokenHash: 'hash-sub-second',
       sessionPublicId: 'sess_sub',
       sessionExpiresAt: new Date(NOW + 500),
     });
@@ -87,7 +87,7 @@ describe('setCachedSessionTokenValid (bounded TTL)', () => {
     );
     await expect(
       setCachedSessionTokenValid({
-        tokenHash: 'hash-error',
+        sessionTokenHash: 'hash-error',
         sessionPublicId: 'sess_error',
         sessionExpiresAt: new Date(NOW + 60_000),
       }),

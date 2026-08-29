@@ -1,12 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const inner = ((callback: (databaseHandle: unknown) => unknown) =>
+    globalRetentionContextMock(callback)) as unknown as (...parameters: unknown[]) => unknown;
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+      inner(...parameters),
+    ),
+  };
+});
+
 const workerState = vi.hoisted(() => ({
   processor: undefined as (() => Promise<unknown>) | undefined,
   options: undefined as Record<string, unknown> | undefined,
   onHandlers: {} as Record<string, (...args: unknown[]) => void>,
 }));
 
-const withGlobalRetentionCleanupDatabaseContextMock = vi.fn();
+const globalRetentionContextMock = vi.fn();
 const runWebhookDeliveryAttemptRetentionJobMock = vi.fn();
 
 vi.mock('bullmq', () => ({
@@ -43,11 +55,6 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-close.util.js', () => ({
   }),
 }));
 
-vi.mock('@/infrastructure/database/contexts/retention-database.context.js', () => ({
-  withGlobalRetentionCleanupDatabaseContext: (callback: (databaseHandle: unknown) => unknown) =>
-    withGlobalRetentionCleanupDatabaseContextMock(callback),
-}));
-
 vi.mock(
   '@/domains/notify/sub-domains/webhook/workers/webhook-delivery-attempt-retention.processor.js',
   () => ({
@@ -68,10 +75,10 @@ describe('webhook-delivery-attempt-retention.worker', () => {
     workerState.processor = undefined;
     workerState.options = undefined;
     workerState.onHandlers = {};
-    withGlobalRetentionCleanupDatabaseContextMock.mockReset();
+    globalRetentionContextMock.mockReset();
     runWebhookDeliveryAttemptRetentionJobMock.mockReset();
 
-    withGlobalRetentionCleanupDatabaseContextMock.mockImplementation(
+    globalRetentionContextMock.mockImplementation(
       async (callback: (databaseHandle: unknown) => Promise<unknown>) =>
         callback({ kind: 'global-retention' }),
     );
@@ -97,13 +104,13 @@ describe('webhook-delivery-attempt-retention.worker', () => {
     expect(workerState.options).toEqual(expect.objectContaining({ concurrency: 1 }));
   });
 
-  it('runs the retention job inside withGlobalRetentionCleanupDatabaseContext', async () => {
+  it('runs the retention job inside withMaintenanceDatabaseContext', async () => {
     const { createWebhookDeliveryAttemptRetentionWorker } = await import(WORKER_MODULE);
 
     createWebhookDeliveryAttemptRetentionWorker();
     const result = await workerState.processor?.();
 
-    expect(withGlobalRetentionCleanupDatabaseContextMock).toHaveBeenCalledOnce();
+    expect(globalRetentionContextMock).toHaveBeenCalledOnce();
     expect(runWebhookDeliveryAttemptRetentionJobMock).toHaveBeenCalledWith({
       kind: 'global-retention',
     });

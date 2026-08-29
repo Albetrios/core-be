@@ -88,7 +88,7 @@ export function createDomainContainers(
 
   tenancyDomain.organizationService.wireOffboardingUploadService(
     uploadDomain.uploadService,
-    // route-audit-#2: cancel the org's active subscription on org delete so billing stops.
+    // route-audit-#2: cancel the org's active subscription on organization delete so billing stops.
     billingDomain.subscriptionService,
   );
 

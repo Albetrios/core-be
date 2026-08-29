@@ -7,12 +7,26 @@ vi.mock(
   () => seatSyncMocks,
 );
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    async (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { PlanService } from '@/domains/billing/sub-domains/plan/plan.service.js';
@@ -43,6 +57,11 @@ function baseRow(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+const scope = PRINCIPAL_SCOPE.REQUEST({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_public',
+}) as OrganizationPrincipalDatabaseScope;
 
 describe('SubscriptionService seat counters (REQ-4)', () => {
   const organizationService = {
@@ -87,13 +106,13 @@ describe('SubscriptionService seat counters (REQ-4)', () => {
       baseRow({ public_id: 'sub_2', seats: 50, plan_included_seats: 10 }),
     ] as never);
 
-    const rows = await service.list('org_public');
+    const rows = await service.list(scope);
 
     // First row: no purchased seats → falls back to plan.included_seats.
     expect(rows[0]!.seats_total).toBe(10);
     // Second row: purchased seats win over the plan fallback.
     expect(rows[1]!.seats_total).toBe(50);
-    // seats_used is the org membership count, shared across rows; resolved once.
+    // seats_used is the organization membership count, shared across rows; resolved once.
     expect(rows[0]!.seats_used).toBe(3);
     expect(rows[1]!.seats_used).toBe(3);
     expect(membershipSeatUsage.countActiveMembers).toHaveBeenCalledTimes(1);
@@ -103,12 +122,12 @@ describe('SubscriptionService seat counters (REQ-4)', () => {
     vi.mocked(repository.findByPublicId).mockResolvedValue(
       baseRow({ seats: null, plan_included_seats: null }) as never,
     );
-    const row = await service.get('org_public', 'sub_public');
+    const row = await service.get(scope, 'sub_public');
     expect(row.seats_total).toBeNull();
     expect(row.seats_used).toBe(3);
   });
 
-  it('reserveSeatCeilingForMemberAdd falls back to the Free-tier ceiling when the org has no active subscription (F3)', async () => {
+  it('reserveSeatCeilingForMemberAdd falls back to the Free-tier ceiling when the organization has no active subscription (F3)', async () => {
     vi.mocked(repository.findActiveSeatStateByOrganizationForUpdate).mockResolvedValue(null);
     vi.mocked(planService.getFreePlanSeatCeiling).mockResolvedValue(1);
     await expect(service.reserveSeatCeilingForMemberAdd(1)).resolves.toBe(1);
@@ -208,13 +227,13 @@ describe('SubscriptionService seat counters (REQ-4)', () => {
     expect(call.idempotencyKey).toMatch(/^seat-sync:org_public:/);
   });
 
-  it('enqueueSeatQuantitySync namespaces an explicit caller key by org before Stripe (changePlan path)', () => {
+  it('enqueueSeatQuantitySync namespaces an explicit caller key by organization before Stripe (changePlan path)', () => {
     service.enqueueSeatQuantitySync('org_public', 'client-key-123');
     const call = vi.mocked(seatSyncMocks.enqueueSubscriptionSeatSyncBestEffort).mock
       .calls[0]![0] as {
       idempotencyKey?: string;
     };
-    // sec-review: the raw client key must be org-namespaced so two orgs reusing the same client-key
+    // sec-review: the raw client key must be organization-namespaced so two organizations reusing the same client-key
     // string with the same resulting seat count cannot collide on ONE Stripe idempotency key
     // (`${token}:qty:${n}`) across different subscriptions (Stripe 400 → retries exhaust → no sync).
     expect(call.idempotencyKey).toBe('sub-seat-sync:org_public:client-key-123');

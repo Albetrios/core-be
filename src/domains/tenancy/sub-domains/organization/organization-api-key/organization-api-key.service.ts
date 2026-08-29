@@ -2,7 +2,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import { env } from '@/shared/config/env.config.js';
 import { ConflictError, NotFoundError } from '@/shared/errors/index.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { OrganizationApiKeyRepository } from './organization-api-key.repository.js';
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
@@ -53,7 +57,7 @@ function getKeyPrefix(key: string): string {
  *   validation errors propagate from the DTO validators.
  * - **Side effects:** persistent row writes (`create`, `update`,
  *   `softDelete`, `touchLastUsedAt`); mutations are wrapped in
- *   `withOrganizationDatabaseContext` to satisfy RLS.
+ *   `withAppDatabaseContext` to satisfy RLS.
  * - **Notes:** raw secret is returned to the caller exactly once (creation
  *   and rotation responses); revocation = soft-delete or status flip to
  *   `REVOKED`; key prefix is non-secret and used purely as a lookup index.
@@ -66,9 +70,10 @@ export class OrganizationApiKeyService {
     private readonly permissionRepository: PermissionRepository,
   ) {}
 
-  async list(organization_public_id: string, query: unknown) {
+  async list(scope: OrganizationPrincipalDatabaseScope, query: unknown) {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateListOrganizationApiKeysQuery(query);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const result = await this.apiKeyRepository.findByOrganizationId(
@@ -89,10 +94,11 @@ export class OrganizationApiKeyService {
   }
 
   async getByPublicId(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     api_key_public_id: string,
   ): Promise<OrganizationApiKeyOutput> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.apiKeyRepository.findByPublicId(api_key_public_id, organization.id);
@@ -102,11 +108,12 @@ export class OrganizationApiKeyService {
   }
 
   async create(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     created_by_user_public_id: string,
     options?: { expiresAtOverride?: Date | null },
   ): Promise<CreateOrganizationApiKeyResult> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateCreateOrganizationApiKey(body);
     await assertCallerCanGrantPermissionCodes({
       authorizationService: this.authorizationService,
@@ -115,10 +122,10 @@ export class OrganizationApiKeyService {
       organizationPublicId: organization_public_id,
       requestedPermissionCodes: parsed.scopes,
     });
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
-      // sec-r5-followup-ratelimit-dos-1 + audit-#8: serialize the per-org count + insert with a
+      // sec-r5-followup-ratelimit-dos-1 + audit-#8: serialize the per-organization count + insert with a
       // transaction-scoped advisory lock so concurrent creates cannot both pass the same count
       // and overshoot ORGANIZATION_API_KEY_MAX_PER_ORG. The lock auto-releases at commit.
       await this.apiKeyRepository.acquireCreationQuotaLock(organization.id);
@@ -160,13 +167,14 @@ export class OrganizationApiKeyService {
   }
 
   async update(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     api_key_public_id: string,
     body: unknown,
     updated_by_user_public_id: string | undefined,
   ): Promise<OrganizationApiKeyOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateOrganizationApiKey(body);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.apiKeyRepository.findByPublicId(api_key_public_id, organization.id);
@@ -184,8 +192,12 @@ export class OrganizationApiKeyService {
     });
   }
 
-  async delete(organization_public_id: string, api_key_public_id: string): Promise<void> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+  async delete(
+    scope: OrganizationPrincipalDatabaseScope,
+    api_key_public_id: string,
+  ): Promise<void> {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const deleted = await this.apiKeyRepository.softDelete(api_key_public_id, organization.id);
@@ -204,10 +216,11 @@ export class OrganizationApiKeyService {
       if (!hashCompare(candidate.key_hash, key_hash)) continue;
       if (candidate.expires_at && candidate.expires_at <= now) continue;
       // The resolver already returned the owning organization public id (FORCE RLS on
-      // tenancy.organizations means we cannot read it here without an org context). Establish that
+      // tenancy.organizations means we cannot read it here without an organization context). Establish that
       // context so the last_used_at touch passes the api_keys tenant-isolation policy.
-      await withOrganizationDatabaseContext(candidate.organization_public_id, () =>
-        this.apiKeyRepository.touchLastUsedAt(candidate.public_id),
+      await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: candidate.organization_public_id }),
+        () => this.apiKeyRepository.touchLastUsedAt(candidate.public_id),
       );
       return {
         public_id: candidate.public_id,
@@ -219,11 +232,12 @@ export class OrganizationApiKeyService {
   }
 
   async rotate(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     api_key_public_id: string,
     created_by_user_public_id: string,
   ): Promise<CreateOrganizationApiKeyResult> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const existing = await this.apiKeyRepository.findByPublicId(
@@ -240,7 +254,7 @@ export class OrganizationApiKeyService {
         throw new ConflictError('errors:apiKeyRotationConflict');
       }
       return this.create(
-        organization_public_id,
+        scope,
         { name: existing.name, scopes: existing.scopes },
         created_by_user_public_id,
         // Carry the replaced key's expiry forward so rotation preserves the original time-box.

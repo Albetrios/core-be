@@ -60,7 +60,7 @@ export const notifications = notifySchema
             ${table.organization_id} IS NOT NULL
             AND ${table.organization_id} = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
@@ -68,19 +68,19 @@ export const notifications = notifySchema
             ${table.organization_id} IS NOT NULL
             AND ${table.organization_id} = (
               SELECT id FROM tenancy.organizations
-              WHERE public_id = current_setting('app.current_organization_id', true)
+              WHERE public_id = current_setting('app.current_organization_public_id', true)
             )
           )`,
       }),
       // Owner access so a user can read/manage their own notifications (the service queries by
-      // user_id). Permissive → OR'd with tenant isolation; inert until app.current_user_id is set.
+      // user_id). Permissive → OR'd with tenant isolation; inert until app.current_user_public_id is set.
       pgPolicy('notifications_owner_access', {
         as: 'permissive',
         for: 'all',
         to: 'public',
         using: sql`${table.user_id} = (
             SELECT id FROM auth.users
-            WHERE public_id = current_setting('app.current_user_id', true)
+            WHERE public_id = current_setting('app.current_user_public_id', true)
               AND deleted_at IS NULL
           )`,
       }),

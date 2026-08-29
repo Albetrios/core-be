@@ -61,5 +61,6 @@ GitHub repo/environment sync is core-be's own tooling:
 | [environment-variables.md](runbooks/environment-variables.md)                           | Canonical env-var reference across every workflow.                         |
 | [add-new-environment.md](runbooks/add-new-environment.md)                               | Add another hosted target alongside `development` and `production`.        |
 | [redis-topology.md](runbooks/redis-topology.md)                                         | The two Redis surfaces and how they are provisioned.                       |
+| [maintenance-database-role.md](runbooks/maintenance-database-role.md)                  | Dedicated `core_be_maintenance` role + `DATABASE_MAINTENANCE_URL` provisioning.   |
 | [worker-scaling.md](runbooks/worker-scaling.md)                                         | BullMQ worker process: scaling, concurrency, resource envelope.            |
 | [stripe-subscription-reconciliation.md](runbooks/stripe-subscription-reconciliation.md) | API-initiated subscription changes vs Stripe webhooks — reconciliation.    |

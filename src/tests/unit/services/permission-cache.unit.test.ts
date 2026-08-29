@@ -30,10 +30,10 @@ describe('PermissionCacheService', () => {
   describe('getCachedPermissions', () => {
     it('returns null on cache miss', async () => {
       vi.mocked(redisConnection.get).mockResolvedValue(null);
-      const result = await getCachedPermissions('user-1', 'org-1');
+      const result = await getCachedPermissions('user-1', 'organization-1');
       expect(result).toBeNull();
-      expect(redisConnection.get).toHaveBeenCalledWith('perm:org:org-1:v');
-      expect(redisConnection.get).toHaveBeenCalledWith('perm:0:user-1:org-1');
+      expect(redisConnection.get).toHaveBeenCalledWith('perm:org:organization-1:v');
+      expect(redisConnection.get).toHaveBeenCalledWith('perm:0:user-1:organization-1');
     });
 
     it('returns parsed codes on cache hit', async () => {
@@ -44,25 +44,25 @@ describe('PermissionCacheService', () => {
           ? '0'
           : JSON.stringify(['billing:read', 'billing:manage']),
       );
-      const result = await getCachedPermissions('user-1', 'org-1');
+      const result = await getCachedPermissions('user-1', 'organization-1');
       expect(result).toEqual(['billing:read', 'billing:manage']);
     });
 
     it('returns null on Redis error', async () => {
       vi.mocked(redisConnection.get).mockRejectedValue(new Error('Redis down'));
-      const result = await getCachedPermissions('user-1', 'org-1');
+      const result = await getCachedPermissions('user-1', 'organization-1');
       expect(result).toBeNull();
     });
   });
 
   describe('setCachedPermissions', () => {
     it('stores codes in Redis with TTL plus jitter', async () => {
-      vi.mocked(redisConnection.get).mockResolvedValue(null); // org version unset → 0
+      vi.mocked(redisConnection.get).mockResolvedValue(null); // organization version unset → 0
       mockedRedisSet(redisConnection.set).mockResolvedValue('OK');
-      await setCachedPermissions('user-1', 'org-1', ['billing:read'], 600);
+      await setCachedPermissions('user-1', 'organization-1', ['billing:read'], 600);
       expect(redisConnection.set).toHaveBeenCalledTimes(1);
       const args = mockedRedisSet(redisConnection.set).mock.calls[0]!;
-      expect(args[0]).toBe('perm:0:user-1:org-1');
+      expect(args[0]).toBe('perm:0:user-1:organization-1');
       expect(args[1]).toBe('["billing:read"]');
       expect(args[2]).toBe('EX');
       const ttlSeconds = Number(args[3]);
@@ -73,12 +73,12 @@ describe('PermissionCacheService', () => {
 
   describe('invalidatePermissions', () => {
     it('deletes the cache key and recompute lock', async () => {
-      vi.mocked(redisConnection.get).mockResolvedValue(null); // org version unset → 0
+      vi.mocked(redisConnection.get).mockResolvedValue(null); // organization version unset → 0
       vi.mocked(redisConnection.del).mockResolvedValue(1);
-      await invalidatePermissions('user-1', 'org-1');
+      await invalidatePermissions('user-1', 'organization-1');
       expect(redisConnection.del).toHaveBeenCalledWith(
-        'perm:0:user-1:org-1',
-        'perm:lock:user-1:org-1',
+        'perm:0:user-1:organization-1',
+        'perm:lock:user-1:organization-1',
       );
     });
   });

@@ -58,9 +58,9 @@ worker cluster exceed 12 cores. The cluster has spare capacity; it just can't ge
    so seed `≈ VUS / 0.8` (`pnpm db:seed:loadtest`).
 7. **Loadtest server reachable** on `:3001` (`/livez` → 200).
 8. **Captcha fail-open + login** — a password login returns a token (proves `NODE_ENV=development + RATE_LIMIT_RELAXED_CAPS=true`, §1) and an
-   org-scoped read returns 200.
+   organization-scoped read returns 200.
 9. **Rate limits lifted** — a token works and isn't 429'd.
-10. **Role-cap headroom** — `max(roles/org)` well under `MEMBER_ROLE_MAX_PER_ORG` (data hygiene, §3).
+10. **Role-cap headroom** — `max(roles/organization)` well under `MEMBER_ROLE_MAX_PER_ORG` (data hygiene, §3).
 
 ---
 
@@ -75,7 +75,7 @@ Run a **dedicated** loadtest server (leave any normal `:3000` dev server alone).
 | `CAPTCHA_PROVIDER` | `disabled` | `disabled` | belt-and-suspenders with the `test` fail-open. |
 | `RATE_LIMIT_MAX` | `100000000` | `100` | all k6 traffic is one IP; the global limiter must never reject (it still runs — its cost is measured). |
 | `WEBHOOK_URL_ALLOWLIST` | `example.com` | `hooks.example.com,*.partner.example.com` | `POST /notify/webhooks` validates host vs allowlist **and** resolves it (SSRF/DNS-pin); `example.com` resolves to a public IP and passes both. |
-| `MEMBER_ROLE_MAX_PER_ORG` | `500` (max) | `50` | the journey create/deletes roles under concurrency; the default 50 is hit when many VUs share an org. |
+| `MEMBER_ROLE_MAX_PER_ORG` | `500` (max) | `50` | the journey create/deletes roles under concurrency; the default 50 is hit when many VUs share an organization. |
 | `POSTGRES_MAX_CONNECTIONS` | `500` | `100` | the connection-budget check reads this from **env**, not the live DB — must match the actual Postgres `max_connections` (§4). |
 | `DATABASE_POOL_MAX` | `44` (10-worker cluster) / `100` (single) | `10` | per-process pool. Budget: `(N_workers + 1) × pool ≤ Postgres max − 10` (§4) — `setup-loadtest.sh` computes it. |
 | `DEPLOYMENT_API_REPLICA_COUNT` | `= N_workers` | `2` | makes the budget check account for the cluster. |
@@ -94,21 +94,21 @@ Boot: single process `node dist/src/server.js` (after `pnpm build`); cluster via
 
 - **Pending-upload quota** (per user): the journey **deletes** the pending upload it creates so it
   never fills. Leak reset: `DELETE FROM upload.uploads WHERE status = 'PENDING';`
-- **`MEMBER_ROLE_MAX_PER_ORG`** (per org, env, max 500): raise it **and** clean leaked roles (§3).
+- **`MEMBER_ROLE_MAX_PER_ORG`** (per organization, env, max 500): raise it **and** clean leaked roles (§3).
 - **`MAX_TEAM_ORGANIZATIONS_PER_OWNER`** (20): why `create-org` is excluded from the journey (it
-  accumulates orgs with no cleanup — org-delete is destructive).
+  accumulates organizations with no cleanup — organization-delete is destructive).
 - **Idempotency** (`X-Idempotency-Key` on `POST /organizations|/memberships|/roles|/api-keys|/notification-policies|/webhooks|/uploads`): reused key
   - different body → 422. Keys are run-unique (`idem-<RUN>-<vu>-<iter>-<n>`).
 
 ## 3. Test data
 
 ```bash
-pnpm db:seed:loadtest   # 12 orgs x 10 users (override BULK_ORGS/BULK_USERS_PER_ORG for more)
+pnpm db:seed:loadtest   # 12 organizations x 10 users (override BULK_ORGS/BULK_USERS_PER_ORG for more)
 # for 200 VU you need >200 usable users; seed ~20x12: 
 ALLOW_BULK_SEED=1 BULK_PROFILE=demo BULK_ORGS=20 BULK_USERS_PER_ORG=12 pnpm db:seed:bulk && pnpm tool:load-test-credential-pool
 ```
 
-- **~20% of bulk users are unusable** — their org has an MFA-required policy, so password login
+- **~20% of bulk users are unusable** — their organization has an MFA-required policy, so password login
   returns `mfa_required` (no token). `setup()` filters these out (e.g. 174 of 216 usable).
 - **Data hygiene before a run** (leaks from prior runs slow every query → 403/p99 inflation):
 
@@ -154,20 +154,20 @@ RUN=$(date +%s) VUS=100 DURATION=60s k6 run src/tests/load/k6/scenarios/comprehe
 
 `VUS`, `DURATION`, `RUN` (unique per invocation — keeps names + idempotency keys unique),
 `THINK` (think-time s/phase, default 0.4), `WRITE_EVERY` (write phases every Nth iteration; >1 =
-read-dominant), `RARE` (`true` to include the cross-org member-invite flow — OFF by default because
+read-dominant), `RARE` (`true` to include the cross-organization member-invite flow — OFF by default because
 it churns other users' permission caches under load), `DIAG` (`true` logs each failure's status/body),
 `BASE_URL`.
 
 ## 5. Journey design (why each guard exists)
 
 - **`setup()` mints all tokens once** (login → `switch-to-organization`) and **filters** to
-  token-bearing, org-scoped admins; VUs index in. No per-request login → **can't storm** the per-IP
+  token-bearing, organization-scoped admins; VUs index in. No per-request login → **can't storm** the per-IP
   login limit. It also issues one **cache-warming** read per user.
 - **No re-auth by default** (`REAUTH=false`): re-login on 401 from one IP self-amplifies into a login
   storm under load. (Tokens last 900 s; runs are shorter.)
 - **Run-unique names + idempotency keys** (`RUN`) — no cross-run slug/key collisions.
 - **Self-cleaning writes** — created roles/keys/policies/webhooks/uploads/memberships are deleted
-  in-iteration so data + per-org caps don't grow.
+  in-iteration so data + per-organization caps don't grow.
 - **Per-op metrics**: total / `Server-Timing` server-compute / TTFB(waiting) / queue+network, plus
   per-op 4xx/429/503 counters. `handleSummary` prints a table sorted by server-compute and writes
   `/tmp/journey-<vus>vu.json`.

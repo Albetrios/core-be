@@ -56,7 +56,7 @@ describe('Billing account reads — unconfigured provider degradation', () => {
     await seedPermissions([...BILLING_PERMISSIONS]);
   });
 
-  /** Team org with billing permissions and an ACTIVE subscription carrying a Stripe customer id. */
+  /** Team organization with billing permissions and an ACTIVE subscription carrying a Stripe customer id. */
   async function createBillingReadContext() {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });

@@ -38,7 +38,7 @@ describe('Security: Privilege escalation', () => {
     await seedPermissions(Object.values(TENANCY_PERMISSIONS));
   });
 
-  /** Helper: create a user with the given permission codes and return token + org. */
+  /** Helper: create a user with the given permission codes and return token + organization. */
   async function createMemberWithPermissions(permissionCodes: string[]) {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });
@@ -123,12 +123,12 @@ describe('Security: Privilege escalation', () => {
     expect(response.statusCode).toBe(403);
   });
 
-  // NEGATIVE — user in org A with valid token cannot access org B membership list.
-  // Flat routes resolve the org from the `org` claim, so cross-tenant access is
-  // expressed by scoping member A's token to org B's claim: A has no membership
+  // NEGATIVE — user in organization A with valid token cannot access organization B membership list.
+  // Flat routes resolve the organization from the `org` claim, so cross-tenant access is
+  // expressed by scoping member A's token to organization B's claim: A has no membership
   // in B, so the permission preHandler denies it. A's privileges in A grant
   // nothing in B.
-  it("should return 403 when an org-A user claims org-B and lists B's memberships", async () => {
+  it("should return 403 when an organization-A user claims organization-B and lists B's memberships", async () => {
     const memberA = await createMemberWithPermissions([TENANCY_PERMISSIONS.MEMBERSHIP_READ]);
     const memberB = await createMemberWithPermissions([TENANCY_PERMISSIONS.MEMBERSHIP_READ]);
 
@@ -146,11 +146,11 @@ describe('Security: Privilege escalation', () => {
     expect(response.statusCode).toBe(403);
   });
 
-  // NEGATIVE — user in org A cannot update a role in org B.
-  // Member A holds ROLE_MANAGE in A, but a token scoped to org B's claim grants
+  // NEGATIVE — user in organization A cannot update a role in organization B.
+  // Member A holds ROLE_MANAGE in A, but a token scoped to organization B's claim grants
   // nothing in B; even addressing B's role id, the permission preHandler denies
-  // before any org-scoped lookup.
-  it("should return 403 when an org-A member claims org-B and updates B's role", async () => {
+  // before any organization-scoped lookup.
+  it("should return 403 when an organization-A member claims organization-B and updates B's role", async () => {
     const memberA = await createMemberWithPermissions([TENANCY_PERMISSIONS.ROLE_MANAGE]);
     const memberB = await createMemberWithPermissions([TENANCY_PERMISSIONS.ROLE_MANAGE]);
 
@@ -191,7 +191,7 @@ describe('Security: Privilege escalation', () => {
       // Intentionally missing MEMBERSHIP_MANAGE
     ]);
 
-    // Fetch a real membership id from the (flat, org-from-claim) list — the
+    // Fetch a real membership id from the (flat, organization-from-claim) list — the
     // paginated payload is `data: [{ id, user_id, ... }]`. Using a real row
     // makes the 403 meaningful: the request reaches the MEMBERSHIP_MANAGE
     // preHandler and is denied, rather than failing earlier on a bad id.
@@ -252,7 +252,7 @@ describe('Security: Privilege escalation', () => {
       method: 'PATCH',
       url: testApiPath('/tenancy/organization'),
       token,
-      payload: { name: 'Escalated org name' },
+      payload: { name: 'Escalated organization name' },
     });
 
     expect(response.statusCode).toBe(403);

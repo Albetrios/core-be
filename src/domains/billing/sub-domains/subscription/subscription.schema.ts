@@ -88,14 +88,14 @@ export const subscriptions = billingSchema
       check('chk_subs_period', sql`${table.current_period_end} > ${table.current_period_start}`),
       check('chk_subs_updated', sql`${table.updated_at} >= ${table.created_at}`),
       // audit #41: the USING arm keeps the retention-cleanup bypass so the
-      // global retention worker can SELECT/DELETE org rows it must purge, but
+      // global retention worker can SELECT/DELETE organization rows it must purge, but
       // the explicit WITH CHECK omits it. Without an explicit WITH CHECK,
       // Postgres reuses USING for the write-side check, which would let any
       // context with `app.global_retention_cleanup='true'` INSERT/UPDATE a
       // subscription row under an arbitrary `organization_id`. Pinning WITH
-      // CHECK to the current-org GUC forces every write to land in the active
+      // CHECK to the current-organization GUC forces every write to land in the active
       // tenant (HTTP request context or the Stripe-webhook
-      // `withOrganizationContext`), closing the cross-tenant write hole. No
+      // `withAppDatabaseContext`), closing the cross-tenant write hole. No
       // legitimate writer ever inserts/updates subscriptions under the
       // retention GUC, so dropping the bypass on the write side is safe.
       pgPolicy('subscriptions_tenant_isolation', {
@@ -104,12 +104,12 @@ export const subscriptions = billingSchema
         to: 'public',
         using: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations
-            WHERE public_id = current_setting('app.current_organization_id', true)
+            WHERE public_id = current_setting('app.current_organization_public_id', true)
           )
           OR current_setting('app.global_retention_cleanup', true) = 'true'`,
         withCheck: sql`${table.organization_id} = (
             SELECT id FROM tenancy.organizations
-            WHERE public_id = current_setting('app.current_organization_id', true)
+            WHERE public_id = current_setting('app.current_organization_public_id', true)
           )`,
       }),
     ],

@@ -22,7 +22,7 @@ installs; the script (`tooling/dev/setup-mac-tools.sh`) just dispatches each ent
 
 | Tool | Why | Source (authenticated) |
 | --- | --- | --- |
-| **Homebrew** | package manager for everything below | official installer (`NONINTERACTIVE=1`), Homebrew GitHub org |
+| **Homebrew** | package manager for everything below | official installer (`NONINTERACTIVE=1`), Homebrew GitHub organization |
 | **Node.js** (`.nvmrc` major — 24) | runtime; pnpm via `corepack` | Homebrew — only if missing/older than `.nvmrc` (an existing nvm/fnm Node is left alone) |
 | **gitleaks** | pre-commit + CI secret scan | Homebrew |
 | **gh** | GitHub CLI (env/ruleset sync, PR tooling) | Homebrew |

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 
 /**
  * Postgres advisory-lock namespaces (`classid`) for per-scope resource-creation quotas (audit-#8).
@@ -39,7 +39,7 @@ export const RESOURCE_QUOTA_LOCK_NAMESPACE = {
  * @remarks
  * - **Algorithm:** `pg_advisory_xact_lock(namespace, objid)` on the request-scoped connection; the
  *   lock auto-releases at COMMIT/ROLLBACK. MUST be acquired inside the same transaction as the
- *   subsequent `count(...) >= cap` check and the insert (e.g. within `withOrganizationDatabaseContext`).
+ *   subsequent `count(...) >= cap` check and the insert (e.g. within `withAppDatabaseContext`).
  *   The `objid` is `hashtextextended(key) & 0x7fffffff` — a stable positive int4 hash of the scope
  *   id, so `bigserial` keys beyond int4's 2.1B max can never overflow the int4 `objid` (B-1). A hash
  *   collision only causes harmless extra contention; the count is still independently scope-filtered.

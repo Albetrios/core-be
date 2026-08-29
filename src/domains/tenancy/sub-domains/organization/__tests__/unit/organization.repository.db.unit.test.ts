@@ -116,7 +116,7 @@ describe('OrganizationRepository (database)', () => {
     await repository.markDeletionStarted(organization.public_id);
     await repository.softDelete(organization.public_id);
 
-    // Must return null — soft-deleted org must not be assigned a Stripe customer id.
+    // Must return null — soft-deleted organization must not be assigned a Stripe customer id.
     const result = await repository.updateStripeCustomerId(organization.id, 'cus_ghost_123');
     expect(result).toBeNull();
   });
@@ -165,7 +165,7 @@ describe('OrganizationRepository (database)', () => {
     expect(finalState?.owner_user_id).toBe(activeMember.id);
   });
 
-  it('route-audit-#2: countActiveOwnedByUser counts only active orgs owned by the user', async () => {
+  it('route-audit-#2: countActiveOwnedByUser counts only active organizations owned by the user', async () => {
     const owner = await createTestUser({ email: 'count-owner@test.com' });
     const other = await createTestUser({ email: 'count-other@test.com' });
     expect(await repository.countActiveOwnedByUser(owner.id)).toBe(0);
@@ -176,7 +176,7 @@ describe('OrganizationRepository (database)', () => {
     // Orgs owned by a different user don't count toward this owner.
     expect(await repository.countActiveOwnedByUser(other.id)).toBe(0);
 
-    // A soft-deleted org drops out of the count (softDelete requires deletion_started_at first).
+    // A soft-deleted organization drops out of the count (softDelete requires deletion_started_at first).
     await repository.markDeletionStarted(org1.public_id);
     await repository.softDelete(org1.public_id);
     expect(await repository.countActiveOwnedByUser(owner.id)).toBe(1);

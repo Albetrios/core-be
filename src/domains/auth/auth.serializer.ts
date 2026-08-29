@@ -39,7 +39,7 @@ export const AuthSerializer = {
     };
   },
   /**
-   * Access token plus the active-org delta returned by the org-switch endpoints
+   * Access token plus the active-organization delta returned by the organization-switch endpoints
    * (`switch-to-organization` / `switch-to-personal`): the newly active organization
    * (with capabilities) and the caller's resolved permissions in it, so the client
    * repaints the dashboard without a follow-up `GET /auth/me/context`.

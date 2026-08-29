@@ -4,16 +4,17 @@ import { createMemberRolePermissionController } from '@/domains/tenancy/sub-doma
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { NotFoundError, UnauthorizedError } from '@/shared/errors/index.js';
 import type { MemberRolePermissionService } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.service.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScope({
     auth: { kind: 'user', userId: generatePublicId('user'), role: 'user' },
     params: {},
     body: {},
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {
@@ -43,7 +44,10 @@ describe('createMemberRolePermissionController', () => {
       mockRequest({ params: { organization_id: organizationPublicId, role_id: rolePublicId } }),
       mockReply(),
     );
-    expect(service.list).toHaveBeenCalledWith(organizationPublicId, rolePublicId);
+    expect(service.list).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      rolePublicId,
+    );
     expect(response).toMatchObject({
       data: [{ role_id: rolePublicId, permission_code: 'tenancy:read' }],
       meta: { pagination: { has_more: false, next: null, estimated_total: 1 } },
@@ -93,7 +97,12 @@ describe('createMemberRolePermissionController', () => {
       }),
       mockReply(),
     );
-    expect(service.put).toHaveBeenCalledWith(organizationPublicId, rolePublicId, body, userId);
+    expect(service.put).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      rolePublicId,
+      body,
+      userId,
+    );
     expect(response).toMatchObject({
       data: [{ role_id: rolePublicId, permission_code: 'tenancy:read' }],
     });

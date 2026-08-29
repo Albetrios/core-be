@@ -36,7 +36,7 @@ export interface CreateOrganizationApiKeyResult {
   raw_key: string;
 }
 
-/** Successful authentication match returned by `OrganizationApiKeyService.authenticate` (carries the org and granted scopes). */
+/** Successful authentication match returned by `OrganizationApiKeyService.authenticate` (carries the organization and granted scopes). */
 export interface OrganizationApiKeyAuthMatch {
   public_id: string;
   organization_public_id: string;
@@ -46,7 +46,7 @@ export interface OrganizationApiKeyAuthMatch {
 /**
  * Candidate row returned by the `tenancy.resolve_api_key_for_authentication` SECURITY DEFINER
  * resolver — enough to verify the secret and establish tenancy without reading `tenancy.api_keys`
- * or `tenancy.organizations` directly (both are FORCE RLS and the auth phase has no org context).
+ * or `tenancy.organizations` directly (both are FORCE RLS and the auth phase has no organization context).
  */
 export interface OrganizationApiKeyAuthenticationCandidate {
   public_id: string;

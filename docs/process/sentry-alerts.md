@@ -26,7 +26,7 @@ Create these in **Sentry → Alerts → Create Alert** (issue or metric alert). 
 | **P95 transaction regression** | Metric | `transaction.duration` p95 > 2s for 10m, exclude `/livez` and `/readyz` | Email |
 | **DB pool exhaustion** | Issues | Message `database.pool.exhaustion.high` or `database.pool.exhaustion.critical` | Email + Slack |
 
-Pool exhaustion alerts are emitted by the API process when org-scoped RLS checkouts or cluster `pg_stat_activity` counts exceed configured ratios for consecutive polls (`DB_POOL_*` env vars). This path is **independent** of `METRICS_ENABLED`.
+Pool exhaustion alerts are emitted by the API process when organization-scoped RLS checkouts or cluster `pg_stat_activity` counts exceed configured ratios for consecutive polls (`DB_POOL_*` env vars). This path is **independent** of `METRICS_ENABLED`.
 
 ---
 

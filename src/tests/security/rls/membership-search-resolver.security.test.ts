@@ -17,8 +17,8 @@ import {
  * (`tenancy.search_organization_membership_ids`, migration 20260702000000).
  *
  * Server-side member search matches on the member's user email / name, which live in `auth.users` —
- * a FORCE ROW LEVEL SECURITY table behind a self-owner policy keyed on `app.current_user_id`. The
- * members list runs under ORG-only context (`app.current_organization_id` set, `app.current_user_id`
+ * a FORCE ROW LEVEL SECURITY table behind a self-owner policy keyed on `app.current_user_public_id`. The
+ * members list runs under ORG-only context (`app.current_organization_public_id` set, `app.current_user_public_id`
  * NOT set), so under the non-superuser `core_be_app` role a plain join from `tenancy.memberships`
  * to `auth.users` resolves the auth.users policy to NULL and returns ZERO rows — search would
  * silently match nothing in production while passing under the RLS-exempt CI superuser. The resolver
@@ -51,7 +51,7 @@ describe('Security: member-search resolver under FORCE RLS', () => {
     await cleanupDatabase();
   });
 
-  it('resolver returns the matching membership id under org-only context, where a raw join is RLS-blocked to 0 rows', async () => {
+  it('resolver returns the matching membership id under organization-only context, where a raw join is RLS-blocked to 0 rows', async () => {
     const owner = await createTestUser({ email: 'rls-owner@example.com' });
     const organization = await createTestOrganization({ ownerUserId: owner.id });
     const role = await createRoleWithPermissions({
@@ -71,7 +71,7 @@ describe('Security: member-search resolver under FORCE RLS', () => {
     });
 
     await executeAsCoreBeAppTenant(organization.public_id, async (transaction) => {
-      // Memberships ARE visible under the org GUC (proves the org policy is satisfied)…
+      // Memberships ARE visible under the organization GUC (proves the organization policy is satisfied)…
       const membershipCount = await transaction.execute(
         drizzleSql`SELECT count(*)::int AS count FROM tenancy.memberships WHERE organization_id = ${organization.id}`,
       );
@@ -96,36 +96,40 @@ describe('Security: member-search resolver under FORCE RLS', () => {
     });
   });
 
-  it('resolver is organization-scoped: it never returns another org’s matching membership', async () => {
+  it('resolver is organization-scoped: it never returns another organization’s matching membership', async () => {
     const shared = await createTestUser({ email: 'rls-shared@example.com' });
 
     const ownerA = await createTestUser({ email: 'rls-a@example.com' });
-    const orgA = await createTestOrganization({ ownerUserId: ownerA.id });
+    const organizationA = await createTestOrganization({ ownerUserId: ownerA.id });
     const roleA = await createRoleWithPermissions({
-      organizationId: orgA.id,
+      organizationId: organizationA.id,
       permissionCodes: [],
       createdByUserId: ownerA.id,
     });
     const membershipA = await createMembership({
       userId: shared.id,
-      organizationId: orgA.id,
+      organizationId: organizationA.id,
       roleId: roleA.id,
     });
 
     const ownerB = await createTestUser({ email: 'rls-b@example.com' });
-    const orgB = await createTestOrganization({ ownerUserId: ownerB.id });
+    const organizationB = await createTestOrganization({ ownerUserId: ownerB.id });
     const roleB = await createRoleWithPermissions({
-      organizationId: orgB.id,
+      organizationId: organizationB.id,
       permissionCodes: [],
       createdByUserId: ownerB.id,
     });
-    await createMembership({ userId: shared.id, organizationId: orgB.id, roleId: roleB.id });
+    await createMembership({
+      userId: shared.id,
+      organizationId: organizationB.id,
+      roleId: roleB.id,
+    });
 
-    await executeAsCoreBeAppTenant(orgA.public_id, async (transaction) => {
+    await executeAsCoreBeAppTenant(organizationA.public_id, async (transaction) => {
       const resolved = await transaction.execute(
-        drizzleSql`SELECT id FROM tenancy.search_organization_membership_ids(${orgA.id}::bigint, ${'%rls-shared%'}::text)`,
+        drizzleSql`SELECT id FROM tenancy.search_organization_membership_ids(${organizationA.id}::bigint, ${'%rls-shared%'}::text)`,
       );
-      // Only org A's membership for the shared user — org B's row for the same email is excluded.
+      // Only organization A's membership for the shared user — organization B's row for the same email is excluded.
       expect(idsFromResult(resolved)).toEqual([membershipA.id]);
     });
   });

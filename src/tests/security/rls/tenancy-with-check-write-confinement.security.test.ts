@@ -18,11 +18,11 @@ import {
  * flips a non-key column (proving visibility), never the `organization_id` itself.
  *
  * These tenancy policies declare USING with a null WITH CHECK, so Postgres reuses the USING
- * predicate as the WITH CHECK for writes. This closes the gap: under org B's tenant context (the
- * least-privilege `core_be_app` role with `app.current_organization_id` set, no user GUC),
- * reassigning a visible org-B row to org A must be rejected by the policy — the DB backstop that
- * catches an application bug writing the wrong `organization_id`. A same-org reassignment is the
- * positive control, proving the rejection is the org predicate and not a blanket permission denial.
+ * predicate as the WITH CHECK for writes. This closes the gap: under organization B's tenant context (the
+ * least-privilege `core_be_app` role with `app.current_organization_public_id` set, no user GUC),
+ * reassigning a visible organization-B row to organization A must be rejected by the policy — the DB backstop that
+ * catches an application bug writing the wrong `organization_id`. A same-organization reassignment is the
+ * positive control, proving the rejection is the organization predicate and not a blanket permission denial.
  */
 const TENANCY_ORG_SCOPED_TABLES = [
   { schemaName: 'tenancy', tableName: 'memberships' },
@@ -66,7 +66,7 @@ async function updateReturningCountAsTenant(
   });
 }
 
-describe('Security: tenancy RLS WITH CHECK confines cross-org writes', () => {
+describe('Security: tenancy RLS WITH CHECK confines cross-organization writes', () => {
   let fixture: RlsTenantFixture;
   let organizationAInternalId: number;
   let organizationBInternalId: number;
@@ -85,7 +85,7 @@ describe('Security: tenancy RLS WITH CHECK confines cross-org writes', () => {
   });
 
   it.each(TENANCY_ORG_SCOPED_TABLES)(
-    'rejects reassigning a $tableName row from org B to org A (WITH CHECK)',
+    'rejects reassigning a $tableName row from organization B to organization A (WITH CHECK)',
     async ({ schemaName, tableName }) => {
       const rowIds = fixture.rowIdsByTable.get(tableKey(schemaName, tableName));
       expect(rowIds, `fixture seeds a ${tableName} row for both orgs`).toBeDefined();
@@ -108,11 +108,11 @@ describe('Security: tenancy RLS WITH CHECK confines cross-org writes', () => {
     },
   );
 
-  it('allows a same-org reassignment under the matching tenant context (positive control)', async () => {
+  it('allows a same-organization reassignment under the matching tenant context (positive control)', async () => {
     const rowIds = fixture.rowIdsByTable.get(tableKey('tenancy', 'memberships'))!;
 
-    // Re-asserting the row to its own org passes the predicate and updates exactly one row —
-    // proving the rejections above are the org WITH CHECK, not a blanket permission denial.
+    // Re-asserting the row to its own organization passes the predicate and updates exactly one row —
+    // proving the rejections above are the organization WITH CHECK, not a blanket permission denial.
     const affected = await updateReturningCountAsTenant(
       fixture.organizationBPublicId,
       `UPDATE "tenancy"."memberships" SET organization_id = ${organizationBInternalId} WHERE id = ${rowIds.organizationB} RETURNING id`,

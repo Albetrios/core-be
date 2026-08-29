@@ -158,30 +158,37 @@ describe('MembershipRepository (database)', () => {
 
   it('q search is organization-scoped (no cross-organization leak)', async () => {
     const ownerA = await createTestUser({ email: 'scope-owner-a@test.com' });
-    const orgA = await createTestOrganization({ ownerUserId: ownerA.id });
+    const organizationA = await createTestOrganization({ ownerUserId: ownerA.id });
     const roleA = await createRoleWithPermissions({
-      organizationId: orgA.id,
+      organizationId: organizationA.id,
       permissionCodes: ['organization:read'],
     });
     const ownerB = await createTestUser({ email: 'scope-owner-b@test.com' });
-    const orgB = await createTestOrganization({ ownerUserId: ownerB.id });
+    const organizationB = await createTestOrganization({ ownerUserId: ownerB.id });
     const roleB = await createRoleWithPermissions({
-      organizationId: orgB.id,
+      organizationId: organizationB.id,
       permissionCodes: ['organization:read'],
     });
-    // Same searchable member email present in BOTH orgs.
+    // Same searchable member email present in BOTH organizations.
     const shared = await createTestUser({ email: 'crossorg@example.com' });
     const inA = await createMembership({
       userId: shared.id,
-      organizationId: orgA.id,
+      organizationId: organizationA.id,
       roleId: roleA.id,
     });
-    await createMembership({ userId: shared.id, organizationId: orgB.id, roleId: roleB.id });
+    await createMembership({
+      userId: shared.id,
+      organizationId: organizationB.id,
+      roleId: roleB.id,
+    });
 
-    const resultA = await repository.findByOrganizationId(orgA.id, { limit: 20, q: 'crossorg' });
+    const resultA = await repository.findByOrganizationId(organizationA.id, {
+      limit: 20,
+      q: 'crossorg',
+    });
     expect(resultA.items).toHaveLength(1);
     expect(resultA.items[0]!.public_id).toBe(inA.public_id);
-    expect(resultA.items[0]!.organization_id).toBe(orgA.id);
+    expect(resultA.items[0]!.organization_id).toBe(organizationA.id);
   });
 
   it('returns null for missing memberships and supports non-active updates', async () => {
@@ -261,7 +268,7 @@ describe('MembershipRepository (database)', () => {
     expect(activated?.status).toBe('ACTIVE');
     expect(activated?.joined_at).not.toBeNull();
 
-    // The exploit: a SUSPENDED member (per-org ban) must NOT be able to self-restore to ACTIVE
+    // The exploit: a SUSPENDED member (per-organization ban) must NOT be able to self-restore to ACTIVE
     // by accepting a still-pending invitation — activate is a no-op and the ban stands.
     const banned = await createTestUser({ email: 'activate-banned@test.com' });
     const suspended = await createMembership({

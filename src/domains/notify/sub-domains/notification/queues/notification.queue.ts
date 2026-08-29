@@ -13,7 +13,7 @@ import {
 /** BullMQ queue name for asynchronous notification dispatch (in-app + email fan-out). */
 export const NOTIFICATION_QUEUE_NAME = 'notification';
 
-/** Only ids are stored in Redis; content is loaded in the worker from Postgres with org scoping. */
+/** Only ids are stored in Redis; content is loaded in the worker from Postgres with organization scoping. */
 export type NotificationJobData = NotificationJobDataValidated;
 
 let notificationQueue: Queue<NotificationJobData> | null = null;

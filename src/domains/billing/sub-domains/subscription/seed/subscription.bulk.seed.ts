@@ -1,19 +1,19 @@
 /**
  * Subscription bulk seeder — for every organization in the registry, creates
- * `counts.subscriptionsPerOrg` subscriptions linked to a plan from the catalog and the org owner.
+ * `counts.subscriptionsPerOrg` subscriptions linked to a plan from the catalog and the organization owner.
  *
  * Status spread vs. the schema: `idx_subscriptions_org` is a partial unique index that permits at
- * most one non-`CANCELED` subscription per organization (Issue #10). So each org gets exactly one
- * live subscription (its status rotated across the non-terminal values by org index, so the whole
+ * most one non-`CANCELED` subscription per organization (Issue #10). So each organization gets exactly one
+ * live subscription (its status rotated across the non-terminal values by organization index, so the whole
  * dataset still covers every live status) and the remaining rows are `CANCELED`. Across the run
  * every value of the `chk_subs_status` constraint is exercised.
  *
  * Idempotency: every bulk row carries a deterministic marker `provider_subscription_id` of the
- * form `sub_bulk_<organizationId>_<index>`. The seeder counts existing markers per org and only
+ * form `sub_bulk_<organizationId>_<index>`. The seeder counts existing markers per organization and only
  * creates the missing higher indices, so a re-run with the same counts is a no-op.
  */
 import { and, eq, like } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { plans } from '@/domains/billing/sub-domains/plan/plan.schema.js';
 import { subscriptions } from '@/domains/billing/sub-domains/subscription/subscription.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
@@ -49,10 +49,10 @@ function bulkPrefixForOrganization(organizationId: number): string {
  * Seeds subscriptions for every organization in `context.registry.organizations`.
  *
  * @remarks
- * Algorithm: load the plan catalog once, then for each org count existing bulk markers and insert
- * only the missing higher indices (index 0 = a live subscription whose status rotates by org index;
+ * Algorithm: load the plan catalog once, then for each organization count existing bulk markers and insert
+ * only the missing higher indices (index 0 = a live subscription whose status rotates by organization index;
  * later indices = `CANCELED`). Side effects: inserts into `billing.subscriptions`. Failure modes:
- * warns and returns early if the org registry or plan catalog is empty; otherwise propagates DB
+ * warns and returns early if the organization registry or plan catalog is empty; otherwise propagates DB
  * errors.
  */
 export async function seedSubscriptionsBulk(context: SeedContext): Promise<void> {

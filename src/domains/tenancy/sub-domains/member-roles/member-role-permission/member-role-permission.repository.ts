@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.schema.js';
 
 /**
@@ -24,13 +24,13 @@ const MEMBER_ROLE_PERMISSION_MAX_ROWS_PER_ROLE = 256;
  * **Tenant-isolation precondition (audit L4):** `role_permissions` has no
  * `organization_id` column — these queries scope by `role_id` and rely on the
  * caller having resolved the role *within the active organization* (the service
- * loads the role org-scoped before mutating its permissions). The
+ * loads the role organization-scoped before mutating its permissions). The
  * `role_permissions_tenant_isolation` RLS policy backstops both halves: `USING`
  * confines reads/deletes to `role_id IN (SELECT id FROM tenancy.roles WHERE
- * organization_id = current-org)`, and — since audit H1 added the explicit
- * `WITH CHECK` — inserts are confined to the same org-owned role set, so a write
+ * organization_id = current-organization)`, and — since audit H1 added the explicit
+ * `WITH CHECK` — inserts are confined to the same organization-owned role set, so a write
  * can never land a permission row on a foreign org's role even under a retention
- * context. No redundant org predicate is added here to avoid threading
+ * context. No redundant organization predicate is added here to avoid threading
  * `organization_id` through a join the RLS policy already enforces.
  */
 export class MemberRolePermissionRepository {

@@ -73,7 +73,7 @@ describe('stripe webhook backoff curve (property)', () => {
 describe('stripe idempotency key builder (property)', () => {
   const segment = fc.stringMatching(/^[a-z0-9_-]{1,40}$/);
 
-  it('returns undefined exactly when the client sent no key, for any operation/org pair', () => {
+  it('returns undefined exactly when the client sent no key, for any operation/organization pair', () => {
     fc.assert(
       fc.property(segment, segment, (operation, organization) => {
         // Absent client key → absent Stripe key. Stripe treats an undefined key as

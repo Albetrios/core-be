@@ -16,7 +16,7 @@ export const WEBHOOK_DELIVERY_QUEUE_NAME = 'webhook-delivery';
 /** Total BullMQ job attempts (initial + retries). Worker derives its final-attempt guard from this. */
 export const WEBHOOK_DELIVERY_JOB_ATTEMPTS = 5;
 
-/** Delivery attempt id and org scope are stored in Redis; payload and secrets live in Postgres. */
+/** Delivery attempt id and organization scope are stored in Redis; payload and secrets live in Postgres. */
 export type WebhookDeliveryJobData = WebhookDeliveryJobDataValidated;
 
 let webhookDeliveryQueue: Queue<WebhookDeliveryJobData> | null = null;

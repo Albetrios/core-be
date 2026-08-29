@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { createMemberInvitationController } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { ValidationError } from '@/shared/errors/index.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 // sec-new-T2: invitationId path-param validation for the remaining invitation routes
 // (accept / revoke / resend). Add-member issues invitations via POST /memberships (REQ-1), so the
@@ -21,14 +22,19 @@ describe('createMemberInvitationController — invitationId path-param validatio
   const controller = createMemberInvitationController(service as never);
 
   function mockUserRequest(params: Record<string, string>): FastifyRequest {
-    return {
-      auth: { kind: 'user', userId: generatePublicId('user'), role: 'USER' },
+    return attachPrincipalScope({
+      auth: {
+        kind: 'user',
+        userId: generatePublicId('user'),
+        role: 'USER',
+        organizationPublicId,
+      },
       params,
       body: {},
       query: {},
       headers: {},
       id: 'req-id',
-    } as unknown as FastifyRequest;
+    }) as unknown as FastifyRequest;
   }
 
   function mockReply(): FastifyReply {
@@ -78,7 +84,10 @@ describe('createMemberInvitationController — invitationId path-param validatio
       mockUserRequest({ organization_id: organizationPublicId, invitation_id: invitationPublicId }),
       mockReply(),
     );
-    expect(service.revoke).toHaveBeenCalledWith(organizationPublicId, invitationPublicId);
+    expect(service.revoke).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
+      invitationPublicId,
+    );
   });
 
   it('resendInvitation rejects a malformed invitationId (sec-new-T2)', async () => {
@@ -97,7 +106,7 @@ describe('createMemberInvitationController — invitationId path-param validatio
       mockReply(),
     );
     expect(service.resend).toHaveBeenCalledWith(
-      organizationPublicId,
+      expect.objectContaining({ organizationPublicId: organizationPublicId }),
       invitationPublicId,
       expect.anything(),
       expect.objectContaining({ requestId: expect.any(String) }),

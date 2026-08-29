@@ -231,7 +231,7 @@ Steps in each deploy workflow:
 
 **GHCR images (CI):** On push to **`main`**, the reusable [reusable-docker-build-trivy.yml](../../../.github/workflows/reusable-docker-build-trivy.yml) job builds API + worker images, runs Trivy (CRITICAL/HIGH, `exit-code: 1`), then pushes to GHCR. PRs build and scan only (no push).
 
-**Railway pull access:** Each Railway service must be allowed to pull from `ghcr.io` (package visibility + deploy token or linked registry). Images are public within the org or use Railway’s registry credentials for private GHCR packages.
+**Railway pull access:** Each Railway service must be allowed to pull from `ghcr.io` (package visibility + deploy token or linked registry). Images are public within the organization or use Railway’s registry credentials for private GHCR packages.
 
 **Optional GitHub environment secrets:**
 

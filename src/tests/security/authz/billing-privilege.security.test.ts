@@ -58,7 +58,7 @@ describe('Security: billing privilege separation', () => {
   });
 
   /**
-   * A team org holding an ACTIVE subscription, plus a member whose role grants
+   * A team organization holding an ACTIVE subscription, plus a member whose role grants
    * `subscription:read` and deliberately NOT `subscription:manage`.
    */
   async function createReadOnlyMemberContext() {

@@ -4,15 +4,21 @@ import type { UserRepository } from '@/domains/user/user.repository.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
-vi.mock('@/infrastructure/database/contexts/global-admin-database.context.js', () => ({
-  withGlobalAdminDatabaseContext: vi.fn((callback: () => Promise<unknown>) => callback()),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const inner = vi.fn((callback: () => Promise<unknown>) => callback()) as unknown as (
+    ...parameters: unknown[]
+  ) => unknown;
+  return {
+    ...actual,
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+    withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+      inner(...parameters),
+    ),
+  };
+});
 
 vi.mock('@/shared/utils/infrastructure/postgres-error.util.js', () => ({
   runInsertWithPublicIdentifierRetry: async (operation: () => Promise<unknown>) => operation(),

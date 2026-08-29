@@ -10,11 +10,11 @@ Per-organization role definitions and the role ↔ permission join table. A `mem
 
 ## Key invariants
 
-- **Roles are organization-scoped**: every role row carries `organization_id`; cross-org reads are forbidden by RLS.
+- **Roles are organization-scoped**: every role row carries `organization_id`; cross-organization reads are forbidden by RLS.
 - **Permission catalog is global, role assignments are scoped**: the permission constants (`TENANCY_PERMISSIONS`, `BILLING_PERMISSIONS`, etc.) are platform-defined; what a role grants is per-organization.
-- **Updating a role's permissions invalidates every member's cache**: role-permission replacement and role deletion bump the organization permission cache version (`invalidateOrganizationPermissions`), orphaning every `(user, org)` cache key in the org in O(1) — a role change can affect many members, so the whole org namespace is invalidated rather than enumerating holders.
+- **Updating a role's permissions invalidates every member's cache**: role-permission replacement and role deletion bump the organization permission cache version (`invalidateOrganizationPermissions`), orphaning every `(user, organization)` cache key in the organization in O(1) — a role change can affect many members, so the whole organization namespace is invalidated rather than enumerating holders.
 - **Built-in roles are uneditable** (when present): the seed creates "Owner" / "Admin" / "Member" with fixed permission sets that admins can clone but not edit in place.
-- **Role reads project a live `member_count`**: the list / get / create / update role responses include `member_count` — the number of `ACTIVE` or `INVITED` memberships assigned the role (a `SUSPENDED` member is excluded, matching the seat count), resolved per request from a single membership aggregate (`GROUP BY role_id`), never stored. The org owner is a normal membership on the `Owner` role, so it counts naturally. `PUT /roles/:role_id/permissions` returns the permission set (not a role object), so it carries no `member_count`.
+- **Role reads project a live `member_count`**: the list / get / create / update role responses include `member_count` — the number of `ACTIVE` or `INVITED` memberships assigned the role (a `SUSPENDED` member is excluded, matching the seat count), resolved per request from a single membership aggregate (`GROUP BY role_id`), never stored. The organization owner is a normal membership on the `Owner` role, so it counts naturally. `PUT /roles/:role_id/permissions` returns the permission set (not a role object), so it carries no `member_count`.
 
 ## Lifecycle
 

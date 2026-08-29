@@ -28,7 +28,7 @@ Read the curve, not the peak:
   **not** CPU- or event-loop-bound — so the [load-shed valve](#the-load-shed-valve)
   never fires and there are **zero server 5xx** at any level.
 - **`http_req_failed` sits flat at ~13.8%** across all levels. That is **not**
-  capacity failure: it is the per-organization write cap (100 writes/min/org)
+  capacity failure: it is the per-organization write cap (100 writes/min/organization)
   returning `429`, which is workload-proportional and therefore constant as a
   fraction of a journey. Write-cap `429`s are rejected before route-level metrics,
   so they do not appear in `http_request_duration_seconds`.
@@ -73,7 +73,7 @@ and concurrent-create paths race their unique indexes (Postgres `23505`):
   serialized per user with a transaction-scoped `pg_advisory_xact_lock`, so it
   held at **0 new `23505` 5xx** through the whole ladder.
 - The other **24 `23505`s** observed during the run are concurrent-create races
-  on idempotent paths (org / session / MFA bootstrap) — every one is caught and
+  on idempotent paths (organization / session / MFA bootstrap) — every one is caught and
   resolved to 2xx success statuses. Recorded route statuses across the ladder were
   **success-only** (run predates the uniform-200 policy).
 
@@ -85,7 +85,7 @@ and concurrent-create paths race their unique indexes (Postgres `23505`):
 2. **Then add API replicas** behind the LB, each with a pool sized so
    `replicas × pool ≤ Postgres max_connections` (minus headroom). The pool is the
    throttle — oversizing it just moves contention into Postgres.
-3. **Keep the per-org write cap** — it is the fairness valve that kept
+3. **Keep the per-organization write cap** — it is the fairness valve that kept
    `http_req_failed` proportional rather than letting one tenant starve the pool.
 4. **Watch the event loop, not just throughput.** A rising `503` rate from the
    overload guard means the API tier is CPU-starved; a rising p95 with a calm loop

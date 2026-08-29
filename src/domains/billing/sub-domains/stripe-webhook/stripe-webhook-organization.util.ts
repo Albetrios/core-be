@@ -1,6 +1,9 @@
 import type Stripe from 'stripe';
 import type { WorkerContextDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
-import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import type { StripeWebhookEventRepository } from './stripe-webhook-event.repository.js';
 
@@ -56,7 +59,7 @@ function readStripeCustomerId(
 }
 
 /**
- * Resolves tenancy scope for Stripe webhook side effects (RLS requires app.current_organization_id).
+ * Resolves tenancy scope for Stripe webhook side effects (RLS requires app.current_organization_public_id).
  *
  * @remarks
  * The **database mapping is authoritative whenever it exists** (audit #2): the
@@ -117,18 +120,21 @@ export async function resolveOrganizationPublicIdForStripeEvent(
 
   // Database mapping wins when present; metadata is the binding of last resort
   // for a first-contact subscription with no local row, guarded by the
-  // subscriptions WITH CHECK (audit #41) against a non-existent org.
+  // subscriptions WITH CHECK (audit #41) against a non-existent organization.
   return fromDatabase ?? fromMetadata;
 }
 
 /**
- * Runs billing mutations under SET LOCAL app.current_organization_id for RLS policies.
+ * Runs billing mutations under SET LOCAL app.current_organization_public_id for RLS policies.
  */
 export async function runWithOrganizationPublicIdForStripeWebhook<T>(
   organizationPublicId: string,
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
 ): Promise<T> {
-  return withOrganizationContext(organizationPublicId, callback);
+  return withAppDatabaseContext(
+    PRINCIPAL_SCOPE.JOB({ organizationPublicId: organizationPublicId }),
+    callback,
+  );
 }
 
 /**

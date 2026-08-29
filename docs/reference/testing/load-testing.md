@@ -48,7 +48,7 @@ Runs **daily at 02:00 UTC** (`cron`) and **on demand** (`workflow_dispatch`). Th
 **SLO-style thresholds (k6):** Scenarios define `http_req_duration` percentiles on tagged requests and `http_req_failed` (see each file under `src/tests/load/k6/scenarios/`). The gate enforces:
 
 - **Health stress**: `health/live` p(95)&lt;200ms, p(99)&lt;500ms; `health/ready` p(95)&lt;500ms, p(99)&lt;1000ms; global failure rate &lt;1%.
-- **API stress**: Per-route p(95)&lt;500ms for users/me, organizations, notifications, unread-count, and the active-org memberships (`/tenancy/organization/memberships`); global p(95)&lt;500ms and failure rate &lt;1%.
+- **API stress**: Per-route p(95)&lt;500ms for users/me, organizations, notifications, unread-count, and the active-organization memberships (`/tenancy/organization/memberships`); global p(95)&lt;500ms and failure rate &lt;1%.
 
 Artifacts (`k6-*.json` summaries and `server.log`) are uploaded for 14 days. Optional email: configure `RESEND_API_KEY` and `LOAD_TEST_RESULT_EMAIL_TO` or `TEST_REPORT_EMAIL_TO`; the workflow invokes `pnpm tool:send-load-test-results-email` with `K6_USE_SUMMARIES=1` (reads gate `k6-*.json` files — no second k6 run).
 
@@ -73,10 +73,10 @@ To gain confidence in the **whole system** (not just health endpoints), run both
      pnpm load:stress:api
      ```
 
-   - Hits: `GET /api/v1/users/me`, `GET /api/v1/tenancy/organizations`, `GET /api/v1/notify/notifications`, `GET /api/v1/notify/notifications/unread-count`, `GET /api/v1/tenancy/organization/memberships` with up to 100 VUs. The active org rides the token's `org` claim, so `TEST_ORG_ID` scopes the token (via `switchToOrganization`) rather than appearing in the path.
+   - Hits: `GET /api/v1/users/me`, `GET /api/v1/tenancy/organizations`, `GET /api/v1/notify/notifications`, `GET /api/v1/notify/notifications/unread-count`, `GET /api/v1/tenancy/organization/memberships` with up to 100 VUs. The active organization rides the token's `org` claim, so `TEST_ORG_ID` scopes the token (via `switchToOrganization`) rather than appearing in the path.
 
 3. **Optional — auth flow**: `pnpm load:auth`
-   - Stresses login + profile + list orgs (ramping load profile; see thresholds in `src/tests/load/k6/scenarios/auth-onboarding.js`).
+   - Stresses login + profile + list organizations (ramping load profile; see thresholds in `src/tests/load/k6/scenarios/auth-onboarding.js`).
 
 If **load:stress** and **load:stress:api** both pass, the system is under load-tested for both infra and main API paths.
 
@@ -161,7 +161,7 @@ from noise.
    only appears in one order it was the data growth.
 3. **Check the journey against what the client actually calls.** A step the real client never issues
    inflates the route it targets and adds load that does not exist in production. `POST
-   /auth/switch-to-organization` returns the active-org context inline and core-fe writes it straight
+   /auth/switch-to-organization` returns the active-organization context inline and core-fe writes it straight
    into its cache, so a `GET /auth/me/context` after a switch measures a request the app never makes.
 4. **Hold the auth method constant, and know what it costs.** `POST /auth/login` verifies with
    argon2id — roughly 100 ms of deliberate CPU per call. Node runs one thread, so 50 concurrent
@@ -203,8 +203,8 @@ The same signals are observable live via `GET /readyz` (verbose), `GET /metrics`
 ## Prerequisites
 
 - **Server**: Run the API with `pnpm dev` (and optionally `pnpm dev:worker` for background jobs).
-- **Postgres + Redis**: Required for auth and org-dependent scenarios. Start with `docker compose up -d` or your own instances.
-- **Database**: Migrations applied (`pnpm db:migrate`). For auth and org scenarios, run full seed: `pnpm db:seed:full` (creates demo user `demo@example.com` / `DemoPassword123!` and a demo organization).
+- **Postgres + Redis**: Required for auth and organization-dependent scenarios. Start with `docker compose up -d` or your own instances.
+- **Database**: Migrations applied (`pnpm db:migrate`). For auth and organization scenarios, run full seed: `pnpm db:seed:full` (creates demo user `demo@example.com` / `DemoPassword123!` and a demo organization).
 - **k6**: Install [k6](https://k6.io/docs/get-started/installation/) for scenario runs.
 
 ## Quick commands (no auth)
@@ -227,7 +227,7 @@ The same signals are observable live via `GET /readyz` (verbose), `GET /metrics`
 - **Auth**: Bearer token (TEST_TOKEN) + TEST_ORG_ID for memberships
 - **Env**: `TEST_TOKEN` (required), `TEST_ORG_ID` (required for memberships). Get via `pnpm tool:load-test-credentials`.
 - **Run**: `pnpm load:stress:api` after exporting TEST_TOKEN and TEST_ORG_ID.
-- **Routes**: users/me, tenancy/organizations, notify/notifications, notify/notifications/unread-count, tenancy/organization/memberships (active org from the token claim; `TEST_ORG_ID` scopes the token, not the path). Stress profile: 20→50→100 VUs.
+- **Routes**: users/me, tenancy/organizations, notify/notifications, notify/notifications/unread-count, tenancy/organization/memberships (active organization from the token claim; `TEST_ORG_ID` scopes the token, not the path). Stress profile: 20→50→100 VUs.
 
 ### 3. Auth onboarding
 
@@ -239,8 +239,8 @@ The same signals are observable live via `GET /readyz` (verbose), `GET /metrics`
 ### 4. Daily ops
 
 - **File**: `src/tests/load/k6/scenarios/daily-ops.js`
-- **Auth**: Bearer token scoped to the active org (the `org` claim; scope via `TEST_ORG_ID`)
-- **Env**: `TEST_TOKEN` (required), `TEST_ORG_ID` (default `test-org-id`). Use the helper script to get token and org id: `pnpm tool:load-test-credentials` (see below).
+- **Auth**: Bearer token scoped to the active organization (the `org` claim; scope via `TEST_ORG_ID`)
+- **Env**: `TEST_TOKEN` (required), `TEST_ORG_ID` (default `test-organization-id`). Use the helper script to get token and organization id: `pnpm tool:load-test-credentials` (see below).
 - **Run**: `pnpm load:daily-ops` with `TEST_TOKEN` and `TEST_ORG_ID`, or `TEST_TOKEN=<token> TEST_ORG_ID=<org_public_id> k6 run src/tests/load/k6/scenarios/daily-ops.js`
 
 ### 5. Billing
@@ -253,8 +253,8 @@ The same signals are observable live via `GET /readyz` (verbose), `GET /metrics`
 ### 6. Webhooks
 
 - **File**: `src/tests/load/k6/scenarios/webhooks.js`
-- **Auth**: Bearer token scoped to the active org (the `org` claim; scope via `TEST_ORG_ID`)
-- **Env**: `TEST_TOKEN` (required), `TEST_ORG_ID` (default `test-org-id`)
+- **Auth**: Bearer token scoped to the active organization (the `org` claim; scope via `TEST_ORG_ID`)
+- **Env**: `TEST_TOKEN` (required), `TEST_ORG_ID` (default `test-organization-id`)
 - **Run**: `pnpm load:webhooks` with `TEST_TOKEN` and `TEST_ORG_ID`, or `TEST_TOKEN=<token> TEST_ORG_ID=<org_public_id> k6 run src/tests/load/k6/scenarios/webhooks.js`
 
 ### 7. Admin
@@ -275,8 +275,8 @@ Walks the complete front-end user journey once per virtual user, so **VUs are us
   round trip (needs `TEST_MODE=true`).
 - **Credentials**: the pool at `src/tests/load/k6/data/credential-pool.json` — build it with
   `pnpm db:seed:loadtest`.
-- **Routes** (16): guest refresh → send-code → login → me/context → profile patch → create org →
-  onboarding complete → switch org → me/context again → workspace and dashboard reads →
+- **Routes** (16): guest refresh → send-code → login → me/context → profile patch → create organization →
+  onboarding complete → switch organization → me/context again → workspace and dashboard reads →
   authed refresh → logout.
 
 | Env | Default | Purpose |
@@ -293,8 +293,8 @@ does and its cost belongs in the numbers, but login presents `AUTH_STATIC_VERIFI
 than the code `send-code` issued, so the two calls stay independent and a non-200 on `send-code` does
 not abort the journey.
 
-**The second `me/context` after the org switch is a benchmark, not a fidelity claim.** core-fe does
-**not** make that call — `switch-to-organization` already returns the active-org context inline and
+**The second `me/context` after the organization switch is a benchmark, not a fidelity claim.** core-fe does
+**not** make that call — `switch-to-organization` already returns the active-organization context inline and
 the client writes it into its cache with `setQueryData` (verified against live responses: the switch
 payload's `active_organization` and `my_permissions` are byte-identical to what the re-read returns,
 and `organizations[]` differs only by the `is_active` flag). The step exists because that route is
@@ -314,8 +314,8 @@ BASE_URL=http://localhost:3000 VUS=50 POOL=50 k6 run src/tests/load/k6/scenarios
 
 ### Org-scoped / RLS-heavy (informational, CI nightly)
 
-Org-scoped scenarios resolve the tenant from the token's `org` claim — no org path segment and no
-`X-Organization-Id` header. `TEST_ORG_ID` is used to **scope the token** to that org (the helpers
+Org-scoped scenarios resolve the tenant from the token's `org` claim — no organization path segment and no
+any organization header. `TEST_ORG_ID` is used to **scope the token** to that organization (the helpers
 call `switchToOrganization` / `loginScopedToOrganization`), not to build the path.
 
 | File | Env | Routes |
@@ -328,17 +328,17 @@ call `switchToOrganization` / `loginScopedToOrganization`), not to build the pat
 | `upload-list.js` | `TEST_TOKEN`, optional `TEST_UPLOAD_PUBLIC_ID` | `GET /api/v1/uploads/:id` |
 | `user-data-export.js` | `TEST_TOKEN` | `POST /api/v1/users/me/data-export` |
 
-CI runs a subset in the **org-scoped routes** job step (see `scheduled-k6-load-slo.yml`).
+CI runs a subset in the **organization-scoped routes** job step (see `scheduled-k6-load-slo.yml`).
 
 ### RLS concurrency beyond pool size
 
 - **File**: `src/tests/load/k6/scenarios/rls-concurrency-beyond-pool.js`
-- **Auth**: Bearer token scoped to the active org (the `org` claim; scope via `TEST_ORG_ID`)
+- **Auth**: Bearer token scoped to the active organization (the `org` claim; scope via `TEST_ORG_ID`)
 - **Env**: `TEST_TOKEN`, `TEST_ORG_ID` (required); optional `DATABASE_POOL_MAX` (default `10`), `BEYOND_POOL_FACTOR` (default `4`), `BEYOND_POOL_VUS` (explicit VU override)
 - **Run**: `RATE_LIMIT_MAX=10000 pnpm dev` (or `pnpm dev:loadtest`), then `pnpm load:rls-concurrency` with `TEST_TOKEN` and `TEST_ORG_ID`
 - **Rate limit**: This scenario drives `DATABASE_POOL_MAX × BEYOND_POOL_FACTOR` VUs (default 40) with a short `sleep`, so it sends far more than the default global limit of `RATE_LIMIT_MAX` (100) requests per `RATE_LIMIT_WINDOW_MS` (60s) per IP. Without raising `RATE_LIMIT_MAX`, k6 will count `429 Too Many Requests` as failures and breach the `http_req_failed < 1%` threshold even when the pool is healthy. Match the server's `DATABASE_POOL_MAX` when overriding it on the k6 side.
-- **Purpose**: Validates production-readiness audit item #5 (per-request RLS transaction pinning). It ramps concurrent VUs to `DATABASE_POOL_MAX × BEYOND_POOL_FACTOR` against an org-scoped (RLS) endpoint (`GET .../memberships`) and asserts `http_req_failed` stays below 1%. With `DATABASE_RLS_SCOPED_CONTEXTS=true` the connection checkout is held only for the unit-of-work, so the pool absorbs several multiples of concurrent requests; under the legacy request-pinned model the API would saturate near `DATABASE_POOL_MAX` and later requests would block or fail.
-- **CI**: Runs nightly as part of the **org-scoped routes** informational step in `scheduled-k6-load-slo.yml` (seeded full demo data guarantees `TEST_ORG_ID`; the workflow already boots the API with `RATE_LIMIT_MAX=10000`). Pair a manual run with the `database_rls_active_checkouts` / `database_rls_checkout_hold_seconds` metrics from the [resource-limits runbook](../../deployment/runbooks/resource-limits.md) to confirm checkout hold time stays short.
+- **Purpose**: Validates production-readiness audit item #5 (per-request RLS transaction pinning). It ramps concurrent VUs to `DATABASE_POOL_MAX × BEYOND_POOL_FACTOR` against an organization-scoped (RLS) endpoint (`GET .../memberships`) and asserts `http_req_failed` stays below 1%. With `DATABASE_RLS_SCOPED_CONTEXTS=true` the connection checkout is held only for the unit-of-work, so the pool absorbs several multiples of concurrent requests; under the legacy request-pinned model the API would saturate near `DATABASE_POOL_MAX` and later requests would block or fail.
+- **CI**: Runs nightly as part of the **organization-scoped routes** informational step in `scheduled-k6-load-slo.yml` (seeded full demo data guarantees `TEST_ORG_ID`; the workflow already boots the API with `RATE_LIMIT_MAX=10000`). Pair a manual run with the `database_rls_active_checkouts` / `database_rls_checkout_hold_seconds` metrics from the [resource-limits runbook](../../deployment/runbooks/resource-limits.md) to confirm checkout hold time stays short.
 
 ## Obtaining credentials
 

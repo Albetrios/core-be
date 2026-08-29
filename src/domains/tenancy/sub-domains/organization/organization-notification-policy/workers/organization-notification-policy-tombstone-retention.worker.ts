@@ -1,5 +1,8 @@
 import { Worker } from 'bullmq';
-import { withGlobalRetentionCleanupDatabaseContext } from '@/infrastructure/database/contexts/retention-database.context.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import {
   getRetentionWorkerOptions,
@@ -30,7 +33,7 @@ export function createOrganizationNotificationPolicyTombstoneRetentionWorker(): 
   const worker = new Worker(
     ORGANIZATION_NOTIFICATION_POLICY_TOMBSTONE_RETENTION_QUEUE_NAME,
     async () =>
-      withGlobalRetentionCleanupDatabaseContext((databaseHandle) =>
+      withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, (databaseHandle) =>
         runOrganizationNotificationPolicyTombstoneRetentionJob(databaseHandle),
       ),
     {

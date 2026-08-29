@@ -66,7 +66,7 @@ if (
 // R1 — workers/processors must not call getRequestDatabase().
 if (/\.(worker|processor)\.ts$/.test(filePath) && /getRequestDatabase/.test(content)) {
   violations.push(
-    "workers/processors must not call getRequestDatabase() (RLS) — bind a handle via a context wrapper (withOrganizationContext / runTenantScopedWorkerJob).",
+    "workers/processors must not call getRequestDatabase() (RLS) — bind a handle via a context wrapper (withOrganizationContext / runOrganizationScopedWorkerJob).",
   );
 }
 

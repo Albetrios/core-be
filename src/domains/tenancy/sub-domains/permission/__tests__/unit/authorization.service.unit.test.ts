@@ -9,15 +9,28 @@ vi.mock('@/infrastructure/cache/redis.client.js', () => ({
   },
 }));
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: vi.fn(
-    async (_organizationId: string, callback: () => Promise<string[]>) => callback(),
-  ),
-}));
-
 import { redisConnection } from '@/infrastructure/cache/redis.client.js';
 import { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permission/permission.repository.js';
+
+// The service paths under test run inside the real principal wrapper, which
+// opens a `database.transaction()` — passthrough so no Postgres is needed
+// (CI's unit/contract lanes run without a database service).
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 describe('AuthorizationService', () => {
   const permissionRepository = {

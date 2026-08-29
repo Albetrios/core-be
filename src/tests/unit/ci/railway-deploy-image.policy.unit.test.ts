@@ -73,7 +73,7 @@ describe('Railway deploy tooling (policy)', () => {
   it('seeds reference data after migrate so a fresh environment can provision orgs', () => {
     // Migrations create the schema but never insert the `tenancy.permissions` reference
     // rows that owner-role provisioning FK-references. Without the seed, a fresh
-    // environment provisions NO personal/team org — every provision rolls back on the
+    // environment provisions NO personal/team organization — every provision rolls back on the
     // missing permission FK and the read-path self-heal swallows it to
     // `personal_organization_id: null`. The reference seed must run, and AFTER migrate
     // (the schema must exist first).

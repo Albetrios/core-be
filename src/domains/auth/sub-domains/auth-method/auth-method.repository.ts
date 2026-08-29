@@ -1,5 +1,5 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { DEFAULT_REPOSITORY_LIST_LIMIT } from '@/shared/constants/query-limits.constants.js';
 import { capListWithWarning } from '@/shared/utils/infrastructure/list-cap.util.js';
 import { auth_methods } from '@/domains/auth/sub-domains/auth-method/auth-method.schema.js';
@@ -129,7 +129,7 @@ export class AuthMethodRepository {
   /**
    * Resolves a linked credential by `(provider, provider_user_id)` for the pre-session OAuth
    * callback via the `auth.resolve_auth_method_by_provider` SECURITY DEFINER resolver. `auth_methods`
-   * is FORCE RLS and the callback has no `app.current_user_id` yet, so a plain SELECT would resolve
+   * is FORCE RLS and the callback has no `app.current_user_public_id` yet, so a plain SELECT would resolve
    * the owner policy to NULL and return zero rows. Returns the row plus the owning `user_public_id`.
    */
   async findByProviderUserId(
@@ -194,7 +194,7 @@ export class AuthMethodRepository {
   /**
    * Takes a transaction-scoped advisory lock serializing concurrent credential mutations for one
    * user. Released automatically at COMMIT/ROLLBACK, so it must be acquired inside the same
-   * `withUserDatabaseContext` transaction as a subsequent count-then-mutate (e.g. the MFA-delete
+   * `withAppDatabaseContext (user scope)` transaction as a subsequent count-then-mutate (e.g. the MFA-delete
    * "would this remove the last factor?" check), closing that race (route-audit C1 / deleteMfa).
    */
   async acquireCredentialMutationLock(userId: number): Promise<void> {

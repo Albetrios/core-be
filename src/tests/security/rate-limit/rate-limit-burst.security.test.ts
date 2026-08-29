@@ -101,35 +101,35 @@ describe('Security: Rate limit burst (429)', () => {
     const app = await createRateLimitedApp({
       max: 2,
       keyGenerator: (request) => {
-        const organizationPublicId = request.headers['x-organization-id'];
+        const organizationPublicId = request.headers['x-test-organization'];
         return organizationPublicId ? `organization:${organizationPublicId}` : `ip:${request.ip}`;
       },
     });
 
-    const orgAFirst = await app.inject({
+    const organizationAFirst = await app.inject({
       method: 'GET',
       url: '/burst-test',
-      headers: { 'x-organization-id': 'org_public_a' },
+      headers: { 'x-test-organization': 'org_public_a' },
     });
-    const orgASecond = await app.inject({
+    const organizationASecond = await app.inject({
       method: 'GET',
       url: '/burst-test',
-      headers: { 'x-organization-id': 'org_public_a' },
+      headers: { 'x-test-organization': 'org_public_a' },
     });
-    const orgAThird = await app.inject({
+    const organizationAThird = await app.inject({
       method: 'GET',
       url: '/burst-test',
-      headers: { 'x-organization-id': 'org_public_a' },
+      headers: { 'x-test-organization': 'org_public_a' },
     });
-    const orgBFirst = await app.inject({
+    const organizationBFirst = await app.inject({
       method: 'GET',
       url: '/burst-test',
       headers: { 'x-organization-id': 'org_public_b' },
     });
 
-    expect(orgAFirst.statusCode).toBe(200);
-    expect(orgASecond.statusCode).toBe(200);
-    expect(orgAThird.statusCode).toBe(429);
-    expect(orgBFirst.statusCode).toBe(200);
+    expect(organizationAFirst.statusCode).toBe(200);
+    expect(organizationASecond.statusCode).toBe(200);
+    expect(organizationAThird.statusCode).toBe(429);
+    expect(organizationBFirst.statusCode).toBe(200);
   });
 });

@@ -1,5 +1,5 @@
 /**
- * Common building blocks for org-scoped list endpoints that support opaque-cursor pagination
+ * Common building blocks for organization-scoped list endpoints that support opaque-cursor pagination
  * **plus** server-side search (`q`) and sort (`sort` / `order`). One mechanism shared by every list
  * (memberships, roles, api-keys, …) so the keyset + cursor + filter-binding subtleties live in a
  * single place instead of being hand-rolled per repository.

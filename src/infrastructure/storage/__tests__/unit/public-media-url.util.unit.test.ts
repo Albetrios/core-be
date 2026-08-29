@@ -27,7 +27,7 @@ describe('buildPublicMediaUrl (audit-#13)', () => {
     expect(isPublicMediaKey('organization-files/o1/contract.pdf')).toBe(false);
   });
 
-  it('refuses to build a public URL for a private key (avatars/org-logos only)', () => {
+  it('refuses to build a public URL for a private key (avatars/organization-logos only)', () => {
     delete process.env.PUBLIC_MEDIA_BASE_URL;
     resetEnvCacheForTests();
     expect(() =>
