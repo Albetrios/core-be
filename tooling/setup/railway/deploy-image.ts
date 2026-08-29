@@ -516,6 +516,60 @@ async function fetchDeployment({
   return result.deployment;
 }
 
+/**
+ * Best-effort dump of a failed deployment's container logs so the CI job shows
+ * the actual boot crash instead of only "ended in non-success status: FAILED"
+ * (observability gap found while triaging issue #1129's dev-deploy failure).
+ *
+ * @remarks
+ * - **Algorithm:** Railway GraphQL `deploymentLogs` (last 120 lines), printed
+ *   verbatim; any error is swallowed into a single warning — diagnostics must
+ *   never mask the original failure.
+ * - **Side effects:** stdout only.
+ */
+async function dumpDeploymentLogsOnFailure({
+  token,
+  authMode,
+  deploymentId,
+  label,
+}: {
+  token: string;
+  authMode: RailwayAuthMode;
+  deploymentId: string;
+  label: string;
+}): Promise<void> {
+  try {
+    const result = await railwayGraphQL<{
+      deploymentLogs: { message: string; severity: string | null; timestamp: string }[] | null;
+    }>({
+      token,
+      authMode,
+      query: `
+        query($deploymentId: String!, $limit: Int!) {
+          deploymentLogs(deploymentId: $deploymentId, limit: $limit) {
+            message
+            severity
+            timestamp
+          }
+        }
+      `,
+      variables: { deploymentId, limit: 120 },
+    });
+    const lines = result.deploymentLogs ?? [];
+    console.log(
+      `::group::Railway container logs — ${label} deployment ${deploymentId} (last ${lines.length} lines)`,
+    );
+    for (const line of lines) {
+      console.log(`${line.timestamp} [${line.severity ?? 'info'}] ${line.message}`);
+    }
+    console.log('::endgroup::');
+  } catch (error) {
+    console.log(
+      `Could not fetch Railway container logs for ${label} deployment ${deploymentId}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 async function waitForTerminalStatus({
   token,
   authMode,
@@ -711,6 +765,12 @@ async function main(): Promise<void> {
   }
 
   if (finalDeployment.status !== DEPLOYMENT_SUCCESS_STATUS) {
+    await dumpDeploymentLogsOnFailure({
+      token,
+      authMode: deploymentContext.authMode,
+      deploymentId,
+      label: options.label,
+    });
     throw new Error(
       `Deployment ${deploymentId} for ${options.label} ended in non-success status: ${finalDeployment.status}.`,
     );
