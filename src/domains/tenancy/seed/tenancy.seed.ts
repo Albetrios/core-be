@@ -3,7 +3,7 @@
  * Domain-owned; used by scripts/seed orchestration. Data is passed in (no faker here).
  */
 import { sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.schema.js';
@@ -47,7 +47,7 @@ export async function seedOrganization(payload: SeedOrganizationPayload) {
   return row ?? null;
 }
 
-/** Input for {@link seedRole}; `is_system` defaults to `false` (custom org role). */
+/** Input for {@link seedRole}; `is_system` defaults to `false` (custom organization role). */
 export interface SeedRolePayload {
   organization_id: number;
   name: string;

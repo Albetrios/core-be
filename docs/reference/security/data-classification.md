@@ -8,7 +8,7 @@ High-level classification of sensitive fields for retention, export, and access 
 | **Authentication secrets**  | Password hashes, MFA secrets, session rows, API key hashes    | Never returned by API; short TTL or hard delete    |
 | **Billing** | Stripe customer ids on subscriptions | Tenant RLS; minimal exposure in serializers — see [billing-database-schema.md](../data/billing-database-schema.md) |
 | **Operational metadata**    | IP in audit logs, `request_id` in API meta                    | Retention workers; audit purge cron                |
-| **Webhook secrets**         | `notify.webhooks.encrypted_secret`                            | Encrypted at rest; org-scoped RLS                  |
+| **Webhook secrets**         | `notify.webhooks.encrypted_secret`                            | Encrypted at rest; organization-scoped RLS                  |
 | **System ingress**          | `billing.stripe_webhook_events` (event ids only)              | No tenant RLS; no full Stripe payload stored       |
 
 When adding columns that hold email, phone, government ids, or payment instrument details, update this table and confirm export/retention behavior.

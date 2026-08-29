@@ -3,16 +3,22 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { NotFoundError } from '@/shared/errors/index.js';
 import { createNotificationController } from '@/domains/notify/sub-domains/notification/notification.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): never {
-  return {
-    auth: { kind: 'user' as const, userId: generatePublicId('user'), role: 'user' },
+  return attachPrincipalScope({
+    auth: {
+      kind: 'user' as const,
+      userId: generatePublicId('user'),
+      role: 'user',
+      organizationPublicId: generatePublicId('organization'),
+    },
     params: {},
     body: {},
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as never;
+  }) as never;
 }
 
 describe('createNotificationController', () => {
@@ -41,7 +47,7 @@ describe('createNotificationController', () => {
       {} as FastifyReply,
     );
     expect(service.listForUser).toHaveBeenCalledWith(
-      expect.any(String),
+      expect.objectContaining({ source: 'request' }),
       expect.objectContaining({ limit: 25, include_total: false }),
     );
     expect(
@@ -61,7 +67,10 @@ describe('createNotificationController', () => {
       mockRequest({ params: { notification_id: notificationId } }),
       {} as FastifyReply,
     );
-    expect(service.get).toHaveBeenCalledWith(notificationId, expect.any(String));
+    expect(service.get).toHaveBeenCalledWith(
+      notificationId,
+      expect.objectContaining({ source: 'request' }),
+    );
   });
 
   it('markNotificationRead updates row', async () => {

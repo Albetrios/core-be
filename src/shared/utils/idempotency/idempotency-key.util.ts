@@ -66,7 +66,7 @@ export interface IdempotencyScope {
  * anonymous callers presenting the same `X-Idempotency-Key` would collide and the second caller
  * could be served the first caller's cached (possibly token-bearing) response body. The
  * organization segment is intentionally ignored here because an unauthenticated request can set
- * the `X-Organization-Id` header without proving membership.
+ * a request-asserted organization value without proving membership.
  */
 export function hasAuthenticatedIdempotencyActor(scope: IdempotencyScope): boolean {
   const hasApiKey = typeof scope.apiKeyPublicId === 'string' && scope.apiKeyPublicId.length > 0;

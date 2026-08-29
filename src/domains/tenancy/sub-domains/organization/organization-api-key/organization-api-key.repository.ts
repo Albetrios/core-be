@@ -1,6 +1,6 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { api_keys } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.schema.js';
 import { BaseRepository } from '@/infrastructure/database/base-repository.js';
@@ -54,7 +54,7 @@ const API_KEY_PREFIX_RESOLVER_CAP = 16;
 /**
  * Drizzle data-access for `tenancy.api_keys`. Stores hashed keys (never raw
  * secrets), normalises the `scopes` jsonb column to `string[]`, supports
- * cursor-paginated org-scoped listings, soft-delete, prefix lookup for
+ * cursor-paginated organization-scoped listings, soft-delete, prefix lookup for
  * authentication, and `last_used_at` touches.
  */
 export class OrganizationApiKeyRepository extends BaseRepository {
@@ -78,7 +78,7 @@ export class OrganizationApiKeyRepository extends BaseRepository {
   }
 
   /**
-   * audit-#8: transaction-scoped advisory lock that serializes the per-org API-key creation
+   * audit-#8: transaction-scoped advisory lock that serializes the per-organization API-key creation
    * quota check + insert, so concurrent creates cannot both pass the count and overshoot
    * `ORGANIZATION_API_KEY_MAX_PER_ORG`. Must be called inside the create transaction before
    * {@link countActiveByOrganization}.
@@ -241,7 +241,7 @@ export class OrganizationApiKeyRepository extends BaseRepository {
    * Resolves active API-key candidates by prefix for the pre-session authentication phase.
    * Delegates to the `tenancy.resolve_api_key_for_authentication` SECURITY DEFINER resolver because
    * `tenancy.api_keys` (and `tenancy.organizations`) are FORCE RLS and the auth phase has no
-   * `app.current_organization_id` context — a plain SELECT would resolve the policy to NULL and
+   * `app.current_organization_public_id` context — a plain SELECT would resolve the policy to NULL and
    * return zero rows, rejecting every valid key in production.
    */
   async findActiveByKeyPrefix(

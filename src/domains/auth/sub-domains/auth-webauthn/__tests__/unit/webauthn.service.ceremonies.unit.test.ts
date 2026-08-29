@@ -13,12 +13,6 @@ import type { WebauthnCredentialRepository } from '@/domains/auth/sub-domains/au
  * the verifier, the counter update, and the refusal arms.
  */
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
 const { consumeChallengeMock, createChallengeMock } = vi.hoisted(() => ({
   consumeChallengeMock: vi.fn(),
   createChallengeMock: vi.fn().mockResolvedValue('challenge-token'),
@@ -49,6 +43,22 @@ const { completeFirstFactorAuthMock } = vi.hoisted(() => ({
 vi.mock('@/domains/auth/shared/complete-first-factor-auth.js', () => ({
   completeFirstFactorAuth: completeFirstFactorAuthMock,
 }));
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const ACTIVE_USER = {
   id: 7,
@@ -163,7 +173,7 @@ describe('WebauthnService.verifyAuthentication', () => {
     // Clone-detection depends on the persisted counter advancing to the verifier's value.
     expect(credentialRepository.updateCounter).toHaveBeenCalledWith('cred-abc', 42);
 
-    // The session is minted for the challenged user with the personal-org self-heal arm on.
+    // The session is minted for the challenged user with the personal-organization self-heal arm on.
     const completion = completeFirstFactorAuthMock.mock.calls[0]?.[0] as {
       user: { public_id: string; email: string };
       ensurePersonalOrganizationOnMiss: boolean;

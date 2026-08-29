@@ -40,7 +40,7 @@ describe('Tenancy Domain — Integration', () => {
     await seedAllPermissions();
   });
 
-  // ─── Helper: create user with full org permissions ────────────
+  // ─── Helper: create user with full organization permissions ────────────
   async function createAuthorizedUserAndOrganization(permissionCodes = ALL_TENANCY_PERMISSIONS) {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });
@@ -111,10 +111,10 @@ describe('Tenancy Domain — Integration', () => {
       expect((response.json() as { data: Record<string, unknown> }).data.name).toBe('Test Org');
     });
 
-    it('R9: reclaims a team slug after the owning org is soft-deleted', async () => {
+    it('R9: reclaims a team slug after the owning organization is soft-deleted', async () => {
       // Regression for the full-vs-partial slug unique index. Before the fix, a soft-deleted team
       // kept its slug indexed, so re-creating the same slug hit the tombstone and returned 409 for a
-      // slug no visible org owned. With the partial index (WHERE deleted_at IS NULL) the slug frees
+      // slug no visible organization owned. With the partial index (WHERE deleted_at IS NULL) the slug frees
       // immediately on soft-delete.
       const user = await createTestUser();
       const userToken = await generateTestToken({ userId: user.public_id });
@@ -129,7 +129,7 @@ describe('Tenancy Domain — Integration', () => {
       expect(createResponse.statusCode).toBe(200);
       const createdId = (createResponse.json() as { data: { id: string } }).data.id;
 
-      // The creator is bootstrapped as owner with full permissions — soft-delete the org.
+      // The creator is bootstrapped as owner with full permissions — soft-delete the organization.
       const ownerOrgToken = await generateTestToken({
         userId: user.public_id,
         organizationPublicId: createdId,

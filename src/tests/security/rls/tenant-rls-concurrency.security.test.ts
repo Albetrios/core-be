@@ -47,7 +47,7 @@ describe('Security: Tenant RLS concurrency', () => {
       organizationId: organization.id,
       roleId: role.id,
     });
-    // Flat organization route resolves the active org from the JWT `org` claim;
+    // Flat organization route resolves the active organization from the JWT `org` claim;
     // each tenant's bearer is pinned to its own organization so concurrent
     // requests cannot cross-bind the RLS GUC.
     const token = await generateTestToken({

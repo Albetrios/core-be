@@ -45,7 +45,7 @@ Findings are ordered by severity (Critical/High first), then effort. Numbering i
   - Service backs these with `withUserDatabaseContext(...)` (`organization.service.ts` ~228–247) + the membership-bound `organizations_user_discovery` policy (`migrations/20260520000004_*`).
 - `assertPostgresConnectionBudget` (`src/infrastructure/database/assert-connection-budget.ts`) checks pool vs `max_connections` but never checks `rolsuper` / `rolbypassrls` / `relforcerowsecurity`. No startup guard exists.
 
-**Why it is dangerous:** PostgreSQL never applies RLS (even `FORCE`d) to a superuser or a role with `BYPASSRLS`. Railway's default Postgres user is often a superuser; a one-line `.env` mistake pointing `DATABASE_URL` at it disables tenant isolation with **zero error**. `GET /organizations/:id`, `/by-slug/:slug`, list, notifications inbox, and other RLS-only read paths can return any tenant's rows to any authenticated user — a cross-tenant data leak. Blast radius is narrowed (not eliminated) because financial/member mutations are double-protected by `requireOrganizationPermission`, but org-discovery reads are not.
+**Why it is dangerous:** PostgreSQL never applies RLS (even `FORCE`d) to a superuser or a role with `BYPASSRLS`. Railway's default Postgres user is often a superuser; a one-line `.env` mistake pointing `DATABASE_URL` at it disables tenant isolation with **zero error**. `GET /organizations/:id`, `/by-slug/:slug`, list, notifications inbox, and other RLS-only read paths can return any tenant's rows to any authenticated user — a cross-tenant data leak. Blast radius is narrowed (not eliminated) because financial/member mutations are double-protected by `requireOrganizationPermission`, but organization-discovery reads are not.
 
 **Fix:**
 
@@ -57,7 +57,7 @@ Findings are ordered by severity (Critical/High first), then effort. Numbering i
 
    Refuse to start if either is true.
 
-2. Add a regression test that connects as the real production role and asserts a cross-org `SELECT` returns 0 rows.
+2. Add a regression test that connects as the real production role and asserts a cross-organization `SELECT` returns 0 rows.
 
 3. Confirm deployed `DATABASE_URL` uses a dedicated non-superuser login role that `core_be_app` is granted to (or make `core_be_app` `LOGIN` and use it directly).
 
@@ -108,11 +108,11 @@ keyGenerator: (request) => {
 },
 ```
 
-`request.organizationId` is set from the request-asserted header or path **before** authentication. The org-keyed max/key is therefore attacker-controlled on routes that rely on the global limiter.
+`request.organizationId` is set from the request-asserted header or path **before** authentication. The organization-keyed max/key is therefore attacker-controlled on routes that rely on the global limiter.
 
 **Why it is dangerous:** An unauthenticated client can attach a fresh, well-formed `X-Organization-Id` to each request, producing a new `org:<id>` bucket each time and bypassing the global per-IP cap. Conversely, an attacker can use a victim organization's public id and burn that organization's shared bucket, causing cross-tenant throttling. This can amplify JWT/session lookup load on authenticated routes that do not have stricter per-route presets. Compounds with Finding **#5** (spoofable `request.ip`) and Finding **#12** (CAPTCHA off by default).
 
-**Fix:** Key the global limiter on `request.ip` only (after Finding **#5** is fixed). Apply org/user-scoped quotas in a post-auth `preHandler`, following the existing rate-limit preset pattern. If org keying remains, combine IP and verified org membership in the key so a forged/fresh org id cannot reset the IP budget.
+**Fix:** Key the global limiter on `request.ip` only (after Finding **#5** is fixed). Apply organization/user-scoped quotas in a post-auth `preHandler`, following the existing rate-limit preset pattern. If organization keying remains, combine IP and verified organization membership in the key so a forged/fresh organization id cannot reset the IP budget.
 
 - **Effort:** M
 - **When:** Now
@@ -182,7 +182,7 @@ const outerPromise = database.transaction(async (transaction) => {
 
 Pool max defaults to 10 in `src/infrastructure/database/connection.ts`. `assert-connection-budget.ts` validates total connection budget, not HTTP concurrency under checkout pinning.
 
-**Why it is dangerous:** Every org-scoped HTTP request holds a pooled checkout for its entire lifetime, including time spent waiting on slow queries or **outbound HTTP calls inside the transaction**. With `DATABASE_POOL_MAX=10`, a single API instance can saturate at roughly 10 concurrent org requests before later requests block and fail. On Neon, horizontal scaling is constrained by total database connections — this is the dominant concurrency ceiling at scale. **Second most likely sustained production incident** after Redis fail-closed rate limiting (see Executive summary).
+**Why it is dangerous:** Every organization-scoped HTTP request holds a pooled checkout for its entire lifetime, including time spent waiting on slow queries or **outbound HTTP calls inside the transaction**. With `DATABASE_POOL_MAX=10`, a single API instance can saturate at roughly 10 concurrent organization requests before later requests block and fail. On Neon, horizontal scaling is constrained by total database connections — this is the dominant concurrency ceiling at scale. **Second most likely sustained production incident** after Redis fail-closed rate limiting (see Executive summary).
 
 **Fix:**
 
@@ -444,7 +444,7 @@ await redisConnection.incr(IDEMPOTENCY_CLAIM_COUNTER_LOGICAL_KEY);
 
 (Combined from both audits — no contradictions removed.)
 
-- **RLS tenant isolation (when role is correct):** `FORCE ROW LEVEL SECURITY` on tenant tables; dedicated `core_be_app` role design; system tables deny-all plus role-scoped policies; membership-bound org discovery policies.
+- **RLS tenant isolation (when role is correct):** `FORCE ROW LEVEL SECURITY` on tenant tables; dedicated `core_be_app` role design; system tables deny-all plus role-scoped policies; membership-bound organization discovery policies.
 - **Webhook SSRF protection:** Enforced at delivery time via DNS-pinned, allowlisted fetch logic, not only at registration.
 - **Worker reliability:** BullMQ retry/backoff, per-source DLQ, 30-day DLQ retention, Sentry on final failure, ordered worker shutdown.
 - **JWT hygiene:** RS256 enforced, issuer/audience/expiry checked, PII excluded from access-token payloads; session revocation paths exist.
@@ -466,7 +466,7 @@ This is strong, security-conscious engineering — forced fail-closed RLS (when 
 
 | Dimension | Score | Rationale |
 | --- | ---: | --- |
-| **Security** | **76** | Strong model (RLS, JWT, SSRF, redaction); dinged by DB-role assumption (**#1**), unauthenticated org rate-limit key (**#3**), spoofable proxy IP (**#4**), CAPTCHA-off default (**#8**), anonymous idempotency scope (**#7**). |
+| **Security** | **76** | Strong model (RLS, JWT, SSRF, redaction); dinged by DB-role assumption (**#1**), unauthenticated organization rate-limit key (**#3**), spoofable proxy IP (**#4**), CAPTCHA-off default (**#8**), anonymous idempotency scope (**#7**). |
 | **Reliability** | **72** | DLQ/retries/shutdown are solid; Redis fail-closed SPOF (**#2**), no pre-close drain (**#9**), health conflation (**#10**), crash-on-rejection (**#14**), migration races (**#11**). |
 | **Scalability** | **70** | Keyset indexes, permission caching, connection budgeting are strong; per-request DB checkout pinning (**#5**) and Redis SPOF (**#2**) cap concurrency; hot idempotency counter (**#13**). |
 | **Observability** | **84** | Sentry + OTel + Prometheus + correlation IDs; minus readiness/liveness conflation (**#10**) and loose `x-request-id` (**#16**). |
@@ -502,7 +502,7 @@ Also before meaningful scale: **#6** (concurrent index lane), **#9** (shutdown d
 | Global rate limit `skipOnError: true` | **#2** |
 | DB role boot assertion + cross-tenant RLS regression test | **#1** |
 | `TRUST_PROXY` hop-count parsing + hosted assertion | **#4** |
-| Global rate limit: IP-only or IP+verified org key | **#3** |
+| Global rate limit: IP-only or IP+verified organization key | **#3** |
 | Skip / fingerprint anonymous idempotency on auth routes | **#7** |
 | Pre-close shutdown drain delay (~1.5–2× probe interval) | **#9** |
 | Migration runner advisory lock | **#11** |

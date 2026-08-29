@@ -5,6 +5,7 @@
  */
 
 import type { Worker } from 'bullmq';
+import { isWorkerRuntime } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { STRIPE_WEBHOOK_QUEUE_NAME } from '@/domains/billing/sub-domains/stripe-webhook/queues/stripe-webhook.queue.js';
 import { MAIL_QUEUE_NAME } from '@/infrastructure/mail/queues/mail.queue.js';
 import { attachDeadLetterAndAlerting } from '@/infrastructure/queue/dlq/dead-letter.js';
@@ -67,6 +68,16 @@ function pushWorkerWithDeadLetterHook(
 export async function registerDomainWorkers(
   workerContainers: DomainContainers,
 ): Promise<WorkerHandle[]> {
+  // C1 (context-layer audit): every worker-runtime database guard —
+  // assertWorkerDatabaseContext, the FORCE-RLS table asserts, the unpinned-pool
+  // throw — is gated on isWorkerRuntime(). Starting BullMQ processors without the
+  // flag would silently disable that entire guard net, so fail the boot instead.
+  if (!isWorkerRuntime()) {
+    throw new Error(
+      'registerDomainWorkers requires CORE_BE_RUNTIME=worker — the worker-runtime RLS guard net is disabled without it. ' +
+        'Start workers via src/worker.ts (which sets it) or set the variable explicitly.',
+    );
+  }
   const workers: WorkerHandle[] = [];
   const selectedFamilies = getSelectedWorkerQueueFamilies();
   const poolDemand = computeWorkerPostgresPoolDemand({

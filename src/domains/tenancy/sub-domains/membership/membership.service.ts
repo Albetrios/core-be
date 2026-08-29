@@ -8,12 +8,15 @@ import {
 import { isPostgresUniqueViolation } from '@/shared/utils/infrastructure/postgres-error.util.js';
 import { isDisposableEmailBlocked } from '@/shared/utils/text/email.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import {
   acquireResourceQuotaLock,
   RESOURCE_QUOTA_LOCK_NAMESPACE,
 } from '@/infrastructure/database/resource-quota-lock.util.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import type { UserSettingsService } from '@/domains/user/sub-domains/user-settings/user-settings.service.js';
 import {
   isFactoryDefaultUserLocaleSettings,
@@ -58,7 +61,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
  *   so tenancy does not depend on billing — billing already depends on tenancy, so importing the
  *   concrete service here would create a cycle. The composition root late-wires the concrete
  *   service in via {@link MembershipService.wireSeatEnforcement}.
- * - **Failure modes:** `reserveSeatCeilingForMemberAdd` returns `null` (no ceiling) when the org has
+ * - **Failure modes:** `reserveSeatCeilingForMemberAdd` returns `null` (no ceiling) when the organization has
  *   no active subscription or the plan is unlimited; the implementer takes a row lock so concurrent
  *   adds serialize. `enqueueSeatQuantitySync` is best-effort (swallows enqueue failures).
  * - **Side effects:** the implementer acquires a `FOR UPDATE` lock (reserve) / enqueues a job (sync).
@@ -93,7 +96,7 @@ export interface MembershipPermissionsOutput {
  *
  * @remarks
  * - **Algorithm:** every public method runs inside
- *   {@link withOrganizationDatabaseContext} and resolves the caller's
+ *   {@link withAppDatabaseContext} and resolves the caller's
  *   organization through
  *   {@link OrganizationService.requireOrganizationRecordByPublicId}
  *   before touching the membership repository. `transferOwnership` is
@@ -105,7 +108,7 @@ export interface MembershipPermissionsOutput {
  *   locale settings.
  * - **Failure modes:** `NotFoundError('Membership' | 'Organization' | 'Role' |
  *   'User')` for missing rows; `ForbiddenError('errors:ownerCannotLeave')`
- *   when the org owner tries to leave;
+ *   when the organization owner tries to leave;
  *   `ForbiddenError('errors:onlyOwnerCanTransfer')` for non-owner ownership
  *   transfers;
  *   `ForbiddenError('errors:membershipActivationRequiresInvitationAccept')`
@@ -178,7 +181,7 @@ export class MembershipService {
   }
 
   /**
-   * Enforces the plan seat limit before a member is added (REQ-4). MUST run inside the org
+   * Enforces the plan seat limit before a member is added (REQ-4). MUST run inside the organization
    * transaction so the advisory lock (and the billing port's FOR UPDATE, when a subscription
    * exists) serializes concurrent adds. No-op when the seat-enforcement port is unwired (minimal
    * harness) or when the plan grants unlimited seats (`ceiling === null`). Throws
@@ -187,15 +190,15 @@ export class MembershipService {
    * already counts and a burst of invites cannot overshoot the limit).
    *
    * @remarks
-   * audit-#M1: the FOR UPDATE row lock only exists when the org has an ACTIVE subscription. On the
+   * audit-#M1: the FOR UPDATE row lock only exists when the organization has an ACTIVE subscription. On the
    * free-tier / no-subscription branch the ceiling is a catalog value with no row to lock, so two
    * concurrent adds could both pass `used < ceiling` and overshoot a plan with `included_seats > 1`.
-   * A per-org advisory xact lock (`MEMBERSHIP_SEAT`) taken up front serializes the count+insert on
+   * A per-organization advisory xact lock (`MEMBERSHIP_SEAT`) taken up front serializes the count+insert on
    * BOTH paths, independent of whether the free ceiling happens to be 1.
    */
   private async assertSeatAvailableForMemberAdd(organizationInternalId: number): Promise<void> {
     if (!this.seatEnforcement) return;
-    // Serialize concurrent member-adds for this org before the count so the free-tier path (no
+    // Serialize concurrent member-adds for this organization before the count so the free-tier path (no
     // FOR UPDATE row to lock) cannot race two inserts past the ceiling. Auto-released at COMMIT.
     await acquireResourceQuotaLock(
       RESOURCE_QUOTA_LOCK_NAMESPACE.MEMBERSHIP_SEAT,
@@ -244,13 +247,13 @@ export class MembershipService {
     organizationPublicId: string,
   ): Promise<void> {
     if (!(this.organizationSettingsService && this.userSettingsService)) return;
-    const currentSettings = await this.userSettingsService.get(userPublicId);
+    const currentSettings = await this.userSettingsService.getForInvitedUser(userPublicId);
     if (!isFactoryDefaultUserLocaleSettings(currentSettings)) return;
     const defaultLocale =
       await this.organizationSettingsService.resolveDefaultLocaleForOrganization(
         organizationPublicId,
       );
-    await this.userSettingsService.update(userPublicId, {
+    await this.userSettingsService.updateForInvitedUser(userPublicId, {
       language: defaultLocale,
       preferred_locales: preferredLocalesForOrganizationDefaultLocale(defaultLocale),
     });
@@ -260,7 +263,7 @@ export class MembershipService {
    * Resolves user + role summaries (and the live invitation for `INVITED` rows) for a page of
    * memberships and serializes them. The internal `user_id`/`role_id` are never emitted; user
    * summaries go through the SECURITY DEFINER resolver (auth.users is FORCE RLS and unreachable by a
-   * plain join under org-only context), and each distinct avatar key is presigned for read.
+   * plain join under organization-only context), and each distinct avatar key is presigned for read.
    */
   private async serializeMemberships(
     rows: MembershipRow[],
@@ -318,9 +321,10 @@ export class MembershipService {
     return output!;
   }
 
-  async list(organization_public_id: string, query: unknown) {
+  async list(scope: OrganizationPrincipalDatabaseScope, query: unknown) {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateListMembershipsQuery(query);
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const result = await this.membershipRepository.findByOrganizationId(
@@ -342,10 +346,11 @@ export class MembershipService {
   }
 
   async getByPublicId(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     membership_public_id: string,
   ): Promise<MembershipOutput> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -358,11 +363,12 @@ export class MembershipService {
   }
 
   async create(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     invited_by_user_public_id: string | undefined,
     options?: { requestId?: string },
   ): Promise<MembershipOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateCreateMembership(body);
     const userService = this.userService;
     const memberInvitationService = this.memberInvitationService;
@@ -378,13 +384,13 @@ export class MembershipService {
         { field: 'email', messageKey: 'errors:disposableEmail' },
       ]).withReason('disposable_email');
     }
-    // Provision/find the invitee in its OWN transaction (BEFORE the org context) so the public-id
-    // collision retry can open fresh transactions — a pinned org transaction would abort on retry.
+    // Provision/find the invitee in its OWN transaction (BEFORE the organization context) so the public-id
+    // collision retry can open fresh transactions — a pinned organization transaction would abort on retry.
     // A user left with no membership by a later failure is harmless and reused on the next attempt.
     const inviteeUser = await userService.findOrCreateInvitedByEmail({
       email: parsed.email,
     });
-    const result = await withOrganizationDatabaseContext(organization_public_id, async () => {
+    const result = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       // Capability matrix: a PERSONAL organization is single-member by definition. Collaboration
@@ -408,7 +414,7 @@ export class MembershipService {
         requestedPermissionCodes: rolePermissionCodes,
       });
       // REQ-4: enforce the plan seat limit before persisting the new membership. Runs INSIDE the
-      // existing org transaction so the per-org advisory lock (plus the FOR UPDATE row lock when a
+      // existing organization transaction so the per-organization advisory lock (plus the FOR UPDATE row lock when a
       // subscription exists) serializes concurrent adds — two simultaneous adds cannot both pass the
       // same count and exceed the limit, on the paid OR the free-tier path (audit-#M1). Ceiling of
       // null (unlimited plan / unwired port) is a no-op.
@@ -437,7 +443,7 @@ export class MembershipService {
         }
         throw error;
       }
-      // Issue the invitation (token + email) in this same org transaction.
+      // Issue the invitation (token + email) in this same organization transaction.
       await memberInvitationService.createForMembership({
         organization_name: organization.name ?? organization.public_id,
         organization_id: organization.id,
@@ -452,24 +458,25 @@ export class MembershipService {
       await this.applyOrganizationLocaleDefaults(inviteeUser.public_id, organization_public_id);
       return this.resolveAndSerializeMembership(created, organization_public_id);
     });
-    // sec-R11: invalidate the invitee's cached permissions AFTER the org transaction commits.
+    // sec-R11: invalidate the invitee's cached permissions AFTER the organization transaction commits.
     // Doing it pre-commit left a race where a concurrent recompute re-cached the stale set.
     await invalidatePermissions(inviteeUser.public_id, organization_public_id);
     // REQ-4: the seat count just grew — reconcile the Stripe subscription quantity out-of-band.
-    // Enqueued AFTER the org transaction commits so the worker re-reads the new count. Best-effort.
+    // Enqueued AFTER the organization transaction commits so the worker re-reads the new count. Best-effort.
     this.enqueueSeatQuantitySync(organization_public_id);
     return result;
   }
 
   async update(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     membership_public_id: string,
     body: unknown,
     updated_by_user_public_id: string | undefined,
   ): Promise<MembershipOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateMembership(body);
     let affectedUserInternalId: number | undefined;
-    const result = await withOrganizationDatabaseContext(organization_public_id, async () => {
+    const result = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -478,7 +485,7 @@ export class MembershipService {
       );
       if (!membership) throw new NotFoundError('Membership');
       /**
-       * sec-new-T1: The org owner's membership must not be modified by other members.
+       * sec-new-T1: The organization owner's membership must not be modified by other members.
        * An Admin holding MEMBERSHIP_MANAGE could otherwise SUSPEND the owner, locking
        * them out of all RBAC-gated routes with no self-recovery path. The ownership
        * transfer endpoint is the correct mechanism for any ownership-adjacent change.
@@ -501,7 +508,7 @@ export class MembershipService {
        * counted toward the cap, so a `SUSPENDED -> ACTIVE` transition adds one to the live seat
        * count. Without this check, suspend → add-a-new-member-into-the-freed-slot → reactivate
        * overshoots the plan's seat ceiling unbounded. Run the same seat-availability check as
-       * `create`, inside this org transaction so the subscription `FOR UPDATE` lock serializes it.
+       * `create`, inside this organization transaction so the subscription `FOR UPDATE` lock serializes it.
        */
       if (parsed.status === 'ACTIVE' && membership.status !== 'ACTIVE') {
         await this.assertSeatAvailableForMemberAdd(organization.id);
@@ -545,9 +552,13 @@ export class MembershipService {
     return result;
   }
 
-  async delete(organization_public_id: string, membership_public_id: string): Promise<void> {
+  async delete(
+    scope: OrganizationPrincipalDatabaseScope,
+    membership_public_id: string,
+  ): Promise<void> {
+    const organization_public_id = scope.organizationPublicId;
     let affectedUserInternalId: number | undefined;
-    await withOrganizationDatabaseContext(organization_public_id, async () => {
+    await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -590,10 +601,11 @@ export class MembershipService {
   }
 
   async getPermissions(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     membership_public_id: string,
   ): Promise<MembershipPermissionsOutput> {
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
+    const organization_public_id = scope.organizationPublicId;
+    return withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const membership = await this.membershipRepository.findByPublicId(
@@ -608,8 +620,12 @@ export class MembershipService {
     });
   }
 
-  async leaveOrganization(organization_public_id: string, user_public_id: string): Promise<void> {
-    await withOrganizationDatabaseContext(organization_public_id, async () => {
+  async leaveOrganization(
+    scope: OrganizationPrincipalDatabaseScope,
+    user_public_id: string,
+  ): Promise<void> {
+    const organization_public_id = scope.organizationPublicId;
+    await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       const userId = await this.organizationService.resolveUserInternalIdByPublicId(user_public_id);
@@ -628,7 +644,7 @@ export class MembershipService {
       );
       if (!deleted) {
         // The atomic owner-guard refused the delete: a concurrent transfer made this user the
-        // owner after the pre-check above (which would otherwise orphan the org), or the row
+        // owner after the pre-check above (which would otherwise orphan the organization), or the row
         // vanished. Re-resolve so the race surfaces the same ownerCannotLeave as the pre-check.
         const current =
           await this.organizationService.requireOrganizationRecordByPublicId(
@@ -649,12 +665,13 @@ export class MembershipService {
   }
 
   async transferOwnership(
-    organization_public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     current_user_public_id: string,
   ): Promise<MembershipOutput> {
+    const organization_public_id = scope.organizationPublicId;
     const parsed = validateTransferOwnership(body);
-    const result = await withOrganizationDatabaseContext(organization_public_id, async () => {
+    const result = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
       // A PERSONAL organization belongs solely to its owner and cannot be handed off.
@@ -695,21 +712,24 @@ export class MembershipService {
    *
    * @remarks
    * - **Algorithm:** runs {@link MembershipRepository.countActiveByOrganization} inside
-   *   {@link withOrganizationDatabaseContext} so the `memberships` RLS policy resolves the
+   *   {@link withAppDatabaseContext} so the `memberships` RLS policy resolves the
    *   org's rows. Resolves the org's internal id from its public id first.
    * - **Failure modes:** `NotFoundError('Organization')` when the public id does not resolve.
-   * - **Side effects:** one read-only COUNT query under the org GUC.
+   * - **Side effects:** one read-only COUNT query under the organization GUC.
    * - **Notes:** this is the cross-domain SERVICE entry point billing's `SubscriptionService`
    *   calls to compute `seats_used` — billing never reaches the membership repository/schema
    *   directly (cross-domain reads go service→service).
    */
   async countActiveMembers(options: { organizationPublicId: string }): Promise<number> {
-    return withOrganizationDatabaseContext(options.organizationPublicId, async () => {
-      const organization = await this.organizationService.requireOrganizationByPublicId(
-        options.organizationPublicId,
-      );
-      return this.membershipRepository.countActiveByOrganization(organization.id);
-    });
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: options.organizationPublicId }),
+      async () => {
+        const organization = await this.organizationService.requireOrganizationByPublicId(
+          options.organizationPublicId,
+        );
+        return this.membershipRepository.countActiveByOrganization(organization.id);
+      },
+    );
   }
 
   /**
@@ -722,10 +742,10 @@ export class MembershipService {
    *   `seatsUsed - ceiling` non-owner ACTIVE members ordered by `joined_at DESC` (longest-tenured
    *   kept), then purges each suspended member's Redis permission cache so access is revoked at once
    *   rather than lingering for the cache TTL. The **owner is never suspended**, so an owner-only or
-   *   owner-plus-invites org may remain above `ceiling` (invitations are not suspendable) — the
+   *   owner-plus-invites organization may remain above `ceiling` (invitations are not suspendable) — the
    *   add-member ceiling check still blocks further growth.
-   * - **Failure modes:** `NotFoundError('Organization')` for a missing org; otherwise none beyond the
-   *   underlying queries. Runs in the org DB context + transaction so the count and suspend are
+   * - **Failure modes:** `NotFoundError('Organization')` for a missing organization; otherwise none beyond the
+   *   underlying queries. Runs in the organization DB context + transaction so the count and suspend are
    *   consistent and RLS-scoped.
    * - **Side effects:** flips excess memberships to `SUSPENDED`; invalidates permission caches.
    */
@@ -733,8 +753,8 @@ export class MembershipService {
     organizationPublicId: string;
     ceiling: number;
   }): Promise<number> {
-    const suspendedUserIds = await withOrganizationDatabaseContext(
-      options.organizationPublicId,
+    const suspendedUserIds = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: options.organizationPublicId }),
       async () => {
         const organization = await this.organizationService.requireOrganizationRecordByPublicId(
           options.organizationPublicId,
@@ -752,7 +772,7 @@ export class MembershipService {
       },
     );
     // Post-commit (policy audit R11): purge each suspended member's permission cache OUTSIDE the
-    // org context block, so a concurrent recompute can't re-cache the pre-suspension permission set
+    // organization context block, so a concurrent recompute can't re-cache the pre-suspension permission set
     // before the suspend transaction commits.
     for (const userInternalId of suspendedUserIds) {
       await this.invalidatePermissionsForMembership(userInternalId, options.organizationPublicId);
@@ -769,11 +789,13 @@ export class MembershipService {
     userInternalId: number;
     limit: number;
   }) {
-    return withUserDatabaseContext(options.userPublicId, (_databaseHandle) =>
-      this.membershipRepository.listOrganizationsForUserDataExport(
-        options.userInternalId,
-        options.limit,
-      ),
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: options.userPublicId }),
+      (_databaseHandle) =>
+        this.membershipRepository.listOrganizationsForUserDataExport(
+          options.userInternalId,
+          options.limit,
+        ),
     );
   }
 }

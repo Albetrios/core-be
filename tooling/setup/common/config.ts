@@ -48,7 +48,7 @@ export const setupConfigSchema = z.object({
     name: z.string().min(1),
     displayName: z.string().min(1),
     // npm package name. Defaults to `name`; set explicitly only when the npm
-    // name must differ from the project slug (e.g. a scoped `@org/api` name).
+    // name must differ from the project slug (e.g. a scoped `@organization/api` name).
     packageName: z.string().min(1).optional(),
     // package.json `description`. Defaults to the committed description when
     // omitted so an adopting fork is not forced to invent one immediately.

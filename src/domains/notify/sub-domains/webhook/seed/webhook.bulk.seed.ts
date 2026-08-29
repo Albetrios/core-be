@@ -9,7 +9,7 @@
  * count-and-resume make a re-run with the same counts a no-op.
  */
 import { and, eq, like } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { encryptFieldSecret } from '@/shared/utils/security/field-secret-encryption.util.js';
 import { webhooks } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
@@ -19,11 +19,11 @@ import { generateBulkWebhook } from './webhook.faker.js';
 /** Host suffix that brands every bulk-seeded webhook URL (used as the resume/select marker). */
 const BULK_WEBHOOK_HOST_SUFFIX = '.webhooks.seed.local';
 /** `LIKE` pattern matching all bulk-seeded webhook URLs (shared with the delivery-attempt seeder). */
-export const BULK_WEBHOOK_URL_PATTERN = `https://bulk-seed-org-%${BULK_WEBHOOK_HOST_SUFFIX}/endpoint`;
+export const BULK_WEBHOOK_URL_PATTERN = `https://bulk-seed-organization-%${BULK_WEBHOOK_HOST_SUFFIX}/endpoint`;
 
 /** Builds the deterministic, schema-valid (`^https://`) seed URL for one org's webhook index. */
 function bulkWebhookUrl(organizationId: number, index: number): string {
-  return `https://bulk-seed-org-${organizationId}-hook-${index}${BULK_WEBHOOK_HOST_SUFFIX}/endpoint`;
+  return `https://bulk-seed-organization-${organizationId}-hook-${index}${BULK_WEBHOOK_HOST_SUFFIX}/endpoint`;
 }
 
 /** Seeds the webhook endpoints for a single organization, resuming from the existing count. */

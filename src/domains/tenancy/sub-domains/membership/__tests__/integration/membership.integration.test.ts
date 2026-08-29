@@ -148,7 +148,7 @@ describe('Membership Sub-Domain — Integration', () => {
         permissionCodes: [TENANCY_PERMISSIONS.MEMBERSHIP_READ],
       });
 
-      // REQ-1: add-member-by-email. findOrCreateInvitedByEmail resolves the existing user; the org
+      // REQ-1: add-member-by-email. findOrCreateInvitedByEmail resolves the existing user; the organization
       // default locale is applied on create regardless of the INVITED status.
       const createMembershipResponse = await injectAuthenticated(app, {
         method: 'POST',
@@ -226,7 +226,7 @@ describe('Membership Sub-Domain — Integration', () => {
   });
 
   describe('POST /api/v1/tenancy/organization/memberships — REQ-4 seat enforcement', () => {
-    // Builds an org whose owner+admin already holds a seat, optionally with an active subscription on
+    // Builds an organization whose owner+admin already holds a seat, optionally with an active subscription on
     // a plan that grants `includedSeats` seats. Returns the admin token + a grantable member role.
     async function createSeatLimitedContext(
       includedSeats: number | null,
@@ -305,8 +305,8 @@ describe('Membership Sub-Domain — Integration', () => {
       expect(response.statusCode).toBe(200);
     });
 
-    it('caps an unsubscribed org at the Free-tier ceiling when a plan catalog exists (F3)', async () => {
-      // A plan catalog exists (cheapest active plan grants 1 seat) but the org has NO subscription.
+    it('caps an unsubscribed organization at the Free-tier ceiling when a plan catalog exists (F3)', async () => {
+      // A plan catalog exists (cheapest active plan grants 1 seat) but the organization has NO subscription.
       // Its entitlement falls to the Free-tier ceiling, so the owner's seat fills it and the next add
       // is rejected — "no members until you subscribe".
       const { organization, adminToken, memberRole } = await createSeatLimitedContext(null, false);
@@ -453,7 +453,7 @@ describe('Membership Sub-Domain — Integration', () => {
       expect(updated!.joined_at).not.toBeNull();
     });
 
-    it('notifies the org membership-managers when the invitation is accepted (item #10)', async () => {
+    it('notifies the organization membership-managers when the invitation is accepted (item #10)', async () => {
       const {
         organization,
         invitation,
@@ -616,15 +616,17 @@ describe('Membership Sub-Domain — Integration', () => {
     });
 
     it('refuses cross-organization revoke attempts with 404 (tenant isolation)', async () => {
-      const { organization: orgA, invitation } = await createPendingInvitationForAdminRevoke();
-      const { organization: orgB, token: orgBAdminToken } = await createAuthorizedContext();
-      expect(orgA.id).not.toBe(orgB.id);
+      const { organization: organizationA, invitation } =
+        await createPendingInvitationForAdminRevoke();
+      const { organization: organizationB, token: organizationBAdminToken } =
+        await createAuthorizedContext();
+      expect(organizationA.id).not.toBe(organizationB.id);
 
       const response = await injectAuthenticated(app, {
         method: 'DELETE',
         url: testApiPath(`/tenancy/organization/invitations/${invitation.public_id}`),
-        token: orgBAdminToken,
-        organizationPublicId: orgB.public_id,
+        token: organizationBAdminToken,
+        organizationPublicId: organizationB.public_id,
       });
       expect(response.statusCode).toBe(404);
 
@@ -744,13 +746,14 @@ describe('Membership Sub-Domain — Integration', () => {
 
     it('refuses cross-tenant resend with 404 (tenant isolation)', async () => {
       const { invitation } = await createPendingInvitationForResend();
-      const { organization: orgB, token: orgBAdminToken } = await createAuthorizedContext();
+      const { organization: organizationB, token: organizationBAdminToken } =
+        await createAuthorizedContext();
 
       const response = await injectAuthenticated(app, {
         method: 'POST',
         url: testApiPath(`/tenancy/organization/invitations/${invitation.public_id}/resend`),
-        token: orgBAdminToken,
-        organizationPublicId: orgB.public_id,
+        token: organizationBAdminToken,
+        organizationPublicId: organizationB.public_id,
         headers: { 'x-idempotency-key': `idem-${randomUUID()}` },
         payload: { expires_in_days: 10 },
       });
@@ -864,7 +867,7 @@ describe('Membership Sub-Domain — Integration', () => {
           url: testApiPath(`/tenancy/organization/logo`),
           token,
           organizationPublicId: organization.public_id,
-          payload: { key: 'organization-logos/some-other-org/logo.png' },
+          payload: { key: 'organization-logos/some-other-organization/logo.png' },
         });
         expect(response.statusCode).toBe(400);
       });
@@ -932,16 +935,17 @@ describe('Membership Sub-Domain — Integration', () => {
     });
 
     it('refuses cross-organization lookups with 404 (tenant isolation)', async () => {
-      const { membership: orgAMembership } = await createAuthorizedContext();
-      const { organization: orgB, token: orgBToken } = await createAuthorizedContext();
+      const { membership: organizationAMembership } = await createAuthorizedContext();
+      const { organization: organizationB, token: organizationBToken } =
+        await createAuthorizedContext();
 
       const response = await injectAuthenticated(app, {
         method: 'GET',
         url: testApiPath(
-          `/tenancy/organization/memberships/${orgAMembership.public_id}/permissions`,
+          `/tenancy/organization/memberships/${organizationAMembership.public_id}/permissions`,
         ),
-        token: orgBToken,
-        organizationPublicId: orgB.public_id,
+        token: organizationBToken,
+        organizationPublicId: organizationB.public_id,
       });
       expect(response.statusCode).toBe(404);
     });
@@ -1096,11 +1100,11 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(403);
 
-      const [orgUnchanged] = await database
+      const [organizationUnchanged] = await database
         .select()
         .from(organizations)
         .where(eq(organizations.id, organization.id));
-      expect(orgUnchanged!.owner_user_id).not.toBe(target.id);
+      expect(organizationUnchanged!.owner_user_id).not.toBe(target.id);
     });
 
     it('rejects transfer to a user who is not an active member (404)', async () => {
@@ -1120,7 +1124,7 @@ describe('Membership Sub-Domain — Integration', () => {
   });
 
   describe('DELETE /api/v1/tenancy/organization/memberships/:membership_id', () => {
-    it('refuses to remove the organization owner (403, no orphaned org)', async () => {
+    it('refuses to remove the organization owner (403, no orphaned organization)', async () => {
       const owner = await createTestUser();
       const organization = await createTestOrganization({ ownerUserId: owner.id });
       const adminRole = await createRoleWithPermissions({
@@ -1223,7 +1227,7 @@ describe('Membership Sub-Domain — Integration', () => {
       return row?.value ?? 0;
     }
 
-    it('rejects POST /memberships on a PERSONAL org with 422 (errors:personalOrganizationNoMembers) and creates no row', async () => {
+    it('rejects POST /memberships on a PERSONAL organization with 422 (errors:personalOrganizationNoMembers) and creates no row', async () => {
       const { owner, organization, ownerRoleId, token } = await setupPersonalOrganizationOwner();
       // A valid body that PASSES validation and reaches the guard: an invitee email + the real owner
       // role's public id. The single-member guard runs before role resolution, so the 422 is the
@@ -1248,14 +1252,14 @@ describe('Membership Sub-Domain — Integration', () => {
 
       expectPersonalNoMembersUnprocessableEntity(response);
 
-      // No second membership was created — the personal org is still single-member.
+      // No second membership was created — the personal organization is still single-member.
       const membershipsAfter = await countMemberships(organization.id);
       expect(membershipsAfter).toBe(1);
       // Sanity: the owner provisioned with the full set is unaffected.
       expect(owner.id).toBeDefined();
     });
 
-    it('positive contrast: the SAME POST /memberships succeeds (200) on a TEAM org — the guard is type-specific, not a blanket block', async () => {
+    it('positive contrast: the SAME POST /memberships succeeds (200) on a TEAM organization — the guard is type-specific, not a blanket block', async () => {
       await seedAllTenancyPermissions();
       const owner = await createTestUser();
       const team = await provisionOrganizationWithOwner({

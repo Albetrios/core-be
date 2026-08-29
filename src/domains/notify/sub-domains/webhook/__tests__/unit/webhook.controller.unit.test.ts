@@ -4,9 +4,10 @@ import { ValidationError } from '@/shared/errors/index.js';
 import { createWebhookController } from '@/domains/notify/sub-domains/webhook/webhook.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { WebhookService } from '@/domains/notify/sub-domains/webhook/webhook.service.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScope({
     auth: { userId: generatePublicId('user'), role: 'user' },
     params: {},
     body: {},
@@ -14,7 +15,7 @@ function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {
@@ -60,7 +61,10 @@ describe('createWebhookController', () => {
       mockReply(),
     );
     expect(service.list).toHaveBeenCalledWith(
-      expect.objectContaining({ organization_public_id: organizationPublicId, limit: 25 }),
+      expect.objectContaining({
+        scope: expect.objectContaining({ organizationPublicId }),
+        limit: 25,
+      }),
     );
 
     await controller.getWebhook(
@@ -114,7 +118,7 @@ describe('createWebhookController', () => {
     );
     expect(service.listDeliveryAttempts).toHaveBeenCalledWith(
       expect.objectContaining({
-        organization_public_id: organizationPublicId,
+        scope: expect.objectContaining({ organizationPublicId }),
         webhook_public_id: webhookPublicId,
         limit: 10,
       }),
@@ -139,7 +143,7 @@ describe('createWebhookController', () => {
     );
     expect(service.listDeliveryAttempts).toHaveBeenCalledWith(
       expect.objectContaining({
-        organization_public_id: organizationPublicId,
+        scope: expect.objectContaining({ organizationPublicId }),
         webhook_public_id: webhookPublicId,
         limit: 25,
       }),
@@ -157,7 +161,7 @@ describe('createWebhookController', () => {
       );
       expect(service.list).toHaveBeenCalledWith(
         expect.objectContaining({
-          organization_public_id: organizationPublicId,
+          scope: expect.objectContaining({ organizationPublicId }),
           after: 'cursor-token',
           limit: 5,
           include_total: true,
@@ -320,7 +324,7 @@ describe('createWebhookController', () => {
       );
       expect(service.listDeliveryAttempts).toHaveBeenCalledWith(
         expect.objectContaining({
-          organization_public_id: organizationPublicId,
+          scope: expect.objectContaining({ organizationPublicId }),
           webhook_public_id: webhookPublicId,
           after: 'cursor-attempt',
           limit: 50,

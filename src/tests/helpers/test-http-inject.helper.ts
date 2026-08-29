@@ -142,9 +142,9 @@ export async function injectAuthenticated(
     ...options.headers,
     authorization: `Bearer ${options.token}`,
   };
-  if (options.organizationPublicId) {
-    headers['x-organization-id'] = options.organizationPublicId;
-  }
+  // organizationPublicId is accepted-and-ignored: the X-Organization-Id header was
+  // removed — the active organization rides ONLY the token's signed `org` claim, so
+  // suites scope requests by minting the right token, never by header.
   const { token, organizationPublicId, extraHeaders, ...routeOptions } = options;
   void token;
   void organizationPublicId;
@@ -180,7 +180,7 @@ export async function waitForOrganizationRlsTransactionCommit(): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, 50));
 }
 
-/** POST/PATCH/DELETE on org-scoped routes commit in onResponse after inject() resolves. */
+/** POST/PATCH/DELETE on organization-scoped routes commit in onResponse after inject() resolves. */
 export async function injectAuthenticatedOrganizationMutation(
   application: FastifyInstance,
   options: InjectAuthenticatedOptions,

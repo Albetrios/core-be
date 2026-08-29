@@ -139,10 +139,10 @@ Size the connection budget against Neon `max_connections` (see formula above).
 
 ### Row-level security (RLS) and the connection pool
 
-Org-scoped HTTP routes (`X-Organization-Id` set) hold **one pool checkout** for the full request via `organizationRlsTransactionMiddleware` (`BEGIN` + `SET LOCAL app.current_organization_id`). That keeps Postgres RLS policies aligned with the handler on a single connection.
+Organization-scoped HTTP routes hold **one pool checkout per unit of work** via `withAppDatabaseContext` (`BEGIN` + `SET LOCAL app.current_organization_public_id`, released at COMMIT) — the old request-pinned transaction middleware is a no-op stub.
 
-> **Throughput SLA (RLS ceiling).** Because each org-scoped request holds its connection for the
-> whole request, a single process sustains at most `DATABASE_POOL_MAX` concurrent org-scoped
+> **Throughput SLA (RLS ceiling).** Because each organization-scoped request holds its connection for the
+> whole request, a single process sustains at most `DATABASE_POOL_MAX` concurrent organization-scoped
 > requests. Steady-state RPS ≈ `DATABASE_POOL_MAX / avg_request_seconds` per process (e.g. 20 / 0.05s
 > ≈ 400 RPS). Beyond that, requests queue against `connect_timeout` and the 5s HTTP statement timeout
 > and surface as 504s. Scale by raising `DATABASE_POOL_MAX` (within the connection budget above) or
@@ -150,7 +150,7 @@ Org-scoped HTTP routes (`X-Organization-Id` set) hold **one pool checkout** for 
 
 | Concern                | Guidance                                                                                               |
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
-| Effective concurrency  | Treat **`DATABASE_POOL_MAX` as the per-process ceiling** for concurrent org-scoped requests            |
+| Effective concurrency  | Treat **`DATABASE_POOL_MAX` as the per-process ceiling** for concurrent organization-scoped requests            |
 | Workers                | Pass `organization_id` / `organizationPublicId` in queries — do not rely on session GUC                |
 | Billing tables         | PK / FK / RLS per table: [billing-database-schema.md](../../reference/data/billing-database-schema.md) |
 | System tables (no RLS) | [system-tables-without-tenant-rls.md](../../reference/security/system-tables-without-tenant-rls.md)    |
@@ -164,9 +164,9 @@ Org-scoped HTTP routes (`X-Organization-Id` set) hold **one pool checkout** for 
 | `DATABASE_HTTP_STATEMENT_TIMEOUT_MS` | `5000`  | Connection-level `statement_timeout` for HTTP handlers (scoped RLS contexts only)                                                                                                                   |
 | `DATABASE_STATEMENT_TIMEOUT_MS`      | `30000` | Connection-level default for workers and long-running queries                                                                                                                                     |
 
-Org-scoped HTTP handlers wrap database work in `withOrganizationDatabaseContext` — there is no per-request transaction pin. Keep Stripe / S3 / Resend calls **outside** those callbacks (enforced by ESLint).
+Org-scoped HTTP handlers wrap database work in `withAppDatabaseContext` — there is no per-request transaction pin. Keep Stripe / S3 / Resend calls **outside** those callbacks (enforced by ESLint).
 
-Cross-organization reads (organization list/get/getBySlug/create) and invitation flows MUST use `withUserDatabaseContext` or the `tenancy.resolve_member_invitation_lookup_by_public_id` / `tenancy.list_pending_member_invitations_for_email` SECURITY DEFINER helpers (see migration `20260520000004_organization_discovery_and_invitation_lookup_rls.sql`).
+Cross-organization reads (organization list/get/getBySlug/create) and invitation flows MUST use a user principal scope (`withAppDatabaseContext`) or the `tenancy.resolve_member_invitation_lookup_by_public_id` / `tenancy.list_pending_member_invitations_for_email` SECURITY DEFINER helpers (see migration `20260520000004_organization_discovery_and_invitation_lookup_rls.sql`).
 
 ### Pool exhaustion alerting (API)
 
@@ -174,7 +174,7 @@ The API process polls every `DATABASE_POOL_ALERT_POLL_INTERVAL_MS` (default **5s
 
 | Variable                                | Default | Meaning                                                              |
 | --------------------------------------- | ------- | -------------------------------------------------------------------- |
-| `DATABASE_POOL_ACTIVE_WARN_RATIO`       | `0.8`   | Warn when in-process org RLS checkouts ≥ `DATABASE_POOL_MAX × ratio` |
+| `DATABASE_POOL_ACTIVE_WARN_RATIO`       | `0.8`   | Warn when in-process organization RLS checkouts ≥ `DATABASE_POOL_MAX × ratio` |
 | `DATABASE_POOL_ACTIVE_CRITICAL_RATIO`   | `0.95`  | Critical threshold for same signal                                   |
 | `DATABASE_POOL_CLUSTER_WARN_RATIO`      | `0.8`   | Warn when cluster active+waiting connections exceed budget × ratio   |
 | `DATABASE_POOL_CLUSTER_CRITICAL_RATIO`  | `0.95`  | Critical cluster threshold                                           |

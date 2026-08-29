@@ -35,7 +35,7 @@ export function isFactoryDefaultUserLocaleSettings(
 /**
  * Build the `preferred_locales` array that should be applied when adopting the organization's
  * default locale for a user without explicit locale preferences. Currently a single-element list
- * but kept as a helper so future fallback chains (e.g. `[org, 'en']`) can be added in one place.
+ * but kept as a helper so future fallback chains (e.g. `[organization, 'en']`) can be added in one place.
  */
 export function preferredLocalesForOrganizationDefaultLocale(
   organizationDefaultLocale: OrganizationDefaultLocale,

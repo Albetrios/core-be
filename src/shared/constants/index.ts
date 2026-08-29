@@ -4,8 +4,8 @@ export type { GlobalRole } from './roles.constants.js';
 /** Generic message returned to clients for any 500 response; internal details go to Sentry only. */
 export const EXTERNAL_ERROR_MESSAGE = 'Something went wrong! Please try again later.';
 
-/** Local-dev fallback base URL for the SPA when `FRONTEND_URL` is unset (email links, OAuth redirect URIs). */
-export const DEFAULT_FRONTEND_URL = 'http://localhost:3000';
+/** Local-dev fallback base URL for the SPA when `FRONTEND_URL` is unset (email links, OAuth redirect URIs). Matches core-fe's Vite dev server (`pnpm dev` on 5173) — NOT this API's own port. */
+export const DEFAULT_FRONTEND_URL = 'http://localhost:5173';
 
 /** Lowercase kebab-case slug (organization slugs, role slugs, public identifiers). */
 export const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/; // eslint-disable-line security/detect-unsafe-regex

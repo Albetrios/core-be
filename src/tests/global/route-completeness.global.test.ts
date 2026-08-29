@@ -134,7 +134,7 @@ describe('Route Completeness', () => {
       'public',
       'authenticated',
       'global-role',
-      'org-permission',
+      'organization-permission',
       'bearer-token',
     ]);
     for (const route of ROUTE_REGISTRY) {

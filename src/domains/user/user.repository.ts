@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
 import { and, asc, eq, ilike, isNotNull, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { countWithCap } from '@/infrastructure/database/utils/capped-count.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { users } from '@/domains/user/user.schema.js';
 import { escapeLikePattern } from '@/shared/utils/validation/validation.util.js';
 import {
@@ -67,7 +67,7 @@ export class UserRepository {
   /**
    * Resolves a user by email for the pre-session authentication phase (login, forgot-password,
    * webauthn auth-options, OAuth find-or-create). Goes through the `auth.resolve_user_*` SECURITY
-   * DEFINER resolver because `auth.users` is FORCE RLS and no `app.current_user_id` is set yet — a
+   * DEFINER resolver because `auth.users` is FORCE RLS and no `app.current_user_public_id` is set yet — a
    * plain SELECT would resolve the owner policy to NULL and return zero rows, rejecting every login.
    */
   async findByEmail(email: string): Promise<UserRow | null> {
@@ -113,7 +113,7 @@ export class UserRepository {
    * (`POST /auth/login` no longer authenticates with the previous credential).
    * Pre-fix, removing the PASSWORD auth-method only flipped `auth_methods.revoked_at`
    * but left the stale hash on `auth.users`, so the credential remained valid.
-   * Caller MUST be inside `withUserDatabaseContext` so the FORCE-RLS owner-access
+   * Caller MUST be inside `withAppDatabaseContext (user scope)` so the FORCE-RLS owner-access
    * policy is satisfied.
    */
   async clearPasswordHash(publicId: string) {
@@ -194,8 +194,8 @@ export class UserRepository {
   /**
    * Inserts a user from an OAuth profile (no password) with a caller-supplied `public_id`.
    *
-   * Public-id generation, unique-collision retry, and the `withUserDatabaseContext` wrapper that
-   * satisfies the FORCE RLS owner WITH CHECK (`public_id = app.current_user_id`) live in
+   * Public-id generation, unique-collision retry, and the `withAppDatabaseContext (user scope)` wrapper that
+   * satisfies the FORCE RLS owner WITH CHECK (`public_id = app.current_user_public_id`) live in
    * {@link UserService.createFromOAuth}: the context must be set to the exact `public_id` used for
    * the insert, so the service owns the generate → enter-context → insert sequence per attempt.
    */

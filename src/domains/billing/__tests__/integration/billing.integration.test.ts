@@ -58,7 +58,7 @@ describe('Billing Domain — Response contract (integration)', () => {
   }
 
   /**
-   * Team org whose member holds `permissionCodes`, with an ACTIVE local-only subscription that
+   * Team organization whose member holds `permissionCodes`, with an ACTIVE local-only subscription that
    * carries a Stripe customer id — the state the billing-account reads need to get past
    * `resolveStripeCustomerId` and reach the Stripe branch.
    */

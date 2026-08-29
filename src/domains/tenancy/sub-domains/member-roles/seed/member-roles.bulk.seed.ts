@@ -10,7 +10,7 @@
  * `ON CONFLICT DO NOTHING`, so a re-run with the same counts is a no-op.
  */
 import { and, eq, like, isNull } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.schema.js';
 import { SYSTEM_PERMISSIONS } from '@/domains/tenancy/sub-domains/permission/seed/permission.reference.seed.js';
 import { seedRole, seedRolePermissions } from '@/domains/tenancy/seed/tenancy.seed.js';

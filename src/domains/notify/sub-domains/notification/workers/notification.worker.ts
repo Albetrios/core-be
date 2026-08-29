@@ -1,4 +1,10 @@
 import { Worker, type Job } from 'bullmq';
+import {
+  MAINTENANCE_SCOPE,
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
 import { getDefaultWorkerOptions } from '@/infrastructure/queue/worker-runtime/worker-options.js';
 import { buildWorkerHandle } from '@/infrastructure/queue/worker-runtime/worker-close.util.js';
@@ -9,9 +15,11 @@ import {
   NOTIFICATION_QUEUE_NAME,
   type NotificationJobData,
 } from '@/domains/notify/sub-domains/notification/queues/notification.queue.js';
-import { createWorkerNotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
+import {
+  type NotificationRepository,
+  createWorkerNotificationRepository,
+} from '@/domains/notify/sub-domains/notification/notification.repository.js';
 import { dispatchOutboxEmail, recordOutboxEmail } from '@/infrastructure/mail/queues/mail.queue.js';
-import { withSystemTableWorkerContext } from '@/infrastructure/database/contexts/worker-database.context.js';
 import { isMailConfigured } from '@/infrastructure/mail/mail.service.js';
 import { buildNotificationEmailHtml } from './notification-email-content.js';
 import {
@@ -22,15 +30,10 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { getWorkerConcurrencyNotify } from '@/shared/config/worker-concurrency.util.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
 import {
-  runTenantScopedWorkerJob,
+  runOrganizationScopedWorkerJob,
   type WorkerDatabaseHandle,
 } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
-import { withOrganizationContext } from '@/infrastructure/database/contexts/tenant-database.context.js';
-import { withGlobalAdminDatabaseContext } from '@/infrastructure/database/contexts/global-admin-database.context.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
-import type { NotificationRepository } from '@/domains/notify/sub-domains/notification/notification.repository.js';
-
 type NotificationDispatchData = {
   channels?: ('email' | 'in_app')[];
   email?: string;
@@ -90,7 +93,7 @@ async function dispatchNotificationEmail(options: {
   // back the existing id), closing the duplicate-email window the Redis marker alone left
   // open. The Redis marker below is now just a fast-path to skip the DB insert on retry.
   let mailOutboxId: number | undefined;
-  await withSystemTableWorkerContext(async () => {
+  await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, async () => {
     mailOutboxId = await recordOutboxEmail({
       to: email,
       subject,
@@ -138,7 +141,7 @@ async function dispatchNotificationEmail(options: {
  *   scope when `organizationPublicId` is set, global retention scope otherwise), then iterate
  *   `data.channels ?? ['in_app']`; for each channel, look up the recipient and send. The email
  *   channel renders the shared transactional template and persists/dispatches via the mail
- *   outbox under `withSystemTableWorkerContext`, guarded by a one-time Redis dispatch marker
+ *   outbox under `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER)`, guarded by a one-time Redis dispatch marker
  *   so retries of the same notification job never enqueue a duplicate email.
  * - **Failure modes:** missing notification row → throws `notification.not_found:<id>`; absent
  *   mail configuration or recipient logs `notification.worker.channel_skipped` and continues;
@@ -168,21 +171,30 @@ export async function processNotificationDispatchJob(
   // GUC's blast radius is a future-regression risk: any patch that adds a write
   // inside this scope (e.g. "stamp delivered_at") would silently inherit cross-tenant
   // write privileges. Resolve the recipient's public id via the narrow SECURITY
-  // DEFINER function and pin `withUserDatabaseContext` so the
+  // DEFINER function and pin `withAppDatabaseContext (user scope)` so the
   // `notifications_owner_access` policy authorises the read on its intended branch.
   const loadNotificationForScope = async () => {
     if (organizationPublicId === null || organizationPublicId === undefined) {
-      const userPublicId = await withGlobalAdminDatabaseContext(async (databaseHandle) => {
-        const repository =
-          notificationRepository ?? createWorkerNotificationRepository(databaseHandle);
-        return repository.findUserPublicIdForNotificationDispatch(notificationId);
-      });
+      const userPublicId = await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.GLOBAL_ADMIN,
+        async (databaseHandle) => {
+          const repository =
+            notificationRepository ?? createWorkerNotificationRepository(databaseHandle);
+          return repository.findUserPublicIdForNotificationDispatch(notificationId);
+        },
+      );
       if (!userPublicId) {
         throw new Error(`notification.user_unknown:${String(notificationId)}`);
       }
-      return withUserDatabaseContext(userPublicId, loadNotification);
+      return withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+        loadNotification,
+      );
     }
-    return withOrganizationContext(organizationPublicId, loadNotification);
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.JOB({ organizationPublicId: organizationPublicId }),
+      loadNotification,
+    );
   };
   const notificationRow =
     notificationRepository !== undefined
@@ -257,10 +269,10 @@ async function processTenantScopedNotificationJob(
  *
  * @remarks
  * - **Algorithm:** for each job, branch on `organizationPublicId`: tenant-scoped jobs run inside
- *   `runTenantScopedWorkerJob` (`withOrganizationContext`) so RLS pins reads to the org;
+ *   `runOrganizationScopedWorkerJob` (`withAppDatabaseContext`) so RLS pins reads to the organization;
  *   tenant-less notifications delegate directly to {@link processNotificationDispatchJob}
  *   which then enters its own `loadNotificationForScope` flow — resolving the recipient
- *   public id under `withGlobalAdminDatabaseContext` and pinning `withUserDatabaseContext`
+ *   public id under `withMaintenanceDatabaseContext` and pinning `withAppDatabaseContext (user scope)`
  *   for the load (sec-re-01: the prior wiring wrapped this branch in
  *   `runGlobalRetentionWorkerJob` and injected a repository, which short-circuited the new
  *   `loadNotificationForScope` flow — making the sec-D #10 user-context fix dead code).
@@ -288,7 +300,7 @@ export function createNotificationWorker(): WorkerHandle {
       return runWithPropagatedTraceContext({ traceparent, tracestate }, job.name, () => {
         // sec-re-01: tenant-less notifications delegate directly to
         // processNotificationDispatchJob so it can enter its own loadNotificationForScope
-        // flow (withGlobalAdminDatabaseContext → withUserDatabaseContext). The prior
+        // flow (withMaintenanceDatabaseContext → withAppDatabaseContext (user scope)). The prior
         // wiring wrapped this branch in runGlobalRetentionWorkerJob AND injected a
         // repository, which short-circuited the new flow and left the sec-D #10 fix
         // dead code.
@@ -300,7 +312,7 @@ export function createNotificationWorker(): WorkerHandle {
           );
         }
 
-        return runTenantScopedWorkerJob(
+        return runOrganizationScopedWorkerJob(
           { organizationPublicId, notificationId, requestId },
           (databaseHandle) => processTenantScopedNotificationJob(databaseHandle, job),
         );

@@ -77,7 +77,7 @@ describe('generate-route-catalog', () => {
     expect(toRegistryAccess('PUBLIC')).toBe('public');
     expect(toRegistryAccess('AUTH')).toBe('authenticated');
     expect(toRegistryAccess('ROLE: admin')).toBe('global-role');
-    expect(toRegistryAccess('PERM: organization:update')).toBe('org-permission');
+    expect(toRegistryAccess('PERM: organization:update')).toBe('organization-permission');
     expect(toRegistryAccess('TOKEN: metrics')).toBe('bearer-token');
   });
 

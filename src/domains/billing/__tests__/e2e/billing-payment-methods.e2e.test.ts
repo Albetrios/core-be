@@ -55,7 +55,7 @@ describe('Billing payment methods (e2e)', () => {
     await seedPermissions([...BILLING_PERMISSIONS]);
   });
 
-  /** Team org + membership with billing perms, plus an ACTIVE Stripe-backed subscription. */
+  /** Team organization + membership with billing perms, plus an ACTIVE Stripe-backed subscription. */
   async function createBillingContext() {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });

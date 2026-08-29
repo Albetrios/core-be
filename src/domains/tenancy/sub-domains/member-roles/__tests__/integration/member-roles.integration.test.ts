@@ -139,7 +139,7 @@ describe('Member Roles Sub-Domain — Integration', () => {
       expect(response.statusCode).toBe(200);
       const body = response.json() as { data: Array<{ name: string; member_count: number }> };
       const countByRole = new Map(body.data.map((role) => [role.name, role.member_count]));
-      expect(countByRole.get('Owner')).toBe(1); // the org owner's ACTIVE membership
+      expect(countByRole.get('Owner')).toBe(1); // the organization owner's ACTIVE membership
       expect(countByRole.get('Admin')).toBe(1); // the member assigned above
       expect(countByRole.get('Member')).toBe(0); // unassigned system role
       expect(countByRole.get('Viewer')).toBe(0); // unassigned system role
@@ -153,7 +153,7 @@ describe('Member Roles Sub-Domain — Integration', () => {
   describe('boundary 400s — validator wired at the route (route-coverage gap-fill)', () => {
     // Observed-status capture across e2e+integration+security showed no 400 on any of these three
     // routes: every DTO rule was unit-proven, none was proven wired. One refusal each closes that.
-    // POST /roles is idempotencyRequired — the org-mutation helper supplies the key, so the 422
+    // POST /roles is idempotencyRequired — the organization-mutation helper supplies the key, so the 422
     // cannot fire and the refusal is the validator's own.
 
     it('POST /roles returns 400 when name is missing', async () => {
@@ -291,7 +291,7 @@ describe('Member Roles Sub-Domain — Integration', () => {
       return row?.value ?? 0;
     }
 
-    it('rejects POST /roles on a PERSONAL org with 422 (errors:personalOrganizationNoRoles) and creates no role', async () => {
+    it('rejects POST /roles on a PERSONAL organization with 422 (errors:personalOrganizationNoRoles) and creates no role', async () => {
       await seedAllTenancyPermissions();
       const owner = await createTestUser();
       const provisioned = await provisionPersonalOrganization(owner.id);
@@ -327,7 +327,7 @@ describe('Member Roles Sub-Domain — Integration', () => {
       expect(rolesAfter).toBe(1);
     });
 
-    it('positive contrast: the SAME POST /roles succeeds (200) on a TEAM org — the guard is type-specific, not a blanket block', async () => {
+    it('positive contrast: the SAME POST /roles succeeds (200) on a TEAM organization — the guard is type-specific, not a blanket block', async () => {
       await seedAllTenancyPermissions();
       const owner = await createTestUser();
       const team = await provisionOrganizationWithOwner({

@@ -97,7 +97,7 @@ describe('Security: Organization API key authentication', () => {
       .set({ scopes: [TENANCY_PERMISSIONS.ORGANIZATION_READ] })
       .where(eq(api_keys.public_id, apiKeyPublicId));
 
-    // The org API-key principal carries its own organization, so the flat route
+    // The organization API-key principal carries its own organization, so the flat route
     // resolves the tenant from the key — no organization path segment.
     const response = await injectRoute(app, {
       method: 'GET',
@@ -107,7 +107,7 @@ describe('Security: Organization API key authentication', () => {
     expect(response.statusCode).toBe(403);
   });
 
-  it('authenticates an org API key end-to-end on a permission-guarded org route', async () => {
+  it('authenticates an organization API key end-to-end on a permission-guarded organization route', async () => {
     const { rawKey, apiKeyPublicId } = await createApiKeyWithPermissions([
       TENANCY_PERMISSIONS.API_KEY_READ,
       TENANCY_PERMISSIONS.API_KEY_MANAGE,
@@ -122,7 +122,7 @@ describe('Security: Organization API key authentication', () => {
       .where(eq(api_keys.public_id, apiKeyPublicId));
 
     // Flat webhook route: the organization is resolved from the API-key
-    // principal (the key is pinned to one org), not an organization path segment.
+    // principal (the key is pinned to one organization), not an organization path segment.
     const response = await injectRoute(app, {
       method: 'GET',
       url: testApiPath('/notify/webhooks'),
@@ -131,16 +131,16 @@ describe('Security: Organization API key authentication', () => {
     expect(response.statusCode).toBe(200);
   });
 
-  it('rejects an org API key on a user-only route that requires a real user', async () => {
+  it('rejects an organization API key on a user-only route that requires a real user', async () => {
     const { rawKey } = await createApiKeyWithPermissions([
       TENANCY_PERMISSIONS.API_KEY_READ,
       TENANCY_PERMISSIONS.API_KEY_MANAGE,
     ]);
 
-    // Flat GET /tenancy/organization resolves the active org from the principal
-    // and calls requireAuth (no org-permission preHandler), so an API-key
+    // Flat GET /tenancy/organization resolves the active organization from the principal
+    // and calls requireAuth (no organization-permission preHandler), so an API-key
     // principal (empty userId) must be rejected with 401 even though it could
-    // satisfy an org-permission check on a permission-guarded route.
+    // satisfy an organization-permission check on a permission-guarded route.
     const response = await injectRoute(app, {
       method: 'GET',
       url: testApiPath('/tenancy/organization'),

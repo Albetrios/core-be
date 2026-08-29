@@ -166,7 +166,7 @@ describe('Security: invitation lifecycle flow abuse', () => {
 
   describe('revoke closes the invitation for every downstream step', () => {
     it('a revoked invitation cannot be accepted, even with the correct token', async () => {
-      // Answered **404, not 400**, and deliberately so. The accept route resolves the owning org
+      // Answered **404, not 400**, and deliberately so. The accept route resolves the owning organization
       // through the SECURITY DEFINER `resolve_member_invitation_lookup_by_public_id`, which
       // migration 20260608051000 hardened with four guards — `accepted_at IS NULL`,
       // `revoked_at IS NULL`, and both `deleted_at IS NULL`. A revoked invitation therefore does not

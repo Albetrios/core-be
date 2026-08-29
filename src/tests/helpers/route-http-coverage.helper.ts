@@ -101,7 +101,7 @@ export function buildRouteSmokeCases(
         expectForbidden: 403,
         expectSuccess: declaredSuccessStatus(route),
       };
-    case 'org-permission': {
+    case 'organization-permission': {
       const unauthenticatedStatus =
         route.method === 'POST' || route.method === 'PUT' || route.method === 'PATCH'
           ? [400, 401, 422]

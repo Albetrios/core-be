@@ -93,7 +93,7 @@ POOL_FILE=src/tests/load/k6/data/credential-pool.json
 HAVE=$(node -e "try{console.log(require('./$POOL_FILE').length)}catch{console.log(0)}")
 if [ "${HAVE:-0}" -lt "$NEEDED" ]; then
   ORGS=$(( (NEEDED + 11) / 12 ))
-  echo "      have $HAVE < $NEEDED -> seeding $ORGS orgs x 12 users"
+  echo "      have $HAVE < $NEEDED -> seeding $ORGS organizations x 12 users"
   ALLOW_BULK_SEED=1 BULK_PROFILE=demo BULK_ORGS="$ORGS" BULK_USERS_PER_ORG=12 pnpm db:seed:bulk >/dev/null 2>&1
   pnpm tool:load-test-credential-pool >/dev/null 2>&1
 fi

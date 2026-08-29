@@ -3,9 +3,12 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { user_notification_preferences } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.schema.js';
 import { UserNotificationPreferencesRepository } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.repository.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 describe('UserNotificationPreferencesRepository (database)', () => {
   const repository = new UserNotificationPreferencesRepository();
@@ -85,10 +88,10 @@ describe('UserNotificationPreferencesRepository (database)', () => {
   });
 
   // sec-U7: defense-in-depth pin on `organization_id`. The original RLS
-  // policy carried an org branch that only verified the `app.current_organization_id`
+  // policy carried an organization branch that only verified the `app.current_organization_public_id`
   // GUC matched, NOT membership — a future route wrapping this table in
-  // `withOrganizationDatabaseContext` would have let any user write
-  // preferences against any org id they passed in `X-Organization-Id`,
+  // `withAppDatabaseContext` would have let any user write
+  // preferences against any organization id they could assert (historically the removed header),
   // bypassing membership entirely. The schema-level CHECK constraint
   // (`chk_user_notif_prefs_no_org`) refuses non-null `organization_id`
   // outright so even a direct raw-SQL bypass of the application guard
@@ -100,7 +103,7 @@ describe('UserNotificationPreferencesRepository (database)', () => {
     // Raw insert via the privileged test connection — RLS does not apply at
     // this role, so only the CHECK constraint can refuse the write. This
     // simulates a future hostile/buggy code path attempting to persist an
-    // org-scoped preference outside the membership-gated route.
+    // organization-scoped preference outside the membership-gated route.
     await expect(
       database.insert(user_notification_preferences).values({
         user_id: user.id,
@@ -142,7 +145,7 @@ describe('UserNotificationPreferencesRepository (database)', () => {
     const CONCURRENT_REPLACES = 8;
     const settled = await Promise.allSettled(
       Array.from({ length: CONCURRENT_REPLACES }, (_, index) =>
-        withUserDatabaseContext(user.public_id, () =>
+        withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }), () =>
           repository.replaceAll(user.id, payload(index % 2 === 0), user.id),
         ),
       ),

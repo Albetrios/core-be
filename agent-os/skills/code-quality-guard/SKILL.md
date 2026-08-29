@@ -26,7 +26,7 @@ Layer 3 (CI)      -- Full validation, Semgrep SAST, Gitleaks full-repo, tests
 | `.biomeignore`                      | 1 + 2 | Paths Biome skips (e.g. migrations, lockfile)                                                                                                                                                                 |
 | `.vscode/settings.json`             | 1     | Editor format on save, Biome fix on save                                                                                                                                                                      |
 | `.husky/pre-commit`                 | 2     | Pre-commit hook script (static sync checks + local SonarQube quality gate)                                                                                                                                    |
-| `.husky/pre-push`                   | 2     | Pre-push: typecheck, build, build:check, changed-markdown lint, generated-doc drift checks (tree/routes/org-scope), unit tests                                                                                |
+| `.husky/pre-push`                   | 2     | Pre-push: typecheck, build, build:check, changed-markdown lint, generated-doc drift checks (tree/routes/organization-scope), unit tests                                                                                |
 | `.husky/commit-msg`                 | 2     | Validates commit messages with commitlint (conventional commits)                                                                                                                                              |
 | `commitlint.config.cjs`             | 2 + 3 | Commitlint rules (extends `@commitlint/config-conventional`); same config as CI on push to `main`                                                                                                             |
 | `lint-staged.config.mjs`            | 2     | Which files get linted/formatted on commit (at repo root)                                                                                                                                                     |
@@ -104,7 +104,7 @@ Pre-commit mirrors a **subset** of the static checks in [`.github/workflows/pr-c
 | 2    | `pnpm build`       | Compile failures                   |
 | 3    | `pnpm build:check` | Unresolved `@/` aliases in `dist/` |
 | 4    | `pnpm docs:lint:changed` | Markdown lint (changed files only) — conditional on pushed markdown file changes |
-| 5    | `pnpm tool:project-structure-tree:check` + `pnpm routes:catalog:check` + `pnpm validate:route-org-scope` | Generated-doc drift (`src-structure-tree.txt`, `docs/routes.txt`, org-scope catalog) left behind by `--no-verify` commits that skipped pre-commit steps 5/6b/6c — conditional on pushed `src/`/`tooling/` changes; check-only, never mutates the tree |
+| 5    | `pnpm tool:project-structure-tree:check` + `pnpm routes:catalog:check` + `pnpm validate:route-organization-scope` | Generated-doc drift (`src-structure-tree.txt`, `docs/routes.txt`, organization-scope catalog) left behind by `--no-verify` commits that skipped pre-commit steps 5/6b/6c — conditional on pushed `src/`/`tooling/` changes; check-only, never mutates the tree |
 | 6    | `pnpm test:unit`   | Failing shared unit tests — conditional on pushed unit-relevant changes |
 
 > The SonarQube quality gate runs at **pre-commit** (`pnpm guard:pre-commit`, the final guard step), not pre-push. It is mandatory and has no bypass.

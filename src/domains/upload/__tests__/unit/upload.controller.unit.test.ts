@@ -3,16 +3,17 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { createUploadController } from '@/domains/upload/upload.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { UploadService } from '@/domains/upload/upload.service.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return {
+  return attachPrincipalScope({
     auth: { kind: 'user' as const, userId: generatePublicId('user'), role: 'USER' },
     params: {},
     body: {},
     headers: {},
     id: 'request-id',
     ...overrides,
-  } as FastifyRequest;
+  }) as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {

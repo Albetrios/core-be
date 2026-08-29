@@ -5,7 +5,7 @@
  * Idempotency: the primary key is `organization_id`, so every insert uses `.onConflictDoNothing()`;
  * a re-run with the same registry is a no-op.
  */
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { organization_settings } from '@/domains/tenancy/sub-domains/organization/organization-settings/organization-settings.schema.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';
 import { generateBulkOrganizationSettings } from './organization-settings.faker.js';
@@ -15,7 +15,7 @@ import { generateBulkOrganizationSettings } from './organization-settings.faker.
  *
  * @remarks
  * Algorithm: for each organization, insert a faker-built settings row keyed by `organization_id`
- * with `.onConflictDoNothing()`, attributing `created_by_user_id` to the org owner. Side effects:
+ * with `.onConflictDoNothing()`, attributing `created_by_user_id` to the organization owner. Side effects:
  * inserts into `tenancy.organization_settings`. Failure modes: warns and returns early when no
  * organizations exist; otherwise propagates DB errors.
  */

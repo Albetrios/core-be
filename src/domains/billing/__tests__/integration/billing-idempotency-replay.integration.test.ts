@@ -27,7 +27,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
  *
  * - the missing-key 422 was asserted at three of the five routes,
  * - the in-flight 409 was asserted at none of them,
- * - per-org lock contention was proven only as a thrown `ConflictError` in
+ * - per-organization lock contention was proven only as a thrown `ConflictError` in
  *   `subscription.service.unit.test.ts`, and
  * - the k6 scenario accepts `409 | 422`.
  *
@@ -66,7 +66,7 @@ describe('Billing idempotency replay — 409 while a key is in flight', () => {
     }
   });
 
-  /** Team org + billing permissions + a local-only ACTIVE subscription with a Stripe customer. */
+  /** Team organization + billing permissions + a local-only ACTIVE subscription with a Stripe customer. */
   async function createBillingContext() {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });

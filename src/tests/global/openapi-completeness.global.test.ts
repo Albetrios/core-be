@@ -67,7 +67,7 @@ describe('OpenAPI completeness', () => {
   });
 
   it('advertises the bearerAuth security scheme on protected routes and omits it on public routes', () => {
-    // Drift guard for `getRouteSecurity` / `PUBLIC_ROUTE_KEYS`: the active org rides the token claim,
+    // Drift guard for `getRouteSecurity` / `PUBLIC_ROUTE_KEYS`: the active organization rides the token claim,
     // so every authenticated route must require bearerAuth and every PUBLIC route (auth forms,
     // Stripe-signed webhooks, health, plans) must NOT advertise a JWT requirement. If a NEW public
     // route is added but not exempted, this fails — preventing the OpenAPI from over-stating auth.

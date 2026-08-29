@@ -9,8 +9,6 @@ import {
   NotFoundError,
   ValidationError,
 } from '@/shared/errors/index.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { UserService } from '@/domains/user/user.service.js';
@@ -38,6 +36,10 @@ import type { CreateUploadInput, UploadCreateOutput, UploadDetailOutput } from '
 import type { UploadRepository, UploadRow } from './upload.repository.js';
 import { serializeUploadCreate, serializeUploadDetail } from './upload.serializer.js';
 import { validateUploadPublicIdParam } from './upload.validator.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /** Inputs for {@link UploadService}'s private atomic PENDING-slot reservation. */
 interface ReservePendingUploadSlotParams {
@@ -60,7 +62,7 @@ interface ReservePendingUploadSlotParams {
  * - **Algorithm:** {@link UploadService.createUpload} resolves owner/organization
  *   context, computes the S3 key from {@link UPLOAD_PURPOSE_CONFIG} + a canonical
  *   extension, then atomically reserves the PENDING row inside
- *   {@link withUserDatabaseContext} (a per-user advisory lock guards the
+ *   {@link withAppDatabaseContext (user scope)} (a per-user advisory lock guards the
  *   pending-count check + insert in one transaction so the quota holds under
  *   concurrency and the owner-access RLS policy authorizes the write) and only
  *   AFTER the slot is committed requests a presigned URL (PUT or POST per
@@ -71,7 +73,7 @@ interface ReservePendingUploadSlotParams {
  *   `PENDING` → `UPLOADED` (idempotent for already-confirmed rows) or
  *   `FAILED` on mismatch. {@link UploadService.deleteUpload} performs a
  *   best-effort S3 delete then soft-deletes the row.
- * - **Failure modes:** quota exceeded → `ValidationError`; missing org
+ * - **Failure modes:** quota exceeded → `ValidationError`; missing organization
  *   permission → `ForbiddenError`; unknown public id or owner mismatch →
  *   `NotFoundError`; S3 verification failure → row moved to `FAILED` and a
  *   `ValidationError` raised so the caller does not attach an unverified
@@ -193,8 +195,8 @@ export class UploadService {
   }
 
   /**
-   * Atomically reserves a PENDING upload row while enforcing the per-user (and, for org
-   * uploads, the per-org) quota.
+   * Atomically reserves a PENDING upload row while enforcing the per-user (and, for organization
+   * uploads, the per-organization) quota.
    *
    * Runs the advisory lock, pending-count check, and insert inside a single RLS database
    * transaction so concurrent create-upload requests are serialized: a request can only
@@ -204,14 +206,14 @@ export class UploadService {
    * passed a non-atomic count and then over-inserted.
    *
    * @remarks
-   * - **sec-r7/M4:** the RLS context MUST match the row being inserted. An org-scoped
+   * - **sec-r7/M4:** the RLS context MUST match the row being inserted. An organization-scoped
    *   upload (`organization_id` set) only satisfies the `uploads_tenant_isolation`
-   *   `WITH CHECK` under `withOrganizationDatabaseContext` (`app.current_organization_id`);
-   *   under `withUserDatabaseContext` the INSERT is rejected by RLS as the production
-   *   `core_be_app` role (FORCE RLS) — every org-logo / org-file upload would 500.
+   *   `WITH CHECK` under `withAppDatabaseContext` (`app.current_organization_public_id`);
+   *   under `withAppDatabaseContext (user scope)` the INSERT is rejected by RLS as the production
+   *   `core_be_app` role (FORCE RLS) — every organization-logo / organization-file upload would 500.
    *   User-scoped uploads (`organization_id` NULL, e.g. avatars) run under
-   *   `withUserDatabaseContext` so the `uploads_owner_access` policy applies. The org cap
-   *   is the primary abuse guard for org uploads (sec-UP4); the per-user cap is enforced
+   *   `withAppDatabaseContext (user scope)` so the `uploads_owner_access` policy applies. The organization cap
+   *   is the primary abuse guard for organization uploads (sec-UP4); the per-user cap is enforced
    *   against the user's pending rows visible in the active context.
    */
   private async reservePendingUploadSlot(
@@ -230,36 +232,36 @@ export class UploadService {
     } = params;
     const environment = getEnv();
     const pendingCap = environment.UPLOAD_MAX_PENDING_PER_USER;
-    const orgPendingCap = environment.UPLOAD_MAX_PENDING_PER_ORGANIZATION;
+    const organizationPendingCap = environment.UPLOAD_MAX_PENDING_PER_ORGANIZATION;
     // Org-scoped uploads must run under organization RLS context so the tenant-isolation
     // WITH CHECK passes; user-scoped uploads run under user context for owner-access.
     const runReservation = async (): Promise<UploadRow> => {
       // audit-#7: take the ORG-scoped advisory lock BEFORE the per-user lock (a globally
-      // consistent org-then-user order, deadlock-free) so concurrent reservations from
-      // DIFFERENT members of the same org serialize on the org cap. Previously the org count
+      // consistent organization-then-user order, deadlock-free) so concurrent reservations from
+      // DIFFERENT members of the same organization serialize on the organization cap. Previously the organization count
       // was checked while holding only the per-user lock, so N members could each pass the
-      // same org count and overshoot UPLOAD_MAX_PENDING_PER_ORGANIZATION by N.
+      // same organization count and overshoot UPLOAD_MAX_PENDING_PER_ORGANIZATION by N.
       if (organizationInternalId !== null) {
         await this.repository.acquirePendingOrganizationQuotaLock(organizationInternalId);
       }
       await this.repository.acquirePendingUploadQuotaLock(userInternalId);
-      // sec-UP4: enforce the org-level cap BEFORE the per-user cap so a single
-      // org with many members cannot pile PENDING uploads across user accounts
-      // and exhaust storage. The org-scoped lock above now makes this count + insert
+      // sec-UP4: enforce the organization-level cap BEFORE the per-user cap so a single
+      // organization with many members cannot pile PENDING uploads across user accounts
+      // and exhaust storage. The organization-scoped lock above now makes this count + insert
       // atomic across members (not just within a single user).
       if (organizationInternalId !== null) {
-        const orgPendingCount =
+        const organizationPendingCount =
           await this.repository.countPendingByOrganizationId(organizationInternalId);
-        if (orgPendingCount >= orgPendingCap) {
+        if (organizationPendingCount >= organizationPendingCap) {
           throw new ValidationError(
             'errors:uploadPendingQuotaExceeded',
-            { limit: orgPendingCap, pending: orgPendingCount },
+            { limit: organizationPendingCap, pending: organizationPendingCount },
             undefined,
             [
               {
                 field: 'file_size',
                 messageKey: 'errors:uploadPendingQuotaExceeded',
-                messageParams: { limit: orgPendingCap, pending: orgPendingCount },
+                messageParams: { limit: organizationPendingCap, pending: organizationPendingCount },
               },
             ],
           );
@@ -295,9 +297,15 @@ export class UploadService {
     };
 
     if (organizationInternalId !== null && organizationPublicId !== null) {
-      return withOrganizationDatabaseContext(organizationPublicId, runReservation);
+      return withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId }),
+        runReservation,
+      );
     }
-    return withUserDatabaseContext(userPublicId, runReservation);
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+      runReservation,
+    );
   }
 
   private async resolveUploadOrganizationInternalId(
@@ -315,11 +323,12 @@ export class UploadService {
       /**
        * `requireOrganizationByPublicId` reads `tenancy.organizations` which is FORCE RLS.
        * Under `DATABASE_RLS_SCOPED_CONTEXTS=true` the call needs either an active
-       * organization context or `app.current_user_id` + the `organizations_user_discovery`
+       * organization context or `app.current_user_public_id` + the `organizations_user_discovery`
        * policy. The latter is appropriate here because we have just authorized the user.
        */
-      const organization = await withUserDatabaseContext(userPublicId, () =>
-        this.organizationService.requireOrganizationByPublicId(input.organization_id!),
+      const organization = await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+        () => this.organizationService.requireOrganizationByPublicId(input.organization_id!),
       );
       return organization.id;
     }
@@ -348,8 +357,8 @@ export class UploadService {
   /**
    * Stronger variant of {@link assertKeyConfirmed} that also binds the row to a
    * specific owner (sec-UP5). Callers must supply either `userInternalId`
-   * (user-scoped uploads like avatars) or `organizationInternalId` (org-scoped
-   * uploads like logos / org files). Mismatch yields a ValidationError with the
+   * (user-scoped uploads like avatars) or `organizationInternalId` (organization-scoped
+   * uploads like logos / organization files). Mismatch yields a ValidationError with the
    * same key as a missing/un-confirmed row, so callers do not leak whether the
    * row exists.
    *
@@ -391,8 +400,9 @@ export class UploadService {
       return;
     }
 
-    const organization = await withUserDatabaseContext(userPublicId, () =>
-      this.organizationService.findOrganizationByInternalId(row.organization_id!),
+    const organization = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+      () => this.organizationService.findOrganizationByInternalId(row.organization_id!),
     );
     if (!organization) {
       throw new NotFoundError('Upload');
@@ -413,8 +423,9 @@ export class UploadService {
     userInternalId: number;
   }): Promise<UploadRow> {
     const { public_id, userPublicId, userInternalId } = input;
-    const row = await withUserDatabaseContext(userPublicId, () =>
-      this.repository.findByPublicId(public_id),
+    const row = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+      () => this.repository.findByPublicId(public_id),
     );
     if (!row) throw new NotFoundError('Upload');
 
@@ -531,8 +542,9 @@ export class UploadService {
     // legacy rows are at end-of-life; refuse and require re-upload via
     // a fresh pending key.
     if (!pendingKeyed) {
-      const failedRow = await withUserDatabaseContext(userPublicId, () =>
-        this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
+      const failedRow = await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+        () => this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
       );
       if (!failedRow) throw new NotFoundError('Upload');
       logger.warn(
@@ -553,8 +565,9 @@ export class UploadService {
     });
 
     if (!verified) {
-      const failedRow = await withUserDatabaseContext(userPublicId, () =>
-        this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
+      const failedRow = await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+        () => this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
       );
       if (!failedRow) throw new NotFoundError('Upload');
       throw new ValidationError('errors:uploadVerificationFailed', undefined, {
@@ -564,8 +577,9 @@ export class UploadService {
 
     // Repoint the row at the immutable final key in the same update that marks it UPLOADED, so a
     // servable row never references the overwritable pending key.
-    const updated = await withUserDatabaseContext(userPublicId, () =>
-      this.repository.markConfirmedByPublicId(validatedPublicId, finalKey),
+    const updated = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+      () => this.repository.markConfirmedByPublicId(validatedPublicId, finalKey),
     );
     if (!updated) throw new NotFoundError('Upload');
 
@@ -662,8 +676,9 @@ export class UploadService {
        */
       const organization =
         userPublicId !== undefined && userPublicId.length > 0
-          ? await withUserDatabaseContext(userPublicId, () =>
-              this.organizationService.findOrganizationByInternalId(row.organization_id!),
+          ? await withAppDatabaseContext(
+              PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+              () => this.organizationService.findOrganizationByInternalId(row.organization_id!),
             )
           : await this.organizationService.findOrganizationByInternalId(row.organization_id);
       organizationPublicId = organization?.public_id ?? null;
@@ -689,8 +704,9 @@ export class UploadService {
       );
     }
 
-    const deleted = await withUserDatabaseContext(userPublicId, () =>
-      this.repository.softDeleteByPublicId(validatedPublicId),
+    const deleted = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+      () => this.repository.softDeleteByPublicId(validatedPublicId),
     );
     if (!deleted) throw new NotFoundError('Upload');
   }
@@ -755,7 +771,7 @@ export class UploadService {
    * @remarks
    * sec-UP8: the previous implementation only soft-deleted DB rows and relied
    * on `UPLOAD_TOMBSTONE_RETENTION_CRON` to eventually clean S3. The cron is
-   * optional, so an operator who forgot to set it left org-deletion S3 objects
+   * optional, so an operator who forgot to set it left organization-deletion S3 objects
    * around indefinitely — a GDPR Article 17 violation and an unbounded
    * storage cost. Object removal now happens synchronously in the same
    * offboarding pass, matching the user-tombstone contract.

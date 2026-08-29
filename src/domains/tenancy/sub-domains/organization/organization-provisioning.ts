@@ -1,4 +1,3 @@
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { BILLING_PERMISSIONS } from '@/domains/billing/billing.permissions.js';
 import { TENANCY_PERMISSIONS } from '@/domains/tenancy/tenancy.permissions.js';
@@ -7,6 +6,10 @@ import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/mem
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import type { Organization } from '@/domains/tenancy/sub-domains/organization/organization.types.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /** Name of the auto-provisioned, undeletable owner role created with every organization. */
 export const OWNER_ROLE_NAME = 'Owner';
@@ -104,20 +107,20 @@ export interface ProvisionOrganizationResult {
 /**
  * Atomically bootstrap an organization with full owner access: organization row →
  * system `Owner` role → every tenancy permission granted to it (plus billing read/manage
- * for TEAM orgs) → the owner's ACTIVE membership. Without this, a freshly created
+ * for TEAM organizations) → the owner's ACTIVE membership. Without this, a freshly created
  * organization's owner resolves zero permissions (the permission path is a strict
  * role→membership join with no owner shortcut).
  *
  * @remarks
- * - **Algorithm:** pre-generates the org `public_id` and runs every insert inside one
- *   `withOrganizationDatabaseContext(publicId, …)` transaction, so `app.current_organization_id`
- *   equals the org being created. The org row then satisfies its tenant-isolation WITH CHECK
- *   (`public_id = app.current_organization_id`) and the child rows (roles, role_permissions,
- *   memberships) satisfy theirs (`organization_id` → the just-inserted org) — all under the
+ * - **Algorithm:** pre-generates the organization `public_id` and runs every insert inside one
+ *   `withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: publicId }), …)` transaction, so `app.current_organization_public_id`
+ *   equals the organization being created. The organization row then satisfies its tenant-isolation WITH CHECK
+ *   (`public_id = app.current_organization_public_id`) and the child rows (roles, role_permissions,
+ *   memberships) satisfy theirs (`organization_id` → the just-inserted organization) — all under the
  *   non-superuser `core_be_app` role with NO admin escape hatch (the tenancy policies do not honor
  *   `app.global_admin`; only `auth`/`audit` do, which is why the former global-admin path failed
  *   its WITH CHECK with 42501 in deployed environments). One transaction keeps the owner-bootstrap
- *   atomic — a partial failure can never leave an org whose owner has no access. TEAM
+ *   atomic — a partial failure can never leave an organization whose owner has no access. TEAM
  *   organizations additionally insert the default {@link DEFAULT_TEAM_ROLES}
  *   (Admin/Member/Viewer) and their grants so a new team can assign a role and invite members
  *   immediately; PERSONAL organizations get Owner only. This is a server-side bootstrap only;
@@ -160,91 +163,94 @@ export async function provisionPersonalOrganization(
 async function provisionOrganization(
   input: ProvisionOrganizationInput,
 ): Promise<ProvisionOrganizationResult> {
-  // Pre-generate the org public_id so the entire owner-bootstrap runs INSIDE the new org's own
-  // RLS context (`app.current_organization_id` = this id): every tenant-isolation WITH CHECK then
-  // passes naturally — the org row (`public_id = app.current_organization_id`) and its child rows
-  // (roles, role_permissions, memberships, all `organization_id`-scoped to the just-inserted org).
-  // This replaces `withGlobalAdminDatabaseContext`, which was both improper on a self-service
+  // Pre-generate the organization public_id so the entire owner-bootstrap runs INSIDE the new org's own
+  // RLS context (`app.current_organization_public_id` = this id): every tenant-isolation WITH CHECK then
+  // passes naturally — the organization row (`public_id = app.current_organization_public_id`) and its child rows
+  // (roles, role_permissions, memberships, all `organization_id`-scoped to the just-inserted organization).
+  // This replaces `withMaintenanceDatabaseContext`, which was both improper on a self-service
   // login/signup path AND ineffective: the tenancy policies never honor `app.global_admin` (only
-  // auth/audit do), so the org INSERT failed its WITH CHECK with SQLSTATE 42501 under the
+  // auth/audit do), so the organization INSERT failed its WITH CHECK with SQLSTATE 42501 under the
   // non-superuser `core_be_app` role in deployed environments.
   const organizationPublicId = generatePublicId('organization');
-  return withOrganizationDatabaseContext(organizationPublicId, async (databaseHandle) => {
-    const [organization] = await databaseHandle
-      .insert(organizations)
-      .values({
-        public_id: organizationPublicId,
-        name: input.name,
-        slug: input.slug,
-        type: input.type,
-        owner_user_id: input.ownerUserId,
-        created_by_user_id: input.ownerUserId,
-        updated_by_user_id: input.ownerUserId,
-      })
-      .returning();
+  return withAppDatabaseContext(
+    PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId }),
+    async (databaseHandle) => {
+      const [organization] = await databaseHandle
+        .insert(organizations)
+        .values({
+          public_id: organizationPublicId,
+          name: input.name,
+          slug: input.slug,
+          type: input.type,
+          owner_user_id: input.ownerUserId,
+          created_by_user_id: input.ownerUserId,
+          updated_by_user_id: input.ownerUserId,
+        })
+        .returning();
 
-    const [role] = await databaseHandle
-      .insert(roles)
-      .values({
-        public_id: generatePublicId('memberRole'),
-        organization_id: organization!.id,
-        name: OWNER_ROLE_NAME,
-        is_system: true,
-        created_by_user_id: input.ownerUserId,
-      })
-      .returning();
+      const [role] = await databaseHandle
+        .insert(roles)
+        .values({
+          public_id: generatePublicId('memberRole'),
+          organization_id: organization!.id,
+          name: OWNER_ROLE_NAME,
+          is_system: true,
+          created_by_user_id: input.ownerUserId,
+        })
+        .returning();
 
-    await databaseHandle.insert(role_permissions).values(
-      ownerPermissionCodesForOrganizationType(input.type).map((permission_code) => ({
-        role_id: role!.id,
-        permission_code,
-        created_by_user_id: input.ownerUserId,
-      })),
-    );
+      await databaseHandle.insert(role_permissions).values(
+        ownerPermissionCodesForOrganizationType(input.type).map((permission_code) => ({
+          role_id: role!.id,
+          permission_code,
+          created_by_user_id: input.ownerUserId,
+        })),
+      );
 
-    const [membership] = await databaseHandle
-      .insert(memberships)
-      .values({
-        public_id: generatePublicId('membership'),
-        user_id: input.ownerUserId,
-        organization_id: organization!.id,
-        role_id: role!.id,
-        status: 'ACTIVE',
-        joined_at: new Date(),
-      })
-      .returning();
+      const [membership] = await databaseHandle
+        .insert(memberships)
+        .values({
+          public_id: generatePublicId('membership'),
+          user_id: input.ownerUserId,
+          organization_id: organization!.id,
+          role_id: role!.id,
+          status: 'ACTIVE',
+          joined_at: new Date(),
+        })
+        .returning();
 
-    // TEAM organizations also receive the default non-owner system roles (Admin/Member/Viewer)
-    // so the team can assign a role and invite members immediately. PERSONAL organizations are
-    // single-member and reject custom roles, so they get Owner only.
-    if (input.type === 'TEAM') {
-      for (const defaultRole of DEFAULT_TEAM_ROLES) {
-        const [defaultRoleRow] = await databaseHandle
-          .insert(roles)
-          .values({
-            public_id: generatePublicId('memberRole'),
-            organization_id: organization!.id,
-            name: defaultRole.name,
-            description: defaultRole.description,
-            is_system: true,
-            created_by_user_id: input.ownerUserId,
-          })
-          .returning();
+      // TEAM organizations also receive the default non-owner system roles (Admin/Member/Viewer)
+      // so the team can assign a role and invite members immediately. PERSONAL organizations are
+      // single-member and reject custom roles, so they get Owner only.
+      if (input.type === 'TEAM') {
+        for (const defaultRole of DEFAULT_TEAM_ROLES) {
+          const [defaultRoleRow] = await databaseHandle
+            .insert(roles)
+            .values({
+              public_id: generatePublicId('memberRole'),
+              organization_id: organization!.id,
+              name: defaultRole.name,
+              description: defaultRole.description,
+              is_system: true,
+              created_by_user_id: input.ownerUserId,
+            })
+            .returning();
 
-        await databaseHandle.insert(role_permissions).values(
-          defaultRole.permissionCodes.map((permission_code) => ({
-            role_id: defaultRoleRow!.id,
-            permission_code,
-            created_by_user_id: input.ownerUserId,
-          })),
-        );
+          await databaseHandle.insert(role_permissions).values(
+            defaultRole.permissionCodes.map((permission_code) => ({
+              role_id: defaultRoleRow!.id,
+              permission_code,
+              created_by_user_id: input.ownerUserId,
+            })),
+          );
+        }
       }
-    }
 
-    return {
-      organization: organization! as Organization,
-      roleId: role!.id,
-      membershipPublicId: membership!.public_id,
-    };
-  });
+      return {
+        organization: organization! as Organization,
+        roleId: role!.id,
+        membershipPublicId: membership!.public_id,
+      };
+    },
+  );
 }

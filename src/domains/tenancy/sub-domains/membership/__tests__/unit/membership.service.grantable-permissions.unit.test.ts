@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    async (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
-
 vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', () => ({
   invalidatePermissions: vi.fn().mockResolvedValue(undefined),
   invalidateOrganizationPermissions: vi.fn().mockResolvedValue(undefined),
@@ -14,6 +8,22 @@ vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', 
 vi.mock('@/domains/tenancy/sub-domains/permission/assert-grantable-permissions.util.js', () => ({
   assertCallerCanGrantPermissionCodes: vi.fn().mockResolvedValue(undefined),
 }));
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 import { ForbiddenError } from '@/shared/errors/index.js';
 import { MembershipService } from '@/domains/tenancy/sub-domains/membership/membership.service.js';
@@ -26,9 +36,13 @@ import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permiss
 import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permission/permission.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { MemberInvitationService } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
- * Regression for the Critical org-takeover finding (T1).
+ * Regression for the Critical organization-takeover finding (T1).
  *
  * A `MEMBERSHIP_MANAGE` + `INVITATION_MANAGE` holder must not be able to mint an Admin (or
  * any other privileged-role) membership for a throwaway account that the caller does not
@@ -36,6 +50,11 @@ import type { MemberInvitationService } from '@/domains/tenancy/sub-domains/memb
  * `assertCallerCanGrantPermissionCodes` against the resolved role's permission codes
  * BEFORE the membership row is persisted.
  */
+const asScope = (organizationPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    organizationPublicId,
+  }) as OrganizationPrincipalDatabaseScope;
+
 describe('MembershipService.create — grantable-permissions guard (sec-T1)', () => {
   const organization = { id: 1, public_id: 'org_public', owner_user_id: 99 };
   const adminRole = { id: 2, public_id: 'role_public_admin', name: 'Admin' };
@@ -152,7 +171,7 @@ describe('MembershipService.create — grantable-permissions guard (sec-T1)', ()
     });
 
     await service.create(
-      'org_public',
+      asScope('org_public'),
       { email: 'invitee@example.com', role_id: 'role_public_admin' },
       'inviter_public',
     );
@@ -177,7 +196,7 @@ describe('MembershipService.create — grantable-permissions guard (sec-T1)', ()
 
     await expect(
       service.create(
-        'org_public',
+        asScope('org_public'),
         { email: 'invitee@example.com', role_id: 'role_public_admin' },
         'inviter_public',
       ),
@@ -193,7 +212,7 @@ describe('MembershipService.create — grantable-permissions guard (sec-T1)', ()
 
     await expect(
       service.create(
-        'org_public',
+        asScope('org_public'),
         { email: 'invitee@example.com', role_id: 'role_public_admin' },
         undefined,
       ),

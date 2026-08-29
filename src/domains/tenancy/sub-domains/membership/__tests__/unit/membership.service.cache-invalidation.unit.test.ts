@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    async (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
-
 import { MembershipService } from '@/domains/tenancy/sub-domains/membership/membership.service.js';
 
 vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', () => ({
@@ -16,7 +10,32 @@ vi.mock('@/domains/tenancy/sub-domains/permission/assert-grantable-permissions.u
   assertCallerCanGrantPermissionCodes: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
 import { invalidatePermissions } from '@/domains/tenancy/sub-domains/permission/permission-cache.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
+
+const asScope = (organizationPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    organizationPublicId,
+  }) as OrganizationPrincipalDatabaseScope;
 
 describe('MembershipService — permission cache invalidation', () => {
   const organizationService = {
@@ -134,7 +153,7 @@ describe('MembershipService — permission cache invalidation', () => {
 
   it('create invalidates user permission cache after membership is created', async () => {
     await service.create(
-      'org_public_abc',
+      asScope('org_public_abc'),
       { email: 'invitee@example.com', role_id: 'role_public' },
       'inviter_public',
     );
@@ -143,7 +162,12 @@ describe('MembershipService — permission cache invalidation', () => {
   });
 
   it('update invalidates the affected user permission cache', async () => {
-    await service.update('org_public_abc', 'membership_public', { status: 'SUSPENDED' }, 'admin');
+    await service.update(
+      asScope('org_public_abc'),
+      'membership_public',
+      { status: 'SUSPENDED' },
+      'admin',
+    );
 
     expect(organizationService.resolveUserPublicIdByInternalId).toHaveBeenCalledWith(5);
     expect(invalidatePermissions).toHaveBeenCalledWith('user_public_affected', 'org_public_abc');
@@ -155,14 +179,14 @@ describe('MembershipService — permission cache invalidation', () => {
       user_id: 5,
     });
 
-    await service.delete('org_public_abc', 'membership_public');
+    await service.delete(asScope('org_public_abc'), 'membership_public');
 
     expect(organizationService.resolveUserPublicIdByInternalId).toHaveBeenCalledWith(5);
     expect(invalidatePermissions).toHaveBeenCalledWith('user_public_affected', 'org_public_abc');
   });
 
   it('leaveOrganization invalidates the leaving user permission cache', async () => {
-    await service.leaveOrganization('org_public_abc', 'user_public_leaver');
+    await service.leaveOrganization(asScope('org_public_abc'), 'user_public_leaver');
 
     expect(invalidatePermissions).toHaveBeenCalledWith('user_public_leaver', 'org_public_abc');
   });

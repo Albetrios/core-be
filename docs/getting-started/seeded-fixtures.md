@@ -22,11 +22,11 @@ The **full** seed (`src/scripts/seed/full.ts`) extends the minimal seed with dem
 After `pnpm db:seed:full`:
 
 - **Plans** — Free, Starter, Pro (from `plan.seed.ts`)
-- **Subscription** — Active monthly subscription on the demo org (Starter plan)
+- **Subscription** — Active monthly subscription on the demo organization (Starter plan)
 - **Usage records** — API requests and storage metrics for the subscription period
-- **Entitlements** — `api_calls` and `storage_gb` feature flags on the demo org
+- **Entitlements** — `api_calls` and `storage_gb` feature flags on the demo organization
 
-Use the organization id (`org_…`) from seed logs with `X-Organization-Id` on billing routes.
+Use the organization id (`org_…`) from seed logs when switching the active organization (`POST /auth/switch-to-organization`) for billing routes.
 
 ## Notify fixtures
 

@@ -1,9 +1,9 @@
 import { and, asc, eq, inArray, lt, or, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
 import {
   assertWorkerDatabaseContext,
+  getRequestDatabase,
   isWorkerRuntime,
-} from '@/infrastructure/database/contexts/worker-database.context.js';
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   MILLISECONDS_PER_MINUTE,
   STRIPE_WEBHOOK_FAILED_COUNT_CAP,
@@ -326,7 +326,7 @@ export class StripeWebhookEventRepository {
    * Resolves the owning organization's public id for a Stripe subscription via
    * the `billing.resolve_organization_public_id_for_stripe_subscription`
    * SECURITY DEFINER resolver. Used by the Stripe webhook handler to pin
-   * `app.current_organization_id` before mutating tenant-scoped billing rows.
+   * `app.current_organization_public_id` before mutating tenant-scoped billing rows.
    *
    * @remarks
    * Architecturally this belongs on the repository rather than as ad-hoc
@@ -362,9 +362,9 @@ export class StripeWebhookEventRepository {
    * @remarks
    * Mirrors {@link resolveOrganizationPublicIdByProviderSubscriptionId}: the
    * lookup lives on the repository because the util layer is forbidden from
-   * importing the raw `sql` template (architecture rule). Each org gets its own
+   * importing the raw `sql` template (architecture rule). Each organization gets its own
    * Stripe customer, so the mapping is unambiguous; `LIMIT 1` in the resolver
-   * tolerates an org holding several subscription rows for the same customer
+   * tolerates an organization holding several subscription rows for the same customer
    * (e.g. a canceled row plus a re-subscribed row). Returns `undefined` when no
    * row maps the customer, letting the caller fail closed rather than trust
    * attacker-influencable Stripe metadata.

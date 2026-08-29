@@ -2,9 +2,13 @@ import { describe, it, expect, vi } from 'vitest';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { createPermissionController } from '@/domains/tenancy/sub-domains/permission/permission.controller.js';
 import type { PermissionService } from '@/domains/tenancy/sub-domains/permission/permission.service.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 function mockRequest(): FastifyRequest {
-  return { id: 'request-id', headers: {} } as unknown as FastifyRequest;
+  return attachPrincipalScope({
+    id: 'request-id',
+    headers: {},
+  }) as unknown as FastifyRequest;
 }
 
 function mockReply(): FastifyReply {

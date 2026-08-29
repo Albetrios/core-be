@@ -65,8 +65,8 @@ describe('Cross-domain e2e: billing onboarding', () => {
     expect(plansResponse.statusCode).toBe(200);
 
     // Flat subscription routes resolve the organization from the JWT `org`
-    // claim, so mint a token scoped to the org created above (the login token
-    // was issued before the org existed and carries no claim).
+    // claim, so mint a token scoped to the organization created above (the login token
+    // was issued before the organization existed and carries no claim).
     const organizationScopedToken = await generateTestToken({
       userId: user.public_id,
       organizationPublicId: organization.public_id,

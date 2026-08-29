@@ -2,7 +2,7 @@ import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { env } from '@/shared/config/env.config.js';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { organization_notification_policies } from '@/domains/tenancy/sub-domains/organization/organization-notification-policy/organization-notification-policy.schema.js';
 import {
   RESOURCE_QUOTA_LOCK_NAMESPACE,
@@ -25,7 +25,7 @@ function normalizeMuteForPersistence(mutedUntil: Date | null | undefined): Date 
 
 /**
  * Drizzle data-access for `tenancy.organization_notification_policies`.
- * Supports per-org list (ordered by `notification_type` then `channel`),
+ * Supports per-organization list (ordered by `notification_type` then `channel`),
  * primary-key lookup scoped to the organization, soft-delete-aware upsert
  * keyed on `(organization_id, notification_type, channel)`, partial update,
  * and soft-delete.
@@ -54,7 +54,7 @@ export class OrganizationNotificationPolicyRepository {
   }
 
   /**
-   * audit-#8: transaction-scoped advisory lock serializing the per-org notification-policy
+   * audit-#8: transaction-scoped advisory lock serializing the per-organization notification-policy
    * creation quota check + insert so concurrent creates cannot both pass the count and overshoot
    * `ORGANIZATION_NOTIFICATION_POLICY_MAX_PER_ORG`. Call inside the create transaction before
    * {@link countActiveByOrganization}.
@@ -82,7 +82,7 @@ export class OrganizationNotificationPolicyRepository {
       )
       // sec-r5-followup-ratelimit-dos-3: defense-in-depth cap matching the
       // create-time MAX_PER_ORG constant so a corrupted table cannot page
-      // unbounded rows into the API process on the per-org list endpoint.
+      // unbounded rows into the API process on the per-organization list endpoint.
       .limit(env.ORGANIZATION_NOTIFICATION_POLICY_MAX_PER_ORG);
     return rows as OrganizationNotificationPolicyRow[];
   }

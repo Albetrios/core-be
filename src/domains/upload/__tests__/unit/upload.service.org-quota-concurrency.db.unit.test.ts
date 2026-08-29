@@ -7,22 +7,25 @@ import { ValidationError } from '@/shared/errors/index.js';
 import { UploadRepository } from '@/domains/upload/upload.repository.js';
 import { UploadService } from '@/domains/upload/upload.service.js';
 import { UPLOAD_PERMISSIONS } from '@/domains/upload/upload.permissions.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const ORG_CAP = 3;
 const REQUESTS_PER_USER = 4;
 
 /**
- * audit-#7 regression: concurrent org uploads from DIFFERENT members of the same organization
- * must not burst past `UPLOAD_MAX_PENDING_PER_ORGANIZATION`. Previously the org count was checked
- * under only a per-user lock, so N members could each pass the same org count and overshoot the
- * cap by N. The org-scoped advisory lock (taken before the user lock) now serializes them.
+ * audit-#7 regression: concurrent organization uploads from DIFFERENT members of the same organization
+ * must not burst past `UPLOAD_MAX_PENDING_PER_ORGANIZATION`. Previously the organization count was checked
+ * under only a per-user lock, so N members could each pass the same organization count and overshoot the
+ * cap by N. The organization-scoped advisory lock (taken before the user lock) now serializes them.
  */
-describe('UploadService org pending-quota concurrency (database)', () => {
+describe('UploadService organization pending-quota concurrency (database)', () => {
   const originalOrgCap = process.env.UPLOAD_MAX_PENDING_PER_ORGANIZATION;
   const originalUserCap = process.env.UPLOAD_MAX_PENDING_PER_USER;
   const originalBucket = process.env.S3_BUCKET;
@@ -31,7 +34,7 @@ describe('UploadService org pending-quota concurrency (database)', () => {
   beforeEach(async () => {
     await cleanupDatabase();
     process.env.UPLOAD_MAX_PENDING_PER_ORGANIZATION = String(ORG_CAP);
-    // Keep the per-user cap high so ONLY the org cap can bind in this test.
+    // Keep the per-user cap high so ONLY the organization cap can bind in this test.
     process.env.UPLOAD_MAX_PENDING_PER_USER = '100';
     process.env.S3_BUCKET = process.env.S3_BUCKET ?? 'test-bucket';
     process.env.UPLOAD_USE_PRESIGNED_POST = 'false';
@@ -107,17 +110,18 @@ describe('UploadService org pending-quota concurrency (database)', () => {
       (result): result is PromiseRejectedResult => result.status === 'rejected',
     );
 
-    // Strict org cap: exactly ORG_CAP succeed regardless of which member won each slot.
+    // Strict organization cap: exactly ORG_CAP succeed regardless of which member won each slot.
     expect(fulfilled.length).toBe(ORG_CAP);
     expect(rejected.length).toBe(REQUESTS_PER_USER * 2 - ORG_CAP);
     for (const result of rejected) {
       expect(result.reason).toBeInstanceOf(ValidationError);
     }
 
-    const orgPendingCount = await withUserDatabaseContext(owner.public_id, () =>
-      repository.countPendingByOrganizationId(organization.id),
+    const organizationPendingCount = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: owner.public_id }),
+      () => repository.countPendingByOrganizationId(organization.id),
     );
-    expect(orgPendingCount).toBe(ORG_CAP);
+    expect(organizationPendingCount).toBe(ORG_CAP);
     expect(objectStorage.createPresignedUploadUrl).toHaveBeenCalledTimes(ORG_CAP);
   });
 });

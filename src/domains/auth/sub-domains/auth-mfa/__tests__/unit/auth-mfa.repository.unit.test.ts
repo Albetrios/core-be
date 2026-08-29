@@ -11,12 +11,19 @@ const mockSelect = vi.fn(() => ({ from: mockFrom }));
 const mockSet = vi.fn(() => ({ where: mockWhereForUpdate }));
 const mockUpdate = vi.fn(() => ({ set: mockSet }));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getRequestDatabase: () => ({
-    select: mockSelect,
-    update: mockUpdate,
-  }),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getRequestDatabase: () => ({
+        select: mockSelect,
+        update: mockUpdate,
+      }),
+    };
+  },
+);
 
 describe('MfaRepository', () => {
   const repository = new MfaRepository();

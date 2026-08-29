@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { middlewarePlugins } from '@/shared/middlewares/index.js';
-import tenantMiddleware from '@/shared/middlewares/tenant/tenant.middleware.js';
 import rateLimitMiddleware from '@/shared/middlewares/rate-limit/rate-limit.middleware.js';
 import organizationRlsTransactionMiddleware from '@/shared/middlewares/tenant/organization-rls-transaction.middleware.js';
-import i18nMiddleware from '@/shared/middlewares/core/i18n.middleware.js';
 
 /**
  * Regression test for middleware ordering. The global limiter is keyed strictly on
- * `request.ip`, so it no longer depends on tenant resolution; the load-bearing constraint
+ * `request.ip`, so it depends on no tenant resolution; the load-bearing constraint
  * is that rate limiting runs before the per-request RLS transaction so throttled requests
- * never open a DB connection. i18n must precede tenant so its translated errors render.
+ * never open a DB connection. (the header-driven tenant middleware was removed with X-Organization-Id).
  */
 describe('middleware registration order', () => {
   const order = middlewarePlugins as readonly unknown[];
@@ -21,14 +19,5 @@ describe('middleware registration order', () => {
     expect(rateLimitIndex).toBeGreaterThanOrEqual(0);
     expect(rlsIndex).toBeGreaterThanOrEqual(0);
     expect(rateLimitIndex).toBeLessThan(rlsIndex);
-  });
-
-  it('resolves tenant after i18n so its translated errors can be rendered', () => {
-    const i18nIndex = order.indexOf(i18nMiddleware);
-    const tenantIndex = order.indexOf(tenantMiddleware);
-
-    expect(i18nIndex).toBeGreaterThanOrEqual(0);
-    expect(tenantIndex).toBeGreaterThanOrEqual(0);
-    expect(i18nIndex).toBeLessThan(tenantIndex);
   });
 });

@@ -96,7 +96,7 @@ Check only what the PR touches. Skip categories marked **none** in the PR **Revi
 | Route catalog | `docs/routes.txt` updated (pre-commit/CI enforces) | Blocker |
 | OpenAPI | Route metadata in `*.routes.ts` Zod schemas + locale `openapi.json` when operations change | Major |
 | Versioning | Public routes under `/api/v1`; deprecation headers if applicable | Major |
-| Access documented | New routes match catalog access (public / authenticated / org permission) | Major |
+| Access documented | New routes match catalog access (public / authenticated / organization permission) | Major |
 
 ### Tests
 
@@ -155,7 +155,7 @@ Use when reviewing as Cursor agent, Bugbot, or **pr-babysit**. Read [skill-index
 
 | Risk | Pattern / rule |
 | ---- | -------------- |
-| Worker request DB | `getRequestDatabase()` under `**/*.worker.ts`, `**/*.processor.ts` (importing types / `setLocalDatabaseConfig` from `request-database.context` is allowed) |
+| Worker request DB | `getRequestDatabase()` under `**/*.worker.ts`, `**/*.processor.ts` (importing types / `setLocalDatabaseConfig` from `database-context-runtime` is allowed) |
 | Controller DB | `database`, `drizzle`, `from(` in `**/*.controller.ts` |
 | Raw user strings | `throw new Error("` or `message: "` without `errors.` / `success.` keys in services/controllers |
 | Secrets | High-entropy literals, `sk_`, `Bearer` token literals in non-test files |

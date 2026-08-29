@@ -1,10 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const inner = ((callback: (databaseHandle: unknown) => unknown) =>
+    globalRetentionContextMock(callback)) as unknown as (...parameters: unknown[]) => unknown;
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+      inner(...parameters),
+    ),
+  };
+});
+
 /**
  * Worker-level suite for the `user-data-export-retention` scheduled cleanup.
  *
  * The invariant that matters here is the database context: expired export bundles are deleted
- * across every tenant, so the job must run inside `withGlobalRetentionCleanupDatabaseContext`
+ * across every tenant, so the job must run inside `withMaintenanceDatabaseContext`
  * (which strips per-tenant RLS) and must receive that wrapper's handle — never a request-scoped one.
  */
 const workerState = vi.hoisted(() => ({
@@ -14,7 +26,7 @@ const workerState = vi.hoisted(() => ({
   onHandlers: {} as Record<string, (...args: unknown[]) => void>,
 }));
 
-const withGlobalRetentionCleanupDatabaseContextMock = vi.fn();
+const globalRetentionContextMock = vi.fn();
 const runUserDataExportRetentionJobMock = vi.fn();
 
 vi.mock('bullmq', () => ({
@@ -52,11 +64,6 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-close.util.js', () => ({
   }),
 }));
 
-vi.mock('@/infrastructure/database/contexts/retention-database.context.js', () => ({
-  withGlobalRetentionCleanupDatabaseContext: (callback: (databaseHandle: unknown) => unknown) =>
-    withGlobalRetentionCleanupDatabaseContextMock(callback),
-}));
-
 vi.mock(
   '@/domains/user/sub-domains/user-data-export/workers/user-data-export-retention.processor.js',
   () => ({
@@ -82,10 +89,10 @@ describe('user-data-export-retention.worker', () => {
     workerState.processor = undefined;
     workerState.options = undefined;
     workerState.onHandlers = {};
-    withGlobalRetentionCleanupDatabaseContextMock.mockReset();
+    globalRetentionContextMock.mockReset();
     runUserDataExportRetentionJobMock.mockReset();
 
-    withGlobalRetentionCleanupDatabaseContextMock.mockImplementation(
+    globalRetentionContextMock.mockImplementation(
       async (callback: (databaseHandle: unknown) => Promise<unknown>) =>
         callback({ kind: 'global-retention' }),
     );
@@ -118,7 +125,7 @@ describe('user-data-export-retention.worker', () => {
     createUserDataExportRetentionWorker();
     const result = await workerState.processor?.();
 
-    expect(withGlobalRetentionCleanupDatabaseContextMock).toHaveBeenCalledOnce();
+    expect(globalRetentionContextMock).toHaveBeenCalledOnce();
     expect(runUserDataExportRetentionJobMock).toHaveBeenCalledWith({ kind: 'global-retention' });
     expect(result).toEqual({ deletedCount: 3, objectsDeleted: 3 });
   });
@@ -137,9 +144,7 @@ describe('user-data-export-retention.worker', () => {
   });
 
   it('propagates a database-context failure instead of reporting a clean sweep', async () => {
-    withGlobalRetentionCleanupDatabaseContextMock.mockRejectedValue(
-      new Error('retention-context-failure'),
-    );
+    globalRetentionContextMock.mockRejectedValue(new Error('retention-context-failure'));
 
     const createUserDataExportRetentionWorker = await importWorkerFactory();
     createUserDataExportRetentionWorker();

@@ -3,9 +3,11 @@ import { organizations } from '@/domains/tenancy/sub-domains/organization/organi
 import { plans } from '@/domains/billing/sub-domains/plan/plan.schema.js';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
 import type { WorkerDatabaseHandle } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
-import { resolveRepositoryDatabaseHandle } from '@/infrastructure/database/contexts/worker-database-guard.util.js';
-import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
-import { assertWorkerDatabaseContext } from '@/infrastructure/database/contexts/worker-database.context.js';
+import {
+  type RequestScopedPostgresDatabase,
+  assertWorkerDatabaseContext,
+  resolveRepositoryDatabaseHandle,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { DEFAULT_REPOSITORY_LIST_LIMIT } from '@/shared/constants/query-limits.constants.js';
 import { capListWithWarning } from '@/shared/utils/infrastructure/list-cap.util.js';
 import { subscriptions } from '@/domains/billing/sub-domains/subscription/subscription.schema.js';
@@ -18,7 +20,7 @@ import type { SubscriptionCreateData, SubscriptionUpdateData } from './subscript
  *
  * @remarks
  * A subscription in one of these states neither occupies the single-subscription
- * slot (so the org can create a fresh subscription) nor is mutable. This list is
+ * slot (so the organization can create a fresh subscription) nor is mutable. This list is
  * the single source of truth shared by three call sites that must agree
  * (audit-#1): the `idx_subscriptions_org` partial-unique index predicate, the
  * {@link SubscriptionRepository.findActiveByOrganization} filter, and the
@@ -115,7 +117,7 @@ export class SubscriptionRepository {
       .leftJoin(plans, eq(subscriptions.plan_id, plans.id))
       .where(eq(subscriptions.organization_id, organization_id))
       // audit #37: deterministic order so the cap truncates the OLDEST rows, not an arbitrary set,
-      // if an org ever exceeds the cap (churned CANCELED history).
+      // if an organization ever exceeds the cap (churned CANCELED history).
       .orderBy(desc(subscriptions.created_at), desc(subscriptions.id))
       .limit(limit + 1);
     return capListWithWarning({
@@ -158,7 +160,7 @@ export class SubscriptionRepository {
    *   `included_seats` (a global catalog row that must NOT be locked). Returns the per-subscription
    *   `seats` (purchased from Stripe) and `plan_included_seats` so the caller computes
    *   `seats_total = seats ?? included_seats ?? null` (null = unlimited).
-   * - **Failure modes:** returns `null` when the org has no active subscription (the seat check is
+   * - **Failure modes:** returns `null` when the organization has no active subscription (the seat check is
    *   then a no-op — the billing-free flow still works).
    * - **Side effects:** acquires a row-level `FOR UPDATE` lock released at the enclosing
    *   transaction's COMMIT/ROLLBACK; the caller MUST run inside a transaction for the lock to span
@@ -228,7 +230,9 @@ export class SubscriptionRepository {
     const rows = await this.db()
       .select({ id: organizations.id })
       .from(organizations)
-      .where(sql`${organizations.public_id} = current_setting('app.current_organization_id', true)`)
+      .where(
+        sql`${organizations.public_id} = current_setting('app.current_organization_public_id', true)`,
+      )
       .limit(1);
     return rows[0]?.id ?? null;
   }
@@ -301,7 +305,7 @@ export class SubscriptionRepository {
     // sec-re-07: re-select with the plans join so the HTTP response carries
     // plan_public_id. The two-step (UPDATE then SELECT) runs inside the
     // caller's existing RLS context so the SELECT can never see a row
-    // outside the org.
+    // outside the organization.
     return this.findByPublicId(public_id, organization_id);
   }
 
@@ -384,7 +388,7 @@ export class SubscriptionRepository {
   }
 }
 
-/** Worker-only factory — requires an explicit handle from `withOrganizationContext`. */
+/** Worker-only factory — requires an explicit handle from `withAppDatabaseContext`. */
 export function createWorkerSubscriptionRepository(
   databaseHandle: WorkerDatabaseHandle,
 ): SubscriptionRepository {

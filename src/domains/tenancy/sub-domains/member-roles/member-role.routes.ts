@@ -62,9 +62,9 @@ export function memberRoleRoutes(deps: MemberRoleRoutesDeps): FastifyPluginAsync
     zodApplication.post(
       '/organization/roles',
       {
-        // sec-r5-ratelimit-dos-2: per (org, actor) cap on custom-role creation
+        // sec-r5-ratelimit-dos-2: per (organization, actor) cap on custom-role creation
         // so an Admin-role-holder cannot churn unbounded role rows. Parity with
-        // sec-r4-I2 / sec-r4-I3 on every other org-scoped mutation. The
+        // sec-r4-I2 / sec-r4-I3 on every other organization-scoped mutation. The
         // sec-r4-D4 .limit(256) on `findByRoleId` already caps per-role read
         // memory; this caps the rate at which new rows can be created.
         config: { idempotencyRequired: true, ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT.config },
@@ -83,7 +83,7 @@ export function memberRoleRoutes(deps: MemberRoleRoutesDeps): FastifyPluginAsync
     zodApplication.patch<{ Params: { role_id: string } }>(
       '/organization/roles/:role_id',
       {
-        // R4: org-scoped admin mutation — cap per (org, actor).
+        // R4: organization-scoped admin mutation — cap per (organization, actor).
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         onRequest: [app.authenticate],
         preHandler: [requireOrganizationPermission(TENANCY_PERMISSIONS.ROLE_MANAGE)],
@@ -101,7 +101,7 @@ export function memberRoleRoutes(deps: MemberRoleRoutesDeps): FastifyPluginAsync
     zodApplication.delete<{ Params: { role_id: string } }>(
       '/organization/roles/:role_id',
       {
-        // R4: org-scoped admin mutation — cap per (org, actor).
+        // R4: organization-scoped admin mutation — cap per (organization, actor).
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         onRequest: [app.authenticate],
         preHandler: [requireOrganizationPermission(TENANCY_PERMISSIONS.ROLE_MANAGE)],
@@ -134,7 +134,7 @@ export function memberRoleRoutes(deps: MemberRoleRoutesDeps): FastifyPluginAsync
     zodApplication.put<{ Params: { role_id: string } }>(
       '/organization/roles/:role_id/permissions',
       {
-        // R4: org-scoped admin mutation (full permission-set replace) — cap per (org, actor).
+        // R4: organization-scoped admin mutation (full permission-set replace) — cap per (organization, actor).
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         onRequest: [app.authenticate],
         preHandler: [requireOrganizationPermission(TENANCY_PERMISSIONS.ROLE_MANAGE)],

@@ -22,6 +22,18 @@ function isLocalDatabaseUrl(value: string | undefined): boolean {
 
 function forceLocalDatabaseForNonCiTestRun(): void {
   if (process.env.CI === 'true' || process.env.ALLOW_HOSTED_TEST_DATABASE === 'true') return;
+
+  // Local↔live parity (must mirror src/tests/setup.ts): the local env file's
+  // DATABASE_URL is the RLS-subject `core_be_app` login — the harness's DDL shims
+  // and cross-tenant fixtures run as `core_be_operator` (owner-member, BYPASSRLS)
+  // via DATABASE_OPERATOR_URL whenever it is provisioned.
+  const operatorUrl = process.env.DATABASE_OPERATOR_URL;
+  if (operatorUrl && isLocalDatabaseUrl(operatorUrl)) {
+    process.env.DATABASE_URL = operatorUrl;
+    process.env.DATABASE_MIGRATION_URL ??= LOCAL_TEST_DATABASE_URL;
+    return;
+  }
+
   if (isLocalDatabaseUrl(process.env.DATABASE_URL)) return;
 
   process.env.DATABASE_URL = LOCAL_TEST_DATABASE_URL;

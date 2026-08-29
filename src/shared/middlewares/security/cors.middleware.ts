@@ -19,7 +19,6 @@ const corsMiddleware: FastifyPluginAsync = async (app) => {
     allowedHeaders: [
       'Content-Type',
       'Authorization',
-      'X-Organization-Id',
       'X-Captcha-Token',
       'X-Idempotency-Key',
       'X-Request-Id',

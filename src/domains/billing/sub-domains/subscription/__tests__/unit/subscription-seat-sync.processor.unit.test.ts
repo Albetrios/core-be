@@ -6,7 +6,7 @@ import {
 import type { SubscriptionSeatSyncJobData } from '@/domains/billing/sub-domains/subscription/queues/subscription-seat-sync.queue.js';
 
 describe('processSubscriptionSeatSyncJob (REQ-4)', () => {
-  it('delegates to syncSeatQuantityForOrganization with the org public id and idempotency key', async () => {
+  it('delegates to syncSeatQuantityForOrganization with the organization public id and idempotency key', async () => {
     const service: SubscriptionSeatSyncService = {
       syncSeatQuantityForOrganization: vi.fn().mockResolvedValue(undefined),
     };

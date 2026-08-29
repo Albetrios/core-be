@@ -149,7 +149,7 @@ describe('audit-export.processor', () => {
     environmentMock.S3_BUCKET = 'audit-export-test-bucket';
     environmentMock.AUDIT_EXPORT_S3_PREFIX = 'audit/export/';
     environmentMock.AUDIT_EXPORT_BATCH_SIZE = 2;
-    // Default: nothing has been exported yet for this org+date.
+    // Default: nothing has been exported yet for this organization+date.
     headObjectMock.mockResolvedValue(null);
     putObjectBufferMock.mockResolvedValue(undefined);
   });
@@ -170,7 +170,7 @@ describe('audit-export.processor', () => {
    * version literal silently drifts (or is dropped), every consumer pinned to `"1"` breaks at read
    * time, long after the export ran. Nothing pinned its shape before this case.
    */
-  it('writes a manifest carrying AUDIT_EXPORT_SCHEMA_VERSION, the export date, and the org id', async () => {
+  it('writes a manifest carrying AUDIT_EXPORT_SCHEMA_VERSION, the export date, and the organization id', async () => {
     const databaseHandle = buildDatabaseHandle({
       organizationIds: [42],
       batches: [[buildAuditRow(1, 42)]],
@@ -211,7 +211,7 @@ describe('audit-export.processor', () => {
    * makes a per-tenant retention delete a prefix delete. A flattened key would still upload
    * fine and quietly break both.
    */
-  it('writes part objects under the partitioned org/date key convention', async () => {
+  it('writes part objects under the partitioned organization/date key convention', async () => {
     const databaseHandle = buildDatabaseHandle({
       organizationIds: [42],
       batches: [[buildAuditRow(1, 42)]],
@@ -321,7 +321,7 @@ describe('audit-export.processor', () => {
   });
 
   /**
-   * Idempotency by manifest: a re-run over an already-exported org+date must not re-read the
+   * Idempotency by manifest: a re-run over an already-exported organization+date must not re-read the
    * ledger or re-upload a byte. The scheduler retries this job, so a non-idempotent run would
    * duplicate a full day of data in S3 on every retry.
    */

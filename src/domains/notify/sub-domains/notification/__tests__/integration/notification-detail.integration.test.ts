@@ -3,6 +3,7 @@ import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { createTestApp } from '@/tests/helpers/test-app.js';
 import { injectAuthenticated } from '@/tests/helpers/test-http-inject.helper.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
+import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { generateTestToken } from '@/tests/helpers/test-auth.js';
 import { database } from '@/infrastructure/database/connection.js';
@@ -45,7 +46,11 @@ describe('Notification detail — happy paths', () => {
 
   it('GET /notify/notifications/:id returns the owned notification', async () => {
     const user = await createTestUser();
-    const token = await generateTestToken({ userId: user.public_id });
+    const organization = await createTestOrganization({ ownerUserId: user.id });
+    const token = await generateTestToken({
+      userId: user.public_id,
+      organizationPublicId: organization.public_id,
+    });
     const notificationId = await insertNotificationFor(user.id);
 
     const response = await injectAuthenticated(app, {
@@ -58,7 +63,11 @@ describe('Notification detail — happy paths', () => {
 
   it('PATCH /notify/notifications/:id/read marks it read', async () => {
     const user = await createTestUser();
-    const token = await generateTestToken({ userId: user.public_id });
+    const organization = await createTestOrganization({ ownerUserId: user.id });
+    const token = await generateTestToken({
+      userId: user.public_id,
+      organizationPublicId: organization.public_id,
+    });
     const notificationId = await insertNotificationFor(user.id);
 
     const response = await injectAuthenticated(app, {
@@ -71,7 +80,11 @@ describe('Notification detail — happy paths', () => {
 
   it('DELETE /notify/notifications/:notification_id removes it', async () => {
     const user = await createTestUser();
-    const token = await generateTestToken({ userId: user.public_id });
+    const organization = await createTestOrganization({ ownerUserId: user.id });
+    const token = await generateTestToken({
+      userId: user.public_id,
+      organizationPublicId: organization.public_id,
+    });
     const notificationId = await insertNotificationFor(user.id);
 
     const response = await injectAuthenticated(app, {

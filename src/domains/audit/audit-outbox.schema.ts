@@ -31,7 +31,7 @@ import { auditSchema } from '@/infrastructure/database/pg-schemas.js';
  * `PENDING → FAILED` after `MAX_ATTEMPTS` drain retries (then operator triage).
  *
  * RLS — mirrors the {@link logs} INSERT/SELECT pattern. INSERT is permitted only
- * under the tenant context (`app.current_organization_id`) or the tenantless
+ * under the tenant context (`app.current_organization_public_id`) or the tenantless
  * system-audit arm (`app.system_audit_insert = 'true'` AND
  * `organization_public_id IS NULL`). SELECT/UPDATE/DELETE require the drain
  * context (`app.audit_outbox_drain = 'true'`) which is set only by the drain
@@ -84,7 +84,7 @@ export const audit_outbox = auditSchema
     (table) => [
       /** Drain claim path: `WHERE status = 'PENDING' ORDER BY created_at`. */
       index('idx_audit_outbox_status_created_at').on(table.status, table.created_at),
-      /** Per-org operator triage: list FAILED rows for a single tenant. */
+      /** Per-organization operator triage: list FAILED rows for a single tenant. */
       index('idx_audit_outbox_org_status').on(table.organization_public_id, table.status),
       check('chk_audit_outbox_status', sql`${table.status} IN ('PENDING', 'PROCESSED', 'FAILED')`),
       check(
@@ -103,7 +103,7 @@ export const audit_outbox = auditSchema
       ),
       check('chk_audit_outbox_attempt_count_nonneg', sql`${table.attempt_count} >= 0`),
       /**
-       * INSERT — tenant context writes its own org row, OR system-audit context
+       * INSERT — tenant context writes its own organization row, OR system-audit context
        * writes a tenantless (`organization_public_id IS NULL`) row. Identical
        * shape to the {@link logs} INSERT policy so callers that already work
        * under either context need no GUC changes.
@@ -112,7 +112,7 @@ export const audit_outbox = auditSchema
         as: 'permissive',
         for: 'insert',
         to: 'public',
-        withCheck: sql`${table.organization_public_id} = current_setting('app.current_organization_id', true)
+        withCheck: sql`${table.organization_public_id} = current_setting('app.current_organization_public_id', true)
           OR (
             ${table.organization_public_id} IS NULL
             AND current_setting('app.system_audit_insert', true) = 'true'

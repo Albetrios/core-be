@@ -52,7 +52,7 @@ PUSHED_SRC_OR_TOOLING=$(git diff --name-only "$PUSH_BASE"...HEAD 2>/dev/null | g
 if [ -n "$PUSHED_SRC_OR_TOOLING" ]; then
   pnpm tool:project-structure-tree:check
   pnpm routes:catalog:check
-  pnpm validate:route-org-scope
+  pnpm validate:route-organization-scope
 else
   echo "Skipping generated-doc drift checks on pre-push (no src/tooling changes)."
 fi

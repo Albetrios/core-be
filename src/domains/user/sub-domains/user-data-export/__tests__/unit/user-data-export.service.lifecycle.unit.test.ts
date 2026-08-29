@@ -6,6 +6,25 @@ import {
   UserDataExportCancelledError,
 } from '@/domains/user/sub-domains/user-data-export/user-data-export.types.js';
 
+// The service paths under test run inside the real principal wrapper, which
+// opens a `database.transaction()` — passthrough so no Postgres is needed
+// (CI's unit/contract lanes run without a database service).
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
 /**
  * `markProcessing` and the best-effort cleanup / observability branches.
  *
@@ -34,11 +53,6 @@ vi.mock('@/domains/user/sub-domains/user-data-export/queues/user-data-export.que
 
 vi.mock('@/domains/user/sub-domains/user-data-export/user-data-export.repository.js', () => ({
   createWorkerUserDataExportRepository: () => workerExportRepository,
-}));
-
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: (_userPublicId: string, callback: (handle?: unknown) => unknown) =>
-    callback({ kind: 'user-context' }),
 }));
 
 vi.mock('@/shared/utils/infrastructure/logger.util.js', () => ({

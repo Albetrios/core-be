@@ -26,13 +26,29 @@ vi.mock('@/shared/utils/identity/public-id.util.js', () => ({
   generatePublicId: () => 'subscription_public',
 }));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getRequestDatabase: () => ({
-    select: mockSelect,
-    insert: mockInsert,
-    update: mockUpdate,
-  }),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getRequestDatabase: () => ({
+        select: mockSelect,
+        insert: mockInsert,
+        update: mockUpdate,
+      }),
+      // A5: resolveRepositoryDatabaseHandle now lives in the SAME module as
+      // getRequestDatabase, so its internal call bypasses the export mock —
+      // override it directly to hand repositories the same mock handle.
+      resolveRepositoryDatabaseHandle: (databaseHandle: unknown) =>
+        databaseHandle ?? {
+          select: mockSelect,
+          insert: mockInsert,
+          update: mockUpdate,
+        },
+    };
+  },
+);
 
 describe('SubscriptionRepository', () => {
   const repository = new SubscriptionRepository();

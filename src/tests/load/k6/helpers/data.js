@@ -17,7 +17,7 @@ export function randomEmail() {
 
 export function randomWebhook(organizationPublicId) {
   return {
-    url: `https://httpbin.org/post?org=${organizationPublicId}`,
+    url: `https://httpbin.org/post?organization=${organizationPublicId}`,
     events: ['*'],
     description: `k6 test webhook ${randomString(6)}`,
   };

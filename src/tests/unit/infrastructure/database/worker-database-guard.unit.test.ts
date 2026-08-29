@@ -9,10 +9,11 @@ const FORBIDDEN_PATTERNS: { pattern: RegExp; message: string }[] = [
   },
   {
     // audit #5: the module moved under `contexts/`; the old anchored pattern matched zero
-    // files, silently disarming this rule. The optional `contexts/` segment matches the real
-    // path `@/infrastructure/database/contexts/request-database.context.js` (and the legacy one).
+    // files, silently disarming this rule. The A5 collapse merged the plumbing into
+    // `database-context-runtime.ts` — the alternation matches the current runtime path AND
+    // both legacy request-database.context paths so a revert cannot silently disarm it.
     pattern:
-      /from\s+['"]@\/infrastructure\/database\/(?:contexts\/)?request-database\.context\.js['"]/,
+      /from\s+['"]@\/infrastructure\/database\/(?:contexts\/)?(?:request-database\.context|database-context-runtime)\.js['"]/,
     message: 'must not import request-database.context',
   },
   {
@@ -27,7 +28,7 @@ const FORBIDDEN_PATTERNS: { pattern: RegExp; message: string }[] = [
  * rule ONLY. `audit-outbox-drain.processor.ts` imports the `RequestScopedPostgresDatabase` TYPE
  * and the low-level `setLocalDatabaseConfig` GUC setter — it never calls `getRequestDatabase()`
  * (the strongest rule, which stays enforced for every file). It runs under
- * `withAuditOutboxDrainDatabaseContext`, setting `app.global_admin` / `app.system_audit_insert`
+ * `withMaintenanceDatabaseContext`, setting `app.global_admin` / `app.system_audit_insert`
  * GUCs explicitly on its own pinned drain handle, so there is no request-scoped RLS fallback.
  * Verified during the security audit; arming the (previously dead) regex re-exposed this file.
  */
@@ -98,7 +99,7 @@ describe('worker database guard — request-database.context pattern (audit #5)'
   it('matches the real contexts/ import path', () => {
     expect(
       requestContextRule?.pattern.test(
-        importLine('@/infrastructure/database/contexts/request-database.context.js'),
+        importLine('@/infrastructure/database/contexts/database-context-runtime.js'),
       ),
     ).toBe(true);
   });
@@ -114,7 +115,7 @@ describe('worker database guard — request-database.context pattern (audit #5)'
   it('does not match an unrelated database import', () => {
     expect(
       requestContextRule?.pattern.test(
-        importLine('@/infrastructure/database/contexts/tenant-database.context.js'),
+        importLine('@/infrastructure/database/contexts/database-context.js'),
       ),
     ).toBe(false);
   });

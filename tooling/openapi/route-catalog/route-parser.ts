@@ -49,7 +49,7 @@ export function toRegistryAccess(access: RouteAccess): RegistryAccess {
   if (access === 'AUTH') return 'authenticated';
   if (access.startsWith('ROLE:')) return 'global-role';
   if (access.startsWith('TOKEN:')) return 'bearer-token';
-  return 'org-permission';
+  return 'organization-permission';
 }
 
 function parseRouteFile(
@@ -124,7 +124,7 @@ export function collectAllParsedRoutes(): ParsedRoute[] {
     string,
     number
   >;
-  const orgScopeMap = JSON.parse(readFileSync(ROUTE_ORG_SCOPE_PATH, 'utf-8')) as Record<
+  const organizationScopeMap = JSON.parse(readFileSync(ROUTE_ORG_SCOPE_PATH, 'utf-8')) as Record<
     string,
     OrgScope
   >;
@@ -139,8 +139,8 @@ export function collectAllParsedRoutes(): ParsedRoute[] {
     const copy: ParsedRoute = { ...route };
     const status = successStatusMap[key];
     if (status !== undefined) copy.successStatus = status;
-    const scope = orgScopeMap[key];
-    if (scope !== undefined) copy.orgScope = scope;
+    const scope = organizationScopeMap[key];
+    if (scope !== undefined) copy.organizationScope = scope;
     return copy;
   });
 

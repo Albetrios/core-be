@@ -26,15 +26,15 @@ Tracks implementation of the consolidated plan from [production-audit-2026-05-18
 | P0-03 | MFA TOTP encrypt at rest | `field-secret-encryption.util.ts`, `auth-mfa.service.ts` |
 | P0-04 | Webhook signing secret encrypt; API omits secret | `webhook.service.ts`, `webhook.serializer.ts`, `webhook-delivery.worker.ts` |
 | P0-05 | `auth.verification_tokens` RLS policies | `migrations/20260518000001_verification_tokens_rls_policies.sql` |
-| P0-06 | Stripe webhook fail-closed without org | `stripe-webhook-organization.util.ts` |
-| P0-07 | Header vs path org mismatch → 400 | `tenant.middleware.ts`, i18n `organizationHeaderPathMismatch` |
+| P0-06 | Stripe webhook fail-closed without organization | `stripe-webhook-organization.util.ts` |
+| P0-07 | Header vs path organization mismatch → 400 | `tenant.middleware.ts`, i18n `organizationHeaderPathMismatch` |
 | Audit #5 | Stripe webhook signature at HTTP layer boundary | `stripe-webhook-ingress.plugin.ts`, `stripe-webhook.routes.ts` (`/stripe` prefix encapsulation), `stripe-webhook-ingress.policy.unit.test.ts` |
 
 ---
 
 ## P1 — Implemented (reference)
 
-OAuth PKCE, membership public IDs, sessions/notification-prefs/notifications RLS, subscription webhook SQL org scope, event emits via services, subscription Stripe compensation, tenant security tests (billing/upload), Stripe duplicate webhook integration test, S3 presign + `POST /uploads/:publicId/confirm`, CI/deploy alignment, pool/RLS docs. (Legacy billing-document and payment-instrument tables were later dropped — Stripe is the source of truth for those entities.)
+OAuth PKCE, membership public IDs, sessions/notification-prefs/notifications RLS, subscription webhook SQL organization scope, event emits via services, subscription Stripe compensation, tenant security tests (billing/upload), Stripe duplicate webhook integration test, S3 presign + `POST /uploads/:publicId/confirm`, CI/deploy alignment, pool/RLS docs. (Legacy billing-document and payment-instrument tables were later dropped — Stripe is the source of truth for those entities.)
 
 New migrations (apply with `pnpm db:migrate`):
 
@@ -63,7 +63,7 @@ pnpm ci:local
 
 ### Test stability (integration / e2e)
 
-Flaky org-scoped integration tests were fixed by:
+Flaky organization-scoped integration tests were fixed by:
 
 | Change | Why |
 | ------ | --- |
@@ -139,7 +139,7 @@ pnpm ci:local                  # full PR gate
 | 5 | Numeric policy IDs | P2-01 (`public_id`) |
 | 13–15 | Permission cache invalidation | P0-02 |
 | (security) | MFA/webhook plaintext | P0-03, P0-04 |
-| (security) | Header/path org mismatch | P0-07 |
+| (security) | Header/path organization mismatch | P0-07 |
 | 3 | Tenant HTTP tests billing/upload | P1-10 (extended; not full route matrix) |
 | 4 | Redis single instance (cache + BullMQ) | Accepted for now: one shared Redis instance across development and production |
 | 9 | Circuit breakers audited (Stripe / Resend / S3) | SDK import CI guard (`external-sdk-coverage.global.test.ts`), ESLint allowlist, `CircuitBreakerOpenError`, mail/stripe-webhook custom backoff, Resend transient retry — [external-service-resilience.md](../reference/reliability/external-service-resilience.md) |

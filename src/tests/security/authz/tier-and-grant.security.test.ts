@@ -51,9 +51,9 @@ describe('Security: privilege-boundary matrix (tier:owner + grant)', () => {
     TENANCY_PERMISSIONS.ORGANIZATION_READ,
   ];
 
-  // Builds a fully-provisioned org: an owner (owner_user_id + a broad-permission
+  // Builds a fully-provisioned organization: an owner (owner_user_id + a broad-permission
   // membership) and one non-owner member whose role carries exactly
-  // `memberPermissionCodes`. Tokens carry the org via the JWT claim, which is how
+  // `memberPermissionCodes`. Tokens carry the organization via the JWT claim, which is how
   // flat tenancy routes resolve the active organization.
   async function setupOrgWithMember(memberPermissionCodes: string[]) {
     await seedPermissions(Object.values(TENANCY_PERMISSIONS));
@@ -103,7 +103,7 @@ describe('Security: privilege-boundary matrix (tier:owner + grant)', () => {
 
   describe('model: tier:owner — owner-only organization operations', () => {
     it('non-owner member POST transfer-ownership → 403 and ownership unchanged', async () => {
-      // A member with even the highest org permission is still not the owner.
+      // A member with even the highest organization permission is still not the owner.
       const { owner, member, organization, memberToken } = await setupOrgWithMember([
         TENANCY_PERMISSIONS.MEMBERSHIP_MANAGE,
       ]);
@@ -117,11 +117,11 @@ describe('Security: privilege-boundary matrix (tier:owner + grant)', () => {
         payload: { new_owner_user_id: member.public_id },
       });
       expect(res.statusCode).toBe(403);
-      const [org] = await database
+      const [organizationRow] = await database
         .select()
         .from(organizations)
         .where(eq(organizations.id, organization.id));
-      expect(org?.owner_user_id).toBe(owner.id);
+      expect(organizationRow?.owner_user_id).toBe(owner.id);
     });
 
     it('owner POST leave → 403 (owner cannot abandon the organization)', async () => {
@@ -145,7 +145,7 @@ describe('Security: privilege-boundary matrix (tier:owner + grant)', () => {
     });
   });
 
-  describe('model: org permission gate — membership management (BFLA)', () => {
+  describe('model: organization permission gate — membership management (BFLA)', () => {
     it('member without membership:manage PATCH a membership → 403', async () => {
       const { membership, memberToken } = await setupOrgWithMember([
         TENANCY_PERMISSIONS.MEMBERSHIP_READ,
@@ -222,13 +222,15 @@ describe('Security: privilege-boundary matrix (tier:owner + grant)', () => {
       expect(res.statusCode).toBe(200);
     });
 
-    it('member of org A PUT org B role permissions → 404 (cross-org isolation)', async () => {
-      const orgA = await setupOrgWithMember([TENANCY_PERMISSIONS.ROLE_MANAGE]);
-      const orgB = await setupOrgWithMember([TENANCY_PERMISSIONS.ROLE_MANAGE]);
+    it('member of organization A PUT organization B role permissions → 404 (cross-organization isolation)', async () => {
+      const organizationA = await setupOrgWithMember([TENANCY_PERMISSIONS.ROLE_MANAGE]);
+      const organizationB = await setupOrgWithMember([TENANCY_PERMISSIONS.ROLE_MANAGE]);
       const res = await injectAuthenticated(app, {
         method: 'PUT',
-        url: testApiPath(`/tenancy/organization/roles/${orgB.memberRole.public_id}/permissions`),
-        token: orgA.memberToken,
+        url: testApiPath(
+          `/tenancy/organization/roles/${organizationB.memberRole.public_id}/permissions`,
+        ),
+        token: organizationA.memberToken,
         payload: { permission_codes: [] },
       });
       expect(res.statusCode).toBe(404);
@@ -238,7 +240,7 @@ describe('Security: privilege-boundary matrix (tier:owner + grant)', () => {
   describe('model: tier:owner — the owner membership is protected (lock-out prevention)', () => {
     it("member with membership:manage PATCH the owner's membership → 403", async () => {
       // Even a full membership:manage grant must not let a member suspend the
-      // owner (which would strip the org of its only owner). The scoped lookup
+      // owner (which would strip the organization of its only owner). The scoped lookup
       // succeeds, then the owner-guard rejects: `errors:ownerMembershipCannotBeModified`.
       const { ownerMembership, memberToken } = await setupOrgWithMember([
         TENANCY_PERMISSIONS.MEMBERSHIP_MANAGE,
@@ -254,7 +256,7 @@ describe('Security: privilege-boundary matrix (tier:owner + grant)', () => {
 
     it("member with membership:manage DELETE the owner's membership → 403", async () => {
       // Removing the owner is likewise blocked (`errors:ownerCannotBeRemoved`):
-      // ownership must be transferred first, never deleted out from under the org.
+      // ownership must be transferred first, never deleted out from under the organization.
       const { ownerMembership, memberToken } = await setupOrgWithMember([
         TENANCY_PERMISSIONS.MEMBERSHIP_MANAGE,
       ]);

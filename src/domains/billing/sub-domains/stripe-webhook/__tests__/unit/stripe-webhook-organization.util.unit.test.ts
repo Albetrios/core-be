@@ -1,12 +1,22 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type Stripe from 'stripe';
 
-vi.mock('@/infrastructure/database/contexts/tenant-database.context.js', () => ({
-  withOrganizationContext: vi.fn(
-    async (_organizationPublicId: string, callback: (handle: unknown) => Promise<unknown>) =>
-      callback({ tag: 'pinned-handle' }),
-  ),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: (handle: unknown) => Promise<unknown>) =>
+        callback({ tag: 'pinned-handle' }),
+    ),
+  };
+});
 
 import * as stripeWebhookOrganizationUtil from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook-organization.util.js';
 import type { StripeWebhookEventRepository } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook-event.repository.js';
@@ -81,7 +91,7 @@ describe('runStripeWebhookHandlerWithOrganizationContext', () => {
   // audit #2: metadata is the binding of last resort ONLY for a genuinely
   // first-contact subscription whose customer is also unknown locally (the
   // Dashboard-origin fallback-INSERT path). It is guarded downstream by the
-  // subscriptions WITH CHECK (audit #41) against a non-existent org.
+  // subscriptions WITH CHECK (audit #41) against a non-existent organization.
   it('falls back to metadata only when no subscription or customer mapping exists', async () => {
     const repository = buildStripeWebhookEventRepositoryStub({
       bySubscription: undefined,

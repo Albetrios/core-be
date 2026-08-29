@@ -8,7 +8,7 @@
  * skipped by the NOT EXISTS filter and any race is caught by the unique index).
  *
  * Usage:
- *   DATABASE_URL=postgresql://... pnpm tool:backfill-personal-orgs
+ *   DATABASE_URL=postgresql://... pnpm tool:backfill-personal-organizations
  */
 import 'dotenv/config';
 import { sql, closeDatabase } from '@/infrastructure/database/connection.js';

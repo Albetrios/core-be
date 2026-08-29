@@ -19,9 +19,16 @@ vi.mock('@/domains/audit/audit-outbox.repository.js', () => ({
 
 const setLocalDatabaseConfigMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  setLocalDatabaseConfig: (...args: unknown[]) => setLocalDatabaseConfigMock(...args),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      setLocalDatabaseConfig: (...args: unknown[]) => setLocalDatabaseConfigMock(...args),
+    };
+  },
+);
 
 interface FakeDatabaseHandle {
   select: ReturnType<typeof vi.fn>;
@@ -37,12 +44,15 @@ interface FakeDatabaseHandle {
 
 function buildDatabaseHandle(
   userIdByPublicId: Record<string, number>,
-  orgIdByPublicId: Record<string, number>,
+  organizationIdByPublicId: Record<string, number>,
   apiKeyIdByPublicId: Record<string, number>,
   insertOverride?: (row: Record<string, unknown>) => Promise<void>,
 ): FakeDatabaseHandle {
   const userRows = Object.entries(userIdByPublicId).map(([public_id, id]) => ({ id, public_id }));
-  const orgRows = Object.entries(orgIdByPublicId).map(([public_id, id]) => ({ id, public_id }));
+  const organizationRows = Object.entries(organizationIdByPublicId).map(([public_id, id]) => ({
+    id,
+    public_id,
+  }));
   const apiKeyRows = Object.entries(apiKeyIdByPublicId).map(([public_id, id]) => ({
     id,
     public_id,
@@ -51,10 +61,10 @@ function buildDatabaseHandle(
   // Route resolution SELECTs by the queried TABLE, not by call order: `buildResolutionMaps`
   // SKIPS a table's SELECT when the batch references no id of that kind (e.g. an API-key-only
   // actor has no user public id), so a positional response array would misalign the moment a
-  // table is skipped. Table identity keeps every actor/target/org/api-key combination correct.
+  // table is skipped. Table identity keeps every actor/target/organization/api-key combination correct.
   const rowsByTable = new Map<unknown, Array<{ id: number; public_id: string }>>([
     [users, userRows],
-    [organizations, orgRows],
+    [organizations, organizationRows],
     [api_keys, apiKeyRows],
   ]);
 
@@ -74,7 +84,18 @@ function buildDatabaseHandle(
     }),
   }));
 
-  const execute = vi.fn().mockResolvedValue(undefined);
+  // execute() serves both the per-row GUC set_config statements (return undefined)
+  // and the two SECURITY DEFINER resolver calls (organization / api-key id lookup) — the
+  // resolver SQL is routed by function name and answered from the same fixtures
+  // the table-routed selects use.
+  const execute = vi.fn().mockImplementation(async (statement: unknown) => {
+    const text = JSON.stringify(
+      (statement as { queryChunks?: unknown[] })?.queryChunks ?? statement ?? '',
+    );
+    if (text.includes('resolve_organization_ids_for_public_ids')) return { rows: organizationRows };
+    if (text.includes('resolve_api_key_ids_for_public_ids')) return { rows: apiKeyRows };
+    return undefined;
+  });
 
   const handle = { select, insert, execute } as FakeDatabaseHandle;
   // Nested transaction (SAVEPOINT): run the callback with the same handle so its insert hits the
@@ -152,7 +173,7 @@ describe('runAuditOutboxDrainJob', () => {
     expect(databaseHandle.insert).not.toHaveBeenCalled();
   });
 
-  it('drains a tenant row: resolves public ids, sets per-row org GUC, inserts audit.logs, marks PROCESSED', async () => {
+  it('drains a tenant row: resolves public ids, sets per-row organization GUC, inserts audit.logs, marks PROCESSED', async () => {
     const row = buildOutboxRow({
       id: 100,
       actor_user_public_id: 'user_a',
@@ -171,11 +192,11 @@ describe('runAuditOutboxDrainJob', () => {
       'app.global_admin',
       'true',
     );
-    // Per-row org GUC for the audit.logs INSERT RLS.
+    // Per-row organization GUC for the audit.logs INSERT RLS.
     expect(setLocalDatabaseConfigMock).toHaveBeenNthCalledWith(
       2,
       databaseHandle,
-      'app.current_organization_id',
+      'app.current_organization_public_id',
       'org_a',
     );
     // …and the system arm is explicitly turned OFF for a tenanted row. Savepoints do NOT restore
@@ -213,7 +234,7 @@ describe('runAuditOutboxDrainJob', () => {
     // inherits the previous row's value and widens the insert policy for the rest of the batch.
     expect(setLocalDatabaseConfigMock).toHaveBeenCalledWith(
       databaseHandle,
-      'app.current_organization_id',
+      'app.current_organization_public_id',
       '',
     );
   });
@@ -240,7 +261,7 @@ describe('runAuditOutboxDrainJob', () => {
   it('marks a row permanently FAILED when the organization public_id no longer resolves', async () => {
     // The actor resolves but the organization was hard-deleted between the outbox insert and
     // the drain. This is the SIBLING of the actor-unresolvable branch (processor `resolveRowInserts`
-    // org guard) — a tenant deleted mid-flight must produce a terminal FAILED row for triage, never
+    // organization guard) — a tenant deleted mid-flight must produce a terminal FAILED row for triage, never
     // a silently-dropped audit or a wedged queue head.
     const row = buildOutboxRow({
       id: 105,
@@ -248,7 +269,7 @@ describe('runAuditOutboxDrainJob', () => {
       organization_public_id: 'org_gone',
     });
     drainRepositoryMock.claimPendingBatch.mockResolvedValueOnce([row]);
-    // user_a resolves; org_gone does not (empty org map).
+    // user_a resolves; org_gone does not (empty organization map).
     const databaseHandle = buildDatabaseHandle({ user_a: 5 }, {}, {});
 
     const result = await runAuditOutboxDrainJob(databaseHandle as never);

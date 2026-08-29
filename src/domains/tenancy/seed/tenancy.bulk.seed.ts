@@ -1,5 +1,5 @@
 /**
- * Tenancy bulk seeder — creates organizations (deterministic slugs `bulk-org-<index>`), each
+ * Tenancy bulk seeder — creates organizations (deterministic slugs `bulk-organization-<index>`), each
  * with an Admin role + full permission grant and a faker-sized set of ACTIVE memberships drawn
  * from the user pool in the registry. Created organizations are appended to the registry for
  * downstream domains (billing, notify, upload, audit).
@@ -8,24 +8,24 @@
  * with the same counts is a no-op.
  */
 import { like } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { SYSTEM_PERMISSIONS } from '@/domains/tenancy/sub-domains/permission/seed/permission.reference.seed.js';
 import type { SeedContext, SeededUser } from '@/scripts/seed/seed-contract.js';
 import { generateBulkOrganizationName } from './tenancy.faker.js';
 import { seedMembership, seedOrganization, seedRole, seedRolePermissions } from './tenancy.seed.js';
 
-const BULK_SLUG_PREFIX = 'bulk-org-';
+const BULK_SLUG_PREFIX = 'bulk-organization-';
 const BULK_SLUG_PATTERN = `${BULK_SLUG_PREFIX}%`;
 const ADMIN_PERMISSION_CODES = SYSTEM_PERMISSIONS.map((permission) => permission.code);
 
 /**
- * Seeds organizations + roles + memberships and appends each org to `context.registry`.
+ * Seeds organizations + roles + memberships and appends each organization to `context.registry`.
  *
  * @remarks
- * Algorithm: count existing bulk orgs, create only the missing higher indices (each with an
+ * Algorithm: count existing bulk organizations, create only the missing higher indices (each with an
  * Admin role, full grant, owner membership, and additional members), then re-select all bulk
- * orgs into the registry. Side effects: inserts into organizations / roles / role_permissions /
+ * organizations into the registry. Side effects: inserts into organizations / roles / role_permissions /
  * memberships. Failure modes: warns and returns early if the user pool is empty; otherwise
  * propagates DB errors.
  */

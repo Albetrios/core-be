@@ -15,7 +15,7 @@ const SENSITIVE_INTERNAL_METADATA_KEYS = new Set<string>(['auth_method_id', 'mfa
  * Defense-in-depth (sec): keys whose VALUE would be a credential/secret if a writer ever
  * placed one in the free-form `metadata` jsonb. Writers should never log secrets, but a
  * single careless `metadata: { token }` would otherwise persist and surface verbatim in the
- * admin / org-audit feed. We keep the key (so an admin sees a field existed) and redact the
+ * admin / organization-audit feed. We keep the key (so an admin sees a field existed) and redact the
  * value before it leaves through the response. Matched case-insensitively as a substring.
  */
 const SECRET_METADATA_KEY_PATTERN =
@@ -96,7 +96,7 @@ function serializeOne<T extends AuditLogRow>(row: T, resolution: AuditLogPublicI
   // spread the entire Drizzle row through with `...item`, leaking the bigserial `id`,
   // every `*_user_id`/`organization_id`/`resource_id`/`actor_api_key_id` bigint, and
   // the internal `metadata.{auth_method_id,mfa_method_id}` keys back to the
-  // admin / org-audit clients. Promoting `metadata` sanitisation while spreading
+  // admin / organization-audit clients. Promoting `metadata` sanitisation while spreading
   // top-level bigints was internally incoherent (an admin's response strip
   // protected the metadata keys but leaked `target_user_id` directly — a more
   // useful enumeration vector for the same class).

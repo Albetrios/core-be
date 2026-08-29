@@ -1,4 +1,8 @@
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, desc } from 'drizzle-orm';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   createDrainAuditOutboxRepository,
@@ -6,8 +10,6 @@ import {
 } from '@/domains/audit/audit-outbox.repository.js';
 import { audit_outbox } from '@/domains/audit/audit-outbox.schema.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { withAuditOutboxDrainDatabaseContext } from '@/infrastructure/database/contexts/audit-outbox-drain-database.context.js';
-import { withSystemAuditInsertContext } from '@/infrastructure/database/contexts/system-audit-insert-database.context.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 
 /**
@@ -33,9 +35,13 @@ function outboxRowId(row: { id: number }): number {
   return Number(row.id);
 }
 
-/** Stages a tenantless PENDING row through the real write path (RLS context included). */
+/**
+ * Stages a tenantless PENDING row through the real write path (RLS context included)
+ * and resolves its id via a superuser read-back — `insertAuditOutboxRow` no longer
+ * RETURNINGs the id (SELECT on audit.outbox is drain-exclusive under RLS).
+ */
 async function stagePendingRow(action: string): Promise<number> {
-  return withSystemAuditInsertContext(() =>
+  await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT, () =>
     insertAuditOutboxRow({
       actorUserPublicId: ACTOR_PUBLIC_ID,
       action,
@@ -43,6 +49,14 @@ async function stagePendingRow(action: string): Promise<number> {
       metadata: { source: 'audit-outbox.repository.db.unit' },
     }),
   );
+  const [row] = await database
+    .select({ id: audit_outbox.id })
+    .from(audit_outbox)
+    .where(eq(audit_outbox.action, action))
+    .orderBy(desc(audit_outbox.id))
+    .limit(1);
+  if (!row) throw new Error(`staged row for ${action} not found`);
+  return Number(row.id);
 }
 
 describe('audit-outbox.repository (database)', () => {
@@ -51,9 +65,11 @@ describe('audit-outbox.repository (database)', () => {
   });
 
   /**
-   * The returned id is not cosmetic — `insertAuditOutboxRow` throws when `RETURNING` comes back
-   * empty, which is the guard that turns a silently-dropped audit row into a loud failure. Prove
-   * the id is real by reading the row back with it.
+   * The affected-row guard is not cosmetic — `insertAuditOutboxRow` throws when the INSERT
+   * stages no row, which turns a silently-dropped audit row into a loud failure. (It no longer
+   * RETURNINGs the id: Postgres applies SELECT-policy visibility to RETURNING rows, and outbox
+   * SELECT is drain-exclusive — a RETURNING would be rejected under the RLS-subject app roles.)
+   * Prove the row is real by reading it back as the superuser test pool.
    */
   it('insertAuditOutboxRow returns the new id and stages a PENDING row with the payload', async () => {
     const insertedId = await stagePendingRow('user.login');
@@ -94,13 +110,17 @@ describe('audit-outbox.repository (database)', () => {
     // sees the batch. Reproduce that by nesting: drain B claims while drain A's transaction is
     // still open. Two sequential `Promise.all` contexts would NOT reproduce it — if A commits
     // first, its rows are still PENDING and B legitimately re-claims them.
-    const { claimedA, claimedB } = await withAuditOutboxDrainDatabaseContext(async (handleA) => {
-      const batchA = await createDrainAuditOutboxRepository(handleA).claimPendingBatch(HALF);
-      const batchB = await withAuditOutboxDrainDatabaseContext((handleB) =>
-        createDrainAuditOutboxRepository(handleB).claimPendingBatch(HALF),
-      );
-      return { claimedA: batchA, claimedB: batchB };
-    });
+    const { claimedA, claimedB } = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN,
+      async (handleA) => {
+        const batchA = await createDrainAuditOutboxRepository(handleA).claimPendingBatch(HALF);
+        const batchB = await withMaintenanceDatabaseContext(
+          MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN,
+          (handleB) => createDrainAuditOutboxRepository(handleB).claimPendingBatch(HALF),
+        );
+        return { claimedA: batchA, claimedB: batchB };
+      },
+    );
 
     expect(claimedA).toHaveLength(HALF);
     expect(claimedB).toHaveLength(HALF);
@@ -125,15 +145,19 @@ describe('audit-outbox.repository (database)', () => {
   it('a fully-locked backlog yields an empty batch to the next claimer instead of blocking', async () => {
     await stagePendingRow('user.locked');
 
-    const claimedByInnerDrain = await withAuditOutboxDrainDatabaseContext(async (outerHandle) => {
-      const outerClaim = await createDrainAuditOutboxRepository(outerHandle).claimPendingBatch(10);
-      expect(outerClaim).toHaveLength(1);
+    const claimedByInnerDrain = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN,
+      async (outerHandle) => {
+        const outerClaim =
+          await createDrainAuditOutboxRepository(outerHandle).claimPendingBatch(10);
+        expect(outerClaim).toHaveLength(1);
 
-      // Still inside the outer transaction — its row lock is held.
-      return withAuditOutboxDrainDatabaseContext((innerHandle) =>
-        createDrainAuditOutboxRepository(innerHandle).claimPendingBatch(10),
-      );
-    });
+        // Still inside the outer transaction — its row lock is held.
+        return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN, (innerHandle) =>
+          createDrainAuditOutboxRepository(innerHandle).claimPendingBatch(10),
+        );
+      },
+    );
 
     expect(claimedByInnerDrain).toEqual([]);
   });
@@ -150,8 +174,9 @@ describe('audit-outbox.repository (database)', () => {
       stagedIds.push(await stagePendingRow(`user.ordered.${index}`));
     }
 
-    const claimed = await withAuditOutboxDrainDatabaseContext((databaseHandle) =>
-      createDrainAuditOutboxRepository(databaseHandle).claimPendingBatch(2),
+    const claimed = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN,
+      (databaseHandle) => createDrainAuditOutboxRepository(databaseHandle).claimPendingBatch(2),
     );
 
     expect(claimed).toHaveLength(2);
@@ -179,7 +204,7 @@ describe('audit-outbox.repository (database)', () => {
   it('recordTransientFailure captures last_error but keeps the row PENDING for a bounded retry', async () => {
     const stagedId = await stagePendingRow('user.transient');
 
-    await withAuditOutboxDrainDatabaseContext((handle) =>
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN, (handle) =>
       createDrainAuditOutboxRepository(handle).recordTransientFailure(stagedId, 'rls-rejected'),
     );
 
@@ -196,7 +221,7 @@ describe('audit-outbox.repository (database)', () => {
   it('recordTransientFailure truncates an oversized last_error to 4000 chars', async () => {
     const stagedId = await stagePendingRow('user.transient.long');
 
-    await withAuditOutboxDrainDatabaseContext((handle) =>
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN, (handle) =>
       createDrainAuditOutboxRepository(handle).recordTransientFailure(stagedId, 'x'.repeat(5_000)),
     );
 
@@ -210,8 +235,9 @@ describe('audit-outbox.repository (database)', () => {
    * 'PENDING'` scope and the three COALESCE/EXTRACT expressions — never ran. Prove it on real rows.
    */
   it('getPendingBacklogStats returns all zeros for an empty backlog', async () => {
-    const stats = await withAuditOutboxDrainDatabaseContext((handle) =>
-      createDrainAuditOutboxRepository(handle).getPendingBacklogStats(),
+    const stats = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN,
+      (handle) => createDrainAuditOutboxRepository(handle).getPendingBacklogStats(),
     );
     expect(stats).toEqual({ pendingCount: 0, oldestPendingAgeSeconds: 0, maxAttemptCount: 0 });
   });
@@ -229,15 +255,16 @@ describe('audit-outbox.repository (database)', () => {
 
     // One claim bumps every row's attempt_count to 1 (rows stay PENDING); then remove one row from
     // the PENDING set via PROCESSED so the count/scope is exercised, not just the aggregates.
-    await withAuditOutboxDrainDatabaseContext((handle) =>
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN, (handle) =>
       createDrainAuditOutboxRepository(handle).claimPendingBatch(10),
     );
-    await withAuditOutboxDrainDatabaseContext((handle) =>
+    await withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN, (handle) =>
       createDrainAuditOutboxRepository(handle).markProcessed([processed]),
     );
 
-    const stats = await withAuditOutboxDrainDatabaseContext((handle) =>
-      createDrainAuditOutboxRepository(handle).getPendingBacklogStats(),
+    const stats = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.AUDIT_OUTBOX_DRAIN,
+      (handle) => createDrainAuditOutboxRepository(handle).getPendingBacklogStats(),
     );
     expect(stats.pendingCount).toBe(2); // the PROCESSED row is excluded by the WHERE scope
     expect(stats.maxAttemptCount).toBe(1); // the claim bumped attempt_count

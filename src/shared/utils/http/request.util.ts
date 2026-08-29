@@ -2,6 +2,11 @@ import type { FastifyRequest } from 'fastify';
 import { ForbiddenError, UnauthorizedError } from '@/shared/errors/index.js';
 import type { ApiKeyAuthContext, AuthContext, UserAuthContext } from '@/shared/types/index.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
+import type {
+  OrganizationPrincipalDatabaseScope,
+  PrincipalDatabaseScope,
+  UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /** Returns the per-request id Fastify generates (used for log correlation, audit fields, idempotency). */
 export function getRequestIdentifier(request: FastifyRequest): string {
@@ -76,7 +81,7 @@ export function requirePrincipal(request: FastifyRequest): AuthContext {
  * path param when the route carries one, otherwise the signed `org` token claim
  * (`auth.organizationPublicId`). Matching that precedence is a security invariant — the
  * organization the permission preHandler authorized MUST equal the organization the controller
- * then scopes data to (and binds the RLS GUC to via `withOrganizationDatabaseContext`). If the
+ * then scopes data to (and binds the RLS GUC to via `withAppDatabaseContext`). If the
  * two could diverge (e.g. one read the path while the other read the claim) a caller could be
  * permission-checked against organization A while reading/writing organization B. The claim is
  * scope, not authority: membership is still verified by `requireOrganizationPermission` and RLS
@@ -92,4 +97,46 @@ export function resolveActiveOrganizationId(request: FastifyRequest): string {
     throw new ForbiddenError('errors:organizationContextRequired');
   }
   return validatePublicIdParam(organizationId, 'organization_id');
+}
+
+/**
+ * Narrows the middleware-attached `request.principalScope` to an
+ * organization-bearing scope — the `requireAuth`-family accessor for organization-scoped
+ * routes. Mints nothing: the scope was already attached by the auth middleware;
+ * this only enforces the route contract and narrows the type.
+ *
+ * @remarks
+ * - **Failure modes:** {@link UnauthorizedError} when unauthenticated (no scope
+ *   attached); {@link ForbiddenError} (`errors:organizationContextRequired`)
+ *   when the token carries no active organization — under the personal/team
+ *   organization model that is a stale/malformed token, not a different scope.
+ * - **Side effects:** none.
+ */
+export function requireOrganizationScope(
+  request: FastifyRequest,
+): OrganizationPrincipalDatabaseScope {
+  const scope = request.principalScope as PrincipalDatabaseScope | undefined;
+  if (!scope) throw new UnauthorizedError();
+  if (scope.organizationPublicId === undefined) {
+    throw new ForbiddenError('errors:organizationContextRequired');
+  }
+  return scope as OrganizationPrincipalDatabaseScope;
+}
+
+/**
+ * Narrows the middleware-attached `request.principalScope` to a user-bearing
+ * scope — the `requireAuth`-family accessor for user-owned resources (rejects
+ * API-key principals, matching {@link requireAuth} semantics; the organization
+ * stays optional — organization-less tokens are the /users/me self-heal transitional
+ * state). Mints nothing.
+ *
+ * @remarks
+ * - **Failure modes:** {@link UnauthorizedError} when unauthenticated or when
+ *   the principal is an API key (no user identity).
+ * - **Side effects:** none.
+ */
+export function requireUserScope(request: FastifyRequest): UserPrincipalDatabaseScope {
+  const scope = request.principalScope as PrincipalDatabaseScope | undefined;
+  if (scope?.userPublicId === undefined) throw new UnauthorizedError();
+  return scope as UserPrincipalDatabaseScope;
 }

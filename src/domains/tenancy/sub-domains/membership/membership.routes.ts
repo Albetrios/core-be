@@ -34,8 +34,8 @@ export interface MembershipRoutesDeps {
 /**
  * Fastify plugin that registers active-organization membership routes (list,
  * get, create, update, delete, plus self-service leave / transfer-ownership)
- * and the member-invitation routes (org-scoped create/list/cancel/resend plus
- * the cross-org `/invitations/:invitation_id/accept` user-facing endpoint).
+ * and the member-invitation routes (organization-scoped create/list/cancel/resend plus
+ * the cross-organization `/invitations/:invitation_id/accept` user-facing endpoint).
  * Permission-gated routes are protected with
  * `requireOrganizationPermission(MEMBERSHIP_*|INVITATION_MANAGE)`; public
  * accept has only a strict rate limit.
@@ -94,7 +94,7 @@ export function membershipRoutes(deps: MembershipRoutesDeps): FastifyPluginAsync
     zodApplication.post(
       '/organization/memberships',
       {
-        // R4: org-scoped admin mutation — cap per (org, actor) alongside the
+        // R4: organization-scoped admin mutation — cap per (organization, actor) alongside the
         // required idempotency key. Mirrors the invitation-create pattern.
         config: { ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT.config, idempotencyRequired: true },
         onRequest: [app.authenticate],
@@ -112,7 +112,7 @@ export function membershipRoutes(deps: MembershipRoutesDeps): FastifyPluginAsync
     zodApplication.patch<{ Params: { membership_id: string } }>(
       '/organization/memberships/:membership_id',
       {
-        // R4: org-scoped admin mutation — cap per (org, actor).
+        // R4: organization-scoped admin mutation — cap per (organization, actor).
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         onRequest: [app.authenticate],
         preHandler: [requireOrganizationPermission(TENANCY_PERMISSIONS.MEMBERSHIP_MANAGE)],
@@ -130,7 +130,7 @@ export function membershipRoutes(deps: MembershipRoutesDeps): FastifyPluginAsync
     zodApplication.delete<{ Params: { membership_id: string } }>(
       '/organization/memberships/:membership_id',
       {
-        // R4: org-scoped admin mutation — cap per (org, actor).
+        // R4: organization-scoped admin mutation — cap per (organization, actor).
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         onRequest: [app.authenticate],
         preHandler: [requireOrganizationPermission(TENANCY_PERMISSIONS.MEMBERSHIP_MANAGE)],
@@ -149,7 +149,7 @@ export function membershipRoutes(deps: MembershipRoutesDeps): FastifyPluginAsync
       {
         // sec-r4-I3: self-service exit revokes the caller's membership row.
         // Without a cap, a session-token holder (or compromised script) could
-        // loop the endpoint against arbitrary org ids to probe membership
+        // loop the endpoint against arbitrary organization ids to probe membership
         // existence by status code. Cap at the moderate-authed tier (30/60s).
         ...MODERATE_AUTHED_RATE_LIMIT,
         onRequest: [app.authenticate],
@@ -183,14 +183,14 @@ export function membershipRoutes(deps: MembershipRoutesDeps): FastifyPluginAsync
       membershipController.transferOwnership,
     );
 
-    // ── Org-admin invitations (active org, INVITATION_MANAGE) ──
+    // ── Org-admin invitations (active organization, INVITATION_MANAGE) ──
     // Adding a member (which issues the invitation) is `POST /organization/memberships` (REQ-1);
     // these routes manage an already-issued invitation.
     zodApplication.delete<{ Params: { invitation_id: string } }>(
       '/organization/invitations/:invitation_id',
       {
-        // sec-r4-I3: invitation revocation is an org-scoped admin mutation.
-        // Cap per (org, actor) so a single admin cannot churn invitations and
+        // sec-r4-I3: invitation revocation is an organization-scoped admin mutation.
+        // Cap per (organization, actor) so a single admin cannot churn invitations and
         // a cross-tenant probe cannot exhaust a victim org's bucket.
         ...ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT,
         onRequest: [app.authenticate],
@@ -222,7 +222,7 @@ export function membershipRoutes(deps: MembershipRoutesDeps): FastifyPluginAsync
       invitationController.resendInvitation,
     );
 
-    // ── Recipient invitations (the invited user, cross-org, auth-only) ──
+    // ── Recipient invitations (the invited user, cross-organization, auth-only) ──
     zodApplication.post<{ Params: { invitation_id: string } }>(
       '/invitations/:invitation_id/accept',
       {

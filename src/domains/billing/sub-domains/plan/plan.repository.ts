@@ -1,5 +1,5 @@
 import { and, asc, eq, or } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { plans } from '@/domains/billing/sub-domains/plan/plan.schema.js';
 
 /**

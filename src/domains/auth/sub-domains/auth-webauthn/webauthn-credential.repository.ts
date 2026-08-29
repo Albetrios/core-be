@@ -1,5 +1,5 @@
 import { and, eq, isNull, lt, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import {
   RESOURCE_QUOTA_LOCK_NAMESPACE,
   acquireResourceQuotaLock,
@@ -17,8 +17,8 @@ export type WebauthnCredentialRow = typeof webauthn_credentials.$inferSelect;
  * Drizzle repository for {@link webauthn_credentials}; tracks signature counter monotonicity via
  * {@link updateCounter} and revokes via `revoked_at` (partial unique index keeps `credential_id`
  * reusable after revocation). `auth.webauthn_credentials` is FORCE RLS keyed on
- * `app.current_user_id`, so every method reads/writes via the request-scoped handle and callers
- * must run inside `withUserDatabaseContext` (the owning user public id is always known at the call
+ * `app.current_user_public_id`, so every method reads/writes via the request-scoped handle and callers
+ * must run inside `withAppDatabaseContext (user scope)` (the owning user public id is always known at the call
  * site — authenticated request or WebAuthn challenge).
  */
 export class WebauthnCredentialRepository {

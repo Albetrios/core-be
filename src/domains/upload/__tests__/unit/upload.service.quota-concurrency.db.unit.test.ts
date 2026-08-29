@@ -5,10 +5,13 @@ import { resetEnvCacheForTests } from '@/shared/config/env.config.js';
 import { ValidationError } from '@/shared/errors/index.js';
 import { UploadRepository } from '@/domains/upload/upload.repository.js';
 import { UploadService } from '@/domains/upload/upload.service.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
 import { createObjectStoragePortMock } from '@/tests/helpers/object-storage-mock.helper.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const PENDING_CAP = 3;
 const CONCURRENT_REQUESTS = 8;
@@ -87,8 +90,9 @@ describe('UploadService pending-quota concurrency (database)', () => {
     }
 
     // Exactly `PENDING_CAP` rows were persisted, and presigned URLs were minted only for them.
-    const pendingCount = await withUserDatabaseContext(user.public_id, () =>
-      repository.countPendingByUserId(user.id),
+    const pendingCount = await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user.public_id }),
+      () => repository.countPendingByUserId(user.id),
     );
     expect(pendingCount).toBe(PENDING_CAP);
     expect(objectStorage.createPresignedUploadUrl).toHaveBeenCalledTimes(PENDING_CAP);

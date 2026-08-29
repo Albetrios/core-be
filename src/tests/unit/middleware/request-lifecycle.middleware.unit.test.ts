@@ -8,7 +8,7 @@ import type { OrganizationRlsTransactionSettlementOutcome } from '@/shared/middl
  * Asserts the request lifecycle coordinator runs onResponse steps in the order:
  *   1. RLS transaction settle (await commit/rollback)
  *   2. Idempotency cache write or forced placeholder release
- *   3. Outbox flush (only after successful commit / no org transaction)
+ *   3. Outbox flush (only after successful commit / no organization transaction)
  *
  * Failure mode being prevented: side effects (idempotency cache, BullMQ enqueue) running
  * before the request DB transaction commits, so a rolled-back write can be replayed as a

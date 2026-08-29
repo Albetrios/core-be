@@ -2,9 +2,11 @@ import { and, count, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-or
 import { countWithCap } from '@/infrastructure/database/utils/capped-count.util.js';
 import { NOTIFICATION_MARK_ALL_READ_BATCH_SIZE } from '@/shared/constants/notification.constants.js';
 import type { WorkerDatabaseHandle } from '@/infrastructure/queue/worker-runtime/worker-processor.util.js';
-import { resolveRepositoryDatabaseHandle } from '@/infrastructure/database/contexts/worker-database-guard.util.js';
-import type { RequestScopedPostgresDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
-import { assertWorkerDatabaseContext } from '@/infrastructure/database/contexts/worker-database.context.js';
+import {
+  type RequestScopedPostgresDatabase,
+  assertWorkerDatabaseContext,
+  resolveRepositoryDatabaseHandle,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { notifications } from '@/domains/notify/sub-domains/notification/notification.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
@@ -100,7 +102,7 @@ export class NotificationRepository {
   /**
    * sec-D #10: resolve the recipient's user public id from a notification id via the
    * `notify.resolve_user_public_id_for_notification` SECURITY DEFINER function. Used by
-   * the notification dispatch worker to pin `withUserDatabaseContext` for NULL-organization
+   * the notification dispatch worker to pin `withAppDatabaseContext (user scope)` for NULL-organization
    * notifications instead of the wider `app.global_retention_cleanup` retention scope.
    * Returns null when the notification or recipient cannot be resolved (worker treats this
    * as a hard error and throws).
@@ -280,7 +282,7 @@ export class NotificationRepository {
  * `global_admin` (sec-D #10 SECURITY DEFINER user-id lookup for tenant-less
  * notifications), or `user` (sec-D #10 narrow per-user load for tenant-less
  * notifications). Retention cleanup uses a raw batch-delete under
- * `withGlobalRetentionCleanupDatabaseContext` (not this factory), so
+ * `withMaintenanceDatabaseContext` (not this factory), so
  * `global_retention_cleanup` is intentionally NOT an accepted context here.
  */
 export function createWorkerNotificationRepository(

@@ -24,7 +24,7 @@ describe('test-http-inject.helper', () => {
     const application = Fastify();
     application.get('/protected', async (request) => ({
       authorization: request.headers.authorization,
-      organizationId: request.headers['x-organization-id'],
+      organizationHeader: request.headers['x-organization-id'] ?? null,
     }));
     await application.ready();
 
@@ -35,9 +35,9 @@ describe('test-http-inject.helper', () => {
       organizationPublicId: 'org_public_id_1234567',
     });
     expect(response.statusCode).toBe(200);
-    const body = response.json() as { authorization: string; organizationId: string };
+    const body = response.json() as { authorization: string; organizationHeader: string | null };
     expect(body.authorization).toBe('Bearer test-token');
-    expect(body.organizationId).toBe('org_public_id_1234567');
+    expect(body.organizationHeader).toBeNull(); // header removed — claim-only
 
     await application.close();
   });

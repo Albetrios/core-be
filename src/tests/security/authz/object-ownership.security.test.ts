@@ -5,6 +5,7 @@ import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { createTestApp } from '@/tests/helpers/test-app.js';
 import { injectAuthenticated } from '@/tests/helpers/test-http-inject.helper.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
+import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { generateTestToken, generateTestTokenAndSession } from '@/tests/helpers/test-auth.js';
 import {
@@ -25,7 +26,7 @@ import { webauthn_credentials } from '@/domains/auth/sub-domains/auth-webauthn/w
 /**
  * Object-ownership (BOLA) attack matrix — Phase 2 of the in-house authorization
  * matrix (route-authorization-model.json). For each model, a different principal
- * is denied the victim's object (`user`→404, `org`→404), the legitimate owner
+ * is denied the victim's object (`user`→404, `organization`→404), the legitimate owner
  * still succeeds (baseline), and denied writes leave state unchanged
  * (verifyNoMutation). e2e — runs in CI (Postgres + Redis required).
  */
@@ -50,8 +51,16 @@ describe('Security: object-ownership BOLA matrix', () => {
   async function twoUsers() {
     const victim = await createTestUser();
     const attacker = await createTestUser();
-    const victimToken = await generateTestToken({ userId: victim.public_id });
-    const attackerToken = await generateTestToken({ userId: attacker.public_id });
+    const victimOrganization = await createTestOrganization({ ownerUserId: victim.id });
+    const attackerOrganization = await createTestOrganization({ ownerUserId: attacker.id });
+    const victimToken = await generateTestToken({
+      userId: victim.public_id,
+      organizationPublicId: victimOrganization.public_id,
+    });
+    const attackerToken = await generateTestToken({
+      userId: attacker.public_id,
+      organizationPublicId: attackerOrganization.public_id,
+    });
     return { victim, attacker, victimToken, attackerToken };
   }
 
@@ -372,10 +381,10 @@ describe('Security: object-ownership BOLA matrix', () => {
     });
   });
 
-  // ─── model: org — member of org A must not reach org B's object ─────────────
+  // ─── model: organization — member of organization A must not reach organization B's object ─────────────
 
-  describe('model: org — subscriptions (cross-org)', () => {
-    it("member of org A GET org B's subscription → 404", async () => {
+  describe('model: organization — subscriptions (cross-organization)', () => {
+    it("member of organization A GET organization B's subscription → 404", async () => {
       const fixture = await seedTwoOrganizationsWithSubscriptions();
       const tokenScopedToOrgA = await generateTestToken({
         userId: fixture.userA.public_id,
@@ -390,7 +399,7 @@ describe('Security: object-ownership BOLA matrix', () => {
       expect(res.statusCode).toBe(404);
     });
 
-    it("member of org A GET org B's subscription payment-setup → 404", async () => {
+    it("member of organization A GET organization B's subscription payment-setup → 404", async () => {
       const fixture = await seedTwoOrganizationsWithSubscriptions();
       const tokenScopedToOrgA = await generateTestToken({
         userId: fixture.userA.public_id,
@@ -407,7 +416,7 @@ describe('Security: object-ownership BOLA matrix', () => {
       expect(res.statusCode).toBe(404);
     });
 
-    it('baseline: member GET own org subscription → 200', async () => {
+    it('baseline: member GET own organization subscription → 200', async () => {
       const fixture = await seedTwoOrganizationsWithSubscriptions();
       const tokenScopedToOrgA = await generateTestToken({
         userId: fixture.userA.public_id,

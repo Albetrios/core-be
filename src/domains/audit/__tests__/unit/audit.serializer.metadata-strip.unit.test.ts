@@ -62,7 +62,7 @@ describe('AuditSerializer — metadata identifier stripping (denylist)', () => {
 
   it('redacts the value of secret-bearing metadata keys but keeps public-id and free-form keys', () => {
     // Defense-in-depth: a writer that ever puts a credential in free-form metadata must not
-    // leak it through the admin/org-audit response. The key stays (so the field is visible);
+    // leak it through the admin/organization-audit response. The key stays (so the field is visible);
     // the value is redacted. Public-id keys — even ones that brush the pattern, like
     // `api_key_public_id` — and ordinary context must flow through untouched.
     const items = AuditSerializer.many([

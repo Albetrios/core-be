@@ -8,8 +8,8 @@ import { authHeaders } from '../helpers/auth.js';
  *
  * Ramps to 20 → 50 → 100 VUs. Use for full-confidence load testing of the API.
  * Requires: TEST_TOKEN (required). TEST_TOKEN must be minted already scoped to
- * TEST_ORG_ID — the active org rides the token's `org` claim, so the flat
- * memberships route carries no org path segment (set TEST_ORG_ID to enable it).
+ * TEST_ORG_ID — the active organization rides the token's `org` claim, so the flat
+ * memberships route carries no organization path segment (set TEST_ORG_ID to enable it).
  * Get credentials: pnpm tool:load-test-credentials (server + full seed).
  *
  * Routes loaded:

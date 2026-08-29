@@ -113,7 +113,7 @@ export function requireRole(
  *
  * @param permissionCode - The permission code to check (use domain constants, never bare strings)
  * @param paramName - Vestigial route-param fallback (default: 'organization_id'). After the route
- *   flatten no route carries an `{organization_id}` segment, so the org is resolved from the token
+ *   flatten no route carries an `{organization_id}` segment, so the organization is resolved from the token
  *   claim; the param lookup is retained only as a defensive fallback and is normally a no-op.
  *
  * Usage:
@@ -142,7 +142,7 @@ export function requireOrganizationPermission(
     if (auth.kind === 'apiKey') {
       // Fail closed: an API-key principal is pinned to exactly one organization and it must equal
       // the route's organization. The union guarantees a non-empty organizationPublicId + scopes,
-      // so a key scoped to another org (or lacking the permission) is rejected here.
+      // so a key scoped to another organization (or lacking the permission) is rejected here.
       if (auth.organizationPublicId !== organizationId) {
         await emitPermissionDenyAudit(
           request,

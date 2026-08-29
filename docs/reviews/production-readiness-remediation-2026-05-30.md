@@ -21,7 +21,7 @@
 | ---: | --- | --- | --- | --- |
 | 1 | DB superuser / BYPASSRLS bypasses RLS | **Done** | #164, #182 | `assert-database-rls-safety.ts` fail-closed in hosted envs |
 | 2 | Redis blip → global rate limit fail-closed | **Done** | #165 | `skipOnError: true` on global limiter |
-| 3 | Global rate limit trusts `X-Organization-Id` | **Done** | #160 | Global key is IP-only; org quotas in post-auth presets |
+| 3 | Global rate limit trusts `X-Organization-Id` | **Done** | #160 | Global key is IP-only; organization quotas in post-auth presets |
 | 4 | `TRUST_PROXY` boolean / spoofable IP | **Done** | #168 | Hop-count parsing + hosted assertion |
 | 5 | Per-request RLS pins DB connection | **Done** | #174, #178, #182, *this PR* | `DATABASE_RLS_SCOPED_CONTEXTS` defaults `true`; k6 concurrency scenario; global guard forbids outbound I/O inside DB context callbacks |
 | 6 | Index migrations block writes pre-deploy | **Done** | #176 | Concurrent non-transactional migration lane |
@@ -51,7 +51,7 @@
 | 41 | OAuth signup orphan user | **Done** | #184 | Transactional find-or-create + link |
 | 42–43 | DLQ replay metadata | **Done** | #184 | Replay keys for webhook/stripe/notification |
 | 44–56 | Idempotency / auth escalation / RLS / queue | **Done** | #184 | See PR #184 description |
-| 57 | Removed org user can delete org uploads | **Done** | #186 | `upload:manage` gate on org-scoped get/confirm/delete |
+| 57 | Removed organization user can delete organization uploads | **Done** | #186 | `upload:manage` gate on organization-scoped get/confirm/delete |
 | 58 | Permission cache not invalidated on revoke | **Done** | pre-#186 | Already on `dev`; audit text was stale |
 | 59 | WebAuthn enumeration / MFA bypass | **Done** | #186 | CAPTCHA + normalized options errors; verify uses `completeFirstFactorAuth` (#184) |
 | 60 | Stripe same-second stale events | **Done** | #186 | Strict `<` on sync; cancel keeps `<=` tie-break |
@@ -82,7 +82,7 @@ Run before production traffic:
 - [ ] `TRUST_PROXY=1` (or correct hop count) on Railway
 - [ ] `CAPTCHA_PROVIDER=turnstile` + `CAPTCHA_SECRET` set (production boot fails otherwise)
 - [ ] `RESEND_API_KEY` set; forgot-password / magic-link / resend-verification return 503 when unset (not false success)
-- [ ] Removed org member cannot GET/confirm/DELETE org-scoped upload
+- [ ] Removed organization member cannot GET/confirm/DELETE organization-scoped upload
 - [ ] WebAuthn authenticate options returns indistinguishable 401 for unknown email / no passkeys
 - [ ] `POST /notify/notifications/mark-all-read` returns `{ updated_count }` only
 - [ ] `pnpm verify:base` green against staging stack

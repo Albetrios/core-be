@@ -1,0 +1,183 @@
+# RLS parity canary — nightly DB suites under the PRODUCTION role posture.
+#
+# Why this exists: the PR lanes run the DB suites against the CI service
+# container's superuser (`core`), which Postgres exempts from RLS entirely —
+# the exact masking that hid eight production bugs (silent audit-log loss,
+# broken account/org deletion, no-op retention) until local parity exposed
+# them in Aug 2026. This canary re-runs the DB-bound suites nightly with the
+# role taxonomy provisioned the way production runs: fixtures as
+# `core_be_operator` (BYPASSRLS, harness-only), maintenance contexts on a real
+# `core_be_maintenance` pool (RLS-SUBJECT), and the security suites'
+# `SET LOCAL ROLE core_be_app` exercising real policies. A regression in any
+# policy arm, WITH CHECK, RETURNING visibility, or plan shape that only bites
+# RLS-subject roles becomes a next-morning ci-failure issue instead of a
+# first-deployment surprise. Companion canaries: scheduled-main-canary.yml
+# (static slice), scheduled-chaos.yml (fault injection).
+name: RLS parity canary
+
+on:
+  schedule:
+    - cron: '45 1 * * *' # nightly 01:45 UTC — between the quality canary and the k6 run
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: ${{ vars.FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 || 'true' }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rls-parity-canary
+  cancel-in-progress: false
+
+jobs:
+  parity:
+    name: DB suites as RLS-subject roles
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17.10-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: core
+          POSTGRES_PASSWORD: core
+          POSTGRES_DB: core
+        options: >-
+          --health-cmd="pg_isready -U core -d core"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      redis:
+        image: redis:8.6.3-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      # Migrations run as the bootstrap superuser (fresh database, roles do not
+      # exist yet — same as a fresh clone locally).
+      DATABASE_MIGRATION_URL: postgresql://core:core@localhost:5432/core
+      # The harness pool: core_be_operator (owner-member + BYPASSRLS), matching
+      # the local parity model — fixtures and TRUNCATE work, while every context
+      # wrapper still arms real GUCs and the SET LOCAL ROLE suites drop to the
+      # RLS-subject core_be_app.
+      DATABASE_URL: postgresql://core_be_operator:parity-canary@localhost:5432/core
+      DATABASE_OPERATOR_URL: postgresql://core_be_operator:parity-canary@localhost:5432/core
+      # Maintenance contexts on the dedicated RLS-SUBJECT role — the posture the
+      # hosted runbook provisions.
+      DATABASE_MAINTENANCE_URL: postgresql://core_be_maintenance:parity-canary@localhost:5432/core
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Export shared CI test env (JWT keys + secrets-encryption + origins)
+        uses: ./.github/actions/test-env
+
+      - name: Run migrations (bootstrap superuser — creates the role taxonomy)
+        run: pnpm db:migrate
+
+      - name: Provision role logins (CI equivalent of the local parity provisioning)
+        # Passwords are throwaway job-local values for an ephemeral service
+        # container — not secrets. BYPASSRLS requires the superuser, exactly as
+        # the maintenance-database-role runbook documents for local provisioning.
+        env:
+          PGPASSWORD: core
+        run: |
+          set -euo pipefail
+          psql -h localhost -U core -d core <<'SQL'
+          ALTER ROLE core_be_operator LOGIN BYPASSRLS PASSWORD 'parity-canary';
+          ALTER ROLE core_be_maintenance LOGIN PASSWORD 'parity-canary';
+          ALTER ROLE core_be_app LOGIN PASSWORD 'parity-canary';
+          SQL
+
+      - name: unit-db (RLS-subject maintenance pool + operator fixtures)
+        run: pnpm vitest run --project unit-db
+
+      - name: e2e
+        run: pnpm test:e2e
+
+      - name: integration
+        run: pnpm test:integration
+
+      - name: security (SET LOCAL ROLE core_be_app suites)
+        run: pnpm test:security
+
+  resolve-success:
+    name: Close ci-failure issue
+    needs: [parity]
+    if: always() && needs.parity.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Close the open ci-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="RLS parity canary failing"
+          existing="$(gh issue list --repo "$GH_REPOSITORY" --state open --label ci-failure \
+            --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            echo "No open ci-failure issue to close."
+            exit 0
+          fi
+          gh issue close "$existing" --repo "$GH_REPOSITORY" \
+            --comment "RLS parity canary is green again — closing automatically. Run: ${WORKFLOW_URL}"
+          echo "Closed ci-failure issue #${existing}."
+
+  notify-failure:
+    name: Notify failure
+    needs: [parity]
+    if: always() && needs.parity.result == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update ci-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh label create ci-failure --repo "$GH_REPOSITORY" \
+            --color D93F0B --description "Automated post-merge/guard failure notification" \
+            2>/dev/null || true
+          title="RLS parity canary failing"
+          body="$(printf '%s\n' \
+            "Run: ${WORKFLOW_URL}" \
+            "" \
+            "The DB suites are red under the PRODUCTION role posture (operator fixtures +" \
+            "RLS-subject maintenance pool + SET LOCAL ROLE core_be_app) while the superuser" \
+            "PR lanes may still be green — this is the RLS-masking bug class." \
+            "" \
+            "Reproduce locally (parity is already provisioned per the" \
+            "maintenance-database-role runbook): run the DB suites normally — the local" \
+            "harness uses the same operator/maintenance roles." \
+            "Check first: NEW-row SELECT visibility, RETURNING visibility, missing" \
+            "WITH CHECK bypass arms, MATERIALIZED locking CTEs (the rls-tenant-isolation-guard" \
+            "skill checklist).")"
+          existing="$(gh issue list --repo "$GH_REPOSITORY" --state open --label ci-failure \
+            --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GH_REPOSITORY" --body "$body"
+            echo "Commented on existing ci-failure issue #${existing}."
+          else
+            gh issue create --repo "$GH_REPOSITORY" --title "$title" --label ci-failure --body "$body"
+          fi

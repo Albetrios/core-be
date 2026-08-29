@@ -106,7 +106,7 @@ describe('GET /api/v1/tenancy/organization/audit-logs — Integration', () => {
   });
 
   it('returns 403 for a member without the audit-log:read permission', async () => {
-    // The org read permission alone must not open the audit trail — a regression that widened the
+    // The organization read permission alone must not open the audit trail — a regression that widened the
     // preHandler to ORGANIZATION_READ would hand every member the tenant's full history.
     const { token } = await createContext([TENANCY_PERMISSIONS.ORGANIZATION_READ]);
     const response = await injectAuthenticated(app, {

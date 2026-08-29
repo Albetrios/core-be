@@ -1,22 +1,22 @@
 /**
  * k6 Scenario: Full natural multi-tenant user journey (reads + complete CRUD).
  *
- * Each VU = a DISTINCT pool user (12 orgs x 10 users) acting as an org admin, moving
+ * Each VU = a DISTINCT pool user (12 organizations x 10 users) acting as an organization admin, moving
  * through the product the way a real admin would in one session. Bodies are taken from
  * the passing e2e/integration tests, so writes succeed (no 400s).
  *
  * Resilience:
- *  - org-scoped token minted per VU (login -> switch-to-organization); any 401 re-auths + retries.
- *  - latency is recorded ONLY for 2xx responses, so the org-scoped write cap (100/min) or any
+ *  - organization-scoped token minted per VU (login -> switch-to-organization); any 401 re-auths + retries.
+ *  - latency is recorded ONLY for 2xx responses, so the organization-scoped write cap (100/min) or any
  *    error surfaces in the fail counter without polluting per-op latency.
- *  - think-time between phases keeps a single VU under the per-org write cap (natural pacing).
+ *  - think-time between phases keeps a single VU under the per-organization write cap (natural pacing).
  *
- * Coverage every iteration: profile + org reads, self-service updates, and full
+ * Coverage every iteration: profile + organization reads, self-service updates, and full
  *   create->read->update->delete lifecycles for roles, api-keys, notification-policies, webhooks.
- * Coverage once per VU (first iteration): the idempotent/heavy flows — create org,
+ * Coverage once per VU (first iteration): the idempotent/heavy flows — create organization,
  *   member invite chain (add member by email -> revoke invitation -> suspend -> remove), data-export.
  *
- * Excludes destructive/external: DELETE /users/me, org delete, Stripe, MFA/WebAuthn, logout.
+ * Excludes destructive/external: DELETE /users/me, organization delete, Stripe, MFA/WebAuthn, logout.
  *
  * Run:  VUS=1 DURATION=60s  k6 run comprehensive-journey.js   (1-user baseline)
  *       VUS=100 DURATION=90s k6 run comprehensive-journey.js  (load)
@@ -71,7 +71,7 @@ export const options = {
 };
 
 /**
- * Mint an org-scoped token for every pool user ONCE, before any VU runs. This avoids a
+ * Mint an organization-scoped token for every pool user ONCE, before any VU runs. This avoids a
  * login storm + per-IP login-rate-limit 429s when 100s of VUs would otherwise each log in
  * from the same IP. VUs index into the returned array by VU number.
  */
@@ -87,18 +87,18 @@ export function setup() {
         tags: { name: 'login' },
       },
     );
-    // Skip users whose org requires MFA (login returns mfa_required, no access_token) — that was
+    // Skip users whose organization requires MFA (login returns mfa_required, no access_token) — that was
     // the 25% failure source. Only token-bearing users ride.
     let t = lr.json('data.access_token');
     if (!t) {
       mfaSkipped += 1;
       continue;
     }
-    // Scope the token to the user's admin org (pool orgPublicId) so write ops are permitted.
-    if (c.orgPublicId) {
+    // Scope the token to the user's admin organization (pool organizationPublicId) so write ops are permitted.
+    if (c.organizationPublicId) {
       const sr = http.post(
         `${API}/auth/switch-to-organization`,
-        JSON.stringify({ organization_id: c.orgPublicId }),
+        JSON.stringify({ organization_id: c.organizationPublicId }),
         {
           headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
           tags: { name: 'switch-org' },
@@ -106,13 +106,13 @@ export function setup() {
       );
       const st = sr.json('data.access_token');
       if (!st) {
-        // switch failed -> not a scoped admin of this org; skip so write ops never 403.
+        // switch failed -> not a scoped admin of this organization; skip so write ops never 403.
         mfaSkipped += 1;
         continue;
       }
       t = st;
     }
-    // Warm this user's org permission cache so the measured load doesn't hit a cold-start recompute
+    // Warm this user's organization permission cache so the measured load doesn't hit a cold-start recompute
     // herd (which yields transient 403 insufficientOrganizationPermissions at high VU ramps).
     http.get(`${API}/tenancy/organization/memberships`, {
       headers: { Authorization: `Bearer ${t}` },
@@ -122,7 +122,7 @@ export function setup() {
       token: t,
       email: c.email,
       password: c.password,
-      orgPublicId: c.orgPublicId,
+      organizationPublicId: c.organizationPublicId,
       userPublicId: c.userPublicId,
     });
   }
@@ -146,7 +146,7 @@ const OP_NAMES = [
   'auth-mfa',
   'list-orgs',
   'get-org',
-  'get-org-settings',
+  'get-organization-settings',
   'list-members',
   'list-roles',
   'list-api-keys',
@@ -175,7 +175,7 @@ const OP_NAMES = [
   'get-webhook',
   'patch-webhook',
   'delete-webhook',
-  'patch-org-settings',
+  'patch-organization-settings',
   'mark-all-read',
   'create-org',
   'data-export',
@@ -252,10 +252,10 @@ function doLogin() {
   );
   record('login', lr);
   let t = lr.json('data.access_token');
-  if (t && cred.orgPublicId) {
+  if (t && cred.organizationPublicId) {
     const sr = http.post(
       `${API}/auth/switch-to-organization`,
-      JSON.stringify({ organization_id: cred.orgPublicId }),
+      JSON.stringify({ organization_id: cred.organizationPublicId }),
       {
         headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
         tags: { name: 'switch-org' },
@@ -303,7 +303,7 @@ function phaseProfile() {
 function phaseExplore() {
   req('list-orgs', 'GET', '/tenancy/organizations');
   req('get-org', 'GET', '/tenancy/organization');
-  req('get-org-settings', 'GET', '/tenancy/organization/settings');
+  req('get-organization-settings', 'GET', '/tenancy/organization/settings');
   req('list-members', 'GET', '/tenancy/organization/memberships');
   req('list-roles', 'GET', '/tenancy/organization/roles');
   req('list-api-keys', 'GET', '/tenancy/organization/api-keys');
@@ -421,7 +421,7 @@ function phaseWebhook(uniq) {
 }
 
 function phaseOrgAdminMisc() {
-  req('patch-org-settings', 'PATCH', '/tenancy/organization/settings', {
+  req('patch-organization-settings', 'PATCH', '/tenancy/organization/settings', {
     is_email_notifications_enabled: true,
     default_locale: 'en',
   });
@@ -451,10 +451,10 @@ function phaseRareOnce(uniq) {
   const upId = up.json('data.id');
   if (upId) req('delete-upload', 'DELETE', `/uploads/${upId}`);
 
-  // NOTE: create-org is intentionally excluded — it has a per-owner cap (MAX_TEAM_ORGANIZATIONS_PER_OWNER)
-  // and no delete here (org-delete is destructive), so it accumulates unboundedly and isn't a hot path.
+  // NOTE: create-organization is intentionally excluded — it has a per-owner cap (MAX_TEAM_ORGANIZATIONS_PER_OWNER)
+  // and no delete here (organization-delete is destructive), so it accumulates unboundedly and isn't a hot path.
 
-  // member invite chain: invite a user from ANOTHER org into this org, then tear it down.
+  // member invite chain: invite a user from ANOTHER organization into this organization, then tear it down.
   const invitee = pool[(__VU - 1 + 60) % pool.length];
   const roleForMember = req(
     'create-role',
@@ -506,7 +506,7 @@ export default function (tokenPool) {
       ? {
           email: e.email,
           password: e.password,
-          orgPublicId: e.orgPublicId,
+          organizationPublicId: e.organizationPublicId,
           userPublicId: e.userPublicId,
         }
       : null;
@@ -516,7 +516,7 @@ export default function (tokenPool) {
   phaseProfile();
   phaseExplore();
   // Writes are occasional (a real session is mostly reads). WRITE_EVERY=1 -> every iteration (heavy);
-  // higher -> realistic read-dominant load that doesn't churn the org permission cache.
+  // higher -> realistic read-dominant load that doesn't churn the organization permission cache.
   if (__ITER % WRITE_EVERY === 0) {
     phaseSelfService(uniq);
     phaseRole(uniq);
@@ -525,7 +525,7 @@ export default function (tokenPool) {
     phaseWebhook(uniq);
     phaseOrgAdminMisc();
   }
-  // Heavy member-invite flow: cross-org membership changes churn invitees' permission caches, so it
+  // Heavy member-invite flow: cross-organization membership changes churn invitees' permission caches, so it
   // is OFF by default for capacity runs (RARE=true to include it; a fraction of VUs, once).
   if (__ENV.RARE === 'true' && __ITER === 0 && __VU % 8 === 0) phaseRareOnce(uniq);
 }

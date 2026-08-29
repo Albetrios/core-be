@@ -3,22 +3,43 @@ import { NotFoundError, ValidationError } from '@/shared/errors/index.js';
 import { UserNotificationPreferencesService } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.service.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { UserNotificationPreferencesRepository } from '@/domains/user/sub-domains/user-notification-preferences/user-notification-preferences.repository.js';
+import {
+  PRINCIPAL_SCOPE,
+  type UserPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn((_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getOrganizationRequestDatabaseSession: vi.fn().mockReturnValue(undefined),
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getOrganizationRequestDatabaseSession: vi.fn().mockReturnValue(undefined),
+    };
+  },
+);
 
 vi.mock('@/infrastructure/database/transaction.js', () => ({
   withAtomicWrite: vi.fn((_callback: (databaseHandle: unknown) => Promise<unknown>) =>
     _callback({}),
   ),
 }));
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 const user = { id: 1, public_id: 'user_public', email: 'user@example.com' };
 const preferenceRow = {
@@ -28,6 +49,12 @@ const preferenceRow = {
   organization_id: null,
   is_enabled: true,
 };
+
+const asUserScope = (userPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    userPublicId,
+    organizationPublicId: 'org_scope_test',
+  }) as UserPrincipalDatabaseScope;
 
 describe('UserNotificationPreferencesService', () => {
   const userService = {
@@ -49,20 +76,20 @@ describe('UserNotificationPreferencesService', () => {
   });
 
   it('get returns preferences for user', async () => {
-    const result = await service.get('user_public');
+    const result = await service.get(asUserScope('user_public'));
     expect(result).toHaveLength(1);
     expect(result[0]?.notification_type).toBe('subscription.updated');
   });
 
   it('get throws when user missing', async () => {
     vi.mocked(userService.findUserRecordByPublicId).mockResolvedValue(null);
-    await expect(service.get('missing')).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.get(asUserScope('missing'))).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('put throws when user missing', async () => {
     vi.mocked(userService.findUserRecordByPublicId).mockResolvedValue(null);
     await expect(
-      service.put('missing', {
+      service.put(asUserScope('missing'), {
         preferences: [
           { notification_type: 'subscription.updated', channel: 'EMAIL', is_enabled: true },
         ],
@@ -72,10 +99,10 @@ describe('UserNotificationPreferencesService', () => {
 
   it('put rejects organization-scoped preferences (org_id is unsettable on this user-scoped endpoint)', async () => {
     // This user-scoped endpoint has no tenant context, so a non-null organization_id can never
-    // satisfy the org RLS branch (would surface as 42501 -> 500). It must be rejected with a 400
+    // satisfy the organization RLS branch (would surface as 42501 -> 500). It must be rejected with a 400
     // before reaching the repository.
     await expect(
-      service.put('user_public', {
+      service.put(asUserScope('user_public'), {
         preferences: [
           {
             notification_type: 'subscription.updated',
@@ -91,7 +118,7 @@ describe('UserNotificationPreferencesService', () => {
   });
 
   it('put persists user-wide preferences when organization_id is omitted', async () => {
-    await service.put('user_public', {
+    await service.put(asUserScope('user_public'), {
       preferences: [
         { notification_type: 'subscription.updated', channel: 'EMAIL', is_enabled: true },
       ],
@@ -113,7 +140,7 @@ describe('UserNotificationPreferencesService', () => {
 
   it('put returns empty list when replaceAll returns no rows', async () => {
     vi.mocked(preferencesRepository.replaceAll).mockResolvedValue([]);
-    const result = await service.put('user_public', {
+    const result = await service.put(asUserScope('user_public'), {
       preferences: [
         { notification_type: 'subscription.updated', channel: 'EMAIL', is_enabled: false },
       ],
@@ -122,7 +149,7 @@ describe('UserNotificationPreferencesService', () => {
   });
 
   it('put replaces preferences for user', async () => {
-    const result = await service.put('user_public', {
+    const result = await service.put(asUserScope('user_public'), {
       preferences: [
         {
           notification_type: 'subscription.updated',

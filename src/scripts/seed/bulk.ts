@@ -6,6 +6,7 @@
  * Usage: `pnpm db:seed:bulk` · `BULK_PROFILE=load SCALE=5 pnpm db:seed:bulk`
  */
 import '@/shared/config/load-env-files.js';
+import '@/scripts/seed/seed-runtime-url.js';
 import { fileURLToPath } from 'node:url';
 import { faker } from '@faker-js/faker';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';

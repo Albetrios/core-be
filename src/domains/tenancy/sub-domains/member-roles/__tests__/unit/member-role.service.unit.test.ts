@@ -1,14 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    async (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
-
 vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', () => ({
   invalidateOrganizationPermissions: vi.fn().mockResolvedValue(undefined),
 }));
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 import {
   ConflictError,
@@ -24,6 +34,10 @@ import type { MemberRolePermissionRepository } from '@/domains/tenancy/sub-domai
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permission/permission.repository.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const organization = { id: 1, public_id: generatePublicId('memberRole') };
 const roleRow = {
@@ -36,6 +50,11 @@ const roleRow = {
   created_at: new Date(),
   updated_at: new Date(),
 };
+
+const asScope = (organizationPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    organizationPublicId,
+  }) as OrganizationPrincipalDatabaseScope;
 
 describe('MemberRoleService', () => {
   const organizationService = {
@@ -51,9 +70,9 @@ describe('MemberRoleService', () => {
     findByInternalId: vi.fn().mockResolvedValue(roleRow),
     // sec-r5-followup-ratelimit-dos-2: create() now consults this guard
     // before insert. Default to 0 so the lifecycle tests still reach create;
-    // the cap regression lives in `per-org-row-caps.unit.test.ts`.
+    // the cap regression lives in `per-organization-row-caps.unit.test.ts`.
     countActiveByOrganization: vi.fn().mockResolvedValue(0),
-    // audit-#8: per-org creation quota advisory lock (no-op in unit tests).
+    // audit-#8: per-organization creation quota advisory lock (no-op in unit tests).
     acquireCreationQuotaLock: vi.fn().mockResolvedValue(undefined),
     create: vi.fn().mockResolvedValue(roleRow),
     update: vi.fn().mockResolvedValue(roleRow),
@@ -99,7 +118,7 @@ describe('MemberRoleService', () => {
   });
 
   it('list returns roles', async () => {
-    const result = await service.list(organization.public_id, { limit: 20, order: 'asc' });
+    const result = await service.list(asScope(organization.public_id), { limit: 20, order: 'asc' });
     expect(result.items).toHaveLength(1);
   });
 
@@ -107,7 +126,7 @@ describe('MemberRoleService', () => {
     vi.mocked(memberRoleRepository.countMembersByRoleForOrganization).mockResolvedValue(
       new Map([[roleRow.id, 4]]),
     );
-    const result = await service.list(organization.public_id, { limit: 20, order: 'asc' });
+    const result = await service.list(asScope(organization.public_id), { limit: 20, order: 'asc' });
     expect(result.items[0]).toMatchObject({ id: roleRow.public_id, member_count: 4 });
     // One grouped query for the whole page — never the per-role count.
     expect(memberRoleRepository.countMembersByRoleForOrganization).toHaveBeenCalledTimes(1);
@@ -116,19 +135,19 @@ describe('MemberRoleService', () => {
 
   it('list defaults member_count to 0 for a role absent from the aggregate', async () => {
     vi.mocked(memberRoleRepository.countMembersByRoleForOrganization).mockResolvedValue(new Map());
-    const result = await service.list(organization.public_id, { limit: 20, order: 'asc' });
+    const result = await service.list(asScope(organization.public_id), { limit: 20, order: 'asc' });
     expect(result.items[0]!.member_count).toBe(0);
   });
 
   it('getByPublicId includes member_count from the single-role count', async () => {
     vi.mocked(memberRoleRepository.countMembersForRole).mockResolvedValue(2);
-    const result = await service.getByPublicId(organization.public_id, roleRow.public_id);
+    const result = await service.getByPublicId(asScope(organization.public_id), roleRow.public_id);
     expect(result).toMatchObject({ id: roleRow.public_id, member_count: 2 });
   });
 
   it('create returns member_count 0 for the brand-new role without an aggregate query', async () => {
     const result = await service.create(
-      organization.public_id,
+      asScope(organization.public_id),
       { name: 'Editor' },
       'creator_public',
     );
@@ -140,7 +159,7 @@ describe('MemberRoleService', () => {
   it('update returns the refreshed member_count for the updated role', async () => {
     vi.mocked(memberRoleRepository.countMembersForRole).mockResolvedValue(5);
     const result = await service.update(
-      organization.public_id,
+      asScope(organization.public_id),
       roleRow.public_id,
       { name: 'Updated' },
       'updater_public',
@@ -149,7 +168,7 @@ describe('MemberRoleService', () => {
   });
 
   it('getByPublicId returns role', async () => {
-    const result = await service.getByPublicId(organization.public_id, roleRow.public_id);
+    const result = await service.getByPublicId(asScope(organization.public_id), roleRow.public_id);
     expect(result.id).toBe(roleRow.public_id);
   });
 
@@ -158,13 +177,13 @@ describe('MemberRoleService', () => {
       new NotFoundError('Organization'),
     );
     await expect(
-      service.create(organization.public_id, { name: 'Editor' }, 'creator_public'),
+      service.create(asScope(organization.public_id), { name: 'Editor' }, 'creator_public'),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('create adds role', async () => {
     await service.create(
-      organization.public_id,
+      asScope(organization.public_id),
       { name: 'Editor', description: 'Can edit' },
       'creator_public',
     );
@@ -177,13 +196,13 @@ describe('MemberRoleService', () => {
       type: 'PERSONAL',
     } as never);
     await expect(
-      service.create(organization.public_id, { name: 'Editor' }, 'creator_public'),
+      service.create(asScope(organization.public_id), { name: 'Editor' }, 'creator_public'),
     ).rejects.toMatchObject({ messageKey: 'errors:personalOrganizationNoRoles' });
     expect(memberRoleRepository.create).not.toHaveBeenCalled();
   });
 
   it('create omits optional description and is_system defaults', async () => {
-    await service.create(organization.public_id, { name: 'Minimal' }, 'creator_public');
+    await service.create(asScope(organization.public_id), { name: 'Minimal' }, 'creator_public');
     expect(memberRoleRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Minimal' }),
     );
@@ -198,7 +217,7 @@ describe('MemberRoleService', () => {
     ).mockResolvedValue(['organization:read']);
 
     await service.create(
-      organization.public_id,
+      asScope(organization.public_id),
       { name: 'Editor', permission_codes: ['organization:read'] },
       'creator_public',
     );
@@ -222,7 +241,7 @@ describe('MemberRoleService', () => {
 
     await expect(
       service.create(
-        organization.public_id,
+        asScope(organization.public_id),
         { name: 'Escalate', permission_codes: ['subscription:manage'] },
         'creator_public',
       ),
@@ -274,23 +293,28 @@ describe('MemberRoleService', () => {
 
   it('update and delete mutate role', async () => {
     await service.update(
-      organization.public_id,
+      asScope(organization.public_id),
       roleRow.public_id,
       { name: 'Updated' },
       'updater_public',
     );
-    await service.delete(organization.public_id, roleRow.public_id);
+    await service.delete(asScope(organization.public_id), roleRow.public_id);
     expect(memberRoleRepository.update).toHaveBeenCalled();
     expect(memberRoleRepository.softDeleteIfNoActiveMembers).toHaveBeenCalled();
   });
 
   it('delete invalidates the entire organization permission namespace', async () => {
-    await service.delete(organization.public_id, roleRow.public_id);
+    await service.delete(asScope(organization.public_id), roleRow.public_id);
     expect(invalidateOrganizationPermissions).toHaveBeenCalledWith(organization.public_id);
   });
 
   it('update does not invalidate the permission cache (no permission change)', async () => {
-    await service.update(organization.public_id, roleRow.public_id, { name: 'X' }, 'updater');
+    await service.update(
+      asScope(organization.public_id),
+      roleRow.public_id,
+      { name: 'X' },
+      'updater',
+    );
     expect(invalidateOrganizationPermissions).not.toHaveBeenCalled();
   });
 
@@ -306,20 +330,25 @@ describe('MemberRoleService', () => {
       new NotFoundError('Organization'),
     );
     await expect(
-      service.list(organization.public_id, { limit: 20, order: 'asc' }),
+      service.list(asScope(organization.public_id), { limit: 20, order: 'asc' }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('getByPublicId throws when role is missing', async () => {
     vi.mocked(memberRoleRepository.findByPublicId).mockResolvedValue(null);
     await expect(
-      service.getByPublicId(organization.public_id, roleRow.public_id),
+      service.getByPublicId(asScope(organization.public_id), roleRow.public_id),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('update passes null updater when user id cannot be resolved', async () => {
     vi.mocked(organizationService.resolveUserInternalIdByPublicId).mockResolvedValue(null);
-    await service.update(organization.public_id, roleRow.public_id, { name: 'X' }, 'missing');
+    await service.update(
+      asScope(organization.public_id),
+      roleRow.public_id,
+      { name: 'X' },
+      'missing',
+    );
     expect(memberRoleRepository.update).toHaveBeenCalledWith(
       roleRow.public_id,
       organization.id,
@@ -331,7 +360,7 @@ describe('MemberRoleService', () => {
   it('update throws when repository returns null', async () => {
     vi.mocked(memberRoleRepository.update).mockResolvedValue(null);
     await expect(
-      service.update(organization.public_id, roleRow.public_id, { name: 'X' }, 'updater'),
+      service.update(asScope(organization.public_id), roleRow.public_id, { name: 'X' }, 'updater'),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -339,9 +368,9 @@ describe('MemberRoleService', () => {
     // route-audit C2: softDeleteIfNoActiveMembers returns null when active members remain (or a
     // concurrent delete), which the service surfaces as the actionable roleHasActiveMembers conflict.
     vi.mocked(memberRoleRepository.softDeleteIfNoActiveMembers).mockResolvedValue(null);
-    await expect(service.delete(organization.public_id, roleRow.public_id)).rejects.toBeInstanceOf(
-      ConflictError,
-    );
+    await expect(
+      service.delete(asScope(organization.public_id), roleRow.public_id),
+    ).rejects.toBeInstanceOf(ConflictError);
   });
 
   it('create rejects `is_system` from the client body (sec-T3: server-only flag)', async () => {
@@ -349,7 +378,7 @@ describe('MemberRoleService', () => {
     // get a ValidationError before the repository is touched.
     await expect(
       service.create(
-        organization.public_id,
+        asScope(organization.public_id),
         { name: 'System', description: null, is_system: true },
         'missing_creator',
       ),
@@ -360,7 +389,7 @@ describe('MemberRoleService', () => {
   it('create persists with null created_by_user_id when the creator id cannot be resolved', async () => {
     vi.mocked(organizationService.resolveUserInternalIdByPublicId).mockResolvedValue(null);
     await service.create(
-      organization.public_id,
+      asScope(organization.public_id),
       { name: 'Custom', description: null },
       'missing_creator',
     );
@@ -377,7 +406,7 @@ describe('MemberRoleService', () => {
       new NotFoundError('Organization'),
     );
     await expect(
-      service.getByPublicId(organization.public_id, roleRow.public_id),
+      service.getByPublicId(asScope(organization.public_id), roleRow.public_id),
     ).rejects.toBeInstanceOf(NotFoundError);
     await expect(
       service.requireRoleRecordByPublicId(organization.public_id, roleRow.public_id),
@@ -387,7 +416,7 @@ describe('MemberRoleService', () => {
   it('update throws when role is missing', async () => {
     vi.mocked(memberRoleRepository.findByPublicId).mockResolvedValue(null);
     await expect(
-      service.update(organization.public_id, roleRow.public_id, { name: 'X' }, 'updater'),
+      service.update(asScope(organization.public_id), roleRow.public_id, { name: 'X' }, 'updater'),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -395,8 +424,8 @@ describe('MemberRoleService', () => {
     vi.mocked(organizationService.requireOrganizationRecordByPublicId).mockRejectedValue(
       new NotFoundError('Organization'),
     );
-    await expect(service.delete(organization.public_id, roleRow.public_id)).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(
+      service.delete(asScope(organization.public_id), roleRow.public_id),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

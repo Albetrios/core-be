@@ -1,4 +1,3 @@
-import { withSystemTableWorkerContext } from '@/infrastructure/database/contexts/worker-database.context.js';
 import { enqueueStripeWebhookByEventIdForReclaim } from '@/domains/billing/sub-domains/stripe-webhook/queues/stripe-webhook.queue.js';
 import { StripeWebhookEventRepository } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook-event.repository.js';
 import {
@@ -8,6 +7,10 @@ import {
 import { env } from '@/shared/config/env.config.js';
 import { MILLISECONDS_PER_MINUTE } from '@/shared/constants/index.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
+import {
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 const CATCHUP_REQUEST_ID = 'stripe-webhook-event-catchup';
 
@@ -76,8 +79,9 @@ export async function runStripeWebhookEventCatchupJob(
     return { scannedCount: 0, missingCount: 0, enqueuedCount: 0 };
   }
 
-  const existingEventIds = await withSystemTableWorkerContext(() =>
-    repository.findExistingStripeEventIds(stripeEventIds),
+  const existingEventIds = await withMaintenanceDatabaseContext(
+    MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER,
+    () => repository.findExistingStripeEventIds(stripeEventIds),
   );
   const missingEventIds = stripeEventIds.filter((eventId) => !existingEventIds.has(eventId));
 

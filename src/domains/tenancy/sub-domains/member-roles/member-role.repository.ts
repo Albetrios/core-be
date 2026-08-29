@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.schema.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { BaseRepository } from '@/infrastructure/database/base-repository.js';
@@ -31,7 +31,7 @@ interface MemberRoleListPagination {
  * ACTIVE + INVITED mirrors the organization seat count
  * ({@link MembershipRepository.countActiveByOrganization}) and the set the
  * members list surfaces per role, so the Roles panel's per-role count reconciles
- * with the Members list. SUSPENDED memberships are a per-org ban and are
+ * with the Members list. SUSPENDED memberships are a per-organization ban and are
  * excluded (a suspended seat is not in use). This constant is the single lever
  * for the counted-status policy — change it here to change every `member_count`.
  */
@@ -61,7 +61,7 @@ export class MemberRoleRepository extends BaseRepository {
   }
 
   /**
-   * audit-#8: transaction-scoped advisory lock serializing the per-org custom-role creation quota
+   * audit-#8: transaction-scoped advisory lock serializing the per-organization custom-role creation quota
    * check + insert so concurrent creates cannot both pass the count and overshoot
    * `MEMBER_ROLE_MAX_PER_ORG`. Call inside the create transaction before
    * {@link countActiveByOrganization}.
@@ -108,10 +108,10 @@ export class MemberRoleRepository extends BaseRepository {
    *   {@link MEMBER_COUNT_STATUSES} (ACTIVE + INVITED) and `deleted_at IS NULL`.
    *   Returns a `Map` keyed by internal `role_id`; roles with no counted members
    *   are simply absent, so callers default to 0. One grouped scan bounded by the
-   *   per-org member cap — this is what keeps the roles-list `member_count`
+   *   per-organization member cap — this is what keeps the roles-list `member_count`
    *   projection free of an N+1 (never call {@link countMembersForRole} per row).
-   * - **Failure modes:** none beyond the underlying query; runs under the org RLS
-   *   context (`memberships` is org-scoped), so the org predicate is belt-and-suspenders.
+   * - **Failure modes:** none beyond the underlying query; runs under the organization RLS
+   *   context (`memberships` is organization-scoped), so the organization predicate is belt-and-suspenders.
    * - **Side effects:** none (read-only).
    */
   async countMembersByRoleForOrganization(organization_id: number): Promise<Map<number, number>> {
@@ -135,7 +135,7 @@ export class MemberRoleRepository extends BaseRepository {
    * @remarks
    * Same status filter as {@link countMembersByRoleForOrganization} (ACTIVE +
    * INVITED, not soft-deleted) — used by the single-role get / update paths where
-   * grouping the whole org would be wasteful. Distinct from
+   * grouping the whole organization would be wasteful. Distinct from
    * {@link MembershipRepository.countActiveByRoleId}, which counts EVERY
    * non-deleted membership (including SUSPENDED) for the delete guard's
    * "any member blocks delete" semantics.

@@ -24,7 +24,7 @@ describe('enqueueSubscriptionSeatSync', () => {
     addMock.mockClear();
   });
 
-  // sec-review: a STABLE per-org jobId (`seat-sync-${org}`) is silently no-op'd by BullMQ while a
+  // sec-review: a STABLE per-organization jobId (`seat-sync-${organization}`) is silently no-op'd by BullMQ while a
   // prior job with that id is still RETAINED (completed OR failed) — the exact duplicate-jobId trap
   // the Stripe webhook reclaim path documents as sec-re-02. That would leave Stripe billing a stale
   // seat count until the retained job aged out (up to 7 days). Each enqueue must get a UNIQUE jobId so
@@ -41,7 +41,7 @@ describe('enqueueSubscriptionSeatSync', () => {
     expect(firstJobId).not.toBe(secondJobId);
   });
 
-  it('carries the org id and idempotency token in the job data', async () => {
+  it('carries the organization id and idempotency token in the job data', async () => {
     await enqueueSubscriptionSeatSync({
       organizationPublicId: 'org_xyz',
       idempotencyKey: 'sub-seat-sync:org_xyz:client-1',

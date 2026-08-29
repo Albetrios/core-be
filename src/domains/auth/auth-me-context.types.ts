@@ -12,7 +12,7 @@ export interface AuthMeContextData {
   organizations: OrganizationOutput[];
 }
 
-/** An organization in the switcher list: the public org shape plus whether it is the caller's active org. */
+/** An organization in the switcher list: the public organization shape plus whether it is the caller's active organization. */
 export interface AuthMeContextOrganization extends OrganizationOutput {
   is_active: boolean;
 }
@@ -21,12 +21,12 @@ export interface AuthMeContextOrganization extends OrganizationOutput {
 export interface AuthMeContextOutput {
   /** The authenticated caller's own profile (same shape as `GET /users/me`). */
   user: UserOutput;
-  /** The active organization (with type-derived `capabilities`), or `null` when no org is in scope. */
+  /** The active organization (with type-derived `capabilities`), or `null` when no organization is in scope. */
   active_organization: OrganizationOutput | null;
   /** Permission codes the caller holds in the active organization (e.g. `["organization:read", …]`). */
   my_permissions: string[];
   /** The caller's platform-wide role, or `null` for a standard user. */
   global_role: GlobalRole | null;
-  /** Organizations the caller belongs to (org-switcher source); each flagged `is_active`. */
+  /** Organizations the caller belongs to (organization-switcher source); each flagged `is_active`. */
   organizations: AuthMeContextOrganization[];
 }

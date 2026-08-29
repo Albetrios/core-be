@@ -3,8 +3,8 @@ import { paginatedResponse, successResponse } from '@/shared/utils/http/response
 import {
   getActingUserPublicId,
   getRequestIdentifier,
+  requireOrganizationScope,
   requirePrincipal,
-  resolveActiveOrganizationId,
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
 import { validateListMemberRolesQuery } from './member-role.validator.js';
@@ -23,9 +23,10 @@ import type { MemberRoleService } from './member-role.service.js';
 export function createMemberRoleController(service: MemberRoleService) {
   return {
     listRoles: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
       const pagination = validateListMemberRolesQuery(request.query);
-      const result = await service.list(organizationId, pagination);
+      const result = await service.list(scope, pagination);
       return paginatedResponse(result.items, getRequestIdentifier(request), {
         per_page: result.limit,
         next: result.next_cursor,
@@ -38,15 +39,17 @@ export function createMemberRoleController(service: MemberRoleService) {
         role_id: string;
       }) ?? { role_id: '' };
       // sec-new-T3: reject malformed path params before reaching the service layer.
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const _organizationId = scope.organizationPublicId;
       const roleId = validatePublicIdParam(rawRoleId ?? '', 'role_id');
-      const data = await service.getByPublicId(organizationId, roleId);
+      const data = await service.getByPublicId(scope, roleId);
       return successResponse(data, getRequestIdentifier(request));
     },
     createRole: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requirePrincipal(request);
-      const organizationId = resolveActiveOrganizationId(request);
-      const data = await service.create(organizationId, request.body, getActingUserPublicId(auth));
+      const scope = requireOrganizationScope(request);
+      const organizationId = scope.organizationPublicId;
+      const data = await service.create(scope, request.body, getActingUserPublicId(auth));
       await recordScopedAuditEvent(request, {
         ...buildAuditActorFields(auth),
         action: 'tenancy.role.create',
@@ -62,14 +65,10 @@ export function createMemberRoleController(service: MemberRoleService) {
         role_id: string;
       }) ?? { role_id: '' };
       // sec-new-T3: reject malformed path params before reaching the service layer.
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const organizationId = scope.organizationPublicId;
       const roleId = validatePublicIdParam(rawUpdateRoleId ?? '', 'role_id');
-      const data = await service.update(
-        organizationId,
-        roleId,
-        request.body,
-        getActingUserPublicId(auth),
-      );
+      const data = await service.update(scope, roleId, request.body, getActingUserPublicId(auth));
       await recordScopedAuditEvent(request, {
         ...buildAuditActorFields(auth),
         action: 'tenancy.role.update',
@@ -85,9 +84,10 @@ export function createMemberRoleController(service: MemberRoleService) {
         role_id: string;
       }) ?? { role_id: '' };
       // sec-new-T3: reject malformed path params before reaching the service layer.
-      const organizationId = resolveActiveOrganizationId(request);
+      const scope = requireOrganizationScope(request);
+      const organizationId = scope.organizationPublicId;
       const roleId = validatePublicIdParam(rawDeleteRoleId ?? '', 'role_id');
-      await service.delete(organizationId, roleId);
+      await service.delete(scope, roleId);
       await recordScopedAuditEvent(request, {
         ...buildAuditActorFields(auth),
         action: 'tenancy.role.delete',

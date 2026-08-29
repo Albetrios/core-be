@@ -27,7 +27,7 @@ export function validateCreateUpload(data: unknown): CreateUploadInput {
   const config = UPLOAD_PURPOSE_CONFIG[input.purpose];
   const allowedTypes = getAllowedContentTypesForPurpose(input.purpose);
 
-  // route-audit L3: the purpose must match its required target BEFORE the org-id checks and key
+  // route-audit L3: the purpose must match its required target BEFORE the organization-id checks and key
   // construction — otherwise e.g. { purpose: organization-logo, for: user } builds an
   // `organization-logos/undefined/...` key on a user-scoped row (namespace pollution + erodes the
   // "key prefix encodes scope" invariant the attach binding relies on).

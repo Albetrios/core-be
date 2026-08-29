@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { user_settings } from '@/domains/user/sub-domains/user-settings/user-settings.schema.js';
 
 /**

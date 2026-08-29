@@ -152,7 +152,7 @@ describe('UploadService — assertKeyConfirmed / assertKeyConfirmedForOwner', ()
       ).rejects.toBeInstanceOf(ValidationError);
     });
 
-    // An org-scoped row still carries its uploader's `user_id`, so this also proves the
+    // An organization-scoped row still carries its uploader's `user_id`, so this also proves the
     // organization check is independent of the user check rather than a fallback for it.
     it('throws when organization_id does not match the requesting organization', async () => {
       findByFileKey.mockResolvedValue(uploadRow({ organization_id: ORGANIZATION_INTERNAL_ID + 1 }));

@@ -3,7 +3,7 @@
 # Why this exists: the main ruleset intentionally has `strict up-to-date` OFF, so
 # two individually-green PRs can merge into a combined tree that no gate ever
 # tested (post-merge-ci's FAST lane deliberately skips re-testing single-PR
-# pushes). That is exactly how `validate:route-org-scope` went red on main in
+# pushes). That is exactly how `validate:route-organization-scope` went red on main in
 # July 2026 without any PR failing. This canary re-runs the full static quality
 # slice on the merged trunk every night and raises a ci-failure issue on red —
 # a broken main becomes a next-morning notification instead of a surprise weeks

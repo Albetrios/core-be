@@ -43,7 +43,7 @@ Every documented contract is **CI-enforced** by an existing test/constant, and t
 | Public ids (`<prefix>_<21>`, external `id`) | api-contract-guard | `src/shared/utils/identity/public-id.util.ts` (`generatePublicId`, `PUBLIC_ID_PREFIXES`) | ✓ |
 | snake_case body keys | api-contract | `src/tests/unit/api/snake-case-body-keys.policy.unit.test.ts` | ✓ |
 | Method→status policy | CLAUDE.md | middleware + `tooling/openapi/route-catalog/route-success-statuses.json` | ✓ |
-| RLS ENABLE+FORCE + org GUC | rls-tenant-isolation-guard | `FORCE ROW LEVEL SECURITY` across 8 migrations (incl. `00000000000000_init.sql`); worker RLS security tests | ✓ |
+| RLS ENABLE+FORCE + organization GUC | rls-tenant-isolation-guard | `FORCE ROW LEVEL SECURITY` across 8 migrations (incl. `00000000000000_init.sql`); worker RLS security tests | ✓ |
 | Worker DB isolation (no `getRequestDatabase` in workers) | CLAUDE.md | `src/tests/unit/infrastructure/database/worker-database-guard.unit.test.ts`, `webhook-worker-no-schema-import.policy.unit.test.ts` | ✓ |
 | Import paths (`@/`, `@tooling/`, no `../`) | import-paths.mdc | `src/tests/global/import-paths.global.test.ts` | ✓ |
 | Idempotency (8 required writes) | idempotency-guard | `src/shared/utils/idempotency/idempotency-required.util.ts` + unit/security tests; declared in subscription/organization/membership routes | ✓ |

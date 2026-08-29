@@ -1,12 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ForbiddenError, NotFoundError } from '@/shared/errors/index.js';
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    async (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
-
 vi.mock('@/domains/tenancy/sub-domains/permission/permission-cache.service.js', () => ({
   invalidateOrganizationPermissions: vi.fn().mockResolvedValue(undefined),
 }));
@@ -15,12 +9,32 @@ vi.mock('@/domains/tenancy/sub-domains/permission/assert-grantable-permissions.u
   assertCallerCanGrantPermissionCodes: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
 import { MemberRolePermissionService } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.service.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { MemberRoleRepository } from '@/domains/tenancy/sub-domains/member-roles/member-role.repository.js';
 import type { MemberRolePermissionRepository } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.repository.js';
 import type { MembershipRepository } from '@/domains/tenancy/sub-domains/membership/membership.repository.js';
 import { invalidateOrganizationPermissions } from '@/domains/tenancy/sub-domains/permission/permission-cache.service.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 
 /**
  * Regression for sec-T2 (High): a holder of `ROLE_MANAGE` must NOT be able to wipe (or modify)
@@ -32,6 +46,11 @@ import { invalidateOrganizationPermissions } from '@/domains/tenancy/sub-domains
  * resolve `organization.owner_user_id` → owner's active membership → owner's role; if it
  * matches the target role, refuse with 403.
  */
+const asScope = (organizationPublicId: string) =>
+  PRINCIPAL_SCOPE.REQUEST({
+    organizationPublicId,
+  }) as OrganizationPrincipalDatabaseScope;
+
 describe('MemberRolePermissionService.put — owner-role protection (sec-T2)', () => {
   const ownerRole = { id: 7, public_id: 'role_owner', name: 'Admin' };
   const nonOwnerRole = { id: 8, public_id: 'role_member', name: 'Member' };
@@ -95,7 +114,12 @@ describe('MemberRolePermissionService.put — owner-role protection (sec-T2)', (
     } as never);
 
     await expect(
-      service.put('org_public', ownerRole.public_id, { permission_codes: [] }, 'requester_public'),
+      service.put(
+        asScope('org_public'),
+        ownerRole.public_id,
+        { permission_codes: [] },
+        'requester_public',
+      ),
     ).rejects.toBeInstanceOf(ForbiddenError);
 
     expect(memberRolePermissionRepository.replace).not.toHaveBeenCalled();
@@ -115,7 +139,7 @@ describe('MemberRolePermissionService.put — owner-role protection (sec-T2)', (
 
     await expect(
       service.put(
-        'org_public',
+        asScope('org_public'),
         ownerRole.public_id,
         { permission_codes: ['tenancy:read'] },
         'requester_public',
@@ -137,7 +161,7 @@ describe('MemberRolePermissionService.put — owner-role protection (sec-T2)', (
     } as never);
 
     const result = await service.put(
-      'org_public',
+      asScope('org_public'),
       nonOwnerRole.public_id,
       { permission_codes: ['tenancy:read'] },
       'requester_public',
@@ -158,7 +182,7 @@ describe('MemberRolePermissionService.put — owner-role protection (sec-T2)', (
 
     await expect(
       service.put(
-        'org_public',
+        asScope('org_public'),
         ownerRole.public_id,
         { permission_codes: ['tenancy:read'] },
         'requester_public',

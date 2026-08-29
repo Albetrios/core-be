@@ -160,13 +160,13 @@ function registerOn(registry: Registry): void {
 
   databaseRlsActiveCheckouts = new Gauge({
     name: 'database_rls_active_checkouts',
-    help: 'In-process org-scoped RLS transaction checkouts currently held (early pool-saturation signal; alert near DATABASE_POOL_MAX)',
+    help: 'In-process organization-scoped RLS transaction checkouts currently held (early pool-saturation signal; alert near DATABASE_POOL_MAX)',
     registers: [registry],
   });
 
   databaseRlsCheckoutHoldSeconds = new Histogram({
     name: 'database_rls_checkout_hold_seconds',
-    help: 'Wall-clock seconds an org-scoped RLS transaction held a pooled connection, by path (scoped_context | request_transaction)',
+    help: 'Wall-clock seconds an organization-scoped RLS transaction held a pooled connection, by path (scoped_context | request_transaction)',
     labelNames: ['path'],
     buckets: DEFAULT_LATENCY_BUCKETS_SECONDS,
     registers: [registry],
@@ -399,8 +399,8 @@ export function setBusinessMetricCounts(options: {
 }
 
 /**
- * Sets the `database_rls_active_checkouts` gauge from the in-process org-RLS checkout
- * counter. Fed by the pool-metrics scrape refresh so dashboards see how many org-scoped
+ * Sets the `database_rls_active_checkouts` gauge from the in-process organization-RLS checkout
+ * counter. Fed by the pool-metrics scrape refresh so dashboards see how many organization-scoped
  * RLS checkouts are held against `DATABASE_POOL_MAX` before postgres.js starts queuing.
  */
 export function setOrganizationRlsActiveCheckouts(count: number): void {
@@ -410,7 +410,7 @@ export function setOrganizationRlsActiveCheckouts(count: number): void {
 }
 
 /**
- * Observes one completed org-RLS checkout hold on the `database_rls_checkout_hold_seconds`
+ * Observes one completed organization-RLS checkout hold on the `database_rls_checkout_hold_seconds`
  * histogram, labelled by `path` (`scoped_context` unit of work vs legacy full-request
  * `request_transaction`). Wired via `registerOrganizationRlsCheckoutHoldObserver` so the hot
  * database-checkout paths stay free of a prom-client import. No-op when metrics are disabled.

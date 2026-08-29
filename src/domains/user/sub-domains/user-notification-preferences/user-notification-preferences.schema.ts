@@ -23,12 +23,12 @@ import { organizations } from '@/domains/tenancy/sub-domains/organization/organi
  *
  * @remarks
  * sec-U7: the `organization_id` column is retained for migration rollback
- * safety, but the RLS policy no longer carries an org branch and a
+ * safety, but the RLS policy no longer carries an organization branch and a
  * `chk_user_notif_prefs_no_org` CHECK constraint pins the column to NULL.
  * Organization-scoped notification preferences live in the
  * `tenancy.organization_notification_policies` table, which is
  * membership-gated. The schema column + FK are kept (rather than dropped) so
- * a rollback can re-permit org-scoped rows without an ALTER TABLE rewrite if
+ * a rollback can re-permit organization-scoped rows without an ALTER TABLE rewrite if
  * the policy change needs to be undone; a follow-up cleanup PR may drop the
  * column once the soak window passes.
  */
@@ -79,12 +79,12 @@ export const user_notification_preferences = authSchema
         to: 'public',
         using: sql`${table.user_id} = (
             SELECT id FROM auth.users
-            WHERE public_id = current_setting('app.current_user_id', true)
+            WHERE public_id = current_setting('app.current_user_public_id', true)
               AND deleted_at IS NULL
           )`,
         withCheck: sql`${table.user_id} = (
             SELECT id FROM auth.users
-            WHERE public_id = current_setting('app.current_user_id', true)
+            WHERE public_id = current_setting('app.current_user_public_id', true)
               AND deleted_at IS NULL
           )`,
       }),

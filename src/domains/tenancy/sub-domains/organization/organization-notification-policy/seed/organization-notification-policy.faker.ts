@@ -6,7 +6,7 @@ import type { Faker } from '@faker-js/faker';
 
 /** Generated delivery rule for one `tenancy.organization_notification_policies` row. */
 export interface BulkNotificationPolicyProfile {
-  /** Whether the `(type, channel)` pair is enabled by default for the org. */
+  /** Whether the `(type, channel)` pair is enabled by default for the organization. */
   default_enabled: boolean;
   /** Whether members cannot opt out of this pair. */
   is_mandatory: boolean;

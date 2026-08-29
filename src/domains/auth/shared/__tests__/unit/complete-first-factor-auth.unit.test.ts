@@ -43,13 +43,13 @@ function buildServices() {
   };
 }
 
-describe('completeFirstFactorAuth — personal-org self-heal (item #5)', () => {
+describe('completeFirstFactorAuth — personal-organization self-heal (item #5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(signAccessToken).mockResolvedValue('signed.jwt.token');
   });
 
-  it('provisions a personal org into the token when the user resolves to none and the caller opts in', async () => {
+  it('provisions a personal organization into the token when the user resolves to none and the caller opts in', async () => {
     vi.mocked(resolveDefaultActiveOrganizationPublicId).mockResolvedValue(undefined);
     vi.mocked(ensurePersonalOrganizationPublicId).mockResolvedValue('org_personalnew');
 

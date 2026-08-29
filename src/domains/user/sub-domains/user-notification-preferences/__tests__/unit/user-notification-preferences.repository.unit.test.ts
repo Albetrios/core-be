@@ -36,9 +36,16 @@ function createMockDatabase() {
 
 const mockDatabase = createMockDatabase();
 
-vi.mock('@/infrastructure/database/contexts/request-database.context.js', () => ({
-  getRequestDatabase: () => mockDatabase,
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      getRequestDatabase: () => mockDatabase,
+    };
+  },
+);
 
 describe('UserNotificationPreferencesRepository', () => {
   const repository = new UserNotificationPreferencesRepository();

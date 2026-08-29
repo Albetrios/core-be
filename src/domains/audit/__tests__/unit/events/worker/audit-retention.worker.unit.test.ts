@@ -1,5 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const inner = ((callback: (databaseHandle: unknown) => unknown) =>
+    globalRetentionContextMock(callback)) as unknown as (...parameters: unknown[]) => unknown;
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+      inner(...parameters),
+    ),
+  };
+});
+
 /**
  * BullMQ registration for the audit-retention worker — the sibling of
  * `audit-outbox-drain.worker.unit.test.ts`.
@@ -16,7 +28,7 @@ const workerState = vi.hoisted(() => ({
   onHandlers: {} as Record<string, (...args: unknown[]) => void>,
 }));
 
-const withGlobalRetentionCleanupDatabaseContextMock = vi.fn();
+const globalRetentionContextMock = vi.fn();
 const runAuditRetentionJobMock = vi.fn();
 
 vi.mock('bullmq', () => ({
@@ -54,11 +66,6 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-close.util.js', () => ({
   }),
 }));
 
-vi.mock('@/infrastructure/database/contexts/retention-database.context.js', () => ({
-  withGlobalRetentionCleanupDatabaseContext: (callback: (databaseHandle: unknown) => unknown) =>
-    withGlobalRetentionCleanupDatabaseContextMock(callback),
-}));
-
 vi.mock('@/domains/audit/workers/audit-retention.processor.js', () => ({
   runAuditRetentionJob: (...args: unknown[]) => runAuditRetentionJobMock(...args),
 }));
@@ -84,10 +91,10 @@ describe('audit-retention.worker', () => {
     workerState.processor = undefined;
     workerState.options = undefined;
     workerState.onHandlers = {};
-    withGlobalRetentionCleanupDatabaseContextMock.mockReset();
+    globalRetentionContextMock.mockReset();
     runAuditRetentionJobMock.mockReset();
 
-    withGlobalRetentionCleanupDatabaseContextMock.mockImplementation(
+    globalRetentionContextMock.mockImplementation(
       async (callback: (databaseHandle: unknown) => Promise<unknown>) =>
         callback({ kind: 'global-retention-cleanup' }),
     );
@@ -124,19 +131,19 @@ describe('audit-retention.worker', () => {
   });
 
   /**
-   * The load-bearing assertion in this file. `audit.logs` is FORCE RLS with an org-scoped
+   * The load-bearing assertion in this file. `audit.logs` is FORCE RLS with an organization-scoped
    * isolation policy; without `app.global_retention_cleanup = true` the purge would see only the
-   * rows of whatever org context happened to be set — i.e. none — and every pass would silently
+   * rows of whatever organization context happened to be set — i.e. none — and every pass would silently
    * delete nothing while reporting success. The context wrapper is the only thing that makes a
    * global purge visible, and the handle it yields must be the one the job runs on.
    */
-  it('runs the purge inside withGlobalRetentionCleanupDatabaseContext', async () => {
+  it('runs the purge inside withMaintenanceDatabaseContext', async () => {
     const { createAuditRetentionWorker } = await import(WORKER_MODULE);
 
     createAuditRetentionWorker();
     const result = await workerState.processor?.();
 
-    expect(withGlobalRetentionCleanupDatabaseContextMock).toHaveBeenCalledOnce();
+    expect(globalRetentionContextMock).toHaveBeenCalledOnce();
     expect(runAuditRetentionJobMock).toHaveBeenCalledExactlyOnceWith({
       kind: 'global-retention-cleanup',
     });

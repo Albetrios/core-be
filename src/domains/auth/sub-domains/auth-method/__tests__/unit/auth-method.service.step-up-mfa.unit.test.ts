@@ -1,15 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/infrastructure/database/contexts/user-database.context.js', () => ({
-  withUserDatabaseContext: vi.fn(async (_userPublicId: string, callback: () => Promise<unknown>) =>
-    callback(),
-  ),
-}));
-
 vi.mock('@/shared/utils/security/password.util.js', () => ({
   hashPassword: vi.fn().mockResolvedValue('hashed'),
   verifyPassword: vi.fn().mockResolvedValue({ valid: true, needsRehash: false }),
 }));
+
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 import { ForbiddenError, UnauthorizedError } from '@/shared/errors/index.js';
 import { AuthMethodService } from '@/domains/auth/sub-domains/auth-method/auth-method.service.js';

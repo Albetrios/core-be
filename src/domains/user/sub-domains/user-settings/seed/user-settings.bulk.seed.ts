@@ -5,7 +5,7 @@
  * Idempotency: the primary key is `user_id`, so every insert uses `.onConflictDoNothing()`; a
  * re-run with the same registry is a no-op.
  */
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { user_settings } from '@/domains/user/sub-domains/user-settings/user-settings.schema.js';
 import type { SeedContext } from '@/scripts/seed/seed-contract.js';
 import { generateBulkUserSettings } from './user-settings.faker.js';

@@ -9,7 +9,7 @@ export const UPLOAD_PURPOSES = {
 /** Union of valid purpose codes from {@link UPLOAD_PURPOSES}. */
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[keyof typeof UPLOAD_PURPOSES];
 
-/** Ownership scope for an upload: belongs to a `user` (private) or an `organization` (org-scoped). */
+/** Ownership scope for an upload: belongs to a `user` (private) or an `organization` (organization-scoped). */
 export const UPLOAD_TARGETS = {
   USER: 'user',
   ORGANIZATION: 'organization',
@@ -99,11 +99,11 @@ export const UPLOAD_PENDING_QUOTA_ADVISORY_LOCK_NAMESPACE = 0x55_50_4c_44;
 /**
  * Postgres advisory-lock namespace (`classid`) used to serialize per-ORGANIZATION PENDING
  * upload-quota reservations (audit-#7). Distinct from
- * {@link UPLOAD_PENDING_QUOTA_ADVISORY_LOCK_NAMESPACE} so the org lock and the per-user lock
+ * {@link UPLOAD_PENDING_QUOTA_ADVISORY_LOCK_NAMESPACE} so the organization lock and the per-user lock
  * occupy separate lock spaces; combined with the organization's internal id as the `objid`.
- * The reservation path always takes the org lock BEFORE the user lock (a globally consistent
- * order) so concurrent reservations from different members of the same org serialize on the
- * org cap without any deadlock risk. The value is the ASCII for `UPLO` and is otherwise
+ * The reservation path always takes the organization lock BEFORE the user lock (a globally consistent
+ * order) so concurrent reservations from different members of the same organization serialize on the
+ * organization cap without any deadlock risk. The value is the ASCII for `UPLO` and is otherwise
  * arbitrary — only its stability and distinctness matter.
  */
 export const UPLOAD_PENDING_ORGANIZATION_QUOTA_ADVISORY_LOCK_NAMESPACE = 0x55_50_4c_4f;

@@ -9,7 +9,7 @@ Structured log event names used in application code. Update dashboards and Sentr
 | `permission-cache.invalidate-organization.failed` | Redis invalidation failed for an organization permission set |
 | `permission-cache.get.failed`                     | Failed to read cached permissions                            |
 
-**Migration (2026-05):** `permission-cache.invalidate-org.failed` was renamed to `permission-cache.invalidate-organization.failed` (full-name convention). Update any saved queries or monitors that still filter on the old string.
+**Migration (2026-05):** `permission-cache.invalidate-organization.failed` was renamed to `permission-cache.invalidate-organization.failed` (full-name convention). Update any saved queries or monitors that still filter on the old string.
 
 ## Related
 

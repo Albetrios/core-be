@@ -1,12 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const inner = ((callback: (databaseHandle: unknown) => unknown) =>
+    globalRetentionContextMock(callback)) as unknown as (...parameters: unknown[]) => unknown;
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn((_scope: unknown, ...parameters: unknown[]) =>
+      inner(...parameters),
+    ),
+  };
+});
+
 const workerState = vi.hoisted(() => ({
   processor: undefined as (() => Promise<unknown>) | undefined,
   options: undefined as Record<string, unknown> | undefined,
   onHandlers: {} as Record<string, (...args: unknown[]) => void>,
 }));
 
-const withGlobalRetentionCleanupDatabaseContextMock = vi.fn();
+const globalRetentionContextMock = vi.fn();
 const runMemberRoleTombstoneRetentionJobMock = vi.fn();
 
 vi.mock('bullmq', () => ({
@@ -43,11 +55,6 @@ vi.mock('@/infrastructure/queue/worker-runtime/worker-close.util.js', () => ({
   }),
 }));
 
-vi.mock('@/infrastructure/database/contexts/retention-database.context.js', () => ({
-  withGlobalRetentionCleanupDatabaseContext: (callback: (databaseHandle: unknown) => unknown) =>
-    withGlobalRetentionCleanupDatabaseContextMock(callback),
-}));
-
 vi.mock(
   '@/domains/tenancy/sub-domains/member-roles/workers/member-role-tombstone-retention.processor.js',
   () => ({
@@ -65,10 +72,10 @@ describe('member-role-tombstone-retention.worker', () => {
     workerState.processor = undefined;
     workerState.options = undefined;
     workerState.onHandlers = {};
-    withGlobalRetentionCleanupDatabaseContextMock.mockReset();
+    globalRetentionContextMock.mockReset();
     runMemberRoleTombstoneRetentionJobMock.mockReset();
 
-    withGlobalRetentionCleanupDatabaseContextMock.mockImplementation(
+    globalRetentionContextMock.mockImplementation(
       async (callback: (databaseHandle: unknown) => Promise<unknown>) =>
         callback({ kind: 'global-retention' }),
     );
@@ -95,7 +102,7 @@ describe('member-role-tombstone-retention.worker', () => {
     expect(workerState.options).toEqual(expect.objectContaining({ concurrency: 1 }));
   });
 
-  it('processor calls withGlobalRetentionCleanupDatabaseContext and runs job inside it', async () => {
+  it('processor calls withMaintenanceDatabaseContext and runs job inside it', async () => {
     const { createMemberRoleTombstoneRetentionWorker } = await import(
       '@/domains/tenancy/sub-domains/member-roles/workers/member-role-tombstone-retention.worker.js'
     );
@@ -103,7 +110,7 @@ describe('member-role-tombstone-retention.worker', () => {
     createMemberRoleTombstoneRetentionWorker();
     const result = await workerState.processor?.();
 
-    expect(withGlobalRetentionCleanupDatabaseContextMock).toHaveBeenCalledOnce();
+    expect(globalRetentionContextMock).toHaveBeenCalledOnce();
     expect(runMemberRoleTombstoneRetentionJobMock).toHaveBeenCalledWith({
       kind: 'global-retention',
     });
@@ -137,9 +144,7 @@ describe('member-role-tombstone-retention.worker', () => {
   });
 
   it('processor throws when database context throws — error propagates out', async () => {
-    withGlobalRetentionCleanupDatabaseContextMock.mockRejectedValue(
-      new Error('db-context-failure'),
-    );
+    globalRetentionContextMock.mockRejectedValue(new Error('db-context-failure'));
 
     const { createMemberRoleTombstoneRetentionWorker } = await import(
       '@/domains/tenancy/sub-domains/member-roles/workers/member-role-tombstone-retention.worker.js'

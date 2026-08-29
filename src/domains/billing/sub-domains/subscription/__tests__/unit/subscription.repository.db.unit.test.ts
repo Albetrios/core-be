@@ -195,7 +195,7 @@ describe('SubscriptionRepository (database)', () => {
     });
 
     // A second local row pointing at the SAME Stripe subscription id (even for a
-    // different org) is now blocked by idx_subscriptions_provider_subscription_id_unique.
+    // different organization) is now blocked by idx_subscriptions_provider_subscription_id_unique.
     await expect(
       repository.create({
         organization_id: organization2.id,

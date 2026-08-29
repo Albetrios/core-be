@@ -10,8 +10,8 @@ One configurable, reproducible seeding tool that populates the database from a s
 
 All three share the contract and the per-domain seeders:
 
-- **`pnpm db:seed`** (`minimal.ts`) — reference/bootstrap data only (permission codes, plans). No users or orgs needed for the app to boot.
-- **`pnpm db:seed:full`** (`full.ts`) — a small fixed demo set plus the cross-domain flows that exercise the API (add user to org, send invite).
+- **`pnpm db:seed`** (`minimal.ts`) — reference/bootstrap data only (permission codes, plans). No users or organizations needed for the app to boot.
+- **`pnpm db:seed:full`** (`full.ts`) — a small fixed demo set plus the cross-domain flows that exercise the API (add user to organization, send invite).
 - **`pnpm db:seed:bulk`** (`bulk.ts`) — scaled volume via profiles, for load/pagination testing and full demo tenants.
 
 ## Contract — `seed-contract.ts`
@@ -21,7 +21,7 @@ All three share the contract and the per-domain seeders:
 - **`composeContributions(...)`** — folds children up the tree (nested sub-domain → sub-domain → domain): runs each part's `seedReference` first, then each part's `seedBulk`.
 - **`orderModules(...)`** — topologically orders domain modules by `dependsOn`.
 - **`SeedContext`** — `{ counts, faker, registry, logger }` handed to every seeder.
-- **`SeedRegistry`** — cross-domain parents. The user and tenancy bulk seeders append created users/orgs; downstream domains (billing, notify, upload, audit) read them. Each domain seeds **only its own tables** — cross-domain wiring lives only here, never inside a domain seeder.
+- **`SeedRegistry`** — cross-domain parents. The user and tenancy bulk seeders append created users/organizations; downstream domains (billing, notify, upload, audit) read them. Each domain seeds **only its own tables** — cross-domain wiring lives only here, never inside a domain seeder.
 
 ## Orchestrator and config
 

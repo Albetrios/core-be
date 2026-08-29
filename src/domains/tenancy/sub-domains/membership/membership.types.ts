@@ -49,7 +49,7 @@ export interface MembershipInvitationRef {
 
 /**
  * Public HTTP response shape for a membership. All identifiers are external
- * public ids (or string-coerced numeric ids where the org id is not yet
+ * public ids (or string-coerced numeric ids where the organization id is not yet
  * resolved); timestamps are ISO-8601 strings. The flat `user_id`/`role_id`
  * remain for back-compat; `user`/`role` embed the display summaries and
  * `invitation` carries the live invite on `INVITED` rows.

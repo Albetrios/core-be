@@ -16,7 +16,7 @@ What this suite covers:
 - Online brute-force caps on passwordless email-code login (per-user attempt ceiling engages, and the capped rejection stays a generic 401 with no lockout/existence oracle — `auth/email-code-brute-force`).
 - Idempotency-key contract: missing/malformed → 422, anonymous → 401, no cached entry on unauthenticated writes, **cross-actor isolation** (a shared `X-Idempotency-Key` value never replays one actor's response to another — `infrastructure/idempotency-cross-actor`).
 - Recent-step-up enforcement on credential routes (a valid bearer WITHOUT a recent step-up is 403 — `authz/object-ownership`).
-- Tenant-isolation invariants (`X-Organization-Id` agreement, RLS scoping).
+- Tenant-isolation invariants (claim-scoped organization, RLS scoping).
 
 What it does **not** cover: dependency vulnerabilities (`pnpm audit`), penetration testing (offline, separate engagement), or full OWASP coverage.
 

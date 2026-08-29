@@ -25,7 +25,7 @@ const WEBHOOK_PERMISSIONS = [NOTIFY_PERMISSIONS.WEBHOOK_READ, NOTIFY_PERMISSIONS
 /**
  * Notify had exactly one domain-owned security file (`webhook-ssrf.security`). All of its
  * cross-tenant and object-ownership coverage lived inside three *multi-domain* platform suites
- * (`object-ownership`, `cross-org-resource`, `cross-org-mutation`) as parameterized rows in
+ * (`object-ownership`, `cross-organization-resource`, `cross-organization-mutation`) as parameterized rows in
  * shared matrices.
  *
  * That works only while someone remembers to add a row. A new notify route, or a resolver that

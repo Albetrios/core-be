@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ValidationError } from '@/shared/errors/index.js';
+import {
+  PRINCIPAL_SCOPE,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
 import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { PlanService } from '@/domains/billing/sub-domains/plan/plan.service.js';
@@ -21,11 +25,21 @@ vi.mock('@/infrastructure/cache/redis-lock.util.js', () => ({
   RedisLockUnavailableError: class RedisLockUnavailableError extends Error {},
 }));
 
-vi.mock('@/infrastructure/database/contexts/organization-database.context.js', () => ({
-  withOrganizationDatabaseContext: vi.fn(
-    async (_organizationPublicId: string, callback: () => Promise<unknown>) => callback(),
-  ),
-}));
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    // Blanket maintenance passthrough: services this suite touches (directly or via
+    // cross-domain imports) may enter maintenance contexts (tombstoning, admin reads) —
+    // the real wrapper opens a database.transaction() and CI's unit lane has no Postgres.
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
 
 /**
  * Regression for sec-B1 + sec-B2 + sec-B3 + sec-B4 (High×4): Stripe reconciliation gaps.
@@ -49,6 +63,11 @@ vi.mock('@/infrastructure/database/contexts/organization-database.context.js', (
  *   = false` toggle, and the upcoming webhook reconciles the actual status (which may be
  *   PAST_DUE / INCOMPLETE / etc.).
  */
+const scope = PRINCIPAL_SCOPE.REQUEST({
+  userPublicId: 'user_public',
+  organizationPublicId: 'org_public',
+}) as OrganizationPrincipalDatabaseScope;
+
 describe('SubscriptionService — Stripe reconciliation (sec-B1+B2+B3+B4)', () => {
   const organization = { id: 1, public_id: 'org_public' };
   const plan = {
@@ -130,7 +149,7 @@ describe('SubscriptionService — Stripe reconciliation (sec-B1+B2+B3+B4)', () =
   // ── sec-B1 ──────────────────────────────────────────────────────────────────────────
   it('PATCH rejects cancel_at_period_end so clients must use /cancel and /resume (sec-B1)', async () => {
     await expect(
-      service.update('org_public', 'sub_public', { cancel_at_period_end: true }),
+      service.update(scope, 'sub_public', { cancel_at_period_end: true }),
     ).rejects.toBeInstanceOf(ValidationError);
 
     expect(repository.update).not.toHaveBeenCalled();
@@ -140,16 +159,12 @@ describe('SubscriptionService — Stripe reconciliation (sec-B1+B2+B3+B4)', () =
   });
 
   it('PATCH with empty body succeeds as a no-op (idempotent shape preserved)', async () => {
-    await expect(service.update('org_public', 'sub_public', {})).resolves.toBeDefined();
+    await expect(service.update(scope, 'sub_public', {})).resolves.toBeDefined();
   });
 
   // ── sec-B2 ──────────────────────────────────────────────────────────────────────────
   it('create() stamps last_stripe_event_created_at so late Stripe events cannot clobber (sec-B2)', async () => {
-    await service.create(
-      'org_public',
-      { plan_id: 'plan_pro', billing_cycle: 'monthly' },
-      'created_by',
-    );
+    await service.create(scope, { plan_id: 'plan_pro', billing_cycle: 'monthly' }, 'created_by');
 
     expect(repository.create).toHaveBeenCalledTimes(1);
     const createPayload = vi.mocked(repository.create).mock.calls[0]![0];
@@ -158,37 +173,33 @@ describe('SubscriptionService — Stripe reconciliation (sec-B1+B2+B3+B4)', () =
 
   it('create() does NOT stamp the watermark when Stripe is not configured (local-only flow)', async () => {
     vi.mocked(paymentProvider.createSubscription).mockResolvedValueOnce({});
-    await service.create(
-      'org_public',
-      { plan_id: 'plan_pro', billing_cycle: 'monthly' },
-      'created_by',
-    );
+    await service.create(scope, { plan_id: 'plan_pro', billing_cycle: 'monthly' }, 'created_by');
     const createPayload = vi.mocked(repository.create).mock.calls[0]![0];
     expect(createPayload.last_stripe_event_created_at).toBeUndefined();
   });
 
   // ── sec-B3 ──────────────────────────────────────────────────────────────────────────
   it('cancel() bumps last_stripe_event_created_at on the local update (sec-B3)', async () => {
-    await service.cancel('org_public', 'sub_public');
+    await service.cancel(scope, 'sub_public');
     const updatePayload = vi.mocked(repository.update).mock.calls[0]![2];
     expect(updatePayload.last_stripe_event_created_at).toBeInstanceOf(Date);
   });
 
   it('resume() bumps last_stripe_event_created_at on the local update (sec-B3)', async () => {
-    await service.resume('org_public', 'sub_public');
+    await service.resume(scope, 'sub_public');
     const updatePayload = vi.mocked(repository.update).mock.calls[0]![2];
     expect(updatePayload.last_stripe_event_created_at).toBeInstanceOf(Date);
   });
 
   it('changePlan() bumps last_stripe_event_created_at on the local update (sec-B3)', async () => {
-    await service.changePlan('org_public', 'sub_public', { plan_id: 'plan_pro' });
+    await service.changePlan(scope, 'sub_public', { plan_id: 'plan_pro' });
     const updatePayload = vi.mocked(repository.update).mock.calls[0]![2];
     expect(updatePayload.last_stripe_event_created_at).toBeInstanceOf(Date);
   });
 
   // ── sec-B4 ──────────────────────────────────────────────────────────────────────────
   it('resume() does NOT force-write status=ACTIVE; lets the Stripe webhook reconcile (sec-B4)', async () => {
-    await service.resume('org_public', 'sub_public');
+    await service.resume(scope, 'sub_public');
     const updatePayload = vi.mocked(repository.update).mock.calls[0]![2];
     expect(updatePayload.cancel_at_period_end).toBe(false);
     expect(updatePayload.status).toBeUndefined();

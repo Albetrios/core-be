@@ -22,9 +22,16 @@ vi.mock('@/infrastructure/observability/sentry/sentry.js', () => ({
   captureMessage: (...arguments_: unknown[]) => captureMessage(...arguments_),
 }));
 
-vi.mock('@/infrastructure/database/contexts/worker-database.context.js', () => ({
-  isWorkerRuntime: () => false,
-}));
+vi.mock(
+  '@/infrastructure/database/contexts/database-context-runtime.js',
+  async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return {
+      ...actual,
+      isWorkerRuntime: () => false,
+    };
+  },
+);
 
 vi.mock('@/infrastructure/queue/worker-runtime/worker-pool-demand-context.js', () => ({
   getWorkerPostgresPoolDemandContext: () => undefined,

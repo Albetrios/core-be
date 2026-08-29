@@ -16,12 +16,12 @@ import { organization_settings } from '@/domains/tenancy/sub-domains/organizatio
 import { OrganizationSettingsRepository } from '@/domains/tenancy/sub-domains/organization/organization-settings/organization-settings.repository.js';
 
 /**
- * Regression guard for the production-only org-mandated-MFA bypass.
+ * Regression guard for the production-only organization-mandated-MFA bypass.
  *
  * `tenancy.memberships` / `tenancy.organization_settings` are FORCE ROW LEVEL SECURITY. The
  * login-time MFA-enforcement check and default-locale lookup run before any tenant GUC exists,
  * so under the non-superuser `core_be_app` role (which production uses) a plain SELECT resolves
- * the tenant policy to NULL and returns ZERO rows — which silently disabled org-mandated MFA.
+ * the tenant policy to NULL and returns ZERO rows — which silently disabled organization-mandated MFA.
  * The fix routes both reads through SECURITY DEFINER resolvers that bypass RLS by ownership.
  *
  * These tests run as `core_be_app` precisely because the local/CI default superuser is RLS-exempt
@@ -104,7 +104,7 @@ describe('Security: organization-settings login-time resolvers under FORCE RLS',
       false,
     );
 
-    // Pending (INVITED) members are not yet subject to org policy.
+    // Pending (INVITED) members are not yet subject to organization policy.
     const invited = await seedUserInOrg({ mfaRequired: true, membershipStatus: 'INVITED' });
     await expect(repository.userHasOrganizationRequiringMfa(invited.user.id)).resolves.toBe(false);
 
@@ -130,7 +130,7 @@ describe('Security: organization-settings login-time resolvers under FORCE RLS',
     await expect(repository.userHasOrganizationRequiringMfa(user.id)).resolves.toBe(false);
   });
 
-  it('default-locale resolver returns the org locale under FORCE RLS (and null for unknown orgs)', async () => {
+  it('default-locale resolver returns the organization locale under FORCE RLS (and null for unknown organizations)', async () => {
     const { organization } = await seedUserInOrg({ mfaRequired: false, locale: 'es' });
 
     await expect(

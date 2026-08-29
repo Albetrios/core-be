@@ -20,7 +20,10 @@ import {
 import { warnWhenBullMqSharesCacheRedisHost } from '@/infrastructure/cache/redis-topology-warn.util.js';
 import { closeDatabase } from '@/infrastructure/database/connection.js';
 import { assertPostgresConnectionBudget } from '@/infrastructure/database/safety/assert-connection-budget.js';
-import { assertDatabaseRoleRlsSafety } from '@/infrastructure/database/safety/assert-database-rls-safety.js';
+import {
+  assertDatabaseRoleRlsSafety,
+  assertMaintenanceDatabaseRoleRlsSafety,
+} from '@/infrastructure/database/safety/assert-database-rls-safety.js';
 import { assertDatabaseTlsVerification } from '@/infrastructure/database/safety/assert-database-tls-safety.js';
 import { assertRedisTlsVerification } from '@/infrastructure/cache/assert-redis-tls-safety.js';
 import { computeWorkerPostgresPoolDemand } from '@/infrastructure/queue/worker-runtime/worker-connection-budget.js';
@@ -91,6 +94,7 @@ async function main() {
   setWorkerPostgresPoolDemandContext(computeWorkerPostgresPoolDemand());
   await assertPostgresConnectionBudget({ assertWorkerConcurrency: true });
   await assertDatabaseRoleRlsSafety();
+  await assertMaintenanceDatabaseRoleRlsSafety();
   registerPostgresPoolMetrics();
 
   const { createWorkerContainers } = await import('@/worker-containers.js');

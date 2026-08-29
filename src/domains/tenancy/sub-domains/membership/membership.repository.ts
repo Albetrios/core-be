@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, ne, sql, type SQL } from 'drizzle-orm';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { member_invitations } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
@@ -163,10 +163,10 @@ export class MembershipRepository extends BaseRepository {
 
   /**
    * `name` sort path. Ordering by the member's `auth.users` display name can't happen in a plain
-   * query under org-only context (FORCE RLS matches zero rows), so the definer function
+   * query under organization-only context (FORCE RLS matches zero rows), so the definer function
    * `tenancy.list_organization_membership_ids_by_name` does the ordering + keyset + `q` filter + limit
    * and returns the page's `(id, sort_value)`. The typed `MembershipRow`s are then fetched by
-   * `id IN (...)` under the org RLS context and reordered to the function's order before the shared
+   * `id IN (...)` under the organization RLS context and reordered to the function's order before the shared
    * `finishKeysetPage` mints the cursor. A cursor whose `filter_fingerprint` no longer matches the
    * current `{q, sort, order}` is ignored (resets to the first page) — never interleaving pages.
    */
@@ -242,8 +242,8 @@ export class MembershipRepository extends BaseRepository {
 
   /**
    * Batch-fetches typed `MembershipRow`s by internal id within an organization (active rows only),
-   * keyed by id so the caller can restore an externally-computed ordering. Runs under the org RLS
-   * context — `memberships` is org-scoped, so no resolver is needed.
+   * keyed by id so the caller can restore an externally-computed ordering. Runs under the organization RLS
+   * context — `memberships` is organization-scoped, so no resolver is needed.
    */
   private async findByIdsForOrganization(
     ids: readonly number[],
@@ -265,7 +265,7 @@ export class MembershipRepository extends BaseRepository {
 
   /**
    * Resolves the membership ids in an organization whose member's user email / first name / last
-   * name matches `q`. `auth.users` is FORCE RLS behind a self-owner policy, so under org-only context
+   * name matches `q`. `auth.users` is FORCE RLS behind a self-owner policy, so under organization-only context
    * a plain join matches zero rows — the search goes through the
    * `tenancy.search_organization_membership_ids` SECURITY DEFINER function (20260702000000), which
    * bypasses RLS by explicit organization scoping and exposes no `auth.users` columns. The term is
@@ -285,7 +285,7 @@ export class MembershipRepository extends BaseRepository {
   /**
    * Maps internal user ids to display SUMMARIES (public id + email + name + raw avatar key) for the
    * membership serializer's embedded `user` object. `auth.users` is FORCE RLS (self-scoped) and
-   * these reads run under org-only context, so a plain join would match zero rows under the app
+   * these reads run under organization-only context, so a plain join would match zero rows under the app
    * role — delegate to the SECURITY DEFINER batch resolver (RLS bypass by ownership). Batched to
    * avoid an N+1 per list page; `avatar_url` is the RAW stored key — the service presigns it.
    */
@@ -328,7 +328,7 @@ export class MembershipRepository extends BaseRepository {
 
   /**
    * Maps internal role ids to summaries (public id + name) for the serializer's embedded `role`
-   * object. `roles` is org-scoped, so a normal RLS-scoped query under the current org context is
+   * object. `roles` is organization-scoped, so a normal RLS-scoped query under the current organization context is
    * correct (no resolver needed).
    */
   async resolveRoleSummariesByInternalIds(
@@ -350,8 +350,8 @@ export class MembershipRepository extends BaseRepository {
    * role grants the given permission code — e.g. all `membership:manage` holders, for the
    * invite-accepted notification fan-out.
    *
-   * @remarks Runs under the org RLS context (`memberships` / `roles` / `role_permissions` are all
-   * org-scoped). `selectDistinct` collapses a user who holds the permission via more than one row.
+   * @remarks Runs under the organization RLS context (`memberships` / `roles` / `role_permissions` are all
+   * organization-scoped). `selectDistinct` collapses a user who holds the permission via more than one row.
    */
   async findUserIdsWithPermission(
     organization_id: number,
@@ -381,7 +381,7 @@ export class MembershipRepository extends BaseRepository {
   /**
    * Maps internal membership ids to their live (pending — not accepted, not revoked) invitation, so
    * the serializer can embed an `invitation` ref on `INVITED` rows (the frontend drives Resend /
-   * Revoke from the members table). Runs under the org RLS context (`member_invitations` is scoped
+   * Revoke from the members table). Runs under the organization RLS context (`member_invitations` is scoped
    * to the org's memberships) — no SECURITY DEFINER needed. Ordered ascending so the newest live
    * invite wins for a membership with more than one historical row.
    */
@@ -431,7 +431,7 @@ export class MembershipRepository extends BaseRepository {
    * is well-indexed via the partial unique index on `(user_id, organization_id)`
    * plus the explicit `idx_memberships_role_id` if present — at worst this is a
    * sequential scan over a single org's membership rows, which is bounded by the
-   * org member cap.
+   * organization member cap.
    */
   async countActiveByRoleId(role_id: number, organization_id: number): Promise<number> {
     const rows = await getRequestDatabase()
@@ -455,7 +455,7 @@ export class MembershipRepository extends BaseRepository {
    * (`deleted_at IS NULL`) — an outstanding invitation already reserves a seat so a
    * burst of invites cannot exceed the plan limit once everyone accepts. The count
    * is exact (no LIMIT) because it feeds a binary `used >= total` seat-availability
-   * check; it is bounded by the per-org member cap. Mirrors {@link countActiveByRoleId}.
+   * check; it is bounded by the per-organization member cap. Mirrors {@link countActiveByRoleId}.
    * SUSPENDED members are intentionally NOT counted (a suspended seat is not in use).
    */
   async countActiveByOrganization(organization_id: number): Promise<number> {
@@ -484,7 +484,7 @@ export class MembershipRepository extends BaseRepository {
    *   DB context (RLS-scoped) and transaction.
    * - **Side effects:** writes `status = 'SUSPENDED'` (a suspended seat is not counted toward the
    *   cap, so this lowers the org's seat usage). Returns the internal `user_id`s actually suspended
-   *   (empty when no non-owner ACTIVE members remain — e.g. an owner-only org that can't shrink
+   *   (empty when no non-owner ACTIVE members remain — e.g. an owner-only organization that can't shrink
    *   further) so the caller can purge each suspended member's permission cache.
    */
   async suspendExcessActiveMembers(options: {
@@ -615,7 +615,7 @@ export class MembershipRepository extends BaseRepository {
    * status to `ACTIVE` and stamps `joined_at` only when the row is still
    * pending (`status <> 'ACTIVE'`). Scoped by internal membership id +
    * organization id so it runs inside the invitation-accept transaction
-   * (shared `withOrganizationDatabaseContext` unit of work) and stays
+   * (shared `withAppDatabaseContext` unit of work) and stays
    * idempotent for a membership that is already active.
    */
   async activateForInvitationAccept(
@@ -630,7 +630,7 @@ export class MembershipRepository extends BaseRepository {
           eq(memberships.id, membership_id),
           eq(memberships.organization_id, organization_id),
           // route-audit-#1: ONLY a still-invited membership may be activated by accepting. Without
-          // this a member an admin SUSPENDED (the per-org ban) could self-restore to ACTIVE by
+          // this a member an admin SUSPENDED (the per-organization ban) could self-restore to ACTIVE by
           // accepting a still-pending invitation — including one suspended while INVITED, where
           // joined_at is still NULL (so a joined_at-only guard would miss it). Mirrors the PATCH
           // guard that already blocks INVITED→ACTIVE via the manager route; permission resolution
@@ -655,7 +655,7 @@ export class MembershipRepository extends BaseRepository {
           // Never soft-delete the current owner's membership — neither via the member's own "leave"
           // (which could race a concurrent transfer-to-them after its owner pre-check) nor via an
           // admin removing a member. The owner must transfer ownership first; otherwise the row is
-          // left intact and the caller surfaces a clean Forbidden, so the org is never orphaned.
+          // left intact and the caller surfaces a clean Forbidden, so the organization is never orphaned.
           sql`NOT EXISTS (
             SELECT 1 FROM ${organizations}
             WHERE ${organizations.id} = ${memberships.organization_id}

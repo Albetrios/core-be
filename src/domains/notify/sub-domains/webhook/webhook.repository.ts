@@ -1,6 +1,6 @@
 import { and, asc, count, eq, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/request-database.context.js';
+import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { DEFAULT_REPOSITORY_LIST_LIMIT } from '@/shared/constants/query-limits.constants.js';
 import { webhooks } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
@@ -104,7 +104,7 @@ export class WebhookRepository {
   }
 
   /**
-   * audit-#8: transaction-scoped advisory lock serializing the per-org webhook creation quota
+   * audit-#8: transaction-scoped advisory lock serializing the per-organization webhook creation quota
    * check + insert so concurrent creates cannot both pass the count and overshoot
    * `WEBHOOK_MAX_PER_ORG`. Call inside the create transaction before
    * {@link countActiveByOrganization}.
@@ -156,7 +156,7 @@ export class WebhookRepository {
       }
 
       // sec-N4: defense-in-depth fan-out cap. The service-level create cap
-      // already prevents legitimate orgs from registering more than
+      // already prevents legitimate organizations from registering more than
       // `WEBHOOK_MAX_PER_ORG` rows, so reaching this branch means either
       // abuse or the two caps have drifted — caller decides which.
       if (maxRows !== undefined && allRows.length >= maxRows) {
@@ -194,7 +194,7 @@ export class WebhookRepository {
    *
    * @remarks
    * - **Algorithm:** identical projection to `findByPublicId` plus `.for('update')`;
-   *   must run inside the org transaction opened by `withOrganizationDatabaseContext`.
+   *   must run inside the organization transaction opened by `withAppDatabaseContext`.
    * - **Failure modes:** none beyond Postgres errors; returns `null` when absent.
    * - **Side effects:** acquires a row-level write lock held until the surrounding
    *   transaction commits — a second rotation blocks here, then re-reads the

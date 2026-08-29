@@ -1,16 +1,16 @@
 /**
  * Policy (audit R11): permission-cache invalidation MUST run AFTER the write transaction commits,
- * i.e. OUTSIDE the `withOrganizationDatabaseContext(...)` callback — never inside it.
+ * i.e. OUTSIDE the `withAppDatabaseContext(...)` callback — never inside it.
  *
  * Invalidating inside the callback (pre-commit) opens a race: a concurrent permission recompute for
  * the affected user reads the OLD committed permission set and re-caches it before the writer
  * commits, so a downgraded/removed member keeps access (or a newly-granted one is delayed) until the
- * cache TTL (~5 min). `AuditService`-style emitters and the org-delete path already invalidate after
+ * cache TTL (~5 min). `AuditService`-style emitters and the organization-delete path already invalidate after
  * the context block; this guard keeps every tenancy mutation consistent and prevents regressions.
  *
  * The scan strips comments and string/template literals, then asserts no `invalidatePermissions(`,
  * `invalidateOrganizationPermissions(`, or `invalidatePermissionsForMembership(` call appears inside
- * any `withOrganizationDatabaseContext(...)` call expression.
+ * any `withAppDatabaseContext(...)` call expression.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -47,10 +47,10 @@ function stripCommentsAndStrings(source: string): string {
     .replace(/"(?:\\.|[^"\\])*"/g, '""');
 }
 
-/** Returns the body spans (paren-balanced) of every `withOrganizationDatabaseContext(...)` call. */
+/** Returns the body spans (paren-balanced) of every `withAppDatabaseContext(...)` call. */
 function organizationContextCallSpans(source: string): string[] {
   const spans: string[] = [];
-  const marker = 'withOrganizationDatabaseContext(';
+  const marker = 'withAppDatabaseContext(';
   let searchFrom = 0;
   for (;;) {
     const start = source.indexOf(marker, searchFrom);
@@ -78,9 +78,25 @@ describe('Policy: permission-cache invalidation runs post-commit (audit R11)', (
     expect(files.length).toBeGreaterThan(3);
   });
 
+  it('is not vacuous — the scanned services actually contain wrapper spans', () => {
+    // This lock silently disarmed once when the wrapper was renamed (the marker matched
+    // zero call sites and every case passed with nothing to check). Guard the guard: if
+    // no scanned file contains the marker, the marker is stale — fail loudly.
+    const totalSpans = files
+      .map(
+        (file) =>
+          organizationContextCallSpans(stripCommentsAndStrings(readFileSync(file, 'utf8'))).length,
+      )
+      .reduce((sum, count) => sum + count, 0);
+    expect(
+      totalSpans,
+      'zero wrapper spans found — update the marker to the current wrapper name',
+    ).toBeGreaterThan(0);
+  });
+
   for (const file of files) {
     const relativePath = relative(PROJECT_ROOT, file);
-    it(`no permission-cache invalidation inside a withOrganizationDatabaseContext callback — ${relativePath}`, () => {
+    it(`no permission-cache invalidation inside a withAppDatabaseContext callback — ${relativePath}`, () => {
       const stripped = stripCommentsAndStrings(readFileSync(file, 'utf8'));
       const offenders: string[] = [];
       for (const span of organizationContextCallSpans(stripped)) {
@@ -90,7 +106,7 @@ describe('Policy: permission-cache invalidation runs post-commit (audit R11)', (
       }
       expect(
         offenders,
-        `${relativePath}: ${offenders.join(', ')} called INSIDE withOrganizationDatabaseContext — ` +
+        `${relativePath}: ${offenders.join(', ')} called INSIDE withAppDatabaseContext — ` +
           'move the invalidation AFTER the context block (post-commit) to avoid the stale re-cache race.',
       ).toEqual([]);
     });

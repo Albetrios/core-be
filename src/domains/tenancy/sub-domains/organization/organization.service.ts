@@ -7,8 +7,13 @@ import {
 import { assertTeamOrganization } from './organization-capability.js';
 import { env } from '@/shared/config/env.config.js';
 import { GLOBAL_ROLES, type GlobalRole } from '@/shared/constants/roles.constants.js';
-import { withOrganizationDatabaseContext } from '@/infrastructure/database/contexts/organization-database.context.js';
-import { withUserDatabaseContext } from '@/infrastructure/database/contexts/user-database.context.js';
+import {
+  PRINCIPAL_SCOPE,
+  MAINTENANCE_SCOPE,
+  withMaintenanceDatabaseContext,
+  withAppDatabaseContext,
+  type OrganizationPrincipalDatabaseScope,
+} from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from './organization.repository.js';
 import type {
   OrganizationBillingContext,
@@ -75,9 +80,9 @@ export type OrganizationOffboardingDependencies = {
  * create / update / soft-delete plus logo lifecycle.
  *
  * @remarks
- * - **Algorithm:** every mutation runs inside `withOrganizationDatabaseContext`
- *   (sets `app.current_organization_id` for RLS) and reads use
- *   `withUserDatabaseContext` to satisfy the `organizations_user_discovery`
+ * - **Algorithm:** every mutation runs inside `withAppDatabaseContext`
+ *   (sets `app.current_organization_public_id` for RLS) and reads use
+ *   `withAppDatabaseContext (user scope)` to satisfy the `organizations_user_discovery`
  *   policy. Slug uniqueness is enforced explicitly; access checks short-
  *   circuit for global admins and otherwise require ownership or an active
  *   membership via {@link OrganizationRepository.userCanAccessOrganization}.
@@ -159,11 +164,12 @@ export class OrganizationService {
   }
 
   private async clearOrganizationLogoStorage(
-    public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     logo_url: string | null,
   ): Promise<void> {
+    const public_id = scope.organizationPublicId;
     await this.deleteOwnedOrganizationLogoObject(public_id, logo_url);
-    const updated = await withOrganizationDatabaseContext(public_id, () =>
+    const updated = await withAppDatabaseContext(scope, () =>
       this.repository.update(public_id, { logo_url: null }, null),
     );
     if (!updated) throw new NotFoundError('Organization');
@@ -190,13 +196,13 @@ export class OrganizationService {
     userPublicId: string,
     userInternalId: number,
   ): Promise<number> {
-    return withUserDatabaseContext(userPublicId, () =>
+    return withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }), () =>
       this.repository.countActiveOwnedByUser(userInternalId),
     );
   }
 
   /**
-   * Resolves the organization row for the active-org public id, throwing `NotFoundError` when it
+   * Resolves the organization row for the active-organization public id, throwing `NotFoundError` when it
    * does not exist. Renamed from `requireOrganizationMembershipByPublicId` (audit-#T2).
    *
    * @remarks
@@ -207,7 +213,7 @@ export class OrganizationService {
    * - **Notes:** this does **NOT** assert that the caller is a member of the organization — it only
    *   resolves the row (the old name falsely implied a membership check). Authorization is enforced
    *   upstream by the route's `requireOrganizationPermission` preHandler and Postgres RLS scoped to
-   *   `app.current_organization_id`. Do not add a route that relies on this method as its sole
+   *   `app.current_organization_public_id`. Do not add a route that relies on this method as its sole
    *   authorization gate; always pair it with a permission preHandler.
    */
   async requireOrganizationRecordByPublicId(
@@ -298,13 +304,16 @@ export class OrganizationService {
     organization_public_id: string,
     stripe_customer_id: string,
   ): Promise<void> {
-    // tenancy.organizations is FORCE RLS — persist the Stripe customer id under the org GUC
+    // tenancy.organizations is FORCE RLS — persist the Stripe customer id under the organization GUC
     // so the update is not silently dropped when called from the payment provider outside HTTP.
-    return withOrganizationDatabaseContext(organization_public_id, async () => {
-      const organization = await this.repository.findByPublicId(organization_public_id);
-      if (!organization) throw new NotFoundError('Organization');
-      await this.repository.updateStripeCustomerId(organization.id, stripe_customer_id);
-    });
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization_public_id }),
+      async () => {
+        const organization = await this.repository.findByPublicId(organization_public_id);
+        if (!organization) throw new NotFoundError('Organization');
+        await this.repository.updateStripeCustomerId(organization.id, stripe_customer_id);
+      },
+    );
   }
 
   private isGlobalAdmin(global_role?: GlobalRole): boolean {
@@ -329,9 +338,9 @@ export class OrganizationService {
   }
 
   /**
-   * Cross-organization read for the current user. Wraps in `withUserDatabaseContext`
+   * Cross-organization read for the current user. Wraps in `withAppDatabaseContext (user scope)`
    * so the `organizations_user_discovery` and `memberships_user_self_discovery`
-   * RLS policies see `app.current_user_id` (introduced by migration
+   * RLS policies see `app.current_user_public_id` (introduced by migration
    * `20260520000004_organization_discovery_and_invitation_lookup_rls.sql`). Without
    * this wrap the call returns empty when `DATABASE_RLS_SCOPED_CONTEXTS=true`.
    */
@@ -341,15 +350,18 @@ export class OrganizationService {
       after: parsed.after,
       limit: parsed.limit,
     });
-    return withUserDatabaseContext(user_public_id, async () => {
-      const result = this.isGlobalAdmin(global_role)
-        ? await this.repository.findAll(pagination)
-        : await this.repository.findAllForUser(user_public_id, pagination);
-      return {
-        ...result,
-        items: await Promise.all(result.items.map((row) => this.toOrganizationOutput(row))),
-      };
-    });
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
+      async () => {
+        const result = this.isGlobalAdmin(global_role)
+          ? await this.repository.findAll(pagination)
+          : await this.repository.findAllForUser(user_public_id, pagination);
+        return {
+          ...result,
+          items: await Promise.all(result.items.map((row) => this.toOrganizationOutput(row))),
+        };
+      },
+    );
   }
 
   async getByPublicId(
@@ -357,12 +369,15 @@ export class OrganizationService {
     user_public_id: string,
     global_role?: GlobalRole,
   ): Promise<OrganizationOutput> {
-    return withUserDatabaseContext(user_public_id, async () => {
-      await this.assertUserCanAccessOrganization(user_public_id, public_id, global_role);
-      const organization = await this.repository.findByPublicId(public_id);
-      if (!organization) throw new NotFoundError('Organization');
-      return this.toOrganizationOutput(organization);
-    });
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
+      async () => {
+        await this.assertUserCanAccessOrganization(user_public_id, public_id, global_role);
+        const organization = await this.repository.findByPublicId(public_id);
+        if (!organization) throw new NotFoundError('Organization');
+        return this.toOrganizationOutput(organization);
+      },
+    );
   }
 
   async getBySlug(
@@ -370,22 +385,25 @@ export class OrganizationService {
     user_public_id: string,
     global_role?: GlobalRole,
   ): Promise<OrganizationOutput> {
-    return withUserDatabaseContext(user_public_id, async () => {
-      const organization = await this.repository.findBySlug(slug);
-      if (!organization) throw new NotFoundError('Organization');
-      await this.assertUserCanAccessOrganization(
-        user_public_id,
-        organization.public_id,
-        global_role,
-      );
-      return this.toOrganizationOutput(organization);
-    });
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
+      async () => {
+        const organization = await this.repository.findBySlug(slug);
+        if (!organization) throw new NotFoundError('Organization');
+        await this.assertUserCanAccessOrganization(
+          user_public_id,
+          organization.public_id,
+          global_role,
+        );
+        return this.toOrganizationOutput(organization);
+      },
+    );
   }
 
   async create(body: unknown, owner_user_public_id: string): Promise<OrganizationOutput> {
-    // Capability gate: this endpoint only ever provisions a TEAM organization (personal orgs are
+    // Capability gate: this endpoint only ever provisions a TEAM organization (personal organizations are
     // auto-provisioned, never created here). Enforce what `/users/me` advertises — in a
-    // personal-only deployment (TEAM_ORGANIZATION_ENABLED=false) team-org creation is rejected
+    // personal-only deployment (TEAM_ORGANIZATION_ENABLED=false) team-organization creation is rejected
     // server-side, not merely hidden by the frontend.
     if (!env.TEAM_ORGANIZATION_ENABLED) {
       throw new ForbiddenError('errors:teamOrganizationsDisabled');
@@ -393,69 +411,73 @@ export class OrganizationService {
     const parsed = validateCreateOrganization(body);
     /**
      * INSERT must pass `organizations_user_discovery` WITH CHECK
-     * (`owner_user_id` resolves to the current `app.current_user_id`). The slug
+     * (`owner_user_id` resolves to the current `app.current_user_public_id`). The slug
      * existence check runs in the same wrap so the SELECT also sees the user GUC.
      */
-    return withUserDatabaseContext(owner_user_public_id, async () => {
-      const ownerId = await this.repository.resolveUserIdByPublicId(owner_user_public_id);
-      if (ownerId === null) throw new NotFoundError('User');
-      // Anti-abuse: cap the number of TEAM organizations a single account may own (personal is
-      // exempt — countActiveOwnedByUser already counts only type='TEAM').
-      // TEN-02 / audit-#8 / audit-R12: serialize the count + insert with ONE per-owner
-      // transaction-scoped advisory lock (the canonical resource-quota lock; releases at COMMIT) so
-      // concurrent creates by the same owner cannot both pass the same count and overshoot the cap.
-      // Previously this path ALSO took a second, redundant lock from the parallel resource-cap-lock
-      // module (now removed) — either lock alone fully serializes, so the second was dead weight.
-      await this.repository.acquireOwnedOrganizationQuotaLock(ownerId);
-      const ownedTeamCount = await this.repository.countActiveOwnedByUser(ownerId);
-      if (ownedTeamCount >= env.MAX_TEAM_ORGANIZATIONS_PER_OWNER) {
-        throw new ConflictError(
-          'errors:maxTeamOrganizationsReached',
-          { max: env.MAX_TEAM_ORGANIZATIONS_PER_OWNER },
-          `Maximum number of team organizations (${env.MAX_TEAM_ORGANIZATIONS_PER_OWNER}) reached for this account`,
-        );
-      }
-      const existing = await this.repository.findBySlug(parsed.slug);
-      if (existing)
-        throw new ConflictError(
-          'errors:organizationSlugExists',
-          { slug: parsed.slug },
-          `Organization with slug "${parsed.slug}" already exists`,
-        ).withReason('organization_slug_exists');
-      try {
-        // Atomically create the organization AND bootstrap the owner's role + full
-        // permissions + membership — without this the creator resolves zero permissions
-        // on their own organization (the permission path is a strict role→membership join).
-        const { organization } = await provisionOrganizationWithOwner({
-          name: parsed.name,
-          slug: parsed.slug,
-          type: 'TEAM',
-          ownerUserId: ownerId,
-        });
-        return this.toOrganizationOutput(organization);
-      } catch (error) {
-        // Two concurrent creates can both pass the findBySlug pre-check; the
-        // loser hits the `idx_organizations_slug` unique index. Map the
-        // Postgres unique_violation to a 409 instead of a 500.
-        if (isPostgresUniqueViolation(error)) {
+    return withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: owner_user_public_id }),
+      async () => {
+        const ownerId = await this.repository.resolveUserIdByPublicId(owner_user_public_id);
+        if (ownerId === null) throw new NotFoundError('User');
+        // Anti-abuse: cap the number of TEAM organizations a single account may own (personal is
+        // exempt — countActiveOwnedByUser already counts only type='TEAM').
+        // TEN-02 / audit-#8 / audit-R12: serialize the count + insert with ONE per-owner
+        // transaction-scoped advisory lock (the canonical resource-quota lock; releases at COMMIT) so
+        // concurrent creates by the same owner cannot both pass the same count and overshoot the cap.
+        // Previously this path ALSO took a second, redundant lock from the parallel resource-cap-lock
+        // module (now removed) — either lock alone fully serializes, so the second was dead weight.
+        await this.repository.acquireOwnedOrganizationQuotaLock(ownerId);
+        const ownedTeamCount = await this.repository.countActiveOwnedByUser(ownerId);
+        if (ownedTeamCount >= env.MAX_TEAM_ORGANIZATIONS_PER_OWNER) {
+          throw new ConflictError(
+            'errors:maxTeamOrganizationsReached',
+            { max: env.MAX_TEAM_ORGANIZATIONS_PER_OWNER },
+            `Maximum number of team organizations (${env.MAX_TEAM_ORGANIZATIONS_PER_OWNER}) reached for this account`,
+          );
+        }
+        const existing = await this.repository.findBySlug(parsed.slug);
+        if (existing)
           throw new ConflictError(
             'errors:organizationSlugExists',
             { slug: parsed.slug },
             `Organization with slug "${parsed.slug}" already exists`,
           ).withReason('organization_slug_exists');
+        try {
+          // Atomically create the organization AND bootstrap the owner's role + full
+          // permissions + membership — without this the creator resolves zero permissions
+          // on their own organization (the permission path is a strict role→membership join).
+          const { organization } = await provisionOrganizationWithOwner({
+            name: parsed.name,
+            slug: parsed.slug,
+            type: 'TEAM',
+            ownerUserId: ownerId,
+          });
+          return this.toOrganizationOutput(organization);
+        } catch (error) {
+          // Two concurrent creates can both pass the findBySlug pre-check; the
+          // loser hits the `idx_organizations_slug` unique index. Map the
+          // Postgres unique_violation to a 409 instead of a 500.
+          if (isPostgresUniqueViolation(error)) {
+            throw new ConflictError(
+              'errors:organizationSlugExists',
+              { slug: parsed.slug },
+              `Organization with slug "${parsed.slug}" already exists`,
+            ).withReason('organization_slug_exists');
+          }
+          throw error;
         }
-        throw error;
-      }
-    });
+      },
+    );
   }
 
   async update(
-    public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     updated_by_user_public_id: string | undefined,
   ): Promise<OrganizationOutput> {
+    const public_id = scope.organizationPublicId;
     const parsed = validateUpdateOrganization(body);
-    return withOrganizationDatabaseContext(public_id, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const organization = await this.repository.findByPublicId(public_id);
       if (!organization) throw new NotFoundError('Organization');
       const userId = await this.repository.resolveUserIdByPublicId(updated_by_user_public_id);
@@ -473,7 +495,7 @@ export class OrganizationService {
       try {
         updated = await this.repository.update(public_id, omitUndefined(parsed), userId ?? null);
       } catch (error) {
-        // Two concurrent slug updates (on different orgs, to the same new slug) can both pass
+        // Two concurrent slug updates (on different organizations, to the same new slug) can both pass
         // the findBySlug pre-check above; the loser hits the `idx_organizations_slug` unique
         // index. Map the unique_violation to a 409 instead of letting it surface as a 500 —
         // mirroring the create path.
@@ -500,18 +522,19 @@ export class OrganizationService {
    *   offboarding resumes (logo/upload cleanup, subscription cancel, soft-delete,
    *   permission-cache purge) and completes.
    * - **Failure modes:** propagates so the reconciler can count + alert and retry on
-   *   the next tick; a PERSONAL org (never deletable standalone, and excluded by the
+   *   the next tick; a PERSONAL organization (never deletable standalone, and excluded by the
    *   reconciler scan) would surface `ConflictError`.
    * - **Side effects:** same as `delete`.
    * - **Notes:** thin alias kept distinct from `delete` so the reconciler's intent is
    *   explicit at the call site.
    */
-  async resumeOffboarding(public_id: string): Promise<void> {
-    await this.delete(public_id);
+  async resumeOffboarding(scope: OrganizationPrincipalDatabaseScope): Promise<void> {
+    await this.delete(scope);
   }
 
-  async delete(public_id: string): Promise<void> {
-    const organization = await withOrganizationDatabaseContext(public_id, async () => {
+  async delete(scope: OrganizationPrincipalDatabaseScope): Promise<void> {
+    const public_id = scope.organizationPublicId;
+    const organization = await withAppDatabaseContext(scope, async () => {
       const found = await this.repository.findByPublicId(public_id);
       if (!found) throw new NotFoundError('Organization');
       // A PERSONAL organization is the user's own account-level workspace — it is never
@@ -524,32 +547,39 @@ export class OrganizationService {
       return found;
     });
     // External I/O (S3) and the upload-service tombstone run outside the deletion transaction.
-    await this.clearOrganizationLogoStorage(public_id, organization.logo_url);
+    await this.clearOrganizationLogoStorage(scope, organization.logo_url);
     if (this.offboardingDependencies) {
       await this.offboardingDependencies.uploadService.tombstoneAllByOrganizationId(
         organization.id,
       );
-      // route-audit-#2: cancel the org's active subscription so deleting the org stops Stripe
+      // route-audit-#2: cancel the org's active subscription so deleting the organization stops Stripe
       // billing (offboarding previously never touched billing). Done BEFORE the soft-delete so a
-      // Stripe failure aborts the whole delete instead of soft-deleting an org that keeps billing.
+      // Stripe failure aborts the whole delete instead of soft-deleting an organization that keeps billing.
       await this.offboardingDependencies.subscriptionService?.cancelActiveForOrganizationOffboarding(
         public_id,
       );
     }
-    const deleted = await withOrganizationDatabaseContext(public_id, () =>
-      this.repository.softDelete(public_id),
+    // The tombstoning UPDATE runs under the global-retention context: sec-new-D3 keeps
+    // `deleted_at IS NULL` on the tenant SELECT arm, and Postgres requires the UPDATE's
+    // NEW row to stay SELECT-visible — under the plain organization scope the soft-delete is
+    // RLS-rejected (42501) AFTER Stripe cancellation already ran. The retention arm
+    // covers USING, WITH CHECK, and new-row visibility; identity columns are unchanged.
+    const deleted = await withMaintenanceDatabaseContext(
+      MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
+      () => this.repository.softDelete(public_id),
     );
     if (!deleted) throw new NotFoundError('Organization');
-    // Purge every member's cached permissions for this org so access stops
+    // Purge every member's cached permissions for this organization so access stops
     // immediately on soft-delete rather than lingering until the cache TTL.
     await invalidateOrganizationPermissions(public_id);
   }
 
   async uploadLogo(
-    public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     body: unknown,
     updated_by_user_public_id: string | undefined,
   ): Promise<OrganizationOutput> {
+    const public_id = scope.organizationPublicId;
     const parsed = validateUploadLogo(body);
     const expectedPrefix = buildOrganizationLogoKeyPrefix(public_id);
     if (!parsed.key.startsWith(expectedPrefix)) {
@@ -575,28 +605,25 @@ export class OrganizationService {
     // TEN-07: store the object KEY (private bucket + signed-on-read), not a permanent
     // unsigned public URL. Reads mint a short-lived signed URL via toOrganizationOutput.
     const logoStorageKey = parsed.key;
-    const { serialized, previousLogoUrl } = await withOrganizationDatabaseContext(
-      public_id,
-      async () => {
-        const organization = await this.repository.findByPublicId(public_id);
-        if (!organization) throw new NotFoundError('Organization');
-        // Bind the upload row to THIS organization explicitly (route-audit L2) — not only via the
-        // key prefix — so the ownership check holds even for a future caller that doesn't derive it.
-        await this.offboardingUploadService!.assertKeyConfirmedForOwner({
-          fileKey: parsed.key,
-          organizationInternalId: organization.id,
-        });
-        const previous = organization.logo_url;
-        const userId = await this.repository.resolveUserIdByPublicId(updated_by_user_public_id);
-        const result = await this.repository.update(
-          public_id,
-          { logo_url: logoStorageKey },
-          userId ?? null,
-        );
-        if (!result) throw new NotFoundError('Organization');
-        return { serialized: await this.toOrganizationOutput(result), previousLogoUrl: previous };
-      },
-    );
+    const { serialized, previousLogoUrl } = await withAppDatabaseContext(scope, async () => {
+      const organization = await this.repository.findByPublicId(public_id);
+      if (!organization) throw new NotFoundError('Organization');
+      // Bind the upload row to THIS organization explicitly (route-audit L2) — not only via the
+      // key prefix — so the ownership check holds even for a future caller that doesn't derive it.
+      await this.offboardingUploadService!.assertKeyConfirmedForOwner({
+        fileKey: parsed.key,
+        organizationInternalId: organization.id,
+      });
+      const previous = organization.logo_url;
+      const userId = await this.repository.resolveUserIdByPublicId(updated_by_user_public_id);
+      const result = await this.repository.update(
+        public_id,
+        { logo_url: logoStorageKey },
+        userId ?? null,
+      );
+      if (!result) throw new NotFoundError('Organization');
+      return { serialized: await this.toOrganizationOutput(result), previousLogoUrl: previous };
+    });
     // Reclaim the PREVIOUS owned logo object outside the DB context — replacing a logo previously
     // orphaned the old S3 object (storage leak). Best-effort + prefix-guarded.
     if (previousLogoUrl && previousLogoUrl !== logoStorageKey) {
@@ -606,10 +633,11 @@ export class OrganizationService {
   }
 
   async deleteLogo(
-    public_id: string,
+    scope: OrganizationPrincipalDatabaseScope,
     updated_by_user_public_id: string | undefined,
   ): Promise<OrganizationOutput> {
-    const organization = await withOrganizationDatabaseContext(public_id, async () => {
+    const public_id = scope.organizationPublicId;
+    const organization = await withAppDatabaseContext(scope, async () => {
       const found = await this.repository.findByPublicId(public_id);
       if (!found) throw new NotFoundError('Organization');
       return found;
@@ -618,7 +646,7 @@ export class OrganizationService {
     // left untouched) — previously DELETE left the object orphaned in the bucket (storage leak).
     // External I/O (S3) runs outside the DB context; best-effort, so a missing object still clears.
     await this.deleteOwnedOrganizationLogoObject(public_id, organization.logo_url);
-    return withOrganizationDatabaseContext(public_id, async () => {
+    return withAppDatabaseContext(scope, async () => {
       const userId = await this.repository.resolveUserIdByPublicId(updated_by_user_public_id);
       const updated = await this.repository.update(public_id, { logo_url: null }, userId ?? null);
       if (!updated) throw new NotFoundError('Organization');
