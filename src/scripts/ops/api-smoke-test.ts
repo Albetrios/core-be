@@ -86,7 +86,6 @@ function authHeaders(includeOrganization = false): Record<string, string> {
     Accept: 'application/json',
   };
   if (includeOrganization) {
-    headers['X-Organization-Id'] = requireOrganizationId();
   }
   return headers;
 }
@@ -171,7 +170,7 @@ async function setupOrganization(): Promise<void> {
   smokeContext.organizationId = demoOrganization.id;
 
   // Post-flatten, the ACTIVE organization rides the signed `org` JWT claim — the
-  // X-Organization-Id header is ignored on flat routes. Login mints a token scoped to the
+  // The X-Organization-Id header was removed. Login mints a token scoped to the
   // demo user's PERSONAL organization, where the organization-permission probes (subscription:read,
   // webhook:read, audit-log:read) legitimately 403. Switch to the demo TEAM organization and adopt
   // the re-scoped token, exactly as a real client does.

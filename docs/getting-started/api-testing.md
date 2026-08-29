@@ -46,7 +46,7 @@ Permissions, plans, demo organization, admin role, membership, an extra organiza
 ### Active organization (token `org` claim)
 
 Org-scoped routes are **flat** — there is no per-organization path segment and no
-`X-Organization-Id` header on organization-scoped calls. The active organization rides the signed `organizationPublicId`
+any organization header. The active organization rides the signed `org`
 claim inside the access token, so the active-organization resource is singular: `/api/v1/tenancy/organization`
 (sub-resources nest under it). The claim is **scope, not authority** — membership and RLS are
 re-checked per request.
@@ -71,7 +71,7 @@ curl -s -X POST http://localhost:3000/api/v1/auth/switch-to-organization \
   -d "{\"organization_id\":\"$ORG_ID\"}" | jq -r '.data.access_token'
 ```
 
-> `X-Organization-Id` is **legacy** and used only by the upload domain; organization-scoped tenancy,
+> The `X-Organization-Id` header was **removed**; organization-scoped tenancy,
 > billing, and notify routes read the active organization from the token claim. Status policy reference:
 > [response-codes.md](../reference/api/response-codes.md).
 

@@ -8,7 +8,7 @@ import {
  * Canonical client integration guide served as the `{slug}://client-guide` MCP
  * resource. It tells any frontend or API client how to authenticate, how the
  * active organization is carried (the signed `org` JWT claim — never a URL path
- * segment or the legacy `X-Organization-Id` header), how to switch the active
+ * segment or any organization header — the header was removed), how to switch the active
  * organization, and how to call the flat organization-scoped routes.
  *
  * @remarks
@@ -44,7 +44,7 @@ alongside \`${MCP_OPENAPI_RESOURCE_URI}\` (full spec) and \`${MCP_ROUTES_RESOURC
 - Every user has exactly one **personal** organization (auto-provisioned on
   signup) plus zero or more **team** organizations they are a member of.
 - The active organization is the signed \`org\` JWT claim. It is **NOT** a URL
-  path segment and **NOT** the \`X-Organization-Id\` header. Organization-scoped
+  path segment and **NOT** any organization header (removed). Organization-scoped
   routes resolve the tenant from the token — the client sends nothing extra
   per request. Membership and Row-Level Security are re-checked on every call.
 - **Switch the active organization** (this re-mints the access token — use the
@@ -90,7 +90,7 @@ The active organization is implicit (from the token), so routes are flat:
   subscription create / change-plan / cancel / resume).
 - \`X-CSRF-Token\` — required on \`POST /api/v1/auth/refresh\`.
 - \`X-Captcha-Token\` — required on public auth forms (login, register, magic link).
-- \`X-Organization-Id\` — LEGACY. Only the upload domain still reads it; it is NOT
+- \`X-Organization-Id\` — REMOVED. No route reads it; it is NOT
   the organization selector for the flat routes. Do not use it to scope tenancy/billing/
   notify calls — switch the token instead.
 

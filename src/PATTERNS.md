@@ -14,7 +14,7 @@ Prevent cross-tenant data leaks. Every read and write performed under an organiz
 
 ### Where it lives
 
-- HTTP layer: [src/shared/middlewares/tenant/tenant.middleware.ts](src/shared/middlewares/tenant/tenant.middleware.ts) — reads `X-Organization-Id`, validates its format, and decorates `request.organizationId`. The **authoritative** active organization is the signed `org` JWT claim; routes carry no `{organization_id}` path segment.
+- HTTP layer: [src/shared/middlewares/core/auth.middleware.ts](src/shared/middlewares/core/auth.middleware.ts) — verifies the JWT / API key and eagerly attaches `request.principalScope` (plus the claim-derived `request.organizationId` decoration). The **authoritative** active organization is the signed `org` JWT claim; routes carry no `{organization_id}` path segment and the legacy `X-Organization-Id` header was removed.
 - Database layer: [src/infrastructure/database/contexts/database-context.ts](src/infrastructure/database/contexts/database-context.ts) — `withAppDatabaseContext(scope, …)` opens a Drizzle transaction and sets the identity GUCs (`app.current_organization_public_id` / `app.current_user_public_id`) from the token-minted principal scope in one `set_config` statement. RLS policies on organization-scoped tables read those GUCs.
 - Worker layer: [src/infrastructure/queue/worker-runtime/worker-processor.util.ts](src/infrastructure/queue/worker-runtime/worker-processor.util.ts) — `runOrganizationScopedWorkerJob` requires `organizationPublicId` in the job payload and wraps the processor body in `withAppDatabaseContext` (with a job-minted principal scope) so RLS sees the same GUC the HTTP layer would have set.
 
@@ -23,15 +23,17 @@ Prevent cross-tenant data leaks. Every read and write performed under an organiz
 ```mermaid
 sequenceDiagram
   participant Client
-  participant Mw as tenant.middleware
+  participant Auth as auth.middleware
+  participant Ctl as controller
   participant Svc as service
   participant Ctx as withAppDatabaseContext
   participant DB as Postgres (RLS)
-  Client->>Mw: HTTP request with X-Organization-Id
-  Mw->>Mw: validate X-Organization-Id format
-  Mw->>Svc: request.organizationId
+  Client->>Auth: HTTP request (Bearer JWT, signed org claim)
+  Auth->>Auth: verify JWT; attach request.principalScope
+  Ctl->>Ctl: requireOrganizationScope(request) — 403 without an organization
+  Ctl->>Svc: service.method(scope, dto)
   Svc->>Ctx: withAppDatabaseContext(scope, fn)
-  Ctx->>DB: BEGIN; SET LOCAL app.current_organization_public_id = organizationId
+  Ctx->>DB: BEGIN; SET LOCAL app.current_organization_public_id
   Ctx->>Svc: pinned databaseHandle (transaction)
   Svc->>DB: SELECT/INSERT/UPDATE (RLS filters by organization)
   Ctx->>DB: COMMIT

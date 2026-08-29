@@ -71,7 +71,6 @@ flowchart LR
 | `X-Idempotency-Key: <uuid>` | `POST`/`PUT`/`PATCH` writes | **Required on 13 routes**, optional elsewhere | `422` if missing on a required route. See [Idempotency keys](#idempotency-keys). |
 | `X-Captcha-Token: <widget token>` | public auth forms | **Required only when Turnstile is configured** (production) | From the Cloudflare Turnstile widget. Routes: `login`, `mfa/login`, `email/send-code`, `password/forgot`, `password/reset`, `email/verify`, OAuth init. |
 | `X-CSRF-Token: <csrf_token cookie value>` | `POST /auth/refresh` **only**, **only if you don't send `Origin`** | Browsers: **not needed** | Browsers always send `Origin`, which satisfies the refresh origin check. This is a fallback for non-browser clients. |
-| `X-Organization-Id: <org_…>` | **upload domain routes only** | Upload only | The flat organization-scoped routes **ignore** it (organization comes from the token claim). Do **not** send it elsewhere. |
 
 **Cookies — never touched by JS.** The browser stores and sends `session_id` (httpOnly) and
 `csrf_token` automatically, scoped to `/api/v1/auth`. Always call `fetch` with
@@ -81,7 +80,7 @@ flowchart LR
 `X-RateLimit-*` (response only), `Stripe-Signature` (Stripe → server only), and the metrics scrape
 token (ops/Prometheus only — not a browser concern).
 
-**What you do *not* send for multi-tenancy:** there is **no** `X-Organization-Id` and **no**
+**What you do *not* send for multi-tenancy:** there is **no** organization header and **no**
 `/organizations/{id}/` path segment on the app routes. The active organization is the token's `org`
 claim — see [Active organization & switching](#active-organization--switching).
 
@@ -634,7 +633,7 @@ The auth/tenancy flow was reshaped across mid-2026 — if you integrated against
   singular `/tenancy/organization` resource now sources the tenant from the signed **`org`** claim.
 - **Switch endpoints** `POST /auth/switch-to-personal` and `POST /auth/switch-to-organization` mint a
   new token with a different `org` claim (and invalidate the previous one).
-- **`X-Organization-Id` is no longer used by the app routes** — only the upload domain still reads it.
+- **The `X-Organization-Id` header was removed** — no route reads it; the organization rides the token claim.
 - **`/auth/mfa/login` now accepts `X-Captcha-Token`** (bot-protection at the MFA step).
 
 See [personal-vs-team-organizations.md](../architecture/personal-vs-team-organizations.md) for the full

@@ -204,18 +204,12 @@ function resolveIdempotencyScope(request: FastifyRequest): {
   const authentication = request.auth;
   const requestWithOrganization = request as FastifyRequest & { organizationId?: string | null };
   const organizationFromRequest = requestWithOrganization.organizationId;
-  const organizationHeader = request.headers['x-organization-id'];
-  const organizationIdFromHeader =
-    typeof organizationHeader === 'string' && organizationHeader.length > 0
-      ? organizationHeader
-      : undefined;
-  // The active organization scopes the idempotency cache key. After the route flatten it rides the
-  // signed `org` JWT claim (`auth.organizationPublicId`) — the authoritative active organization for both
-  // user and API-key principals — not the legacy `X-Organization-Id` header (which clients no longer
-  // send on flat routes). Without this, a user reusing an X-Idempotency-Key across organizations would collide
-  // in the same `idempotency:none:<userId>:<key>` bucket. Header is kept only as a pre-auth fallback.
+  // The active organization scopes the idempotency cache key. It rides the signed `org`
+  // JWT claim (`auth.organizationPublicId`) — the authoritative active organization for
+  // both user and API-key principals; `request.organizationId` is the claim-derived
+  // decoration set by the auth middleware (the X-Organization-Id header was removed).
   const organizationId =
-    authentication?.organizationPublicId ?? organizationFromRequest ?? organizationIdFromHeader;
+    authentication?.organizationPublicId ?? organizationFromRequest ?? undefined;
 
   return omitUndefined({
     userId: authentication?.kind === 'user' ? authentication.userId : undefined,

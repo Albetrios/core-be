@@ -8,6 +8,7 @@ import { GLOBAL_ROLES, type GlobalRole } from '@/shared/constants/roles.constant
 import { resolveGlobalRoleForEmail } from '@/shared/utils/auth/global-admin-role.util.js';
 import { applyApiKeyAuthentication } from '@/shared/middlewares/security/api-key-auth.middleware.js';
 import { PRINCIPAL_SCOPE } from '@/infrastructure/database/contexts/database-context.js';
+import { attachRequestI18nHelpers } from '@/shared/middlewares/core/i18n.middleware.js';
 
 function getBearerToken(request: FastifyRequest): string {
   const authorizationHeader = request.headers.authorization;
@@ -68,17 +69,20 @@ async function rederiveSuperAdminRole(
 }
 
 async function authenticate(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
-  if (request.auth) {
-    attachRequestPrincipalScope(request);
-    return;
+  if (!request.auth) {
+    const apiKeyAuthenticated = await applyApiKeyAuthentication(request);
+    if (!apiKeyAuthenticated) {
+      await authenticateWithBearerToken(request);
+    }
   }
+  // Single attach point for every authentication path (C2): scope + the
+  // claim-derived request.organizationId, then the organization default locale
+  // (claim-driven — the pre-auth X-Organization-Id header is gone).
+  attachRequestPrincipalScope(request);
+  await applyOrganizationDefaultLocale(request);
+}
 
-  const apiKeyAuthenticated = await applyApiKeyAuthentication(request);
-  if (apiKeyAuthenticated) {
-    attachRequestPrincipalScope(request);
-    return;
-  }
-
+async function authenticateWithBearerToken(request: FastifyRequest): Promise<void> {
   const token = getBearerToken(request);
 
   try {
@@ -119,7 +123,6 @@ async function authenticate(request: FastifyRequest, _reply: FastifyReply): Prom
       // still re-checked per request — the claim is scope, not authority.
       organizationPublicId: payload.organizationPublicId,
     }) as AuthContext;
-    attachRequestPrincipalScope(request);
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       throw error;
@@ -153,10 +156,46 @@ export function attachRequestPrincipalScope(request: FastifyRequest): void {
           userPublicId: auth.userId,
           organizationPublicId: auth.organizationPublicId,
         });
+  // Claim-derived organization decoration — the only writer since the
+  // X-Organization-Id header (and tenant middleware) were removed. Consumers
+  // (idempotency scope, rate-limit keys, error-handler context, i18n) now see a
+  // VERIFIED value or null, never an attacker-controlled header.
+  (request as FastifyRequest & { organizationId: string | null }).organizationId =
+    auth.organizationPublicId ?? null;
+}
+
+/**
+ * Applies the organization's default locale when the client sent no
+ * `Accept-Language` — claim-driven replacement for the removed pre-auth
+ * header flow (which was an unauthenticated DB-lookup amplification vector).
+ *
+ * @remarks
+ * - **Algorithm:** skip when `Accept-Language` is present or no organization is
+ *   in scope; otherwise resolve the organization's `default_locale` (Redis-cached)
+ *   and re-attach the request i18n helpers with it.
+ * - **Failure modes:** none surfaced — locale resolution errors fall back to the
+ *   default locale inside the settings service.
+ * - **Side effects:** may rebind `request.t` / `request.language` / `request.i18n`.
+ */
+async function applyOrganizationDefaultLocale(request: FastifyRequest): Promise<void> {
+  if (request.headers['accept-language']) return;
+  const organizationPublicId = request.auth?.organizationPublicId;
+  if (!organizationPublicId) return;
+  const organizationSettingsService = request.server.tenancyDomain?.organizationSettingsService;
+  if (!organizationSettingsService) return; // minimal entrypoints / unit harnesses without tenancy wiring
+  const organizationDefaultLocale =
+    await organizationSettingsService.resolveDefaultLocaleForOrganization(organizationPublicId);
+  attachRequestI18nHelpers(
+    request,
+    request as unknown as Parameters<typeof attachRequestI18nHelpers>[1],
+    organizationDefaultLocale,
+  );
 }
 
 const authMiddleware: FastifyPluginAsync = async (app) => {
   app.decorateRequest('auth', null);
+  // Claim-derived organization decoration (writer: attachRequestPrincipalScope).
+  app.decorateRequest('organizationId', null);
   // The principal scope is a plain per-request property, eagerly assigned by
   // attachRequestPrincipalScope the moment authentication succeeds (both JWT
   // and API-key paths) — undefined on public/unauthenticated routes.

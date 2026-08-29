@@ -315,7 +315,7 @@ BASE_URL=http://localhost:3000 VUS=50 POOL=50 k6 run src/tests/load/k6/scenarios
 ### Org-scoped / RLS-heavy (informational, CI nightly)
 
 Org-scoped scenarios resolve the tenant from the token's `org` claim — no organization path segment and no
-`X-Organization-Id` header. `TEST_ORG_ID` is used to **scope the token** to that organization (the helpers
+any organization header. `TEST_ORG_ID` is used to **scope the token** to that organization (the helpers
 call `switchToOrganization` / `loginScopedToOrganization`), not to build the path.
 
 | File | Env | Routes |

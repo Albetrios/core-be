@@ -95,6 +95,10 @@ mistaken for the current one:
 | 11 | route contracts inside the getters | `requireAuth`-family narrowing accessors: `requireOrganizationScope(request)` (403) / `requireUserScope(request)` (401 for API keys) | 102 narrow-typed field reads keep compile-time guarantees; the contract is the accessor the route calls |
 | 12 | organization path-param precedence (param ?? claim, param validated) | **path params ignored — the signed claim decides** | routes carry no `{organization_id}` segment; param handling was a vestigial IDOR surface |
 | 13 | session scope `{ kind, value }` | `SESSION_SCOPE.ARTIFACT({ sessionPublicId \| sessionTokenHash })` — named fields | field name = GUC name, mirroring the principal grammar |
+| 14 | short forms in prose/identifiers (`org`, `orgs`, `orgB`, `org-permission`) | `organization` everywhere — prose, test titles, catalog data, script names | full-names rule extended beyond identifiers; INTENTIONAL compact wire literals stay: `org_` prefix, JWT claims `org`/`sv` (documented in full-names-only.mdc + api-contract-guard) |
+| 15 | brief `requireTenantScope` / `requireUserAuth` detour | reverted to `requireOrganizationScope` / `requireAuth` | "tenant" stays boundary vocabulary (middleware/pattern/policy names), "organization" is the accessor vocabulary — recorded so the tenant rename is not re-proposed |
+| 16 | `runTenantScopedWorkerJob` + `TenantScopedJobData` | `runOrganizationScopedWorkerJob` + `OrganizationScopedJobData` | worker runner aligned with the accessor vocabulary |
+| 17 | `X-Organization-Id` header + pre-auth tenant middleware | header REMOVED; `request.organizationId` is claim-derived in the auth middleware; organization default-locale moved behind the claim | the header was attacker-controllable pre-auth (documented amplification vector) and dead in authorization; single source of organization truth = the signed claim |
 
 Locked decisions that bound future changes (do NOT revisit casually): the callback shape
 (§3), the wrapper-per-pool split, the scope-family type split (values dynamic, GUC keys

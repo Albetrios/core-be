@@ -3,7 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { createAuditController } from '@/domains/audit/audit.controller.js';
 import type { ListAuditLogsQuery } from '@/domains/audit/audit.dto.js';
 import type { AuditService } from '@/domains/audit/audit.service.js';
-import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 function mockReply(): FastifyReply {
   const headers = new Map<string, string>();
@@ -21,7 +21,7 @@ function mockReply(): FastifyReply {
 function mockRequest(
   overrides: Partial<FastifyRequest<{ Querystring: ListAuditLogsQuery }>> = {},
 ): FastifyRequest<{ Querystring: ListAuditLogsQuery }> {
-  return attachPrincipalScopeGetters({
+  return attachPrincipalScope({
     query: { limit: 20 },
     id: 'request-id',
     ...overrides,

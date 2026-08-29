@@ -1534,8 +1534,7 @@ src/
     │   │   ├── cookie-session-origin.pre-handler.ts
     │   │   └── cookie.middleware.ts
     │   ├── tenant/
-    │   │   ├── organization-rls-transaction.middleware.ts
-    │   │   └── tenant.middleware.ts
+    │   │   └── organization-rls-transaction.middleware.ts
     │   └── index.ts
     ├── types/
     │   └── index.ts
@@ -1789,7 +1788,7 @@ src/
     │   ├── database-context-mock.helper.ts
     │   ├── fast-check-property.util.ts
     │   ├── object-storage-mock.helper.ts
-    │   ├── principal-scope-getters.helper.ts
+    │   ├── principal-scope.helper.ts
     │   ├── redis-mock.helper.ts
     │   ├── registered-route.util.ts
     │   ├── rls-matrix.helper.ts
@@ -2161,8 +2160,7 @@ src/
     │   │   ├── response-format.middleware.hook.unit.test.ts
     │   │   ├── response-format.middleware.unit.test.ts
     │   │   ├── server-timing.middleware.unit.test.ts
-    │   │   ├── shutdown.middleware.unit.test.ts
-    │   │   └── tenant.middleware.unit.test.ts
+    │   │   └── shutdown.middleware.unit.test.ts
     │   ├── observability/
     │   │   ├── business-metrics.unit.test.ts
     │   │   ├── db-pool-alert.service.unit.test.ts

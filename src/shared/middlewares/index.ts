@@ -16,7 +16,6 @@ import idempotencyMiddleware from './core/idempotency.middleware.js';
 import encryptionMiddleware from './security/encryption.middleware.js';
 import authMiddleware from './core/auth.middleware.js';
 import zodTypeProviderMiddleware from './core/zod-type-provider.middleware.js';
-import tenantMiddleware from './tenant/tenant.middleware.js';
 import organizationRlsTransactionMiddleware from './tenant/organization-rls-transaction.middleware.js';
 import requestStatementTimeoutMiddleware from './core/request-statement-timeout.middleware.js';
 import healthMiddleware from './core/health.middleware.js';
@@ -67,9 +66,6 @@ export const middlewarePlugins = [
   encryptionMiddleware,
   zodTypeProviderMiddleware,
   authMiddleware,
-  tenantMiddleware,
-  // `tenantMiddleware` stays AFTER `i18nMiddleware` because it throws a
-  // translated `ValidationError` on header/path mismatch.
   // `rateLimitMiddleware` runs after auth + tenant so per-user / per-organization keys
   // are available (the global limiter is keyed on `request.ip`, so it does
   // not strictly require either, but per-route limits do). Order is otherwise

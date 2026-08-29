@@ -76,7 +76,6 @@ describe('Chaos resilience: Redis permission-cache miss', () => {
               url: testApiPath('/tenancy/organization/memberships'),
               headers: {
                 authorization: `Bearer ${authenticationTokenWaitingForIsolation}`,
-                'x-organization-id': organizationWaitingForIsolation.public_id,
               },
             });
 

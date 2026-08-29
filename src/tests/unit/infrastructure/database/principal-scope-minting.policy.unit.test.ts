@@ -49,7 +49,7 @@ describe('principal-scope minting confinement', () => {
       'src/shared/middlewares/core/auth.middleware.ts',
       'src/infrastructure/database/contexts/database-context.ts',
       // Test mirror of the middleware attachment (doc reference only).
-      'src/tests/helpers/principal-scope-getters.helper.ts',
+      'src/tests/helpers/principal-scope.helper.ts',
     ];
     const offenders = grepFiles('PRINCIPAL_SCOPE.REQUEST').filter(
       (filePath) => !allowed.some((suffix) => filePath.endsWith(suffix)),

@@ -114,7 +114,7 @@ The audit confirms a mature posture. This baseline **builds on** it; it does not
 | Defense | Mechanism | Evidence |
 | ------- | --------- | -------- |
 | Non-enumerable ids | `generatePublicId(entity)` → `prefix_<21 [a-z0-9]>` | `shared/utils/identity/public-id.util.ts` |
-| Org isolation | FORCE RLS on `app.current_organization_id`; organization resolved from JWT `org` claim only | `migrations/00000000000000_init.sql`, tenant middleware |
+| Org isolation | FORCE RLS on `app.current_organization_public_id`; organization resolved from JWT `org` claim only | `migrations/00000000000000_init.sql`, auth middleware scope attach |
 | User isolation | `withUserDatabaseContext` (`app.current_user_id`) + `(public_id, user_id)` repo filters | `auth-method`, `auth-mfa`, `notification`, `upload`, `user-data-export` services |
 | Function gating | permission middleware on every `PERM:` route | `shared/middlewares/` + route registration |
 | Tier guards | `ownerMembershipCannotBeModified`, `ownerCannotBeRemoved`, `ownerCannotLeave`, `onlyOwnerCanTransfer` | `membership.service.ts` (tagged `sec-new-T1`) |

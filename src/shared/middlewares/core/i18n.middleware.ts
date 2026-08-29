@@ -136,22 +136,8 @@ const i18nMiddleware: FastifyPluginAsync = async (app) => {
     });
   });
 
-  // After tenant middleware sets organizationId: apply organization default_locale when Accept-Language is absent.
-  app.addHook('preHandler', async (request) => {
-    if (request.headers['accept-language']) {
-      return;
-    }
-    const organizationPublicId = request.organizationId;
-    if (!organizationPublicId) {
-      return;
-    }
-    const organizationDefaultLocale =
-      await request.server.tenancyDomain.organizationSettingsService.resolveDefaultLocaleForOrganization(
-        organizationPublicId,
-      );
-    const req = request as unknown as I18nRequest;
-    attachRequestI18nHelpers(request, req, organizationDefaultLocale);
-  });
+  // Organization default-locale application moved to the auth middleware
+  // (claim-driven) when the pre-auth X-Organization-Id header was removed.
 };
 
 // fp(): i18nMiddleware registers global onRequest/preHandler hooks that set request.t /

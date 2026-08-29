@@ -195,7 +195,7 @@ export function workerDatabaseContextForUser(userPublicId: string): WorkerDataba
 export type RequestScopedPostgresDatabase = PostgresDatabaseHandle;
 
 /**
- * Fastify HTTP requests that send `X-Organization-Id` run inside a single Drizzle
+ * Organization-scoped Fastify HTTP requests run inside a single Drizzle
  * transaction with `SET LOCAL app.current_organization_public_id` so every query shares one
  * checkout from the postgres.js pool and RLS policies see a stable GUC.
  *

@@ -5,7 +5,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/api-contract-guard/SKILL.md",
-      "computedHash": "91ce6839720d28a31ab19501c292f6b709029a846da984f358c3a58b94a8d311"
+      "computedHash": "3a8f2fbea8db709c0ab3cbc527c24d64093d595737cbe0759543c8829cce7554"
     },
     "auto-implement": {
       "source": "local",
@@ -179,13 +179,13 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/production-hardening-guard/SKILL.md",
-      "computedHash": "4614ae0e7ca39fcd3118208800607d8dceb59b7f2f80d9e5690f6ba3b4e25590"
+      "computedHash": "bc652179b48038ccb1ac271d75c8ffcd134287a47aec4e0471e2e24c6bea89bc"
     },
     "rls-tenant-isolation-guard": {
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/rls-tenant-isolation-guard/SKILL.md",
-      "computedHash": "5289ea015003e9dc54740bc44b1fcbeb6f97451c008a90a70d0696b018ff9950"
+      "computedHash": "2372b501d1fa0552b08d4aa20fbdc43d43ce7e0a71a8a6aebde76b229a5facc9"
     },
     "route-catalog": {
       "source": "local",
@@ -233,7 +233,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/structure-maintainer/SKILL.md",
-      "computedHash": "4ff574f09e09cb796db7e0b0499cf31308efa7b683fce37fb15e6e7e9b5f33ad"
+      "computedHash": "b4d9e4d0793e4c8e98b49abe789e6586fe68d13443b1800bdb8e47e5d56b74ce"
     },
     "supabase-porting": {
       "source": "local",
@@ -251,7 +251,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/test-generator/SKILL.md",
-      "computedHash": "502464448c065ac52090fac98f4b1cc54c721482f7b635c060c6a84cded0e7d7"
+      "computedHash": "3167fbabd376a101e1d4e51bff5d2e558ce7b0310a426bb8d0e1b9529318bd2e"
     },
     "tsdoc-export-guard": {
       "source": "local",

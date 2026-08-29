@@ -17,7 +17,7 @@ import { getEnv } from '@/shared/config/env.config.js';
 
 /**
  * Generate a test organization public ID for use in tests.
- * When used with X-Organization-Id header.
+ * Legacy header helper — the X-Organization-Id header was removed; kept only where a suite deliberately sends an inert header.
  */
 export function generateTestOrganizationId(): string {
   return generatePublicId('organization');

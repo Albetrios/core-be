@@ -111,7 +111,7 @@ function buildRateLimitKeyFromOrganizationActorOrIpAddress(request: FastifyReque
   // returned the empty-string user sentinel for API keys, defeating per-actor isolation.
   const actorId = request.auth ? getAuthenticatedActorId(request.auth) : undefined;
   // Prefer the signed `org` token claim (the active organization for both user and API-key principals) over
-  // the legacy `X-Organization-Id` header, which flat-route clients no longer send. Without this the
+  // the claim-derived request decoration. Without this the
   // per-(organization, actor) bucket would collapse to per-actor post-flatten, so one actor's spend
   // in one organization would throttle them everywhere instead of isolating quota by active organization.
   const requestWithOrganization = request as FastifyRequest & {

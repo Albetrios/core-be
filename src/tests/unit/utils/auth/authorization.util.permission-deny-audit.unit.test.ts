@@ -12,7 +12,7 @@ import {
   requireOrganizationPermission,
   requireRole,
 } from '@/shared/utils/auth/authorization.util.js';
-import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 /**
  * Regression for sec-U13 (Low): both `requireRole` and
@@ -36,7 +36,7 @@ describe('authorization.util — permission-deny audit (sec-U13)', () => {
   const auditRecord = vi.fn().mockResolvedValue(undefined);
 
   function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-    return attachPrincipalScopeGetters({
+    return attachPrincipalScope({
       auth: { kind: 'user' as const, userId: 'user-1', role: GLOBAL_ROLES.USER },
       params: { organization_id: 'org-public' },
       routeOptions: { url: '/api/v1/admin/test' },

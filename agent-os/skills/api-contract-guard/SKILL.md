@@ -94,7 +94,7 @@ Every organization-scoped list endpoint uses the **shared** helpers in `src/shar
 
 - `Authorization: Bearer <ACCESS_TOKEN>` — every authed route (OpenAPI security scheme; Postman collection-level bearer `{{ACCESS_TOKEN}}`).
 - `Content-Type: application/json` — any body.
-- `X-Organization-Id` — legacy header read directly by a few consumers (e.g. the upload domain); organization-scoped routes resolve the active organization from the signed `org` JWT claim, NOT this header. Switch the active organization via `/auth/switch-to-personal` / `/auth/switch-to-organization` (which re-mint the access token).
+- `X-Organization-Id` — **removed**. Organization-scoped routes resolve the active organization from the signed `org` JWT claim only; switch it via `/auth/switch-to-personal` / `/auth/switch-to-organization` (which re-mint the access token). Never reintroduce an organization header.
 - `X-Idempotency-Key` — all mutating routes (optional, auto-generate in clients); REQUIRED on the 13 writes registered with `config.idempotencyRequired: true` (organization create, memberships, transfer-ownership, subscription create/change-plan/cancel/resume, payment-method setup, webhooks, api-keys, notification-policies, roles, uploads). Live list = the `I` (`req`) column in `docs/routes.txt`.
 - `X-Captcha-Token` — public auth forms only (login, email verification-code send + login, password forgot/reset, mfa/login, webauthn authenticate options, oauth authorize).
 - `X-CSRF-Token` — POST /auth/refresh only (double-submit of the csrf_token cookie). Keeps the X- form (frontend-framework default).
@@ -102,7 +102,7 @@ Every organization-scoped list endpoint uses the **shared** helpers in `src/shar
 
 ## Headers kept in X- form (ecosystem standards)
 
-`X-Request-Id`, `X-Client-Request-Id`, `X-Api-Key`, `X-CSRF-Token`, `X-RateLimit-*` (server-emitted with `Retry-After` on 429), Helmet's security headers, `X-Forwarded-For`, `X-Requested-With` (CORS-allowlisted in `cors.middleware.ts` so browser/XHR-library preflights pass — the app reads no meaning from it). Custom headers use the X- form for visual consistency with the infrastructure headers: `X-Organization-Id`, `X-Idempotency-Key`, `X-Idempotency-Replay` (response marker), `X-Captcha-Token`. Standards keep their fixed names: `Authorization`, `Stripe-Signature`, `Retry-After`.
+`X-Request-Id`, `X-Client-Request-Id`, `X-Api-Key`, `X-CSRF-Token`, `X-RateLimit-*` (server-emitted with `Retry-After` on 429), Helmet's security headers, `X-Forwarded-For`, `X-Requested-With` (CORS-allowlisted in `cors.middleware.ts` so browser/XHR-library preflights pass — the app reads no meaning from it). Custom headers use the X- form for visual consistency with the infrastructure headers: `X-Idempotency-Key`, `X-Idempotency-Replay` (response marker), `X-Captcha-Token`. Standards keep their fixed names: `Authorization`, `Stripe-Signature`, `Retry-After`.
 
 ## Sync checklist when touching any of the above
 

@@ -154,7 +154,7 @@ describe('OrganizationSettingsService', () => {
     });
 
     // sec-M1: cache hit must short-circuit the DB call entirely so an
-    // attacker spamming pre-auth requests with an `X-Organization-Id` header
+    // attacker spamming locale lookups (historically via the removed pre-auth header)
     // cannot drive thousands of Postgres lookups per second.
     it('returns the cached locale and skips the DB when cache hits (sec-M1)', async () => {
       i18nLocaleCacheSpies.get.mockResolvedValueOnce('es');

@@ -37,7 +37,7 @@ async function hasSoftDeletedFilterInPolicy(): Promise<boolean> {
  *   public_id = app.current_organization_public_id
  *   OR app.global_retention_cleanup = 'true'
  *
- * A request with `X-Organization-Id` set to a deleted org's `public_id` could
+ * A request scoped (via its token claim) to a deleted organization's `public_id` could
  * still read the organizations row directly. The fix adds `AND deleted_at IS NULL`
  * to the tenant-scoped arm so soft-deleted organizations are invisible to HTTP requests.
  * The `global_retention_cleanup` bypass arm is unchanged — retention workers must

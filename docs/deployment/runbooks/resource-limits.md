@@ -139,7 +139,7 @@ Size the connection budget against Neon `max_connections` (see formula above).
 
 ### Row-level security (RLS) and the connection pool
 
-Org-scoped HTTP routes (`X-Organization-Id` set) hold **one pool checkout** for the full request via `organizationRlsTransactionMiddleware` (`BEGIN` + `SET LOCAL app.current_organization_public_id`). That keeps Postgres RLS policies aligned with the handler on a single connection.
+Organization-scoped HTTP routes hold **one pool checkout per unit of work** via `withAppDatabaseContext` (`BEGIN` + `SET LOCAL app.current_organization_public_id`, released at COMMIT) — the old request-pinned transaction middleware is a no-op stub.
 
 > **Throughput SLA (RLS ceiling).** Because each organization-scoped request holds its connection for the
 > whole request, a single process sustains at most `DATABASE_POOL_MAX` concurrent organization-scoped

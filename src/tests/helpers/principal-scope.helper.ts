@@ -15,7 +15,7 @@ import { attachRequestPrincipalScope } from '@/shared/middlewares/core/auth.midd
  * into the claim (`auth.organizationPublicId ?? params.organization_id`,
  * `kind` defaulting to `'user'`) before running the real attachment.
  */
-export function attachPrincipalScopeGetters<T extends object>(request: T): T {
+export function attachPrincipalScope<T extends object>(request: T): T {
   Object.defineProperty(request, 'principalScope', {
     configurable: true,
     get: () => {

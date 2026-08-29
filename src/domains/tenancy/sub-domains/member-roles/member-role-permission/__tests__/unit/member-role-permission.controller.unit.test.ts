@@ -4,10 +4,10 @@ import { createMemberRolePermissionController } from '@/domains/tenancy/sub-doma
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { NotFoundError, UnauthorizedError } from '@/shared/errors/index.js';
 import type { MemberRolePermissionService } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.service.js';
-import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): FastifyRequest {
-  return attachPrincipalScopeGetters({
+  return attachPrincipalScope({
     auth: { kind: 'user', userId: generatePublicId('user'), role: 'user' },
     params: {},
     body: {},

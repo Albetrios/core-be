@@ -91,7 +91,7 @@ describe('UserNotificationPreferencesRepository (database)', () => {
   // policy carried an organization branch that only verified the `app.current_organization_public_id`
   // GUC matched, NOT membership — a future route wrapping this table in
   // `withAppDatabaseContext` would have let any user write
-  // preferences against any organization id they passed in `X-Organization-Id`,
+  // preferences against any organization id they could assert (historically the removed header),
   // bypassing membership entirely. The schema-level CHECK constraint
   // (`chk_user_notif_prefs_no_org`) refuses non-null `organization_id`
   // outright so even a direct raw-SQL bypass of the application guard

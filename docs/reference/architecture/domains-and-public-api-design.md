@@ -283,7 +283,7 @@ Domain folder = DB schema; each **sub-domain** is a folder with its own controll
 
 All `:id` params are **public_id**. Organization **slug** is unique; `getBySlug(slug)` returns same shape as the active-organization get.
 
-**Organization context (HTTP):** The active organization rides the signed `org` token claim — not a path parameter or header. The tenant middleware resolves it post-auth and re-checks membership + RLS per request; switch with `POST /api/v1/auth/switch-to-personal` or `POST /api/v1/auth/switch-to-organization { organization_id }` (both re-mint the access token). `X-Organization-Id` is legacy (upload domain only). See **[api-testing.md](../../getting-started/api-testing.md)** (active-organization section). Avatars and logos are attached only via presigned upload keys (`avatar_key` / logo `key`), not arbitrary URLs on PATCH.
+**Organization context (HTTP):** The active organization rides the signed `org` token claim — not a path parameter or header. The auth middleware attaches the claim-derived scope; membership + RLS are re-checked per request; switch with `POST /api/v1/auth/switch-to-personal` or `POST /api/v1/auth/switch-to-organization { organization_id }` (both re-mint the access token). The `X-Organization-Id` header was removed. See **[api-testing.md](../../getting-started/api-testing.md)** (active-organization section). Avatars and logos are attached only via presigned upload keys (`avatar_key` / logo `key`), not arbitrary URLs on PATCH.
 
 #### Personal vs Team capability matrix
 

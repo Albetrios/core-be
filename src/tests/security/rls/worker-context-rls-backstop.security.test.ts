@@ -15,7 +15,7 @@ import {
 /**
  * Worker context RLS backstop.
  *
- * Workers run without the HTTP tenant middleware and establish their own organization
+ * Workers run without the HTTP auth/scope middleware and establish their own organization
  * context via {@link withAppDatabaseContext} (the real wrapper used by every tenant-scoped
  * job). `worker-tenant-isolation.security.test.ts` proves the repository layer scopes by
  * `organizationPublicId`; this proves the LAST line of defense: even a raw query run inside

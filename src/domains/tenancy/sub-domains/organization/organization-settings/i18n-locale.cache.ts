@@ -7,7 +7,7 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
  *
  * @remarks
  * The i18n preHandler runs on EVERY unauthenticated request that supplies an
- * `X-Organization-Id` header without `Accept-Language` — the most exposed
+ * authenticated request without `Accept-Language` — the most exposed
  * surface in the app. Without a cache, each such request fires the
  * SECURITY DEFINER function `tenancy.resolve_organization_default_locale`,
  * which lets a distributed attacker drive thousands of pre-auth Postgres

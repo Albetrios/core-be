@@ -3,7 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { createMemberInvitationController } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.controller.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { ValidationError } from '@/shared/errors/index.js';
-import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 // sec-new-T2: invitationId path-param validation for the remaining invitation routes
 // (accept / revoke / resend). Add-member issues invitations via POST /memberships (REQ-1), so the
@@ -22,7 +22,7 @@ describe('createMemberInvitationController — invitationId path-param validatio
   const controller = createMemberInvitationController(service as never);
 
   function mockUserRequest(params: Record<string, string>): FastifyRequest {
-    return attachPrincipalScopeGetters({
+    return attachPrincipalScope({
       auth: {
         kind: 'user',
         userId: generatePublicId('user'),

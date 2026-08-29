@@ -137,7 +137,6 @@ const result = await client.callTool({
     path: '/api/v1/users/me',
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      'X-Organization-Id': organizationId ?? '',
     },
   },
 });
@@ -174,4 +173,4 @@ await client.callTool({
 | Discover | `client.listResources()`, `client.listTools()`, `client.readResource({ uri: 'core-be://openapi' })` |
 | Call API | `client.callTool({ name: 'call_api', arguments: { method, path, body?, headers? } })`               |
 
-The **`call_api`** tool forwards the request through the same backend (auth, tenant, validation). Pass `Authorization` and `X-Organization-Id` in `headers` for protected and organization-scoped endpoints.
+The **`call_api`** tool forwards the request through the same backend (auth, tenant, validation). Pass `Authorization` in `headers` for protected endpoints; the active organization rides the token's signed `org` claim (no header).

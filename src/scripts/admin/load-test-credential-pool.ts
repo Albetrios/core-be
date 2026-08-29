@@ -41,7 +41,7 @@ export interface CredentialPoolEntry {
   email: string;
   /** Plaintext password stamped by this script — same value for all bulk users. */
   password: string;
-  /** Public id of the organization this user is an active member of (for X-Organization-Id). */
+  /** Public id of the organization this user is an active member of (used to scope tokens). */
   organizationPublicId: string;
   /** Public id of this user (for assertions in scenario checks). */
   userPublicId: string;

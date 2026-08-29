@@ -98,7 +98,7 @@ export class OrganizationSettingsService {
     /**
      * sec-M1: Redis cache short-circuits the SECURITY DEFINER DB call on every
      * pre-auth i18n preHandler hit. Without it, every unauthenticated request
-     * that supplies an `X-Organization-Id` header without `Accept-Language`
+     * authenticated without `Accept-Language`
      * triggers a DB round-trip — distributed attackers can drive thousands of
      * pre-auth lookups per second and use the differential response language
      * as an organization-existence oracle. The cache stores the canonical

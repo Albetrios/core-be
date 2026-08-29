@@ -101,7 +101,7 @@ describe('Security: Rate limit burst (429)', () => {
     const app = await createRateLimitedApp({
       max: 2,
       keyGenerator: (request) => {
-        const organizationPublicId = request.headers['x-organization-id'];
+        const organizationPublicId = request.headers['x-test-organization'];
         return organizationPublicId ? `organization:${organizationPublicId}` : `ip:${request.ip}`;
       },
     });
@@ -109,17 +109,17 @@ describe('Security: Rate limit burst (429)', () => {
     const organizationAFirst = await app.inject({
       method: 'GET',
       url: '/burst-test',
-      headers: { 'x-organization-id': 'org_public_a' },
+      headers: { 'x-test-organization': 'org_public_a' },
     });
     const organizationASecond = await app.inject({
       method: 'GET',
       url: '/burst-test',
-      headers: { 'x-organization-id': 'org_public_a' },
+      headers: { 'x-test-organization': 'org_public_a' },
     });
     const organizationAThird = await app.inject({
       method: 'GET',
       url: '/burst-test',
-      headers: { 'x-organization-id': 'org_public_a' },
+      headers: { 'x-test-organization': 'org_public_a' },
     });
     const organizationBFirst = await app.inject({
       method: 'GET',

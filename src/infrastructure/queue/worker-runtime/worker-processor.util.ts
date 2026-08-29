@@ -26,7 +26,7 @@ export type TenantScopedWorkerJob<TJob> = TJob & {
  * Minimal shape every tenant-scoped BullMQ job must satisfy — extracted as its own type
  * so {@link createTenantScopedBullMQWorker}'s generic constraint stays narrow.
  */
-export type TenantScopedJobData = {
+export type OrganizationScopedJobData = {
   organizationPublicId: string;
 };
 
@@ -85,7 +85,7 @@ export async function runUserScopedWorkerJob<TJob, TResult>(
  * BullMQ worker factory for jobs that include `organizationPublicId` in the payload.
  * Runs each job inside `withAppDatabaseContext` and passes a pinned `databaseHandle` to the handler.
  */
-export function createTenantScopedBullMQWorker<TJobData extends TenantScopedJobData>(
+export function createTenantScopedBullMQWorker<TJobData extends OrganizationScopedJobData>(
   queueName: string,
   handler: (databaseHandle: WorkerDatabaseHandle, job: Job<TJobData>) => Promise<unknown>,
   workerOptions: WorkerOptions,

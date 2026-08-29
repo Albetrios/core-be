@@ -10,7 +10,7 @@ For tables **without** tenant RLS, see [system-tables-without-tenant-rls.md](../
 
 | Mechanism | Detail |
 | --------- | ------ |
-| Session GUC | `app.current_organization_public_id` — set from `X-Organization-Id` (organization `public_id`) via tenant middleware |
+| Session GUC | `app.current_organization_public_id` — set from the claim-minted scope by `withAppDatabaseContext` |
 | HTTP | Org-scoped routes run inside `organizationRlsTransactionMiddleware` (single connection + `SET LOCAL` for the request) |
 | Workers / scripts | **Do not** rely on RLS alone — pass `organization_id` / `organizationPublicId` explicitly in queries |
 | FORCE RLS | Enabled on tenant tables ([`20260516000006_force_row_level_security.sql`](../../../migrations/00000000000000_init.sql)) |

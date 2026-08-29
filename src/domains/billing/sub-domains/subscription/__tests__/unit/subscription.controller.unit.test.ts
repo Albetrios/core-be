@@ -4,10 +4,10 @@ import { createSubscriptionController } from '@/domains/billing/sub-domains/subs
 import { ValidationError } from '@/shared/errors/index.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { SubscriptionService } from '@/domains/billing/sub-domains/subscription/subscription.service.js';
-import { attachPrincipalScopeGetters } from '@/tests/helpers/principal-scope-getters.helper.js';
+import { attachPrincipalScope } from '@/tests/helpers/principal-scope.helper.js';
 
 function mockRequest(overrides: Partial<FastifyRequest> = {}): never {
-  return attachPrincipalScopeGetters({
+  return attachPrincipalScope({
     auth: { userId: generatePublicId('user'), role: 'user' },
     params: {},
     body: {},
