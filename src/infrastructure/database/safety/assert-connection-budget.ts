@@ -109,8 +109,19 @@ function computeRequiredPoolConnections(
   return resolveProcessCount(counts) * poolMaxConnections;
 }
 
-/** Column width that keeps the rule and the worked example vertically aligned. */
-const BUDGET_MESSAGE_COLUMN = 30;
+/** Blank space between one column and the next — the only fixed measurement in the layout. */
+const MESSAGE_COLUMN_GAP = 2;
+
+/** Left margin shared by every indented line of the message. */
+const MESSAGE_INDENT = '  ';
+
+/**
+ * Width of a column: its widest cell plus the gap to the next column. Derived per call so a
+ * three-digit pool or a longer variable name cannot silently break the alignment.
+ */
+function columnWidth(cells: readonly string[]): number {
+  return Math.max(...cells.map((cell) => cell.length)) + MESSAGE_COLUMN_GAP;
+}
 
 /**
  * Boot-fatal, so it is written to be actioned straight from the deploy log: the rule that was
@@ -131,41 +142,66 @@ function buildDeploymentBudgetErrorMessage(parameters: {
   );
   const neededMaxConnections = parameters.requiredConnections + parameters.reservedConnections;
 
+  const ruleCell = 'processes × DATABASE_POOL_MAX';
   const wanted = `${parameters.processCount} × ${parameters.poolMaxConnections} = ${parameters.requiredConnections}`;
   const available = `${parameters.postgresMaxConnections} − ${parameters.reservedConnections} = ${parameters.allowedApplicationConnections}`;
 
-  const poolLabel = `DATABASE_POOL_MAX=${fittingPoolMax}`.padEnd(BUDGET_MESSAGE_COLUMN);
-  const clusterLabel = `POSTGRES_MAX_CONNECTIONS=${neededMaxConnections}`.padEnd(
-    BUDGET_MESSAGE_COLUMN,
-  );
-  const noFitLabel = 'Raise the database'.padEnd(BUDGET_MESSAGE_COLUMN);
+  const poolOption = `DATABASE_POOL_MAX=${fittingPoolMax}`;
+  const clusterOption = `POSTGRES_MAX_CONNECTIONS=${neededMaxConnections}`;
+  const noFitOption = 'Raise the database';
+
+  const keyColumn = columnWidth(['Fix', 'Or', 'Docs']);
+  const labelColumn = columnWidth(['The rule', 'Your numbers']);
+  const ruleColumn = columnWidth([ruleCell, wanted]);
+  const compareColumn = columnWidth(['must be ≤', 'is more than']);
+  const optionColumn = columnWidth([poolOption, clusterOption, noFitOption]);
+  const continuation = ' '.repeat(MESSAGE_INDENT.length + keyColumn + optionColumn);
 
   // A pool of 0 is not usable advice; when nothing fits, raising the server is the only fix.
-  const fixLine =
-    fittingPoolMax >= 1
-      ? `  Fix   ${poolLabel}fits now, no database change needed\n`
-      : `  Fix   ${noFitLabel}no pool size fits ${parameters.processCount} processes\n`;
+  const fits = fittingPoolMax >= 1;
+  const fixOption = fits ? poolOption : noFitOption;
+  const fixNote = fits
+    ? 'fits now, no database change needed'
+    : `no pool size fits ${parameters.processCount} processes`;
 
   return (
     'Server cannot start: DATABASE_POOL_MAX is too high for this database.\n' +
     '\n' +
-    `  ${'The rule'.padEnd(14)}${'processes × DATABASE_POOL_MAX'.padEnd(BUDGET_MESSAGE_COLUMN)}` +
-    `${'must be ≤'.padEnd(14)}max_connections − reserved\n` +
-    `  ${'Your numbers'.padEnd(14)}${wanted.padEnd(BUDGET_MESSAGE_COLUMN)}` +
-    `${'is more than'.padEnd(14)}${available}\n` +
-    '\n' +
-    `  DATABASE_POOL_MAX ${parameters.poolMaxConnections} is PER PROCESS, not a total. ` +
+    MESSAGE_INDENT +
+    'The rule'.padEnd(labelColumn) +
+    ruleCell.padEnd(ruleColumn) +
+    'must be ≤'.padEnd(compareColumn) +
+    'max_connections − reserved\n' +
+    MESSAGE_INDENT +
+    'Your numbers'.padEnd(labelColumn) +
+    wanted.padEnd(ruleColumn) +
+    'is more than'.padEnd(compareColumn) +
+    available +
+    '\n\n' +
+    `${MESSAGE_INDENT}DATABASE_POOL_MAX ${parameters.poolMaxConnections} is PER PROCESS, not a total. ` +
     `You run ${parameters.deploymentSummary},\n` +
-    `  so the app asks for ${parameters.requiredConnections} connections but only ` +
+    `${MESSAGE_INDENT}so the app asks for ${parameters.requiredConnections} connections but only ` +
     `${parameters.allowedApplicationConnections} are free.\n` +
     '\n' +
-    fixLine +
-    `  Or    ${clusterLabel}ONLY after raising max_connections to ${neededMaxConnections}\n` +
-    `        ${''.padEnd(BUDGET_MESSAGE_COLUMN)}on the Postgres server itself. This variable\n` +
-    `        ${''.padEnd(BUDGET_MESSAGE_COLUMN)}does not change the server, it only tells\n` +
-    `        ${''.padEnd(BUDGET_MESSAGE_COLUMN)}the app what the server already allows.\n` +
+    MESSAGE_INDENT +
+    'Fix'.padEnd(keyColumn) +
+    fixOption.padEnd(optionColumn) +
+    fixNote +
     '\n' +
-    '  Docs  docs/deployment/runbooks/resource-limits.md'
+    MESSAGE_INDENT +
+    'Or'.padEnd(keyColumn) +
+    clusterOption.padEnd(optionColumn) +
+    `ONLY after raising max_connections to ${neededMaxConnections}\n` +
+    continuation +
+    'on the Postgres server itself. This variable\n' +
+    continuation +
+    'does not change the server, it only tells\n' +
+    continuation +
+    'the app what the server already allows.\n' +
+    '\n' +
+    MESSAGE_INDENT +
+    'Docs'.padEnd(keyColumn) +
+    'docs/deployment/runbooks/resource-limits.md'
   );
 }
 
