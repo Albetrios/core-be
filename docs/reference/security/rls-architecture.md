@@ -48,7 +48,7 @@ row. Elevated access exists only as the named fixture role `core_be_operator`
 | `withSystemAuditInsertContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_AUDIT_INSERT, cb)` |
 | `withSystemTableRetentionContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_RETENTION, cb)` |
 | `withSystemTableWorkerContext(cb)` | `withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.SYSTEM_TABLE_WORKER, cb)` |
-| (pre-auth session lookups, raw) | `withAppDatabaseContext(SESSION_SCOPE.<kind>(value), cb)` |
+| (pre-auth session lookups, raw) | `withAppDatabaseContext(SESSION_SCOPE.ARTIFACT({ sessionPublicId \| sessionTokenHash }), cb)` |
 
 The key upgrade: the first argument is no longer a string anyone can fabricate — it is a
 **branded scope object** whose factories are confined to allowlisted files by policy
@@ -74,6 +74,32 @@ tests. Holding a scope IS the authority.
 `public_id`. The same string flows token/payload → minter (adds provenance only) →
 `set_config` → policy arm; internal ids never enter scopes or GUCs (policies translate
 public→internal inside the arm where an FK column needs it).
+
+### 2.4 Design evolution ledger — earlier vs now (all rounds)
+
+Every deliberate design change on this surface, in order, so no earlier shape is ever
+mistaken for the current one:
+
+| # | Earlier | Now | Why it changed |
+| - | ------- | --- | -------------- |
+| 1 | 9+ string-argument wrappers, one file each | 2 files, branded scopes, registries | forgeable authority → unforgeable objects |
+| 2 | GUCs named `*_id` carrying public ids | `*_public_id` names | name says what it holds |
+| 3 | superuser local runtime + fixtures | 5-role taxonomy (`core_be_app/maintenance/operator/migrator/owner`), local mirrors live | superuser masking hid 8 production bugs |
+| 4 | 3 wrappers (principal / session / maintenance) | 2 wrappers — `withAppDatabaseContext` + `withMaintenanceDatabaseContext` | name = pool/role, scope = GUCs (one axis each) |
+| 5 | lowercase kind keys | CONSTANT_CASE members (`GLOBAL_ADMIN`, `ARTIFACT`, …) | matches the event-constant grammar; GUC strings and ALS kinds stay snake_case (runtime data) |
+| 6 | minters re-validated the org claim | only caller-supplied path params validated (S2) | verification happens once per boundary; the claim is server-signed |
+| 7 | source `'provisioning'` | source `'verified'` | full name↔source symmetry across the three doorways |
+| 8 | scope shapes implicit | shape contract locked (fixed keys per family) | no doorway can grow/drop/rename a field silently |
+| 9 | 5 minter names, 3 call styles (`REQUEST_SCOPE.*`, `resolveJobPrincipalScope`, `resolveVerifiedPrincipalScope`) | one family namespace `PRINCIPAL_SCOPE.REQUEST/.JOB/.VERIFIED` — members = sources, raw pre-proven ids always in objects | one grammar; per-member textual allowlists carry the same confinement |
+| 10 | two lazy getters (`request.principalScope` org-required / `request.userPrincipalScope`) | ONE eager property — the auth middleware attaches `request.principalScope` via `attachRequestPrincipalScope` on both auth paths | scope attaches the moment proof exists, like jobs; getters deleted |
+| 11 | route contracts inside the getters | `requireAuth`-family narrowing accessors: `requireOrganizationScope(request)` (403) / `requireUserScope(request)` (401 for API keys) | 102 narrow-typed field reads keep compile-time guarantees; the contract is the accessor the route calls |
+| 12 | org path-param precedence (param ?? claim, param validated) | **path params ignored — the signed claim decides** | routes carry no `{organization_id}` segment; param handling was a vestigial IDOR surface |
+| 13 | session scope `{ kind, value }` | `SESSION_SCOPE.ARTIFACT({ sessionPublicId \| sessionTokenHash })` — named fields | field name = GUC name, mirroring the principal grammar |
+
+Locked decisions that bound future changes (do NOT revisit casually): the callback shape
+(§3), the wrapper-per-pool split, the scope-family type split (values dynamic, GUC keys
+static per family), and the accessor pair (a single common accessor either locks API keys
+out of org routes or un-types 102 field reads).
 
 ## 3. Layers — text diagram
 
@@ -344,3 +370,88 @@ an as-`core_be_app` (or maintenance-role) regression:
 The recurring root causes worth remembering: superuser masking (local + fixtures),
 `RETURNING`/NEW-row SELECT-visibility, and bypass arms present in USING but missing in
 WITH CHECK.
+
+---
+
+## 9. Code-level flow — entry to row (file by file)
+
+### 9.1 Boot (once)
+
+```text
+src/server.ts
+ ├─ assertDatabaseRlsSafety() + assertMaintenanceDatabaseRoleRlsSafety()
+ │    infrastructure/database/safety/assert-database-rls-safety.ts — both pools RLS-subject or boot fails
+ └─ buildApp() → registerMiddleware() → auth.middleware.ts
+      app.decorateRequest('principalScope', null)  ·  app.decorate('authenticate', authenticate)
+```
+
+### 9.2 HTTP request (the main road)
+
+```text
+route preHandler: [app.authenticate, requireOrganizationPermission(…)]
+ │
+ ├─ authenticate()                    shared/middlewares/core/auth.middleware.ts
+ │    applyApiKeyAuthentication() | verifyAccessToken() + verifyActiveAccessToken()
+ │    request.auth = { kind, userId?, organizationPublicId (org claim) }
+ │    attachRequestPrincipalScope(request)
+ │      → request.principalScope = PRINCIPAL_SCOPE.REQUEST({ userPublicId?, organizationPublicId? })
+ │        (ids leave request.auth ONLY here; path params are ignored)
+ │
+ ├─ requireOrganizationPermission     tenancy authorization.service.ts — membership/permission, 403
+ │
+ ├─ controller                        <resource>.controller.ts
+ │    const scope = requireOrganizationScope(request)   // or requireUserScope — 403/401 + type narrowing
+ │    service.method(scope, …)
+ │
+ ├─ service                           <resource>.service.ts
+ │    await withAppDatabaseContext(scope, async (db) => repository.…)
+ │
+ ├─ withAppDatabaseContext            contexts/database-context.ts
+ │    'source' in scope → principal branch: same-org ALS reuse, else
+ │    checkout (core_be_app) → BEGIN → ONE set_config round trip (org and/or user GUC)
+ │    → pin handle in ALS → callback → COMMIT|ROLLBACK → release + checkout metrics
+ │
+ └─ Postgres: FORCE-RLS policies read the GUCs (USING + WITH CHECK) — no GUC/arm = zero rows
+```
+
+### 9.3 Worker job
+
+```text
+enqueue (inside a scoped context) → payload carries organizationPublicId / userPublicId
+src/worker.ts → queue/bootstrap.ts → domains/**/workers/<x>.worker.ts
+ └─ runTenantScopedWorkerJob / runUserScopedWorkerJob   worker-runtime/worker-processor.util.ts
+      zod-validate payload → PRINCIPAL_SCOPE.JOB({ ids }) → withAppDatabaseContext(scope, cb)
+      createWorker*Repository(databaseHandle) + assertWorkerRlsGucSet (live tripwire)
+      (getRequestDatabase() without a pinned context THROWS in worker runtime)
+```
+
+### 9.4 Pre-auth session (refresh)
+
+```text
+auth-session.service.ts (only consumer)
+  SESSION_SCOPE.ARTIFACT({ sessionTokenHash: hash }) → withAppDatabaseContext
+  → set_config('app.current_session_token_hash', …) → ≤1 auth.sessions row → user known → 9.2
+```
+
+### 9.5 Verified flow (example: invitation accept)
+
+```text
+member-invitation.service.ts (ledgered): invitation token matched (the caller's own proof)
+  → PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: invitation.organization_public_id })
+  → withAppDatabaseContext → normal org GUC → normal policies
+```
+
+### 9.6 Maintenance (example: retention)
+
+```text
+queue/scheduler.ts (cron) → workers/<x>-retention.worker.ts
+  withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, cb)
+  pool: getMaintenanceDatabase() (core_be_maintenance) · registry row decides guc/trx/timeout
+  USING arm admits cross-tenant read/purge; WITH CHECK does not → never plants rows
+```
+
+**Where authority can enter, in file terms:** ids leave `request.auth` only inside
+`attachRequestPrincipalScope`; leave a payload only inside the `run*WorkerJob` runners;
+leave a caller's proof only in the 22 ledgered files; the branded-scope factory never
+leaves `database-context.ts`. Everything downstream — accessors, services, repositories,
+wrappers, Postgres — can only relay or obey, never originate.
