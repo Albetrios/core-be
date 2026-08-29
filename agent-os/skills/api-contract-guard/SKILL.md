@@ -12,7 +12,7 @@ indexNote: route params / public-ids / method→status policy / header matrix �
 > prefix is a 3-letter id prefix by design, and the JWT claim keys `org` / `sv` follow
 > the JWT compact-claim convention (`iss`/`sub`/`aud`) — they ride on every request, so
 > brevity is a deliberate wire-size choice. The full-names-only rule applies to
-> identifiers and prose, never to these wire keys. (Decided during PR #1123.)
+> identifiers and prose, never to these wire keys. (Decided during PR #1127.)
 
 ## Route params — snake_case, semantic, entity-typed
 

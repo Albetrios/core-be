@@ -1,7 +1,7 @@
 # RLS architecture — scopes, layers, and GUCs
 
 The single reference for how Row-Level Security works in core-be after the
-principal-database-context overhaul (PR #1123): what exists, how it evolved from the old
+principal-database-context overhaul (PR #1127): what exists, how it evolved from the old
 wrapper family, the layer model, and exactly which `app.*` GUC each query runs under.
 
 Related: [rls-lock-inventory.md](rls-lock-inventory.md) (the automated locks) ·
