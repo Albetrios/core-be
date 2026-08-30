@@ -238,4 +238,46 @@ describe('fastify-server.util', () => {
     envState.LOG_PRETTY = false;
     vi.resetModules();
   });
+
+  // Regression: `pino-pretty` is a devDependency and every deployed image installs with
+  // `pnpm install --prod`, so the module is absent in a container. Pino resolves a transport
+  // target eagerly and throws `unable to determine transport target for "pino-pretty"` inside
+  // the logger constructor, which killed the API at module load and crash-looped the deploy.
+  // Requesting the transport must degrade to JSON, never take the process down.
+  it('drops the pino-pretty transport instead of throwing when the module is not installed', async () => {
+    envState.LOG_PRETTY = true;
+    envState.TRUST_PROXY = false;
+    vi.resetModules();
+    vi.doMock('node:module', async () => {
+      const actual = await vi.importActual<typeof import('node:module')>('node:module');
+      return {
+        ...actual,
+        createRequire: () => ({
+          resolve: (specifier: string): string => {
+            throw new Error(`Cannot find module '${specifier}'`);
+          },
+        }),
+      };
+    });
+
+    const { buildFastifyServerOptions: buildLocalOptions, buildPinoPrettyTransport } = await import(
+      '@/shared/utils/http/fastify-server.util.js'
+    );
+
+    expect(buildPinoPrettyTransport()).toBeUndefined();
+    const options = buildLocalOptions();
+    expect(options.logger).toMatchObject({ level: 'info' });
+    expect(options.logger).not.toHaveProperty('transport');
+
+    vi.doUnmock('node:module');
+    envState.LOG_PRETTY = false;
+    vi.resetModules();
+  });
+
+  it('builds no transport at all when LOG_PRETTY is off', async () => {
+    envState.LOG_PRETTY = false;
+    vi.resetModules();
+    const { buildPinoPrettyTransport } = await import('@/shared/utils/http/fastify-server.util.js');
+    expect(buildPinoPrettyTransport()).toBeUndefined();
+  });
 });
