@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { LogController, type FastifyServerOptions } from 'fastify';
 
 /** fastify's trust-proxy predicate form (the type itself is not re-exported by fastify@5.12). */
@@ -121,16 +122,53 @@ function resolveIncomingRequestIdentifier(_incomingMessage: IncomingMessage): st
   return randomUUID();
 }
 
+const resolvePackage = createRequire(import.meta.url);
+
+/**
+ * Pino `transport` options that pretty-print through `pino-pretty`, or `undefined` when
+ * `LOG_PRETTY` is off OR the module is absent from the running image.
+ *
+ * `pino-pretty` is a devDependency, and every deployed image installs with
+ * `pnpm install --prod` — so the module is on disk locally and absent in a container.
+ * Pino resolves a transport target EAGERLY inside the `pino()` / Fastify logger
+ * constructor and throws `unable to determine transport target for "pino-pretty"` when it
+ * cannot: a synchronous throw at module load, before the server binds a port. Any deployed
+ * environment whose `LOG_PRETTY` is `true` therefore crash-looped on boot with no
+ * application log line explaining why (deploy `11a1e124`, development, 2026-08-29).
+ *
+ * The condition that decides this is a property of the IMAGE (were devDependencies
+ * pruned?), not of the environment, so it cannot be expressed as an env-schema `.refine()`
+ * the way the security flags are — `NODE_ENV=development` and a pruned image is exactly the
+ * combination that failed. Probe for the module instead and degrade to structured JSON
+ * logging: an unreadable log format is a developer inconvenience, never a reason to take
+ * the process down.
+ */
+export function buildPinoPrettyTransport():
+  | { target: string; options: { colorize: boolean; translateTime: string } }
+  | undefined {
+  if (!env.LOG_PRETTY) return undefined;
+  try {
+    resolvePackage.resolve('pino-pretty');
+  } catch {
+    return undefined;
+  }
+  return {
+    target: 'pino-pretty',
+    options: { colorize: true, translateTime: 'SYS:standard' },
+  };
+}
+
 /**
  * Builds the canonical {@link FastifyServerOptions} used by both the HTTP server and the
  * worker health server: Pino logger with {@link PINO_REDACT_PATHS} plus recursive
- * `redactSensitive` formatter, `pino-pretty` only in local, `trustProxy` resolved from
+ * `redactSensitive` formatter, `pino-pretty` via {@link buildPinoPrettyTransport}, `trustProxy` resolved from
  * env (required behind Railway/LB), correlation id propagation from `x-request-id`
  * (accepted only when it matches {@link SAFE_INBOUND_REQUEST_IDENTIFIER_PATTERN}, otherwise a
  * server-side UUID is generated), and the platform body-limit, request-timeout, and
  * connection-timeout defaults.
  */
 export function buildFastifyServerOptions(): FastifyServerOptions {
+  const prettyTransport = buildPinoPrettyTransport();
   return {
     logger: {
       level: env.LOG_LEVEL,
@@ -141,14 +179,7 @@ export function buildFastifyServerOptions(): FastifyServerOptions {
       formatters: {
         log: (object) => redactSensitive(object),
       },
-      ...(env.LOG_PRETTY
-        ? {
-            transport: {
-              target: 'pino-pretty',
-              options: { colorize: true, translateTime: 'SYS:standard' },
-            },
-          }
-        : {}),
+      ...(prettyTransport ? { transport: prettyTransport } : {}),
     },
     // Drop Fastify's automatic per-request "incoming request" / "request completed" info logs.
     // Each was run through the recursive `redactSensitive` formatter + Pino transport on every

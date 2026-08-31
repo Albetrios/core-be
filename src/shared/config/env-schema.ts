@@ -331,7 +331,7 @@ const envSchemaBase = z.object({
   SHUTDOWN_SKIP_SHARED_TEARDOWN: booleanString('false'),
   /** Category-A. Report missing i18n keys for non-default locales to Sentry (else debug-log). Defaults true; development sets false in `.env`. */
   I18N_REPORT_MISSING_KEYS: booleanString('true'),
-  /** Category-A. Pretty-print logs via pino-pretty. Defaults false (JSON, production-safe); development sets true in `.env`. */
+  /** Category-A. Pretty-print logs via pino-pretty. Defaults false (JSON, production-safe); only a local `.env.local` sets true, because a deployed image prunes the devDependency. */
   LOG_PRETTY: booleanString('false'),
   /** Category-A. Reduced Sentry sampling defaults (production volume) when SENTRY_*_SAMPLE_RATE unset. Defaults true; development sets false in `.env`. */
   SENTRY_REDUCED_SAMPLING: booleanString('true'),
