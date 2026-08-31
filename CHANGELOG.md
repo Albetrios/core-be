@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.0.0](https://github.com/nikunjmavani/core-be/compare/v5.2.2...v6.0.0) (2026-08-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** all 45 POST routes that returned 201 now return 200. The method-status policy becomes exemption-free: success is 200 everywhere, DELETE stays 204. Stripe-shaped uniform model - 200 stays true for idempotent replays and future upserts, where a fixed 201 lies on the replay ("Created" when nothing was created). The webhook + MCP exemption list is deleted rather than maintained: every inbound protocol this API might ever host (webhook acks, OAuth token endpoints, JSON-RPC) expects 200, so the exemption class is gone for good.
+
+### Added
+
+* **api:** uniform success 200 for every method except DELETE (204) ([#1071](https://github.com/nikunjmavani/core-be/issues/1071)) ([eee0dd3](https://github.com/nikunjmavani/core-be/commit/eee0dd3248eb114a7d0c32d6911671754ad05a2c))
+* **auth:** static test login code, k6 user journey, and load tooling ([#1116](https://github.com/nikunjmavani/core-be/issues/1116)) ([f79c514](https://github.com/nikunjmavani/core-be/commit/f79c514a0fae76b2aea56a20fe83a7d4c331a8b2))
+* **database:** RLS scope grammar — principal contexts, five-role taxonomy, claim-only organization ([#1127](https://github.com/nikunjmavani/core-be/issues/1127)) ([f6987b3](https://github.com/nikunjmavani/core-be/commit/f6987b302ce9829994d74541326bc865febdf456))
+* **tooling:** show the git branch on the load-testing board ([#1121](https://github.com/nikunjmavani/core-be/issues/1121)) ([b03a4eb](https://github.com/nikunjmavani/core-be/commit/b03a4ebf3acda5676d9fe68353c0c7182b788d53))
+
+
+### Fixed
+
+* **auth:** accept provider params on OAuth callback; make cookie SameSite configurable ([#1103](https://github.com/nikunjmavani/core-be/issues/1103)) ([bdca0ac](https://github.com/nikunjmavani/core-be/commit/bdca0ac6756c67f0a5c282e13386524e7522c65d))
+* **auth:** per-user rate-limit on the two org-switch POSTs ([#1095](https://github.com/nikunjmavani/core-be/issues/1095)) ([3fed87d](https://github.com/nikunjmavani/core-be/commit/3fed87dcb41672e41c8235faa9c7f8277f949ced))
+* **auth:** point OAuth redirect URIs at the SPA's provider callback pages ([#1126](https://github.com/nikunjmavani/core-be/issues/1126)) ([a911bf4](https://github.com/nikunjmavani/core-be/commit/a911bf40bae51b049cfb89eea2b5a17f2ce9f1fc))
+* **database:** bound lock waits (HTTP + worker), floor the idle timeout, close a savepoint GUC leak ([#1109](https://github.com/nikunjmavani/core-be/issues/1109)) ([3b85cb4](https://github.com/nikunjmavani/core-be/commit/3b85cb4d4c854eb59e70655dc2666fb6b7a35913))
+* **database:** name the exact pool value in the connection budget failure ([#1130](https://github.com/nikunjmavani/core-be/issues/1130)) ([7f7d0ec](https://github.com/nikunjmavani/core-be/commit/7f7d0ec1a8ee7b3da1673c640fcd12a1ef033cb2))
+* **deploy:** dump Railway container logs on non-success deployments ([#1132](https://github.com/nikunjmavani/core-be/issues/1132)) ([4c75a84](https://github.com/nikunjmavani/core-be/commit/4c75a84b06b6c22ae07f26817e2e240015d38ce3))
+* **deploy:** dump Railway container logs when a deployment ends non-success ([4c75a84](https://github.com/nikunjmavani/core-be/commit/4c75a84b06b6c22ae07f26817e2e240015d38ce3))
+* **docker:** cache-bust the apk security-patch layer per build ([#1128](https://github.com/nikunjmavani/core-be/issues/1128)) ([2be86af](https://github.com/nikunjmavani/core-be/commit/2be86afbae9786c4a654e23aa82bb7df73af0cee))
+* **migrations:** SET-capable owner membership for the role-taxonomy sweep (Neon 42501) ([#1131](https://github.com/nikunjmavani/core-be/issues/1131)) ([82cfb29](https://github.com/nikunjmavani/core-be/commit/82cfb29374189a8b42b2975116697bc559051416))
+* **migrations:** taxonomy owner-membership must be SET-capable — Neon 42501 on first hosted deploy ([82cfb29](https://github.com/nikunjmavani/core-be/commit/82cfb29374189a8b42b2975116697bc559051416))
+* **observability:** survive a missing pino-pretty instead of crash-looping on boot ([#1134](https://github.com/nikunjmavani/core-be/issues/1134)) ([afa00ee](https://github.com/nikunjmavani/core-be/commit/afa00ee86c0ee7418b55913db9e4497c7e5ee4d4))
+* **sonar,auth:** self-heal a stale Sonar admin password; drop deprecated Zod passthrough ([#1107](https://github.com/nikunjmavani/core-be/issues/1107)) ([84c92a6](https://github.com/nikunjmavani/core-be/commit/84c92a6119eb343a9b9a8b95ec9b13e199ea1902))
+* **tenancy:** read active organization under the user RLS context, not global-admin ([#1105](https://github.com/nikunjmavani/core-be/issues/1105)) ([0b488db](https://github.com/nikunjmavani/core-be/commit/0b488dba5f31daf53b5a2e79b128dac7fef716ef))
+* **tenancy:** resolve user ids via SECURITY DEFINER, not a raw auth.users read ([#1106](https://github.com/nikunjmavani/core-be/issues/1106)) ([66ae50b](https://github.com/nikunjmavani/core-be/commit/66ae50b6a713c9841a85e1716472b1d328b3d66b))
+
+
+### Performance
+
+* **auth:** share one database context across me/context's user reads ([#1118](https://github.com/nikunjmavani/core-be/issues/1118)) ([c0c7952](https://github.com/nikunjmavani/core-be/commit/c0c7952bc443a2f8894446806873ffe14b68b6b3))
+* **auth:** share one database context across switch-to-organization's reads ([#1120](https://github.com/nikunjmavani/core-be/issues/1120)) ([dfb1ca5](https://github.com/nikunjmavani/core-be/commit/dfb1ca5daf270ce01ed0fa7b027e13eaffa9feb8))
+
+
+### Documentation
+
+* fix broken links to the organization-model doc and the collapsed worker guard ([#1138](https://github.com/nikunjmavani/core-be/issues/1138)) ([8f3f836](https://github.com/nikunjmavani/core-be/commit/8f3f8365238152fb1f16cf193708b263d516d007))
+
 ## [5.2.2](https://github.com/nikunjmavani/core-be/compare/v5.2.1...v5.2.2) (2026-08-11)
 
 
