@@ -59,6 +59,13 @@ jobs:
           --health-timeout=5s
           --health-retries=20
     env:
+      # Pin the harness runtime like every other vitest workflow (see
+      # reusable-vitest-postgres-redis.yml): without it Vitest injects NODE_ENV=test
+      # into its own process, the `pnpm db:migrate` child spawned by
+      # src/tests/global-setup.ts inherits it, and the env schema
+      # (local | development | production) fails the run before any suite executes.
+      # CI has no .env files to rescue it the way a developer's .env.local does.
+      NODE_ENV: development
       # Migrations run as the bootstrap superuser (fresh database, roles do not
       # exist yet — same as a fresh clone locally).
       DATABASE_MIGRATION_URL: postgresql://core:core@localhost:5432/core
@@ -78,6 +85,20 @@ jobs:
 
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
+
+      # Same transform cache as the PR vitest lanes. Cold Vite transforms stall the
+      # event loop during each suite's app boots; the overload-guard valve (250 ms
+      # p99) reads those stalls as saturation and sheds real test requests as 503s —
+      # verified locally with an instrumented guard on a cold cache (posture-
+      # independent: identical sheds as superuser). Warm transforms keep boot stalls
+      # under the valve, the way the green PR lanes run.
+      - name: Cache Vitest
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
+        with:
+          path: node_modules/.vitest
+          key: vitest-rls-parity-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            vitest-rls-parity-${{ runner.os }}-
 
       - name: Export shared CI test env (JWT keys + secrets-encryption + origins)
         uses: ./.github/actions/test-env
