@@ -63,4 +63,33 @@ describe('logger.util', () => {
     expect(localLogger).toBeDefined();
     expect(typeof localLogger.info).toBe('function');
   });
+
+  // Regression: this module builds its Pino instance at import time, so an unresolvable
+  // transport threw before any application code ran — `unable to determine transport target
+  // for "pino-pretty"` took the whole API process down on boot in a deployed image, where
+  // `pnpm install --prod` has pruned the devDependency. Constructing the logger with
+  // LOG_PRETTY set must still succeed when the module is missing.
+  it('still builds a working logger when LOG_PRETTY is set but pino-pretty is not installed', async () => {
+    vi.doMock('@/shared/config/env.config.js', () => ({
+      env: { LOG_LEVEL: 'debug', LOG_PRETTY: true },
+    }));
+    vi.doMock('node:module', async () => {
+      const actual = await vi.importActual<typeof import('node:module')>('node:module');
+      return {
+        ...actual,
+        createRequire: () => ({
+          resolve: (specifier: string): string => {
+            throw new Error(`Cannot find module '${specifier}'`);
+          },
+        }),
+      };
+    });
+
+    const { logger: localLogger } = await import('@/shared/utils/infrastructure/logger.util.js');
+    expect(localLogger).toBeDefined();
+    expect(typeof localLogger.info).toBe('function');
+    expect(() => localLogger.info('boot')).not.toThrow();
+
+    vi.doUnmock('node:module');
+  });
 });

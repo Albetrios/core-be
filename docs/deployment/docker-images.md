@@ -125,7 +125,7 @@ The `runtime` stage sets `ENV NODE_ENV=production`. Override at `docker run` / c
 | `NODE_ENV`   | Use in container? | Notes                                                                                                                                                     |
 | ------------ | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `production` | Default in image  | Requires `JWT_PRIVATE_KEY` + `JWT_PUBLIC_KEY` (RS256), `SECRETS_ENCRYPTION_KEY`, `ALLOWED_ORIGINS`, retention vars, and full deploy secrets — see [env schema](../../src/shared/config/env-schema.ts). |
-| `local`      | Do not use        | [`logger.util.ts`](../../src/shared/utils/infrastructure/logger.util.ts) loads `pino-pretty`, which is **not** in the prod image → startup crash.                        |
+| `local`      | Do not use        | Names a developer machine, not a container: the loader reads `.env.local`, which is dockerignored and therefore absent from the image. Pretty logging no longer crashes it — [`buildPinoPrettyTransport`](../../src/shared/utils/http/fastify-server.util.ts) degrades to JSON and warns when the pruned `pino-pretty` cannot be resolved. |
 | `test`       | Smoke / CI        | Uses the same RS256 + encryption env contract, with test fixtures supplied by CI/setup — same as the [PR CI docker-run job](../../.github/workflows/pr-ci.yml).            |
 
 ### Compose smoke profile (recommended)
