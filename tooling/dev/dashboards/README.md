@@ -27,9 +27,14 @@ pnpm dashboards:proxy:development   # → http://localhost:3011/  (development o
 Which is `TARGET_ENV=development API_ORIGIN=https://development--core-be.cresence.skin PROXY_PORT=3011 pnpm dashboards:proxy` —
 any origin works, so a different `API_ORIGIN` fronts another deployment.
 
-- **The target must have the dashboards enabled** (`ENABLE_QUEUE_DASHBOARD=true`,
-  `ENABLE_API_REFERENCE=true`, `METRICS_ENABLED=true` on its GitHub Environment → Railway) — off, they
-  answer 404 and the hub shows them down.
+- **The target must have the dashboards enabled** (`ENABLE_QUEUE_DASHBOARD=true` and
+  `METRICS_ENABLED=true` on its GitHub Environment → Railway) — off, they answer 404 and the hub shows
+  them down.
+- **Do NOT set `ENABLE_API_REFERENCE=true` on a deployed target.** `@scalar/fastify-api-reference` is a
+  devDependency and the runtime image is installed with `--prod`, so the flag makes the API crash-loop
+  at boot (`Cannot find package '@scalar/fastify-api-reference'`). Hosted API docs live in the Scalar
+  Registry / Postman (`pnpm docs:upload:hosted`, published by the post-merge deploy); the hub's
+  "API Reference" pill therefore stays red against a remote target.
 - **Login user:** the proxy signs in as `DEMO_EMAIL` / `DEMO_PASSWORD` — on a deployed target that must be
   a real super_admin there (listed in that environment's `GLOBAL_ADMIN_EMAILS`); the local
   `demo@example.com` seed does not exist remotely. The bypass header it sends is honoured only where
