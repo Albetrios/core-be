@@ -4,14 +4,27 @@
     {
       "name": "dashboards-proxy",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["tooling/dev/dashboards/proxy.mjs"],
+      "runtimeArgs": [
+        "tooling/dev/dashboards/proxy.mjs"
+      ],
       "port": 3010,
       "autoPort": true
     },
     {
+      "name": "dashboards-proxy-development",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dashboards:proxy:development"
+      ],
+      "port": 3011
+    },
+    {
       "name": "db-viewer",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["tooling/db-viewer/cli.mjs", "--no-open"],
+      "runtimeArgs": [
+        "tooling/db-viewer/cli.mjs",
+        "--no-open"
+      ],
       "port": 4984
     }
   ]

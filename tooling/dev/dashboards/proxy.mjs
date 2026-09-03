@@ -15,10 +15,19 @@
 //     → http://localhost:3010/reference/      Scalar API docs (public)
 //
 // The hub UI is ./hub.html (read per request — edit it live, no restart).
-// Env (optional): PROXY_PORT (3010), API_PORT (PORT from .env.local, else 3000),
-//                 DEMO_EMAIL, DEMO_PASSWORD.
+//
+// It can also front a DEPLOYED environment (the API is reached over HTTPS; the worker health
+// server, SonarQube and Drizzle Studio are local-only and are reported as unavailable):
+//
+//   pnpm dashboards:proxy:development   → http://localhost:3011/  (development on Railway)
+//
+// Env (optional): PROXY_PORT (3010), TARGET_ENV (local — names the `.env.<TARGET_ENV>` file that
+//                 supplies PORT and METRICS_SCRAPE_TOKEN), API_ORIGIN (http://127.0.0.1:<PORT> —
+//                 any origin, e.g. the development deployment's public https origin), API_PORT
+//                 (local port shortcut), DEMO_EMAIL, DEMO_PASSWORD (a super_admin on the target).
 
 import http from 'node:http';
+import https from 'node:https';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -29,9 +38,14 @@ const TW_PATH = join(ROOT, 'tooling/dev/dashboards/tailwind.js');
 const GRIDSTACK_JS_PATH = join(ROOT, 'tooling/dev/dashboards/gridstack.js');
 const GRIDSTACK_CSS_PATH = join(ROOT, 'tooling/dev/dashboards/gridstack.css');
 
+// Which `.env.<name>` supplies PORT + METRICS_SCRAPE_TOKEN: `local` (default) for the Compose
+// stack, `development` / `production` for a deployed target (same files `pnpm github:sync` pushes).
+const TARGET_ENV = process.env.TARGET_ENV || 'local';
+const ENV_FILE_PATH = join(ROOT, `.env.${TARGET_ENV}`);
+
 function envVal(key) {
   try {
-    const line = readFileSync(join(ROOT, '.env.local'), 'utf8')
+    const line = readFileSync(ENV_FILE_PATH, 'utf8')
       .split('\n')
       .find((l) => l.startsWith(`${key}=`));
     return line ? line.slice(key.length + 1).trim() : '';
@@ -40,8 +54,19 @@ function envVal(key) {
   }
 }
 
-const TARGET_HOST = '127.0.0.1';
-const TARGET_PORT = Number(process.env.API_PORT || envVal('PORT') || 3000);
+const LOCAL_HOST = '127.0.0.1';
+const API_ORIGIN = new URL(
+  process.env.API_ORIGIN ||
+    `http://${LOCAL_HOST}:${Number(process.env.API_PORT || envVal('PORT') || 3000)}`,
+);
+const API_IS_HTTPS = API_ORIGIN.protocol === 'https:';
+// Request options shared by every call to the API target (http or https picked by protocol).
+const API_TARGET = {
+  protocol: API_ORIGIN.protocol,
+  host: API_ORIGIN.hostname,
+  port: Number(API_ORIGIN.port || (API_IS_HTTPS ? 443 : 80)),
+};
+const API_IS_LOCAL = [LOCAL_HOST, 'localhost', '::1'].includes(API_ORIGIN.hostname);
 const PROXY_PORT = Number(process.env.PROXY_PORT || process.env.PORT || 3010);
 const METRICS_TOKEN = envVal('METRICS_SCRAPE_TOKEN');
 // The super_admin this proxy logs in as to mint the Bull Board JWT. `dashboards:up` ensures
@@ -66,8 +91,9 @@ const FRAME_BLOCK_HEADERS = [
 let adminToken = null;
 
 function upstream(options, body) {
+  const client = options.protocol === 'https:' ? https : http;
   return new Promise((resolve, reject) => {
-    const req = http.request(options, (res) => {
+    const req = client.request(options, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () =>
@@ -87,8 +113,7 @@ function upstream(options, body) {
 async function login() {
   const res = await upstream(
     {
-      host: TARGET_HOST,
-      port: TARGET_PORT,
+      ...API_TARGET,
       method: 'POST',
       path: '/api/v1/auth/login',
       headers: { 'content-type': 'application/json', 'x-captcha-bypass': 'true' },
@@ -113,6 +138,14 @@ function isMetricsPath(path) {
   return path === '/metrics' || path.startsWith('/metrics?');
 }
 
+function isQueueDashboardPath(path) {
+  return (
+    path === '/admin/queues' ||
+    path.startsWith('/admin/queues/') ||
+    path.startsWith('/admin/queues?')
+  );
+}
+
 function isHubPath(path) {
   return path === '/' || path === '/dashboards' || path === '/dashboards/';
 }
@@ -125,15 +158,20 @@ function stripFrameHeaders(headers) {
   return out;
 }
 
-/** GET a localhost:port path; resolve { code, ms } (code 0 on error/timeout). */
-function probe(port, path, bearer) {
+/** Request options for a local-only sidecar (worker health server, SonarQube, Drizzle Studio). */
+function localTarget(port) {
+  return { protocol: 'http:', host: LOCAL_HOST, port };
+}
+
+/** GET a path on a target; resolve { code, ms } (code 0 on error/timeout). */
+function probe(target, path, bearer) {
   return new Promise((resolve) => {
     const start = process.hrtime.bigint();
     const elapsed = () => Math.round(Number(process.hrtime.bigint() - start) / 1e6);
-    const req = http.request(
+    const client = target.protocol === 'https:' ? https : http;
+    const req = client.request(
       {
-        host: TARGET_HOST,
-        port,
+        ...target,
         path,
         method: 'GET',
         timeout: 2500,
@@ -170,18 +208,25 @@ async function probeAll() {
       token = null;
     }
   }
+  // The worker health server, SonarQube and Drizzle Studio only exist next to a LOCAL API —
+  // against a deployed target they are not probed and are left out of the status (the hub
+  // renders a missing key as "unavailable" rather than "down").
+  const sidecar = (port, path) =>
+    API_IS_LOCAL ? probe(localTarget(port), path) : Promise.resolve(null);
   const [api, reference, bullboard, metrics, worker, sonar, drizzle] = await Promise.all([
-    probe(TARGET_PORT, '/livez'),
-    probe(TARGET_PORT, '/reference/'),
-    probe(TARGET_PORT, '/admin/queues', token),
-    probe(TARGET_PORT, '/metrics', METRICS_TOKEN),
-    probe(WORKER_PORT, '/readyz'),
-    probe(SONAR_PORT, '/api/system/status'),
-    probe(STUDIO_PORT, '/'),
+    probe(API_TARGET, '/livez'),
+    probe(API_TARGET, '/reference/'),
+    probe(API_TARGET, '/admin/queues', token),
+    probe(API_TARGET, '/metrics', METRICS_TOKEN),
+    sidecar(WORKER_PORT, '/readyz'),
+    sidecar(SONAR_PORT, '/api/system/status'),
+    sidecar(STUDIO_PORT, '/'),
   ]);
   const ok = (c) => c >= 200 && c < 400;
-  const entry = (p, anyResponse) => ({ up: anyResponse ? p.code > 0 : ok(p.code), ms: p.ms });
+  const entry = (p, anyResponse) =>
+    p ? { up: anyResponse ? p.code > 0 : ok(p.code), ms: p.ms } : undefined;
   statusCache = {
+    target: { env: TARGET_ENV, origin: API_ORIGIN.origin, local: API_IS_LOCAL },
     api: entry(api),
     reference: entry(reference),
     bullboard: entry(bullboard),
@@ -214,14 +259,22 @@ async function serveStatus(res) {
 }
 
 async function serveWorker(res, path) {
+  if (!API_IS_LOCAL) {
+    res.writeHead(503, { 'content-type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        proxy_error: `worker health server is local-only — not reachable for ${API_ORIGIN.origin}`,
+      }),
+    );
+    return;
+  }
   const workerPath = path.slice('/_worker'.length) || '/';
   const headers =
     workerPath.startsWith('/metrics') && METRICS_TOKEN
       ? { authorization: `Bearer ${METRICS_TOKEN}` }
       : {};
   const r = await upstream({
-    host: TARGET_HOST,
-    port: WORKER_PORT,
+    ...localTarget(WORKER_PORT),
     method: 'GET',
     path: workerPath,
     headers,
@@ -234,17 +287,17 @@ async function serveWorker(res, path) {
 async function serveProxy(clientReq, res, path, reqBody) {
   const metrics = isMetricsPath(path);
   const forward = (bearer) => {
-    const headers = { ...clientReq.headers, host: `${TARGET_HOST}:${TARGET_PORT}` };
+    const headers = { ...clientReq.headers, host: API_ORIGIN.host };
     if (bearer) headers.authorization = `Bearer ${bearer}`;
     delete headers['accept-encoding']; // keep upstream responses uncompressed for simple piping
-    return upstream(
-      { host: TARGET_HOST, port: TARGET_PORT, method: clientReq.method, path, headers },
-      reqBody,
-    );
+    return upstream({ ...API_TARGET, method: clientReq.method, path, headers }, reqBody);
   };
-  const bearer = metrics ? METRICS_TOKEN : adminToken || (await login());
+  // Only Bull Board needs the super_admin JWT; public pages (Scalar /reference/, /livez …) are
+  // forwarded as-is so a failed login (no demo user on a deployed target) cannot 502 them.
+  const needsAdmin = isQueueDashboardPath(path);
+  const bearer = metrics ? METRICS_TOKEN : needsAdmin ? adminToken || (await login()) : null;
   let response = await forward(bearer);
-  if (!metrics && response.status === 401) {
+  if (needsAdmin && response.status === 401) {
     await login();
     response = await forward(adminToken);
   }
@@ -312,7 +365,12 @@ server.listen(PROXY_PORT, '127.0.0.1', () => {
   const base = `http://localhost:${PROXY_PORT}`;
   process.stdout.write(
     `\n  Dashboards hub → ${base}/   (tabbed control room · live status)\n` +
-      `  Auth proxy     → ${base}    (→ API http://${TARGET_HOST}:${TARGET_PORT})\n\n` +
-      (METRICS_TOKEN ? '' : '  ! METRICS_SCRAPE_TOKEN is empty — /metrics may already be open.\n'),
+      `  Auth proxy     → ${base}    (→ API ${API_ORIGIN.origin} · env ${TARGET_ENV} · tokens from .env.${TARGET_ENV})\n\n` +
+      (METRICS_TOKEN
+        ? ''
+        : `  ! METRICS_SCRAPE_TOKEN is empty in .env.${TARGET_ENV} — /metrics may already be open.\n`) +
+      (API_IS_LOCAL
+        ? ''
+        : '  ! remote target — worker health, SonarQube and Drizzle Studio are local-only (shown as unavailable).\n'),
   );
 });

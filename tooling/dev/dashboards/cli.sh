@@ -63,6 +63,8 @@ stop_proc() { # name  pattern
   rm -f "$RUN_DIR/$name.pid"
 }
 
+proxy_pid() { lsof -tiTCP:"${PROXY_URL##*:}" -sTCP:LISTEN 2>/dev/null | head -1; } # the LOCAL hub only (by port)
+
 wait_up() { # url  label — waits through connection-refused (curl --retry-delay) while the server boots
   if curl -s -o /dev/null --retry 45 --retry-delay 1 --retry-connrefused --retry-max-time 60 "$1" 2>/dev/null; then
     ok "$2"; return 0
@@ -131,7 +133,13 @@ cmd_up() {
     local spid=$!; disown "$spid" 2>/dev/null || disown 2>/dev/null || true
     echo "$spid" > "$RUN_DIR/studio.pid"; ok "studio started (pid $spid)  ${c_dim}→ .dashboards/studio.log${c_reset}"
   fi
-  start_proc proxy "dashboards/proxy" node tooling/dev/dashboards/proxy.mjs
+  # The proxy is matched by its listening port, not its command line: a second hub fronting a
+  # deployed environment (`pnpm dashboards:proxy:development` on :3011) runs the same script.
+  if [ -n "$(proxy_pid)" ]; then ok "proxy already running (pid $(proxy_pid))"; else
+    nohup node tooling/dev/dashboards/proxy.mjs > "$RUN_DIR/proxy.log" 2>&1 &
+    local ppid=$!; disown "$ppid" 2>/dev/null || disown 2>/dev/null || true
+    echo "$ppid" > "$RUN_DIR/proxy.pid"; ok "proxy started (pid $ppid)  ${c_dim}→ .dashboards/proxy.log${c_reset}"
+  fi
   log "→ readiness…"
   wait_up "$API_URL/livez"   "API     $API_URL"
   wait_up "$WORKER_URL/readyz" "worker  $WORKER_URL"
@@ -139,7 +147,9 @@ cmd_up() {
 }
 
 cmd_down() {
-  stop_proc proxy  "dashboards/proxy"
+  local proxy_pid_value; proxy_pid_value="$(proxy_pid)"
+  if [ -n "$proxy_pid_value" ]; then kill "$proxy_pid_value" 2>/dev/null && ok "stopped proxy"; else warn "proxy not running"; fi
+  rm -f "$RUN_DIR/proxy.pid"
   stop_proc studio "drizzle-kit.*studio"
   stop_proc worker "src/worker.ts"
   stop_proc api    "src/server.ts"

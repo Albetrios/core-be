@@ -13,6 +13,33 @@ pnpm dashboards:proxy     # just the auth proxy + hub (when the stack is already
 
 Then open **<http://localhost:3010/>**.
 
+## Fronting a deployed environment (development)
+
+The same hub can front a **deployed** API instead of the Compose stack — the proxy reaches it over
+HTTPS and injects the tokens from that environment's `.env.<environment>` file (the file
+`pnpm github:sync` pushes), so Bull Board, `/metrics` and the Scalar reference open in a plain
+browser tab exactly like the local ones:
+
+```sh
+pnpm dashboards:proxy:development   # → http://localhost:3011/  (development on Railway)
+```
+
+Which is `TARGET_ENV=development API_ORIGIN=https://development--core-be.cresence.skin PROXY_PORT=3011 pnpm dashboards:proxy` —
+any origin works, so a different `API_ORIGIN` fronts another deployment.
+
+- **The target must have the dashboards enabled** (`ENABLE_QUEUE_DASHBOARD=true`,
+  `ENABLE_API_REFERENCE=true`, `METRICS_ENABLED=true` on its GitHub Environment → Railway) — off, they
+  answer 404 and the hub shows them down.
+- **Login user:** the proxy signs in as `DEMO_EMAIL` / `DEMO_PASSWORD` — on a deployed target that must be
+  a real super_admin there (listed in that environment's `GLOBAL_ADMIN_EMAILS`); the local
+  `demo@example.com` seed does not exist remotely. The bypass header it sends is honoured only where
+  `CAPTCHA_BYPASS_ALLOWED=true` (development is; production is not).
+- **Local-only sidecars:** the worker health server, SonarQube and Drizzle Studio have no public URL, so
+  against a remote target they are not probed and their pills stay grey; the Runtime "Worker" column
+  and worker queue stats are empty.
+- The footer badge shows the fronted environment and origin so two hubs (local on `:3010`, development
+  on `:3011`) are never confused.
+
 ## Humans use the UI · agents use the data tools
 
 The HTML hub (`hub.html` on `:3010`) is **for humans**. An **AI agent asked to monitor the stack should never read or screenshot the UI** — it reads the *same data the hub renders*, as structured tool output, through the **`dashboards` MCP server** (`mcp.mjs`): `local_stack_status`, `local_metrics`, `local_queue_stats`, `local_worker_health`.

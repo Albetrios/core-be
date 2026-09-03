@@ -69,6 +69,7 @@
     "dashboards:down": "bash tooling/dev/dashboards/cli.sh down",
     "dashboards:status": "bash tooling/dev/dashboards/cli.sh status",
     "dashboards:proxy": "node tooling/dev/dashboards/proxy.mjs",
+    "dashboards:proxy:development": "TARGET_ENV=development API_ORIGIN=https://development--core-be.cresence.skin PROXY_PORT=3011 node tooling/dev/dashboards/proxy.mjs",
     "dashboards:restart": "bash tooling/dev/dashboards/cli.sh restart",
     "sonar:up": "docker compose -f docker-compose.sonar.yml up -d sonarqube",
     "sonar:down": "docker compose -f docker-compose.sonar.yml down",

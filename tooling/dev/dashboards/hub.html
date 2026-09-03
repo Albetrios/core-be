@@ -162,7 +162,8 @@
     </div>
 
     <footer class="border-t border-border pt-5 text-[12px] text-muted-foreground">
-      Gated tools proxy through <span class="font-mono">localhost:3010</span> with credentials injected. Every section refreshes together (global) every 10s — hit <span class="font-mono">↻</span> to refresh now · sparklines hold the last <span class="font-mono">5&nbsp;min</span> · <span id="node-ver" class="font-mono">—</span>.
+      <span id="target-env" class="rounded-md border border-border px-1.5 py-0.5 font-mono text-[10.5px] uppercase tracking-wide text-muted-foreground">…</span>
+      Gated tools proxy through this hub to <span id="target-origin" class="font-mono" hidden>—</span> with credentials injected. Every section refreshes together (global) every 10s — hit <span class="font-mono">↻</span> to refresh now · sparklines hold the last <span class="font-mono">5&nbsp;min</span> · <span id="node-ver" class="font-mono">—</span>.
     </footer>
   </main>
 
@@ -573,8 +574,10 @@ function renderOverview(d, o) {
 
 /* ── 3. quick links (copy at end of url) ── */
 const LINKS = [
-  { name:'API Reference', href:'http://localhost:3000/reference/',  status:'reference', desc:'Scalar — interactive API docs' },
-  { name:'Queues',        href:'http://localhost:3010/admin/queues', status:'bullboard', desc:'Bull Board — jobs & DLQs' },
+  // Reference + queues go THROUGH this proxy (relative hrefs) so they follow whatever API target
+  // it fronts — the local Compose stack or a deployed environment (API_ORIGIN).
+  { name:'API Reference', href:'/reference/',    status:'reference', desc:'Scalar — interactive API docs' },
+  { name:'Queues',        href:'/admin/queues',  status:'bullboard', desc:'Bull Board — jobs & DLQs' },
   { name:'SonarQube',     href:'http://localhost:9000',              status:'sonar',     desc:'Code quality & security', creds:'admin / admin' },
   { name:'Drizzle Studio',href:'https://local.drizzle.studio',       status:'drizzle',   desc:'Browse & edit the database', meta:'Chrome' },
 ];
@@ -756,10 +759,14 @@ function renderRequests(routes, opts) {
 let last = null;
 function applyStatus() {
   ['reference','bullboard','sonar','drizzle'].forEach((k) => { const e = $(`lled-${k}`); if (e) e.className = `h-2 w-2 rounded-full bg-${last?.[k] ? (last[k].up ? 'success pulse' : 'destructive') : 'muted'}`; const m = $(`lms-${k}`); if (m) m.textContent = last?.[k] ? `${last[k].ms}ms` : '—'; });
-  let up = 0, total = 0; if (last) for (const k of Object.keys(last)) { total++; if (last[k].up) up++; }
+  // Only probed services count — `target` is metadata, and a sidecar the proxy did not probe
+  // (worker / Sonar / Studio against a deployed API) is omitted rather than reported down.
+  let up = 0, total = 0; if (last) for (const k of Object.keys(last)) { const v = last[k]; if (!v || typeof v.up !== 'boolean') continue; total++; if (v.up) up++; }
   const cls = last ? (up === total ? 'bg-success pulse' : (up === 0 ? 'bg-destructive' : 'bg-warning')) : 'bg-muted';
   $('sys-led').className = `h-2 w-2 rounded-full ${cls}`;
   $('sys-text').textContent = last ? `${up}/${total} online` : 'offline';
+  const t = last?.target; const te = $('target-env'), to = $('target-origin');
+  if (t && te && to) { te.textContent = t.env; te.className = `rounded-md border px-1.5 py-0.5 font-mono text-[10.5px] uppercase tracking-wide ${t.local ? 'border-border text-muted-foreground' : 'border-warning/50 bg-warning/10 text-warning'}`; to.textContent = t.origin; to.hidden = false; }
 }
 
 /* ── poll loop (global · human-readable freshness) ── */
