@@ -1,6 +1,7 @@
-import { Queue } from 'bullmq';
-import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
-import { listDeadLetterQueueNames } from '@/infrastructure/queue/dlq/dead-letter.js';
+import {
+  getDeadLetterQueueClient,
+  listDeadLetterQueueNames,
+} from '@/infrastructure/queue/dlq/dead-letter.js';
 import { MAIL_QUEUE_NAME } from '@/infrastructure/mail/queues/mail.queue.js';
 import { WEBHOOK_DELIVERY_QUEUE_NAME } from '@/domains/notify/sub-domains/webhook/webhook-delivery/queues/webhook-delivery.queue.js';
 import { NOTIFICATION_QUEUE_NAME } from '@/domains/notify/sub-domains/notification/queues/notification.queue.js';
@@ -99,33 +100,33 @@ export interface DlqDepthSampleResult {
  * warning whenever a single queue crosses `DLQ_DEPTH_WARN_THRESHOLD`.
  *
  * @remarks
- * - **Algorithm:** iterates `SOURCE_QUEUE_NAMES_FOR_DLQ_MONITORING`, opens a
- *   short-lived `Queue` against each `<source>-dlq` name, reads
- *   `getJobCounts('waiting','failed')`, and aggregates totals.
- * - **Failure modes:** Redis connectivity errors during `getJobCounts` propagate
- *   to the worker; queue clients are closed in `finally` to release sockets.
- * - **Side effects:** Sentry `captureMessage('queue.dlq.depth.high', ...)` and
- *   structured log when `total >= warnThreshold`; transient Redis client open/close.
- * - **Notes:** driven by `createDlqDepthWorker`'s repeatable schedule; safe to
- *   call ad hoc for one-shot health probing.
+ * - **Algorithm:** maps `SOURCE_QUEUE_NAMES_FOR_DLQ_MONITORING` to `<source>-dlq`, reads
+ *   `getJobCounts('waiting','failed')` on every queue **concurrently** through the pooled
+ *   dead-letter clients ({@link getDeadLetterQueueClient}), and aggregates totals in list order.
+ * - **Failure modes:** a Redis error on any queue rejects the whole sample (`Promise.all`);
+ *   partial results are not returned. Nothing is closed here — the pooled clients live until
+ *   `closeDeadLetterQueues()` at shutdown.
+ * - **Side effects:** Sentry `captureMessage('queue.dlq.depth.high', ...)` and structured log
+ *   when `total >= warnThreshold`; the first call opens one Redis connection per DLQ.
+ * - **Notes:** driven by `createDlqDepthWorker`'s repeatable schedule and by every `/metrics`
+ *   scrape and verbose `/readyz`. It used to open, query and close a fresh `Queue` per DLQ
+ *   **sequentially** — on a hosted Redis with ~200 ms RTT that is 26 × (connect + script load +
+ *   count + close) ≈ 30 s+, which tripped the platform edge timeout and turned every scrape
+ *   into a 502 (sec-DLQ-scrape). One pass now costs a single round trip.
  */
 export async function sampleDeadLetterQueueDepths(): Promise<DlqDepthSampleResult> {
   const warnThreshold = env.DLQ_DEPTH_WARN_THRESHOLD;
   const deadLetterQueueNames = listDeadLetterQueueNames(SOURCE_QUEUE_NAMES_FOR_DLQ_MONITORING);
-  const depths: DlqDepthSampleResult['depths'][number][] = [];
 
-  for (const deadLetterQueueName of deadLetterQueueNames) {
-    const queue = new Queue(deadLetterQueueName, {
-      connection: getBullMQConnectionOptions(),
-    });
-
-    try {
-      const counts = await queue.getJobCounts('waiting', 'failed');
+  const depths = await Promise.all(
+    deadLetterQueueNames.map(async (deadLetterQueueName) => {
+      const counts = await getDeadLetterQueueClient(deadLetterQueueName).getJobCounts(
+        'waiting',
+        'failed',
+      );
       const waiting = counts.waiting ?? 0;
       const failed = counts.failed ?? 0;
       const total = waiting + failed;
-
-      depths.push({ deadLetterQueueName, waiting, failed, total });
 
       if (total >= warnThreshold) {
         logger.warn(
@@ -137,10 +138,10 @@ export async function sampleDeadLetterQueueDepths(): Promise<DlqDepthSampleResul
           extra: { deadLetterQueueName, waiting, failed, total, warnThreshold },
         });
       }
-    } finally {
-      await queue.close();
-    }
-  }
+
+      return { deadLetterQueueName, waiting, failed, total };
+    }),
+  );
 
   return { depths };
 }
