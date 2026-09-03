@@ -6,6 +6,24 @@ engineStrict: true
 # .nvmrc / .node-version / engines.node (>=24).
 useNodeVersion: 24.18.1
 
+auditConfig:
+  ignoreGhsas:
+    # @faker-js/faker <=10.4.0 — GHSA-qxc2-j82w-r537 (high): helpers.fake is
+    # exploitable into arbitrary code execution via a crafted template string.
+    # Two independent transitive paths, both dev-only tooling with no runtime
+    # exposure: @scalar/cli>@scalar/mock-server, and
+    # openapi-to-postmanv2>postman-collection. The latter is NOT overridable —
+    # postman-collection@5.3.1 (the latest published release; there is no
+    # newer one to move to) calls the pre-v8 faker.address.city API directly
+    # (lib/superstring/dynamic-variables.js), which modern faker removed
+    # (address -> location) in its v8 rewrite. Forcing faker >=10.5 globally
+    # via `overrides` breaks that call at runtime (confirmed: `pnpm
+    # docs:postman` crashes with `Cannot read properties of undefined
+    # (reading 'city')`) — there is no version of faker that is both patched
+    # and compatible with this consumer. Revisit if openapi-to-postmanv2 ever
+    # ships a release with a newer postman-collection.
+    - GHSA-qxc2-j82w-r537
+
 allowBuilds:
   # Telemetry package pulled in transitively; deny its postinstall build so a
   # strict install does not fail on an undecided build script (ERR_PNPM_IGNORED_BUILDS).
@@ -98,13 +116,6 @@ overrides:
   # declares (^3.x); do not let an uncapped floor silently major-bump to 4.x.
   # Fixed in 3.1.6.
   fast-uri: '>=3.1.6 <4'
-  # @faker-js/faker <=10.4.0 — GHSA-qxc2-j82w-r537 (high): helpers.fake is
-  # exploitable into arbitrary code execution via a crafted template string.
-  # Transitive via @scalar/cli>@scalar/mock-server and
-  # openapi-to-postmanv2>postman-collection (both dev-only tooling — no
-  # runtime exposure — but deps:audit does not distinguish dev/prod). 10.4.1
-  # was never published; the fix landed in 10.5.0.
-  '@faker-js/faker': '>=10.5.0'
   # find-my-way <=9.6.0 — GHSA-c96f-x56v-gq3h (high): DDoS via HTTP/2 request
   # smuggling in the router. Transitive via fastify (also fastify-type-provider-zod,
   # @scalar/cli). Fixed in 9.6.1.
