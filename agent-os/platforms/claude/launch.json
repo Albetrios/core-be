@@ -26,6 +26,14 @@
         "--no-open"
       ],
       "port": 4984
+    },
+    {
+      "name": "db-studio-development",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "db:studio:development"
+      ],
+      "port": 4993
     }
   ]
 }

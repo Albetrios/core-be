@@ -138,6 +138,7 @@
     "db:seed:loadtest": "ALLOW_BULK_SEED=1 BULK_PROFILE=demo BULK_ORGS=12 BULK_USERS_PER_ORG=10 pnpm db:seed:bulk && pnpm tool:load-test-credential-pool",
     "db:seed:sync-demo": "tsx src/scripts/seed/sync-demo-permissions.ts",
     "db:studio": "drizzle-kit studio",
+    "db:studio:development": "DATABASE_URL=\"$(sed -n 's/^DATABASE_MIGRATION_URL=//p' .env.development)\" drizzle-kit studio --port 4993",
     "db:viewer": "node ./tooling/db-viewer/cli.mjs",
     "docs:generate": "tsx src/scripts/codegen/generate-openapi.ts",
     "docs:generate:multilang": "OPENAPI_LOCALE=en pnpm docs:generate && OPENAPI_LOCALE=es pnpm docs:generate",

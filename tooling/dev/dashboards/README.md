@@ -44,6 +44,41 @@ any origin works, so a different `API_ORIGIN` fronts another deployment.
   and worker queue stats are empty.
 - The footer badge shows the fronted environment and origin so two hubs (local on `:3010`, development
   on `:3011`) are never confused.
+- **Browse the development database:** `pnpm db:studio:development` runs Drizzle Studio on `:4993`
+  against `DATABASE_MIGRATION_URL` from `.env.development` (the Neon **owner** role — it has
+  `BYPASSRLS`, which is the only way to see rows: the app login is `FORCE ROW LEVEL SECURITY`-scoped
+  and shows every tenant table as empty without a request context). Owner means full write access
+  to development data — browse, don't bulk-edit. Redis on Railway is on the private network
+  (`redis.railway.internal`), so queues are only reachable through the API's Bull Board, never directly.
+
+## Hosting the hub for an environment (Railway)
+
+The same proxy runs as a **tiny extra Railway service** next to `api` and `worker`, so a deployed
+environment gets this one-screen control room at its own URL (e.g.
+`https://development--dashboards.<your-domain>`), no laptop needed. It has zero npm dependencies;
+`Dockerfile.dashboards` copies `proxy.mjs` + `hub.html` and fetches the vendored assets.
+
+Hosted mode is opt-in via `HUB_BIND=0.0.0.0` and then **requires `HUB_AUTH="user:password"`** — the
+proxy refuses to boot without it, because it injects a super_admin Bull Board session and the
+metrics token into every request. Every route is HTTP basic-auth checked except `GET /_health`
+(the platform health check, reveals nothing). The login is your team's shared hub password; rotate
+it by changing the variable.
+
+Create the service once in the Railway UI (no CI change): **New service → GitHub repo (this one)
+→ Settings → Build → Dockerfile path `Dockerfile.dashboards`**, watch branch `main`, then set:
+
+| Variable | Value |
+| -------- | ----- |
+| `HUB_BIND` | `0.0.0.0` |
+| `HUB_AUTH` | `ops:<strong password>` |
+| `API_ORIGIN` | the API service's public origin (e.g. `https://development--core-be.<domain>`) |
+| `TARGET_ENV` | `development` (label only — there is no env file in the image) |
+| `METRICS_SCRAPE_TOKEN` | same value as the API service |
+| `DEMO_EMAIL` / `DEMO_PASSWORD` | a super_admin on that API (listed in its `GLOBAL_ADMIN_EMAILS`) |
+
+Then **Settings → Networking → Generate/Custom domain** and set the health-check path to
+`/_health`. The API must have `ENABLE_QUEUE_DASHBOARD=true` and `METRICS_ENABLED=true` (see above).
+Worker health, SonarQube and Drizzle Studio stay unavailable — they have no public URL.
 
 ## Humans use the UI · agents use the data tools
 

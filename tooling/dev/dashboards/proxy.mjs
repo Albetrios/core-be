@@ -25,9 +25,18 @@
 //                 supplies PORT and METRICS_SCRAPE_TOKEN), API_ORIGIN (http://127.0.0.1:<PORT> —
 //                 any origin, e.g. the development deployment's public https origin), API_PORT
 //                 (local port shortcut), DEMO_EMAIL, DEMO_PASSWORD (a super_admin on the target).
+//                 METRICS_SCRAPE_TOKEN in the process env wins over the env file.
+//
+// HOSTED mode (Dockerfile.dashboards — one small Railway service next to api/worker):
+//   HUB_BIND=0.0.0.0 makes it reachable beyond loopback, and then HUB_AUTH="user:password" is
+//   REQUIRED — the proxy refuses to start without it, because it hands every visitor a
+//   super_admin Bull Board session and the metrics token. Every request is HTTP basic-auth
+//   checked except GET /_health (the platform health check). Vendored assets missing from the
+//   image fall back to their CDN.
 
 import http from 'node:http';
 import https from 'node:https';
+import { timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -68,7 +77,29 @@ const API_TARGET = {
 };
 const API_IS_LOCAL = [LOCAL_HOST, 'localhost', '::1'].includes(API_ORIGIN.hostname);
 const PROXY_PORT = Number(process.env.PROXY_PORT || process.env.PORT || 3010);
-const METRICS_TOKEN = envVal('METRICS_SCRAPE_TOKEN');
+// Process env first (hosted: Railway service variables), then the `.env.<TARGET_ENV>` file (local).
+const METRICS_TOKEN = process.env.METRICS_SCRAPE_TOKEN || envVal('METRICS_SCRAPE_TOKEN');
+
+// Hosted mode: bind beyond loopback only behind a mandatory basic-auth login.
+const HUB_BIND = process.env.HUB_BIND || LOCAL_HOST;
+const HUB_IS_LOOPBACK = [LOCAL_HOST, 'localhost', '::1'].includes(HUB_BIND);
+const HUB_AUTH = process.env.HUB_AUTH || '';
+if (!(HUB_IS_LOOPBACK || HUB_AUTH.includes(':'))) {
+  process.stderr.write(
+    `\n  ✗ HUB_BIND=${HUB_BIND} exposes the hub beyond loopback — set HUB_AUTH="user:password" first.\n` +
+      '    The hub injects a super_admin session and the metrics token into every request; it must\n' +
+      '    never be reachable without its own login.\n\n',
+  );
+  process.exit(1);
+}
+const EXPECTED_AUTH = HUB_AUTH
+  ? Buffer.from(`Basic ${Buffer.from(HUB_AUTH).toString('base64')}`)
+  : null;
+const CDN_FALLBACKS = {
+  '/_hub/tw.js': 'https://cdn.tailwindcss.com',
+  '/_hub/gridstack.js': 'https://cdn.jsdelivr.net/npm/gridstack@11/dist/gridstack-all.min.js',
+  '/_hub/gridstack.css': 'https://cdn.jsdelivr.net/npm/gridstack@11/dist/gridstack.min.css',
+};
 // The super_admin this proxy logs in as to mint the Bull Board JWT. `dashboards:up` ensures
 // this user via `pnpm db:seed:demo-admin` — keep these defaults in sync with that script
 // (src/scripts/seed/ensure-demo-admin.ts) so the seeded password matches what we submit here.
@@ -312,38 +343,25 @@ async function handleRequest(clientReq, res, reqBody) {
     res.end(readHub());
     return;
   }
-  if (clientReq.method === 'GET' && path === '/_hub/tw.js') {
-    try {
-      res.writeHead(200, {
-        'content-type': 'application/javascript; charset=utf-8',
-        'cache-control': 'public, max-age=86400',
-      });
-      res.end(readFileSync(TW_PATH));
-    } catch {
-      res.writeHead(404, { 'content-type': 'text/plain' });
-      res.end(
-        'tailwind asset missing — curl https://cdn.tailwindcss.com -o tooling/dev/dashboards/tailwind.js',
-      );
-    }
-    return;
-  }
-  if (
-    clientReq.method === 'GET' &&
-    (path === '/_hub/gridstack.js' || path === '/_hub/gridstack.css')
-  ) {
+  if (clientReq.method === 'GET' && path in CDN_FALLBACKS) {
+    // Vendored copies are gitignored; when absent (fresh clone, hosted image built offline)
+    // send the browser to the CDN the file was vendored from instead of breaking the page.
     const isCss = path.endsWith('.css');
+    const filePath =
+      path === '/_hub/tw.js' ? TW_PATH : isCss ? GRIDSTACK_CSS_PATH : GRIDSTACK_JS_PATH;
+    let asset;
     try {
-      res.writeHead(200, {
-        'content-type': isCss ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8',
-        'cache-control': 'public, max-age=86400',
-      });
-      res.end(readFileSync(isCss ? GRIDSTACK_CSS_PATH : GRIDSTACK_JS_PATH));
+      asset = readFileSync(filePath);
     } catch {
-      res.writeHead(404, { 'content-type': 'text/plain' });
-      res.end(
-        'gridstack asset missing — curl https://cdn.jsdelivr.net/npm/gridstack@11/dist/gridstack-all.min.js -o tooling/dev/dashboards/gridstack.js',
-      );
+      res.writeHead(302, { location: CDN_FALLBACKS[path], 'cache-control': 'no-store' });
+      res.end();
+      return;
     }
+    res.writeHead(200, {
+      'content-type': isCss ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8',
+      'cache-control': 'public, max-age=86400',
+    });
+    res.end(asset);
     return;
   }
   if (clientReq.method === 'GET' && path === '/_status') return serveStatus(res);
@@ -351,7 +369,29 @@ async function handleRequest(clientReq, res, reqBody) {
   return serveProxy(clientReq, res, path, reqBody);
 }
 
+/** True when the request carries the `HUB_AUTH` basic credentials (constant-time compare). */
+function isAuthorized(clientReq) {
+  if (!EXPECTED_AUTH) return true;
+  const presented = Buffer.from(clientReq.headers.authorization || '');
+  return presented.length === EXPECTED_AUTH.length && timingSafeEqual(presented, EXPECTED_AUTH);
+}
+
 const server = http.createServer((clientReq, clientRes) => {
+  const path = clientReq.url || '/';
+  // Platform health check — the only route that skips the login (it reveals nothing).
+  if (clientReq.method === 'GET' && path === '/_health') {
+    clientRes.writeHead(200, { 'content-type': 'application/json' });
+    clientRes.end(JSON.stringify({ status: 'ok', target: API_ORIGIN.origin, env: TARGET_ENV }));
+    return;
+  }
+  if (!isAuthorized(clientReq)) {
+    clientRes.writeHead(401, {
+      'www-authenticate': 'Basic realm="control room", charset="UTF-8"',
+      'content-type': 'text/plain',
+    });
+    clientRes.end('login required');
+    return;
+  }
   const chunks = [];
   clientReq.on('data', (c) => chunks.push(c));
   clientReq.on('end', () => {
@@ -361,11 +401,15 @@ const server = http.createServer((clientReq, clientRes) => {
   });
 });
 
-server.listen(PROXY_PORT, '127.0.0.1', () => {
+server.listen(PROXY_PORT, HUB_BIND, () => {
   const base = `http://localhost:${PROXY_PORT}`;
   process.stdout.write(
     `\n  Dashboards hub → ${base}/   (tabbed control room · live status)\n` +
-      `  Auth proxy     → ${base}    (→ API ${API_ORIGIN.origin} · env ${TARGET_ENV} · tokens from .env.${TARGET_ENV})\n\n` +
+      `  Auth proxy     → ${base}    (→ API ${API_ORIGIN.origin} · env ${TARGET_ENV} · tokens from .env.${TARGET_ENV})\n` +
+      (HUB_IS_LOOPBACK
+        ? ''
+        : `  Hosted mode    → bound to ${HUB_BIND}, basic-auth login "${HUB_AUTH.split(':')[0]}" required on every route except /_health\n`) +
+      '\n' +
       (METRICS_TOKEN
         ? ''
         : `  ! METRICS_SCRAPE_TOKEN is empty in .env.${TARGET_ENV} — /metrics may already be open.\n`) +

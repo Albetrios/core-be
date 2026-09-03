@@ -1,0 +1,42 @@
+# Control-room hub (tooling/dev/dashboards) as a tiny hosted service — one Railway service next
+# to api/worker so a deployed environment gets the same one-screen dashboard the local `:3010`
+# hub gives a laptop. Zero npm dependencies: the proxy is plain Node (http/https/crypto).
+#
+#   docker build -f Dockerfile.dashboards -t core-dashboards .
+#   docker run --rm -p 3010:3010 -e HUB_BIND=0.0.0.0 -e HUB_AUTH=ops:secret \
+#     -e API_ORIGIN=https://<api-host> -e TARGET_ENV=development \
+#     -e METRICS_SCRAPE_TOKEN=... -e DEMO_EMAIL=... -e DEMO_PASSWORD=... core-dashboards
+#
+# Required service variables (Railway → service → Variables):
+#   HUB_BIND=0.0.0.0            listen beyond loopback (the platform routes to it)
+#   HUB_AUTH=user:password      basic-auth login — the proxy refuses to start without it
+#   API_ORIGIN=https://…        the API this hub fronts (its public origin)
+#   TARGET_ENV=development      label + which env-file name it would read locally (none here)
+#   METRICS_SCRAPE_TOKEN=…      same value as the API service (injected on /metrics)
+#   DEMO_EMAIL / DEMO_PASSWORD  a super_admin on that API (Bull Board login)
+# PORT is injected by the platform; the proxy listens on it.
+ARG NODE_VERSION=24.18.1
+FROM node:${NODE_VERSION}-alpine
+
+WORKDIR /app/tooling/dev/dashboards
+
+# Vendored UI assets are gitignored; fetch them at build so the page is self-contained.
+# If the build has no network the proxy redirects those two paths to the CDN instead.
+RUN apk add --no-cache curl \
+  && (curl -fsSL https://cdn.tailwindcss.com -o tailwind.js || true) \
+  && (curl -fsSL https://cdn.jsdelivr.net/npm/gridstack@11/dist/gridstack-all.min.js -o gridstack.js || true) \
+  && (curl -fsSL https://cdn.jsdelivr.net/npm/gridstack@11/dist/gridstack.min.css -o gridstack.css || true) \
+  && apk del curl
+
+COPY tooling/dev/dashboards/proxy.mjs tooling/dev/dashboards/hub.html ./
+
+ENV NODE_ENV=production \
+  HUB_BIND=0.0.0.0 \
+  PORT=3010
+EXPOSE 3010
+
+USER node
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- "http://127.0.0.1:${PORT}/_health" >/dev/null || exit 1
+
+CMD ["node", "proxy.mjs"]
