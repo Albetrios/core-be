@@ -89,13 +89,22 @@ overrides:
   # source-map auto-loading (sourceMappingURL) discloses arbitrary .map files.
   # Transitive via @scalar/cli > vue > @vue/compiler-sfc. Fixed in 8.5.18.
   postcss: '>=8.5.18'
-  # fast-uri <3.1.5 — GHSA-7p8r-x3mc-p8w7 (high): host confusion via backslash
-  # authority introducer (also covers earlier GHSA-4c8g-83qw-93j6 /
-  # GHSA-v2hh-gcrm-f6hx). Transitive via fastify's ajv/find-my-way URI handling
-  # (request validation + response serialization hot path). Cap <4 so the
-  # override stays on the patched 3.x line ajv declares (^3.x); do not let an
-  # uncapped floor silently major-bump to 4.x. Fixed in 3.1.5.
-  fast-uri: '>=3.1.5 <4'
+  # fast-uri <3.1.6 — GHSA-jqff-g426-hqxp (high): a further host-confusion
+  # variant on top of the GHSA-7p8r-x3mc-p8w7 / GHSA-4c8g-83qw-93j6 /
+  # GHSA-v2hh-gcrm-f6hx family already covered by the 3.1.5 floor below — this
+  # repo's floor was stale against the newer advisory. Transitive via fastify's
+  # ajv/find-my-way URI handling (request validation + response serialization
+  # hot path). Cap <4 so the override stays on the patched 3.x line ajv
+  # declares (^3.x); do not let an uncapped floor silently major-bump to 4.x.
+  # Fixed in 3.1.6.
+  fast-uri: '>=3.1.6 <4'
+  # @faker-js/faker <=10.4.0 — GHSA-qxc2-j82w-r537 (high): helpers.fake is
+  # exploitable into arbitrary code execution via a crafted template string.
+  # Transitive via @scalar/cli>@scalar/mock-server and
+  # openapi-to-postmanv2>postman-collection (both dev-only tooling — no
+  # runtime exposure — but deps:audit does not distinguish dev/prod). 10.4.1
+  # was never published; the fix landed in 10.5.0.
+  '@faker-js/faker': '>=10.5.0'
   # find-my-way <=9.6.0 — GHSA-c96f-x56v-gq3h (high): DDoS via HTTP/2 request
   # smuggling in the router. Transitive via fastify (also fastify-type-provider-zod,
   # @scalar/cli). Fixed in 9.6.1.
@@ -104,7 +113,12 @@ overrides:
   drizzle-orm: '>=0.45.2'
   i18next-fs-backend: '>=2.6.4'
   i18next-http-middleware: '>=3.9.3'
-  qs: '>=6.15.2'
+  # qs >=6.14.2 <=6.15.3 — GHSA-x5fp-wj9c-mxmx (moderate): array-limit bypass
+  # via bracket-key comma parsing. This repo's floor (6.15.2) predates the
+  # advisory's own fix version. Transitive via @stryker-mutator/core>
+  # typed-rest-client (dev-only) and @modelcontextprotocol/sdk>express (the
+  # MCP tooling path, not the HTTP server's own request parsing). Fixed in 6.16.0.
+  qs: '>=6.16.0'
   tmp: '>=0.2.6'
   # undici <7.29.0 — GHSA-8xcm-r25x-g524 / GHSA-m8rv-5g2x-5cg5 /
   # GHSA-jr45-8vmc-qm54 / GHSA-v3r7-h72x-cjcm (moderate–high): various
