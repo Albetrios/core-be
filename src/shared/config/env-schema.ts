@@ -377,6 +377,23 @@ const envSchemaBase = z.object({
    */
   AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED: booleanString('false'),
   /**
+   * Category-B (security). The per-email resend cooldown on `POST /auth/email/send-code` — the
+   * anti-mail-bomb spacing that lets only the FIRST send for an address in
+   * `VERIFICATION_CODE_RESEND_COOLDOWN_SECONDS` issue a code.
+   *
+   * Defaults true (the protection is on). Turned off, every send issues a fresh code, so local work
+   * gets the `debug_verification_code` echo on every attempt instead of a blank field for a minute
+   * after each send — the cooldown's uniform no-op response is indistinguishable from a real send,
+   * which reads as flaky rather than as a rate limit.
+   *
+   * A refine permits `false` ONLY on the `local` and `development` targets — an allowlist rather
+   * than a not-production test, so a target added to the enum later is refused by default instead of
+   * silently inheriting an unthrottled mail path. It changes ONLY the spacing: the per-IP and
+   * per-email rate limits, the 300 ms anti-enumeration floor, and the uniform success response are
+   * all untouched.
+   */
+  AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED: booleanString('true'),
+  /**
    * Category-B. ioredis ready-check on the cache / BullMQ connections. Defaults true (on); the test
    * harness sets `REDIS_READY_CHECK_ENABLED=false` (the per-worker singletons churn across
    * createTestApp instances and a reconnect ready-check rejects against a closing stream). Read via
@@ -1481,6 +1498,17 @@ export const envSchema = envSchemaBase
       message:
         "AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED may only be true on the 'local' or 'development' targets (it makes email login accept a well-known master code, so a deployed runtime must only ever accept the one-time codes issued by send-code). Stated as an allowlist rather than a not-production test so a target added to the enum later is refused by default.",
       path: ['AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED'],
+    },
+  )
+  .refine(
+    (data) =>
+      data.AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED ||
+      data.NODE_ENV === 'local' ||
+      data.NODE_ENV === 'development',
+    {
+      message:
+        "AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED may only be false on the 'local' or 'development' targets (it is the anti-mail-bomb spacing on send-code, so a deployed runtime must keep it on). Stated as an allowlist rather than a not-production test so a target added to the enum later is refused by default.",
+      path: ['AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED'],
     },
   )
   .refine((data) => data.NODE_ENV !== 'production' || data.REDIS_READY_CHECK_ENABLED === true, {
