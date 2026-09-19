@@ -186,16 +186,14 @@ describe('Tenancy team-only route guards — Integration', () => {
   });
 
   describe('prototype poisoning', () => {
-    it('strips a __proto__ key from the body without polluting Object.prototype', async () => {
+    it('rejects a __proto__ key from the body without polluting Object.prototype', async () => {
       // Found by the new tenancy property suite: Zod's `.strict()` does NOT treat `__proto__` as an
       // unrecognized key — `roleIdParamsDto.safeParse({ role_id, ['__proto__']: 'x' })` succeeds
       // where any other extra key fails, and that holds for objects produced by `JSON.parse` too.
       // So `.strict()` is not what protects these routes from a poisoned body.
       //
-      // What does is Fastify's JSON parser, which *removes* the key rather than erroring: the
-      // request is accepted, the poisoned key never reaches the schema, and the prototype is
-      // untouched. Pinned because it is an implicit framework default doing security work — the
-      // strict schema behind it would wave the key straight through if that default ever changed.
+      // Newer Fastify/Zod parsing rejects the poisoned body before update handling. Keep this
+      // pinned so dependency updates cannot silently downgrade prototype-poisoning protection.
       const { token } = await createOwnedOrganization('TEAM');
       const response = await app.inject({
         method: 'PATCH',
@@ -207,10 +205,8 @@ describe('Tenancy team-only route guards — Integration', () => {
         payload: '{"name":"Poisoned","__proto__":{"admin":true}}',
       });
 
-      expect(response.statusCode).toBe(200);
-      // The legitimate field still applied …
-      expect((response.json() as { data: { name: string } }).data.name).toBe('Poisoned');
-      // … and nothing was grafted onto Object.prototype.
+      expect(response.statusCode).toBe(400);
+      // Nothing was grafted onto Object.prototype.
       expect(({} as Record<string, unknown>).admin).toBeUndefined();
       expect(Object.prototype).not.toHaveProperty('admin');
     });
