@@ -17,7 +17,6 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: ${{ vars.FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 || 'true' }}
@@ -459,7 +458,6 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      actions: read
       security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -491,7 +489,7 @@ jobs:
           skip-files: Dockerfile.agent
 
       - name: Upload IaC Trivy SARIF
-        if: always() && hashFiles('trivy-config.sarif') != '' && github.event.repository.private != true
+        if: always() && hashFiles('trivy-config.sarif') != ''
         uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v3
         with:
           sarif_file: trivy-config.sarif
@@ -500,7 +498,7 @@ jobs:
   dependency-review:
     name: Dependency review
     needs: [changes]
-    if: needs.changes.outputs.docs-only-md != 'true' && github.event.repository.private != true
+    if: needs.changes.outputs.docs-only-md != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -515,7 +513,6 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v4
         with:
           fail-on-severity: high
-          allow-ghsas: GHSA-qxc2-j82w-r537
           deny-licenses: GPL-3.0, AGPL-3.0
 
   actionlint:
