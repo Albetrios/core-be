@@ -88,6 +88,17 @@ describe('dead-letter helpers', () => {
       } as Job;
       expect(isFinalJobFailure(job)).toBe(true);
     });
+
+    // BullMQ stores `attempts: 0` on jobs added without the option (cron/repeatable jobs from the
+    // scheduler included) — that is its "no retries" encoding, i.e. exactly one attempt.
+    it('treats opts.attempts 0 (BullMQ default) as a single attempt', async () => {
+      const { isFinalJobFailure, resolveJobMaxAttempts } = await import(
+        '@/infrastructure/queue/dlq/dead-letter.js'
+      );
+      const job = { attemptsMade: 1, opts: { attempts: 0 } } as Job;
+      expect(resolveJobMaxAttempts(job)).toBe(1);
+      expect(isFinalJobFailure(job)).toBe(true);
+    });
   });
 
   describe('getDeadLetterQueueName', () => {
@@ -267,6 +278,32 @@ describe('dead-letter helpers', () => {
       // One Sentry capture for the persist failure, one for the final-failure alert.
       expect(sentryCaptureExceptionMock).toHaveBeenCalledWith(persistError);
       expect(sentryCaptureExceptionMock).toHaveBeenCalledWith(finalError);
+    });
+  });
+
+  // Regression: `audit.dead_letter_jobs` has CHECK (max_attempts >= 1). A cron job's terminal
+  // failure used to be persisted with max_attempts = 0 (BullMQ's default), the insert violated the
+  // constraint, and the durable ledger silently missed every scheduled-job dead-letter.
+  describe('recordDeadLetterFailure ledger row', () => {
+    it('never writes max_attempts below 1 for a job with attempts 0', async () => {
+      const { recordDeadLetterFailure } = await import('@/infrastructure/queue/dlq/dead-letter.js');
+      const job = {
+        id: 'repeat:stripe-webhook-event-catchup:1',
+        name: 'catchup-missing-stripe-webhook-events',
+        data: {},
+        attemptsMade: 1,
+        opts: { attempts: 0 },
+      } as unknown as Job;
+
+      await recordDeadLetterFailure('stripe-webhook-event-catchup', job, new Error('boom'));
+
+      expect(insertDeadLetterJobMock).toHaveBeenCalledTimes(1);
+      const row = insertDeadLetterJobMock.mock.calls[0]?.[0] as {
+        max_attempts: number;
+        attempts_made: number;
+      };
+      expect(row.max_attempts).toBe(1);
+      expect(row.attempts_made).toBe(1);
     });
   });
 });

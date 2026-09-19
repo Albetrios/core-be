@@ -134,6 +134,38 @@ describe('env-schema', () => {
     });
   });
 
+  // The 60s per-email spacing on send-code is the anti-mail-bomb control; turning it off is a
+  // local-only convenience (it makes the TEST_MODE debug_verification_code echo land on every
+  // send). Stated as an allowlist so a target added to the enum later is refused by default.
+  describe('AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED', () => {
+    it('defaults to true so the protection exists unless a developer opts out', () => {
+      const parsed = envSchema.parse({ ...commonRequiredBase, NODE_ENV: 'local' });
+      expect(parsed.AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED).toBe(true);
+    });
+
+    it('rejects false in production', () => {
+      const result = envSchema.safeParse({
+        ...productionRequiredBase,
+        AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED: 'false',
+      });
+      expect(result.success).toBe(false);
+      expect(JSON.stringify(result.error?.issues)).toContain(
+        'AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED',
+      );
+    });
+
+    it('allows false on the local and development targets', () => {
+      for (const NODE_ENV of ['local', 'development'] as const) {
+        const result = envSchema.safeParse({
+          ...commonRequiredBase,
+          NODE_ENV,
+          AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED: 'false',
+        });
+        expect(result.success, `${NODE_ENV} should allow it`).toBe(true);
+      }
+    });
+  });
+
   it('exports schema keys for tooling sync', () => {
     expect(envSchemaKeys.length).toBeGreaterThan(0);
     expect(envSchemaKeys).toContain('DATABASE_URL');

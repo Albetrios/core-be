@@ -54,6 +54,11 @@ process.env.SHUTDOWN_SKIP_SHARED_TEARDOWN = 'true';
 // redis.client / bullmq-redis.client / queue/connection read this raw from process.env (the frozen
 // `env` const predates this override) to disable the ioredis ready-check under the churned test singletons.
 process.env.REDIS_READY_CHECK_ENABLED = 'false';
+// The per-email send-code cooldown is behaviour the auth suites assert, so pin it ON with a plain
+// assignment (not `??=`): the harness runs as NODE_ENV=development, which layers a developer's
+// `.env.local` on top, and a machine that opted out of the spacing locally must not silently lose
+// the coverage for it.
+process.env.AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED = 'true';
 // Category-B security flags now default to their HARDENED value everywhere; the harness sets the
 // relaxed values explicitly (previously implied by the non-production runtime) so e2e behaves as
 // before: captcha bypass, Referer-fallback origin check, empty webhook allowlist, and unauthenticated
