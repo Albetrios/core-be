@@ -152,19 +152,13 @@ describe('public id shape (property)', () => {
     );
   });
 
-  it('documents that Zod .strict() does NOT reject a __proto__ key', () => {
-    // Surfaced by the property above, which found `__proto__` as a counterexample to "strict rejects
-    // every extra key". It is a real Zod behaviour and it holds for `JSON.parse` output too, so it
-    // is recorded here as an executable note rather than filtered away silently.
-    //
-    // It is not a route hole: Fastify's JSON parser strips `__proto__` from a request body before
-    // validation runs, and path params cannot be named `__proto__` at all. The HTTP-layer half of
-    // this is asserted in `tenancy-team-only-routes.integration.test.ts` — if that ever changes,
-    // this schema will not be the thing that catches it.
+  it('rejects a __proto__ key after Zod strict validation', () => {
+    // Zod now treats `__proto__` from JSON.parse as an extra key under `.strict()`.
+    // Keep this pinned so prototype-pollution handling does not silently regress.
     const roleId = generatePublicId('memberRole');
     const poisoned = JSON.parse(`{"role_id":"${roleId}","__proto__":{"admin":true}}`) as unknown;
 
-    expect(roleIdParamsDto.safeParse(poisoned).success).toBe(true);
+    expect(roleIdParamsDto.safeParse(poisoned).success).toBe(false);
     // Any ordinary extra key is still rejected — strictness is intact everywhere else.
     expect(roleIdParamsDto.safeParse({ role_id: roleId, admin: true }).success).toBe(false);
     // Parsing it does not pollute the prototype.
