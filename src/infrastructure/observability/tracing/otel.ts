@@ -39,7 +39,24 @@ export function initOpenTelemetry(serviceName: string): void {
     instrumentations: [new HttpInstrumentation()],
   });
 
-  sdk.start();
+  try {
+    sdk.start();
+  } catch (error) {
+    // Tracing must never take the process down. Since the Sentry v10 bump the
+    // Sentry SDK registers the OpenTelemetry globals itself (trace/context/
+    // propagation), so our NodeSDK.start() can throw "Attempted duplicate
+    // registration" — on the first Neon deploy that unhandled throw at module
+    // top level killed the container before /readyz ever answered (issue
+    // #1129, layer 3). Sentry's OTel then owns tracing; our helpers use the
+    // global API and keep working against it.
+    sdk = null;
+    initialized = true;
+    logger.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      'OpenTelemetry NodeSDK start skipped — globals already registered (Sentry-owned tracing)',
+    );
+    return;
+  }
   initialized = true;
   logger.info({ serviceName: resolvedServiceName, otlpEndpoint }, 'OpenTelemetry initialized');
 }
