@@ -88,7 +88,20 @@ export function listDeadLetterQueueNames(sourceQueueNames: readonly string[]): s
   return sourceQueueNames.map((name) => getDeadLetterQueueName(name));
 }
 
-function getOrCreateDeadLetterQueue(deadLetterQueueName: string): Queue {
+/**
+ * Returns the pooled BullMQ producer for a `<source>-dlq` queue, creating it on first use.
+ *
+ * @remarks
+ * - **Algorithm:** one long-lived {@link Queue} per DLQ name, cached in a module map; the
+ *   dead-letter writer and the depth sampler share the same client and Redis connection.
+ * - **Failure modes:** none at call time — the connection is opened lazily by BullMQ, so a
+ *   Redis outage surfaces on the first command, not here.
+ * - **Side effects:** the first call per name opens a Redis connection that lives until
+ *   {@link closeDeadLetterQueues} runs at shutdown.
+ * - **Notes:** sharing the pool is what keeps `/metrics` and `/readyz` fast on a hosted Redis —
+ *   a fresh connect + script load + close per DLQ costs several round trips each (sec-DLQ-scrape).
+ */
+export function getDeadLetterQueueClient(deadLetterQueueName: string): Queue {
   const existing = deadLetterQueuesByName.get(deadLetterQueueName);
   if (existing) return existing;
   const queue = new Queue(deadLetterQueueName, {
@@ -141,7 +154,7 @@ export async function enqueueDeadLetter(
   error: unknown,
 ): Promise<void> {
   const deadLetterQueueName = getDeadLetterQueueName(sourceQueueName);
-  const queue = getOrCreateDeadLetterQueue(deadLetterQueueName);
+  const queue = getDeadLetterQueueClient(deadLetterQueueName);
   const errorObject = error instanceof Error ? error : new Error(String(error));
   const maxAttempts = job.opts.attempts ?? 1;
 
