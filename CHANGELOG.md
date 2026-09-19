@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.0.1](https://github.com/albetrios/core-be/compare/v6.0.0...v6.0.1) (2026-09-19)
+
+
+### Fixed
+
+* **api:** include Scalar reference in runtime image ([#1158](https://github.com/albetrios/core-be/issues/1158)) ([b414714](https://github.com/albetrios/core-be/commit/b41471457ce384d3f9f56d6f40ca0591eef6a7a3))
+
 ## [6.0.0](https://github.com/nikunjmavani/core-be/compare/v5.2.2...v6.0.0) (2026-08-31)
 
 
