@@ -522,7 +522,7 @@ async function fetchDeployment({
  * (observability gap found while triaging issue #1129's dev-deploy failure).
  *
  * @remarks
- * - **Algorithm:** Railway GraphQL `deploymentLogs` (last 120 lines), printed
+ * - **Algorithm:** Railway GraphQL `deploymentLogs` (last 500 lines), printed
  *   verbatim; any error is swallowed into a single warning — diagnostics must
  *   never mask the original failure.
  * - **Side effects:** stdout only.
@@ -553,7 +553,7 @@ async function dumpDeploymentLogsOnFailure({
           }
         }
       `,
-      variables: { deploymentId, limit: 120 },
+      variables: { deploymentId, limit: 500 },
     });
     const lines = result.deploymentLogs ?? [];
     console.log(
