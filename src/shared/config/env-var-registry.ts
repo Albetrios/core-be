@@ -18,7 +18,7 @@ import type { z } from 'zod';
  * metadata. The default (and required/optional status) lives in the Zod field itself and is read
  * back with Zod's public API, so it is never duplicated here.
  */
-export interface EnvVarSpec<Schema extends z.ZodTypeAny = z.ZodTypeAny> {
+export interface EnvVarSpec<Schema extends z.ZodType = z.ZodType> {
   /** The Zod field for this variable — the validation and allowed-values authority. */
   readonly schema: Schema;
   /** Human-readable allowed-values summary for the catalog, e.g. `integer 1–65535`, `turnstile | disabled`. */
@@ -32,7 +32,7 @@ export interface EnvVarSpec<Schema extends z.ZodTypeAny = z.ZodTypeAny> {
  * description. The Zod field's precise type is preserved in the returned spec so the derived schema
  * object keeps full inference.
  */
-export function envVar<Schema extends z.ZodTypeAny>(
+export function envVar<Schema extends z.ZodType>(
   schema: Schema,
   meta: { readonly allowed: string; readonly description: string },
 ): EnvVarSpec<Schema> {
@@ -52,7 +52,7 @@ export type SchemaShapeOf<Registry extends Record<string, EnvVarSpec>> = {
 export function toSchemaShape<Registry extends Record<string, EnvVarSpec>>(
   registry: Registry,
 ): SchemaShapeOf<Registry> {
-  const shape: Record<string, z.ZodTypeAny> = {};
+  const shape: Record<string, z.ZodType> = {};
   for (const [key, spec] of Object.entries(registry)) {
     shape[key] = spec.schema;
   }

@@ -234,7 +234,7 @@
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@sentry/node": "^10.74.0",
     "@sentry/profiling-node": "^10.74.0",
-    "@simplewebauthn/server": "^13.3.3",
+    "@simplewebauthn/server": "^14.0.2",
     "argon2": "^0.45.1",
     "bullmq": "^6.3.6",
     "disposable-email-domains-js": "^1.25.0",
@@ -248,7 +248,7 @@
     "i18next-http-middleware": "^3.9.9",
     "ioredis": "6.0.0",
     "ipaddr.js": "^2.5.0",
-    "isomorphic-dompurify": "^3.23.0",
+    "isomorphic-dompurify": "^4.2.0",
     "jose": "^6.2.12",
     "opossum": "^10.0.0",
     "otplib": "^13.5.0",
@@ -278,7 +278,7 @@
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/node": "^25.9.7",
     "@types/opossum": "^8.1.9",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.1",
     "chalk": "^6.0.0",
     "drizzle-kit": "^0.31.10",
     "fast-check": "^4.10.1",
@@ -295,7 +295,7 @@
     "tsc-alias": "^1.9.5",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.1"
   },
   "repository": {
     "type": "git",

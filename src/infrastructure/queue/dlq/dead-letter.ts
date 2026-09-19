@@ -120,11 +120,30 @@ export function getDeadLetterQueueClient(deadLetterQueueName: string): Queue {
 }
 
 /**
+ * Resolves a job's retry budget as the ledger and the final-failure check understand it.
+ *
+ * @remarks
+ * - **Algorithm:** BullMQ stores `attempts: 0` on every job added without an explicit
+ *   `attempts` option (its "no retries" encoding — repeatable/cron jobs from the scheduler and
+ *   most ad-hoc adds), and `undefined` never reaches a worker. Both mean "exactly one attempt",
+ *   so the budget is clamped to a minimum of 1.
+ * - **Failure modes:** none; pure.
+ * - **Side effects:** none.
+ * - **Notes:** `audit.dead_letter_jobs` enforces `CHECK (max_attempts >= 1)`. Before this
+ *   clamp a cron job's terminal failure wrote `max_attempts = 0`, the insert violated the
+ *   constraint and the durable ledger silently missed every scheduled-job dead-letter while the
+ *   Redis mirror still recorded it (observed on `stripe-webhook-event-catchup`).
+ */
+export function resolveJobMaxAttempts(job: Pick<Job, 'opts'>): number {
+  return Math.max(1, job.opts.attempts ?? 1);
+}
+
+/**
  * Returns true when the job has used its last retry (BullMQ `failed` event).
  */
 export function isFinalJobFailure(job: Job | undefined): boolean {
   if (!job) return false;
-  const maxAttempts = job.opts.attempts ?? 1;
+  const maxAttempts = resolveJobMaxAttempts(job);
   return job.attemptsMade >= maxAttempts;
 }
 
@@ -156,7 +175,7 @@ export async function enqueueDeadLetter(
   const deadLetterQueueName = getDeadLetterQueueName(sourceQueueName);
   const queue = getDeadLetterQueueClient(deadLetterQueueName);
   const errorObject = error instanceof Error ? error : new Error(String(error));
-  const maxAttempts = job.opts.attempts ?? 1;
+  const maxAttempts = resolveJobMaxAttempts(job);
 
   const data: DeadLetterJobData = omitUndefined({
     original_queue: sourceQueueName,
@@ -214,7 +233,7 @@ async function persistDeadLetterFailureToPostgres(
   error: unknown,
 ): Promise<void> {
   const errorObject = error instanceof Error ? error : new Error(String(error));
-  const maxAttempts = job.opts.attempts ?? 1;
+  const maxAttempts = resolveJobMaxAttempts(job);
 
   try {
     await insertDeadLetterJob({
@@ -362,7 +381,7 @@ export function attachDeadLetterAndAlerting(worker: Worker, queueName: string): 
           jobId: job.id,
           jobName: job.name,
           attempt: job.attemptsMade,
-          maxAttempts: job.opts.attempts ?? 1,
+          maxAttempts: resolveJobMaxAttempts(job),
           error: errorMessage,
         },
         'queue.job.retry',
@@ -376,7 +395,7 @@ export function attachDeadLetterAndAlerting(worker: Worker, queueName: string): 
         jobId: job.id,
         jobName: job.name,
         attemptsMade: job.attemptsMade,
-        maxAttempts: job.opts.attempts ?? 1,
+        maxAttempts: resolveJobMaxAttempts(job),
         error: errorMessage,
       },
       'queue.job.final_failure',

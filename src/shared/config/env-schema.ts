@@ -1861,7 +1861,7 @@ export function formatEnvSchemaDefault(value: unknown): string | undefined {
 export const envSchemaDefaults: Readonly<Record<string, string>> = (() => {
   const defaults: Record<string, string> = {};
   for (const [key, schema] of Object.entries(envSchemaBase.shape)) {
-    const parsed = (schema as z.ZodTypeAny).safeParse(undefined);
+    const parsed = (schema as z.ZodType).safeParse(undefined);
     if (parsed.success) {
       const formatted = formatEnvSchemaDefault(parsed.data);
       if (formatted !== undefined) defaults[key] = formatted;
@@ -1879,7 +1879,7 @@ export const envSchemaDefaults: Readonly<Record<string, string>> = (() => {
  * required (which would also flag optional integrations like Stripe / OAuth / S3).
  */
 export const envSchemaRequiredKeys: readonly string[] = Object.entries(envSchemaBase.shape)
-  .filter(([, schema]) => !(schema as z.ZodTypeAny).safeParse(undefined).success)
+  .filter(([, schema]) => !(schema as z.ZodType).safeParse(undefined).success)
   .map(([key]) => key);
 
 /**
