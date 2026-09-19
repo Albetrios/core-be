@@ -499,7 +499,7 @@ jobs:
   dependency-review:
     name: Dependency review
     needs: [changes]
-    if: needs.changes.outputs.docs-only-md != 'true'
+    if: needs.changes.outputs.docs-only-md != 'true' && github.event.repository.private != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
