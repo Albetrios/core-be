@@ -5,7 +5,7 @@
 
 Allowed values + description come from the explicit registry; the **default** and **required/optional**
 status are read from each Zod field, so this can never disagree with what boots. Registry coverage:
-**12 / 235** variables migrated to an explicit `{ allowed, description }` entry.
+**12 / 236** variables migrated to an explicit `{ allowed, description }` entry.
 
 | Variable | Allowed values | Default | In registry | Description |
 | --- | --- | --- | :---: | --- |
@@ -21,6 +21,7 @@ status are read from each Zod field, so this can never disagree with what boots.
 | `AUDIT_OUTBOX_DRAIN_MAX_ATTEMPTS` | — | — *(optional)* |  | — |
 | `AUDIT_RETENTION_CRON` | — | — *(optional)* |  | — |
 | `AUDIT_RETENTION_DAYS` | — | `365` |  | — |
+| `AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED` | — | `true` |  | — |
 | `AUTH_SESSION_CLEANUP_CRON` | — | — *(optional)* |  | — |
 | `AUTH_SESSION_MAX_AGE_DAYS` | — | `7` |  | — |
 | `AUTH_SESSION_RETENTION_DAYS` | — | `30` |  | — |
