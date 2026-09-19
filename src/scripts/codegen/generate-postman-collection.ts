@@ -6,10 +6,11 @@
  * Output:       docs/postman-collection.json
  */
 import { readFileSync, writeFileSync } from 'node:fs';
+import type { Faker } from '@faker-js/faker';
 import { join } from 'node:path';
 
 // openapi-to-postmanv2 ships CJS — use createRequire for ESM compat
-import { createRequire } from 'node:module';
+import { Module, createRequire } from 'node:module';
 import {
   POSTMAN_COLLECTION_PREFIX,
   PROJECT_DISPLAY_NAME,
@@ -17,6 +18,107 @@ import {
 } from '@/shared/constants/project-identity.constants.js';
 
 const require = createRequire(import.meta.url);
+
+type LegacyNumberOptions = {
+  max?: number;
+  min?: number;
+};
+
+function createPostmanCollectionFakerCompat(faker: Faker): Record<string, unknown> {
+  const imageByCategory = (category: string): (() => string) => {
+    return () => faker.image.urlLoremFlickr({ category });
+  };
+
+  return {
+    ...faker,
+    address: {
+      city: () => faker.location.city(),
+      country: () => faker.location.country(),
+      countryCode: () => faker.location.countryCode(),
+      latitude: () => faker.location.latitude(),
+      longitude: () => faker.location.longitude(),
+      streetAddress: () => faker.location.streetAddress(),
+      streetName: () => faker.location.street(),
+    },
+    commerce: {
+      ...faker.commerce,
+      color: () => faker.color.human(),
+    },
+    company: {
+      ...faker.company,
+      bs: () => faker.company.buzzPhrase(),
+      bsAdjective: () => faker.company.buzzAdjective(),
+      bsBuzz: () => faker.company.buzzVerb(),
+      bsNoun: () => faker.company.buzzNoun(),
+      companyName: () => faker.company.name(),
+      companySuffix: () => faker.helpers.arrayElement(['Inc', 'LLC', 'Group']),
+    },
+    datatype: {
+      ...faker.datatype,
+      number: (options?: LegacyNumberOptions | number) => faker.number.int(options),
+      uuid: () => faker.string.uuid(),
+    },
+    finance: {
+      ...faker.finance,
+      account: () => faker.finance.accountNumber(),
+      mask: () => faker.finance.creditCardNumber(),
+    },
+    image: {
+      ...faker.image,
+      abstract: imageByCategory('abstract'),
+      animals: imageByCategory('animals'),
+      business: imageByCategory('business'),
+      cats: imageByCategory('cats'),
+      city: imageByCategory('city'),
+      fashion: imageByCategory('fashion'),
+      food: imageByCategory('food'),
+      imageUrl: () => faker.image.url(),
+      nature: imageByCategory('nature'),
+      nightlife: imageByCategory('nightlife'),
+      people: imageByCategory('people'),
+      sports: imageByCategory('sports'),
+      transport: imageByCategory('transport'),
+    },
+    internet: {
+      ...faker.internet,
+      color: () => faker.color.rgb({ prefix: '#' }),
+      userName: () => faker.internet.username(),
+    },
+    name: {
+      findName: () => faker.person.fullName(),
+      firstName: () => faker.person.firstName(),
+      jobArea: () => faker.person.jobArea(),
+      jobDescriptor: () => faker.person.jobDescriptor(),
+      jobTitle: () => faker.person.jobTitle(),
+      jobType: () => faker.person.jobType(),
+      lastName: () => faker.person.lastName(),
+      prefix: () => faker.person.prefix(),
+      suffix: () => faker.person.suffix(),
+    },
+    phone: {
+      ...faker.phone,
+      phoneNumber: () => faker.phone.number(),
+      phoneNumberFormat: () => faker.phone.number(),
+    },
+    random: {
+      alphaNumeric: (count = 1) => faker.string.alphanumeric(count),
+      arrayElement: <T>(items: readonly T[]) => faker.helpers.arrayElement(items),
+      word: () => faker.lorem.word(),
+    },
+  };
+}
+
+function installPostmanCollectionFakerCompat(): void {
+  const fakerLocalePath = require.resolve('@faker-js/faker/locale/en');
+  const fakerLocaleModule = require('@faker-js/faker/locale/en') as { faker: Faker };
+  const fakerShimModule = new Module(fakerLocalePath);
+  fakerShimModule.filename = fakerLocalePath;
+  fakerShimModule.loaded = true;
+  fakerShimModule.exports = createPostmanCollectionFakerCompat(fakerLocaleModule.faker);
+  require.cache[fakerLocalePath] = fakerShimModule;
+}
+
+installPostmanCollectionFakerCompat();
 const Converter = require('openapi-to-postmanv2');
 
 const OPENAPI_PATH = join(process.cwd(), 'docs', 'openapi', 'openapi.json');
