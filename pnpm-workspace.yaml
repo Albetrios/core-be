@@ -59,11 +59,10 @@ overrides:
   # Fixed in 5.2.2.
   js-yaml: '>=5.2.2'
   fast-xml-parser: '>=5.7.0'
-  # hono <4.12.34 — GHSA-8j4g-w8fx-2239 (moderate): ReDoS in CORS middleware via
-  # Access-Control-Request-Headers. Also covers earlier GHSA-xgm2-5f3f-mvvc /
-  # GHSA-hvrm-45r6-mjfj / GHSA-w62v-xxxg-mg59. Transitive via
-  # @modelcontextprotocol/sdk + @scalar/cli. Fixed in 4.12.34.
-  hono: '>=4.12.34'
+  # hono <4.13.5 — GHSA-8j4g-w8fx-2239 plus GHSA-gqvv-2mrq-wpjv /
+  # GHSA-g6gw-c38x-mqfc / GHSA-crvj-82cr-hjcx. Transitive via
+  # @modelcontextprotocol/sdk + @scalar/cli. Fixed in 4.13.5.
+  hono: '>=4.13.5'
   # @hono/node-server <2.0.10 — GHSA-frvp-7c67-39w9 (path traversal, <2.0.5) and
   # GHSA-9mqv-5hh9-4cgg (unauthenticated memory-leak DoS via aborted WebSocket
   # handshake, <=2.0.9). Transitive via @modelcontextprotocol/sdk + @scalar/cli.
@@ -120,6 +119,9 @@ overrides:
   # untrusted templates to `helpers.fake`). Revisit when postman-collection drops faker 5.
   '@faker-js/faker': '>=10.4.1'
   'postman-collection>@faker-js/faker': '5.5.3'
+  # smol-toml <=1.7.0 — GHSA-7w5x-hrqm-74c2 (high): malformed TOML DoS.
+  # Transitive markdownlint-cli2. Fixed in 1.7.1.
+  smol-toml: '>=1.7.1'
   tmp: '>=0.2.6'
   # undici <7.29.0 — GHSA-8xcm-r25x-g524 / GHSA-m8rv-5g2x-5cg5 /
   # GHSA-jr45-8vmc-qm54 / GHSA-v3r7-h72x-cjcm (moderate–high): various

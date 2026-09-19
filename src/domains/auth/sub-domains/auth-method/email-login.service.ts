@@ -138,24 +138,33 @@ export class EmailLoginService {
       .update(parsed.email)
       .digest('hex')}`;
     let cooldownClaimed: string | null;
-    try {
-      cooldownClaimed = await this.redis.set(
-        cooldownKey,
-        '1',
-        'EX',
-        VERIFICATION_CODE_RESEND_COOLDOWN_SECONDS,
-        'NX',
-      );
-    } catch (error) {
-      // Redis unavailable — the shared client runs with enableOfflineQueue:false, so a blip
-      // (failover, maintenance, brief partition) rejects this SET immediately. Fail OPEN: a
-      // transient Redis outage must not turn passwordless login into a 500. The per-IP and
-      // per-email rate limits (whose store already degrades to an in-process counter) remain the
-      // mail-bomb backstop; losing only the finer per-email cooldown spacing is the availability
-      // trade-off. Treating the slot as claimed lets the code issue + the email enqueue proceed
-      // (the enqueue then degrades to the durable outbox sweeper if BullMQ/Redis is still down).
-      logger.warn({ err: error }, 'email_login.send.cooldown_unavailable');
+    if (!env.AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED) {
+      // Spacing off — allowlisted to the local/development targets by the env schema. Treat the
+      // slot as claimed so every send issues a fresh code and the TEST_MODE echo below is never
+      // empty: the cooldown's uniform no-op response is indistinguishable from a real send, which
+      // reads as flaky rather than as a rate limit while working locally. Nothing else relaxes —
+      // the per-IP and per-email rate limits and the constant-time floor still apply.
       cooldownClaimed = 'OK';
+    } else {
+      try {
+        cooldownClaimed = await this.redis.set(
+          cooldownKey,
+          '1',
+          'EX',
+          VERIFICATION_CODE_RESEND_COOLDOWN_SECONDS,
+          'NX',
+        );
+      } catch (error) {
+        // Redis unavailable — the shared client runs with enableOfflineQueue:false, so a blip
+        // (failover, maintenance, brief partition) rejects this SET immediately. Fail OPEN: a
+        // transient Redis outage must not turn passwordless login into a 500. The per-IP and
+        // per-email rate limits (whose store already degrades to an in-process counter) remain the
+        // mail-bomb backstop; losing only the finer per-email cooldown spacing is the availability
+        // trade-off. Treating the slot as claimed lets the code issue + the email enqueue proceed
+        // (the enqueue then degrades to the durable outbox sweeper if BullMQ/Redis is still down).
+        logger.warn({ err: error }, 'email_login.send.cooldown_unavailable');
+        cooldownClaimed = 'OK';
+      }
     }
     let issuedCode: string | undefined;
     if (cooldownClaimed) {
