@@ -57,3 +57,6 @@ jobs:
         uses: github/codeql-action/analyze@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
         with:
           category: '/language:javascript-typescript'
+          # Code scanning upload is unavailable for this private repository, but the
+          # PR gate should still execute CodeQL analysis.
+          upload: never
