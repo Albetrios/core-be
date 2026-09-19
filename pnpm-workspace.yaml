@@ -6,24 +6,6 @@ engineStrict: true
 # .nvmrc / .node-version / engines.node (>=24).
 useNodeVersion: 24.18.1
 
-auditConfig:
-  ignoreGhsas:
-    # @faker-js/faker <=10.4.0 — GHSA-qxc2-j82w-r537 (high): helpers.fake is
-    # exploitable into arbitrary code execution via a crafted template string.
-    # Two independent transitive paths, both dev-only tooling with no runtime
-    # exposure: @scalar/cli>@scalar/mock-server, and
-    # openapi-to-postmanv2>postman-collection. The latter is NOT overridable —
-    # postman-collection@5.3.1 (the latest published release; there is no
-    # newer one to move to) calls the pre-v8 faker.address.city API directly
-    # (lib/superstring/dynamic-variables.js), which modern faker removed
-    # (address -> location) in its v8 rewrite. Forcing faker >=10.5 globally
-    # via `overrides` breaks that call at runtime (confirmed: `pnpm
-    # docs:postman` crashes with `Cannot read properties of undefined
-    # (reading 'city')`) — there is no version of faker that is both patched
-    # and compatible with this consumer. Revisit if openapi-to-postmanv2 ever
-    # ships a release with a newer postman-collection.
-    - GHSA-qxc2-j82w-r537
-
 allowBuilds:
   # Telemetry package pulled in transitively; deny its postinstall build so a
   # strict install does not fail on an undecided build script (ERR_PNPM_IGNORED_BUILDS).
@@ -77,11 +59,10 @@ overrides:
   # Fixed in 5.2.2.
   js-yaml: '>=5.2.2'
   fast-xml-parser: '>=5.7.0'
-  # hono <4.12.34 — GHSA-8j4g-w8fx-2239 (moderate): ReDoS in CORS middleware via
-  # Access-Control-Request-Headers. Also covers earlier GHSA-xgm2-5f3f-mvvc /
-  # GHSA-hvrm-45r6-mjfj / GHSA-w62v-xxxg-mg59. Transitive via
-  # @modelcontextprotocol/sdk + @scalar/cli. Fixed in 4.12.34.
-  hono: '>=4.12.34'
+  # hono <4.13.5 — GHSA-8j4g-w8fx-2239 plus GHSA-gqvv-2mrq-wpjv /
+  # GHSA-g6gw-c38x-mqfc / GHSA-crvj-82cr-hjcx. Transitive via
+  # @modelcontextprotocol/sdk + @scalar/cli. Fixed in 4.13.5.
+  hono: '>=4.13.5'
   # @hono/node-server <2.0.10 — GHSA-frvp-7c67-39w9 (path traversal, <2.0.5) and
   # GHSA-9mqv-5hh9-4cgg (unauthenticated memory-leak DoS via aborted WebSocket
   # handshake, <=2.0.9). Transitive via @modelcontextprotocol/sdk + @scalar/cli.
@@ -107,14 +88,15 @@ overrides:
   # source-map auto-loading (sourceMappingURL) discloses arbitrary .map files.
   # Transitive via @scalar/cli > vue > @vue/compiler-sfc. Fixed in 8.5.18.
   postcss: '>=8.5.18'
-  # fast-uri <3.1.6 — GHSA-jqff-g426-hqxp (high): a further host-confusion
-  # variant on top of the GHSA-7p8r-x3mc-p8w7 / GHSA-4c8g-83qw-93j6 /
-  # GHSA-v2hh-gcrm-f6hx family already covered by the 3.1.5 floor below — this
-  # repo's floor was stale against the newer advisory. Transitive via fastify's
-  # ajv/find-my-way URI handling (request validation + response serialization
-  # hot path). Cap <4 so the override stays on the patched 3.x line ajv
-  # declares (^3.x); do not let an uncapped floor silently major-bump to 4.x.
-  # Fixed in 3.1.6.
+  # fast-uri <3.1.6 — GHSA-5jgf-p345-68v8 / GHSA-jqff-g426-hqxp (high): host
+  # confusion via skipped IDN canonicalization and percent-encoded scheme
+  # normalization; GHSA-f65p-4m7j-42xc / GHSA-fph4-wmhf-6fwf (high): SSRF via
+  # malformed IPv6 normalization and repeated hostname percent-decoding. Also
+  # covers the earlier GHSA-7p8r-x3mc-p8w7 / GHSA-4c8g-83qw-93j6 /
+  # GHSA-v2hh-gcrm-f6hx. Transitive via fastify's ajv/find-my-way URI handling
+  # (request validation + response serialization hot path). Cap <4 so the
+  # override stays on the patched 3.x line ajv declares (^3.x); do not let an
+  # uncapped floor silently major-bump to 4.x. Fixed in 3.1.6.
   fast-uri: '>=3.1.6 <4'
   # find-my-way <=9.6.0 — GHSA-c96f-x56v-gq3h (high): DDoS via HTTP/2 request
   # smuggling in the router. Transitive via fastify (also fastify-type-provider-zod,
@@ -124,12 +106,22 @@ overrides:
   drizzle-orm: '>=0.45.2'
   i18next-fs-backend: '>=2.6.4'
   i18next-http-middleware: '>=3.9.3'
-  # qs >=6.14.2 <=6.15.3 — GHSA-x5fp-wj9c-mxmx (moderate): array-limit bypass
-  # via bracket-key comma parsing. This repo's floor (6.15.2) predates the
-  # advisory's own fix version. Transitive via @stryker-mutator/core>
-  # typed-rest-client (dev-only) and @modelcontextprotocol/sdk>express (the
-  # MCP tooling path, not the HTTP server's own request parsing). Fixed in 6.16.0.
+  # qs >=6.14.2 <=6.15.3 — GHSA-x5fp-wj9c-mxmx; <6.16.0 — GHSA-4mjr-xmp4-gh2g (moderate):
+  # transitive via @stryker-mutator/core > typed-rest-client. Fixed in 6.16.0.
   qs: '>=6.16.0'
+  # @faker-js/faker <=10.4.0 — GHSA-qxc2-j82w-r537 (high, `helpers.fake` template injection;
+  # the advisory lists NO patched version). Transitive via @scalar/cli > @scalar/mock-server
+  # (moved to 10.6.0 here) and openapi-to-postmanv2 > postman-collection, which pins the
+  # legacy `faker.address.*` API at EXACTLY 5.5.3 (no upstream release on a newer line) —
+  # forcing 10.x there crashes `pnpm docs:postman` (TypeError: reading 'city'), which is a
+  # required Static-sync CI step. So: keep postman-collection on its own pinned copy and
+  # carry the advisory as an explicit exception below (dev-only docs codegen; we never feed
+  # untrusted templates to `helpers.fake`). Revisit when postman-collection drops faker 5.
+  '@faker-js/faker': '>=10.4.1'
+  'postman-collection>@faker-js/faker': '5.5.3'
+  # smol-toml <=1.7.0 — GHSA-7w5x-hrqm-74c2 (high): malformed TOML DoS.
+  # Transitive markdownlint-cli2. Fixed in 1.7.1.
+  smol-toml: '>=1.7.1'
   tmp: '>=0.2.6'
   # undici <7.29.0 — GHSA-8xcm-r25x-g524 / GHSA-m8rv-5g2x-5cg5 /
   # GHSA-jr45-8vmc-qm54 / GHSA-v3r7-h72x-cjcm (moderate–high): various
@@ -137,3 +129,10 @@ overrides:
   undici: '>=7.29.0 <8'
   uuid: '>=11.1.1'
   yaml@1.10.2: 1.10.3
+
+# `pnpm audit` exceptions — each one MUST reference the override comment that justifies it.
+auditConfig:
+  ignoreGhsas:
+    # @faker-js/faker 5.5.3 pinned by postman-collection (dev-only `docs:postman` codegen); see the
+    # `postman-collection>@faker-js/faker` override above.
+    - GHSA-qxc2-j82w-r537
