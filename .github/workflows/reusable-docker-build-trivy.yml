@@ -236,8 +236,9 @@ jobs:
         if: contains(fromJSON(env.PROTECTED_BRANCHES_JSON), env.TARGET_BRANCH)
         run: |
           set -euo pipefail
-          API_IMAGE="ghcr.io/${{ github.repository }}/${{ env.API_IMAGE }}"
-          WORKER_IMAGE="ghcr.io/${{ github.repository }}/${{ env.WORKER_IMAGE }}"
+          repository_lowercase="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          API_IMAGE="ghcr.io/${repository_lowercase}/${{ env.API_IMAGE }}"
+          WORKER_IMAGE="ghcr.io/${repository_lowercase}/${{ env.WORKER_IMAGE }}"
           docker tag ${{ env.DOCKER_LOCAL_API_TAG }}:ci "${API_IMAGE}:${MERGE_COMMIT_SHA}"
           docker tag ${{ env.WORKER_IMAGE }}:ci "${WORKER_IMAGE}:${MERGE_COMMIT_SHA}"
           docker push "${API_IMAGE}:${MERGE_COMMIT_SHA}"
