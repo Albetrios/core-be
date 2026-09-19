@@ -6,11 +6,7 @@ import {
   verifyAuthenticationResponse,
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
-import type {
-  AuthenticationResponseJSON,
-  AuthenticatorTransportFuture,
-  RegistrationResponseJSON,
-} from '@simplewebauthn/server';
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { env } from '@/shared/config/env.config.js';
 import { MAX_WEBAUTHN_CREDENTIALS_PER_USER } from '@/shared/constants/security.constants.js';
 import {
@@ -144,7 +140,7 @@ export class WebauthnService {
       attestationType: 'none',
       excludeCredentials: existingCredentials.map((credential) => ({
         id: credential.credential_id,
-        transports: credential.transports as AuthenticatorTransportFuture[],
+        transports: credential.transports as string[],
       })),
       authenticatorSelection: {
         residentKey: 'preferred',
@@ -275,7 +271,7 @@ export class WebauthnService {
       rpID: resolveWebauthnRelyingPartyId(),
       allowCredentials: credentials.map((credential) => ({
         id: credential.credential_id,
-        transports: credential.transports as AuthenticatorTransportFuture[],
+        transports: credential.transports as string[],
       })),
       // sec-r4-A2: verifyAuthenticationResponse requires user verification, so the
       // options round-trip must also require it. 'preferred' let UV-incapable
@@ -389,7 +385,7 @@ export class WebauthnService {
         id: storedCredential.credential_id,
         publicKey: Buffer.from(storedCredential.public_key, 'base64url'),
         counter: storedCredential.counter,
-        transports: storedCredential.transports as AuthenticatorTransportFuture[],
+        transports: storedCredential.transports as string[],
       },
     });
 

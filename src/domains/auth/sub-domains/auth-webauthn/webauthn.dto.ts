@@ -23,7 +23,7 @@ const base64URLString = z.string().min(1).max(65536);
 
 /**
  * Known transport types from the WebAuthn Level 3 spec plus `cable`/`hybrid`.
- * Mirrors `AuthenticatorTransportFuture` from `@simplewebauthn/server`.
+ * Mirrors the transport strings accepted by `@simplewebauthn/server`.
  */
 const authenticatorTransport = z.enum([
   'ble',
