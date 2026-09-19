@@ -519,7 +519,7 @@ export async function withAppDatabaseContext<T>(
 
 /** One row of the maintenance-context registry — the GUC it arms and how its transaction is tuned. */
 interface MaintenanceContextDefinition {
-  /** The `app.*` GUC this kind sets to `'true'` — `null` for system-table kinds (non-RLS tables, no GUC). */
+  /** The `app.*` GUC this kind sets to `'true'` — `null` for system-table kinds that require no tenant/user session GUC; role-based RLS may still apply. */
   readonly guc: string | null;
   /** Open a Postgres transaction (default behavior). `false` = pin the shared pool handle without a transaction — for callbacks that perform external I/O and must not hold a checkout across network calls. */
   readonly opensTransaction: boolean;
@@ -527,7 +527,7 @@ interface MaintenanceContextDefinition {
   readonly workerContextKind: WorkerDatabaseContextKind;
   /** Lift the HTTP statement/lock timeouts to the worker budget (bulk background work). */
   readonly appliesWorkerStatementTimeout: boolean;
-  /** Human-readable statement of what the RLS policies grant under this GUC. */
+  /** Human-readable description of access permitted by the scope's GUC or existing database-role grants and policies. */
   readonly grants: string;
 }
 
@@ -538,12 +538,13 @@ interface MaintenanceContextDefinition {
  * can enter {@link withMaintenanceDatabaseContext}.
  *
  * @remarks
- * - **Notes:** every kind here is an RLS escape hatch — scopes are static frozen
+ * - **Notes:** GUC-backed kinds enable specific RLS bypass policy arms; system-table
+ *   kinds rely on existing database-role grants and policies. Scopes are static frozen
  *   singletons (there is nothing per-request about maintenance authority), and
  *   which files may use each kind is pinned by
  *   `maintenance-context-confinement.policy.unit.test.ts`. Adding a kind means
- *   adding a row here, a policy arm in a migration, and a confinement entry —
- *   nothing else.
+ *   adding a row here and a confinement entry, plus a migration if new grants or
+ *   policy arms are required.
  */
 export const MAINTENANCE_CONTEXTS = {
   GLOBAL_RETENTION_CLEANUP: {
@@ -586,7 +587,7 @@ export const MAINTENANCE_CONTEXTS = {
     opensTransaction: true,
     workerContextKind: 'system_table',
     appliesWorkerStatementTimeout: true,
-    grants: 'pure-DB bulk retention on non-RLS tables (e.g. billing.stripe_webhook_events)',
+    grants: 'pure-DB bulk retention on system tables without tenant/user session requirements',
   },
   SYSTEM_TABLE_WORKER: {
     guc: null,
@@ -594,7 +595,7 @@ export const MAINTENANCE_CONTEXTS = {
     workerContextKind: 'system_table',
     appliesWorkerStatementTimeout: false,
     grants:
-      'non-RLS table access from workers doing external I/O (mail outbox, ledgers) — no transaction held across network calls',
+      'system-table access without tenant/user session requirements for workers doing external I/O — no transaction held across network calls',
   },
 } as const satisfies Record<string, MaintenanceContextDefinition>;
 
@@ -643,22 +644,25 @@ export type MaintenanceDatabaseContextOptions = {
 };
 
 /**
- * The single wrapper for every maintenance (bypass) database context: opens one
- * transaction, arms exactly the scope's GUC (`set_config(<guc>, 'true', true)`),
- * pins the handle in ALS, and releases everything at COMMIT/ROLLBACK.
+ * Runs a maintenance callback with the transaction and database context declared
+ * by its scope. Transactional kinds pin a transaction in ALS and set the scope's
+ * GUC when present. Nontransactional kinds pass the shared pool handle, pinning it
+ * only in worker runtime so HTTP callers retain their existing request context.
  *
  * @remarks
- * - **Algorithm:** dispatches on `scope.kind` through {@link MAINTENANCE_CONTEXTS}
- *   — worker-timeout tuning and the ALS context kind come from the same table
- *   row, so behavior per kind is declarative and undriftable.
- * - **Failure modes:** any callback error rolls the transaction back; the GUC
- *   dies with the transaction.
- * - **Side effects:** one Postgres transaction per call; bulk kinds lift the
- *   HTTP statement/lock timeouts to the worker budget.
- * - **SECURITY:** every kind bypasses tenant/user isolation on the tables its
- *   policies name. Enter it only from the paths the confinement policy test
- *   allows for that kind — worker processors, admin-authorized routes, and
- *   trusted system flows. Never on a self-service request path.
+ * - **Algorithm:** dispatches on `scope.kind` through {@link MAINTENANCE_CONTEXTS};
+ *   the registry controls transaction use, GUCs, timeouts, and worker context kind.
+ * - **Failure modes:** callback errors roll back transactional kinds and their
+ *   transaction-local GUCs expire. Nontransactional kinds propagate errors without
+ *   rolling back earlier writes; external I/O is not rolled back in either case.
+ * - **Side effects:** transactional kinds open one Postgres transaction; configured
+ *   kinds lift HTTP statement/lock timeouts to the worker budget. Nontransactional
+ *   kinds hold no transaction or connection checkout across the callback.
+ * - **SECURITY:** GUC-backed kinds enable specific RLS bypass policy arms;
+ *   system-table kinds rely on existing database-role grants and policies.
+ *   Enter only from paths allowed by the confinement policy test: worker
+ *   processors, admin-authorized routes, and trusted system flows. Never enter
+ *   from a self-service request path.
  */
 export async function withMaintenanceDatabaseContext<T>(
   scope: MaintenanceDatabaseScope,

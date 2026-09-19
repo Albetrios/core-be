@@ -21,7 +21,7 @@ export interface DeadLetterJobInsert {
 }
 
 /**
- * Inserts one append-only dead-letter record into `audit.dead_letter_jobs` — the durable
+ * Inserts one dead-letter record into `audit.dead_letter_jobs` — the durable
  * source of truth operators replay from after a job exhausts its BullMQ retries.
  *
  * @remarks
@@ -33,7 +33,8 @@ export interface DeadLetterJobInsert {
  *   ({@link attachDeadLetterAndAlerting}), which captures it to Sentry rather than letting
  *   it escape the `failed` listener. The connection role is a member of `core_be_app`, so
  *   the table's deny-all + `core_be_app` RLS policies permit the write.
- * - **Side effects:** appends one immutable row; never updates or deletes existing rows.
+ * - **Side effects:** inserts one row; this function never updates or deletes existing rows.
+ *   Auto-retry processing may later update the row's resolution marker.
  * - **Notes:** does not store raw payloads — callers pass a redacted `payload_summary`.
  */
 export async function insertDeadLetterJob(record: DeadLetterJobInsert): Promise<void> {
@@ -72,7 +73,9 @@ export type DeadLetterJobLedgerRow = {
  *   oldest first, capped by `limit`.
  * - **Failure modes:** propagates Postgres errors to the caller.
  * - **Side effects:** read-only.
- * - **Notes:** uses the base database connection (system table, no RLS session).
+ * - **Notes:** uses the base database connection independently of any pinned context.
+ *   The system table has FORCE RLS with role-based access policies and does not
+ *   require tenant/user session GUCs.
  */
 export async function findDeadLetterJobsForAutoRetry(input: {
   sourceQueues: readonly string[];
