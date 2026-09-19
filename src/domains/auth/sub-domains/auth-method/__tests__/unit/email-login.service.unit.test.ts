@@ -59,6 +59,9 @@ vi.mock('@/shared/config/env.config.js', () => {
     // TEST_MODE gates the send-code `debug_verification_code` affordance; the Vitest harness runs
     // TEST_MODE=true. A test can flip this on the mock object to exercise the disabled path.
     TEST_MODE: true,
+    // The per-email resend cooldown. True here (the production-safe default) so the suite keeps
+    // exercising the spacing; the opt-out test below flips it on this same mock object.
+    AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED: true,
   };
   return { env, getEnv: () => env };
 });
@@ -262,6 +265,22 @@ describe('EmailLoginService', () => {
     expect(userService.createForEmailCode).not.toHaveBeenCalled();
     expect(verificationTokenRepository.create).not.toHaveBeenCalled();
     expect(vi.mocked(eventBus.emitStrict)).not.toHaveBeenCalled();
+  });
+
+  // Local-only opt-out (allowlisted to local/development by the env schema): with the spacing off
+  // the cooldown slot is never claimed at all, so a repeat send still issues — and still echoes.
+  it('sendCode skips the cooldown claim entirely when the spacing is disabled', async () => {
+    vi.mocked(env).AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED = false;
+    vi.mocked(userService.findByEmail).mockResolvedValue(user as never);
+
+    const result = await service.sendCode({ email: user.email });
+
+    // The SET NX EX claim is the cooldown — with the flag off it must not even be attempted.
+    expect(redis.set).not.toHaveBeenCalled();
+    expect(verificationTokenRepository.create).toHaveBeenCalled();
+    expect(result.debug_verification_code).toBeDefined();
+
+    vi.mocked(env).AUTH_EMAIL_CODE_RESEND_COOLDOWN_ENABLED = true;
   });
 
   it('sendCode fails open and still issues a code when the cooldown Redis SET rejects (Redis down)', async () => {

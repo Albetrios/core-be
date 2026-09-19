@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest';
 
 const PROJECT_ROOT = process.cwd();
 const DOMAINS_ROOT = join(PROJECT_ROOT, 'src/domains');
+const AUDIT_IMPORT_PREFIX = ['from ', "'@/domains/audit/"].join('');
 
 /**
  * The reviewed cross-domain audit surface. Every entry says what it uses audit
@@ -47,7 +48,7 @@ function collectAuditImporters(directory: string, accumulator: string[] = []): s
     }
     if (!entry.endsWith('.ts') || entry.endsWith('.test.ts') || entry.endsWith('.d.ts')) continue;
     const source = readFileSync(fullPath, 'utf8');
-    if (source.includes("from '@/domains/audit/")) {
+    if (source.includes(AUDIT_IMPORT_PREFIX)) {
       accumulator.push(relative(PROJECT_ROOT, fullPath));
     }
   }

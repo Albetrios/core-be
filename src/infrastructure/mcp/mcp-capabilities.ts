@@ -97,7 +97,7 @@ export type McpToolDefinition = {
   name: string;
   title: string;
   description: string;
-  inputSchema: z.ZodTypeAny;
+  inputSchema: z.ZodType;
 };
 
 /** Canonical resource catalog exposed via MCP (OpenAPI spec + route catalog). */
