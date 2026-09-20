@@ -32,9 +32,6 @@ export function classifyAccess(snippet: string, permissionMap: Map<string, strin
     if (snippet.includes('GLOBAL_ROLES.SUPER_ADMIN') || snippet.includes("'super_admin'")) {
       roles.push('super_admin');
     }
-    if (snippet.includes('GLOBAL_ROLES.ADMIN') || snippet.includes("'admin'")) {
-      roles.push('admin');
-    }
     if (snippet.includes('GLOBAL_ROLES.USER') || snippet.includes("'user'")) {
       roles.push('user');
     }

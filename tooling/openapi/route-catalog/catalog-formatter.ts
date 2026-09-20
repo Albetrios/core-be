@@ -59,7 +59,7 @@ function buildPermissionCodesSection(permissionMap: Map<string, string>): string
     lines.push('');
   }
   lines.push('  Global Roles:');
-  lines.push('    super_admin                   admin                          user');
+  lines.push('    super_admin                   user');
   lines.push('');
   return lines;
 }
@@ -107,7 +107,7 @@ export function buildCatalogContent(routes: ParsedRoute[]): string {
     'Legend:',
     '  PUBLIC  = No authentication required',
     '  AUTH    = JWT authentication required',
-    '  ROLE    = Global role required (super_admin, admin, user)',
+    '  ROLE    = Global role required (super_admin, user)',
     '  PERM    = Organization-scoped permission required',
     '  TOKEN   = Credential enforced in-handler (non-JWT bearer token or session cookie)',
     '  Columns after the path: S = success status · I = idempotency (req | -) · O = organization scope (both | team-only, 422 on personal)',

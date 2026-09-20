@@ -70,7 +70,7 @@ describe('createOrganizationController', () => {
       next_cursor: 'organization_cursor_2',
     } as never);
     const response = await controller.listOrganizations(mockRequest(), mockReply());
-    expect(service.list).toHaveBeenCalledWith({}, userPublicId, 'USER');
+    expect(service.list).toHaveBeenCalledWith({}, userPublicId);
     expect(response).toMatchObject({
       data: [organization],
       meta: {
@@ -98,12 +98,12 @@ describe('createOrganizationController', () => {
       mockRequest({ params: { organization_id: organizationPublicId } }),
       mockReply(),
     );
-    expect(service.getByPublicId).toHaveBeenCalledWith(organizationPublicId, userPublicId, 'USER');
+    expect(service.getByPublicId).toHaveBeenCalledWith(organizationPublicId, userPublicId);
   });
 
   it('getOrganizationBySlug delegates to service', async () => {
     await controller.getOrganizationBySlug(mockRequest({ params: { slug: 'acme' } }), mockReply());
-    expect(service.getBySlug).toHaveBeenCalledWith('acme', userPublicId, 'USER');
+    expect(service.getBySlug).toHaveBeenCalledWith('acme', userPublicId);
   });
 
   it('createOrganization returns 200', async () => {
@@ -188,7 +188,7 @@ describe('createOrganizationController', () => {
       }),
       mockReply(),
     );
-    expect(service.getByPublicId).toHaveBeenCalledWith(organizationPublicId, userPublicId, 'user');
+    expect(service.getByPublicId).toHaveBeenCalledWith(organizationPublicId, userPublicId);
   });
 
   it('rejects a missing organization context with ForbiddenError on each validated handler', async () => {
@@ -218,7 +218,7 @@ describe('createOrganizationController', () => {
   it('uses empty slug default when params are undefined', async () => {
     vi.mocked(service.getBySlug).mockClear();
     await controller.getOrganizationBySlug(mockRequest({ params: undefined }), mockReply());
-    expect(service.getBySlug).toHaveBeenCalledWith('', userPublicId, 'USER');
+    expect(service.getBySlug).toHaveBeenCalledWith('', userPublicId);
   });
 
   it('listOrganizationAuditLogs returns has_more false on last page', async () => {

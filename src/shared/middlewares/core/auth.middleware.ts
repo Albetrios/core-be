@@ -108,8 +108,12 @@ async function authenticateWithBearerToken(request: FastifyRequest): Promise<voi
     // role. (No code path mints `admin` today, but re-deriving it fails closed if one ever does.)
     // Regular users skip the lookup — preserves the existing hot-path latency.
     const claimedRole = payload.role ? (payload.role as GlobalRole) : undefined;
-    const isPrivilegedClaim =
-      claimedRole === GLOBAL_ROLES.SUPER_ADMIN || claimedRole === GLOBAL_ROLES.ADMIN;
+    // Anything that is not the ordinary `user` role is treated as a privileged claim and
+    // re-derived. Listing the privileged values explicitly meant a claim carrying a value the
+    // server no longer issues — a retired role, a typo, a forged string — fell through as
+    // "not privileged" and was trusted verbatim for the token's lifetime. Inverting the test
+    // fails closed: an unrecognised role is re-derived against live state like any other.
+    const isPrivilegedClaim = claimedRole !== undefined && claimedRole !== GLOBAL_ROLES.USER;
     const effectiveRole = isPrivilegedClaim
       ? await rederiveSuperAdminRole(request, payload.userId)
       : claimedRole;

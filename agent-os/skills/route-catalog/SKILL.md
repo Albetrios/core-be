@@ -46,7 +46,7 @@ The three annotation columns (`S`, `I`, `O`) print **after the path** and before
 | ---------------------------------------------------------------- | ------------------------------------------------------ |
 | No options / no `preHandler`                                     | `PUBLIC`                                               |
 | `[app.authenticate]` only                                        | `AUTH`                                                 |
-| `[app.authenticate, requireRole(GLOBAL_ROLES.X, ...)]`           | `ROLE: super_admin, admin` (list the roles)            |
+| `[app.authenticate, requireRole(GLOBAL_ROLES.X, ...)]`           | `ROLE: super_admin` (list the roles)            |
 | `[app.authenticate, requireOrganizationPermission(PERM.X, ...)]` | `PERM: <permission_code>` (e.g. `organization:update`) |
 
 To resolve permission codes, look at the constant imported (e.g. `TENANCY_PERMISSIONS.ORGANIZATION_UPDATE`). Map these to their string values. Common mappings:
@@ -77,7 +77,7 @@ Use this exact format:
 Legend:
   PUBLIC  = No authentication required
   AUTH    = JWT authentication required
-  ROLE    = Global role required (super_admin, admin, user)
+  ROLE    = Global role required (super_admin, user)
   PERM    = Organization-scoped permission required
   TOKEN   = Non-JWT bearer token required
   Columns after the path: S = success status · I = idempotency (req | -) · O = organization scope (both | team-only, 422 on personal)

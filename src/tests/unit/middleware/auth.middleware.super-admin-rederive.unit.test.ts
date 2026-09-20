@@ -166,16 +166,19 @@ describe('auth.middleware — super_admin per-request re-derive (sec-A6)', () =>
     await application.close();
   });
 
-  it('route-#6: re-derives an ADMIN JWT claim against live state instead of trusting it', async () => {
-    // No code path mints `admin` today, but if a stale/forged admin claim ever appeared it must
-    // be re-validated (not honored for the token lifetime). resolveGlobalRoleForEmail returns the
-    // user's TRUE role; a non-allowlisted account is downgraded to USER.
+  it('route-#6: re-derives a role claim the server does not issue, instead of trusting it', async () => {
+    // `admin` was a real GLOBAL_ROLES value until it was removed as never-issued. A token minted
+    // before that — or forged, or carrying a typo — must still be re-validated rather than honored
+    // for its lifetime. The middleware treats ANY claim that is not `user` as privileged, so a
+    // retired or unrecognised value fails closed here; listing the privileged values explicitly
+    // would let exactly this token through untouched. resolveGlobalRoleForEmail returns the user's
+    // TRUE role; a non-allowlisted account is downgraded to USER.
     vi.mocked(resolveGlobalRoleForEmail).mockReturnValue(undefined);
     await setup();
     const adminUserPublicId = generatePublicId('user');
     const accessToken = await signAccessToken({
       userId: adminUserPublicId,
-      role: GLOBAL_ROLES.ADMIN,
+      role: 'admin',
     });
 
     const response = await application.inject({
@@ -185,7 +188,7 @@ describe('auth.middleware — super_admin per-request re-derive (sec-A6)', () =>
     });
 
     expect(response.statusCode).toBe(200);
-    // The ADMIN claim triggered the live re-derivation (not a blind trust)...
+    // The retired claim triggered the live re-derivation (not a blind trust)...
     expect(findUserRecordByPublicId).toHaveBeenCalledWith(adminUserPublicId);
     // ...and downgraded to USER since the email is not in the allowlist.
     expect((response.json() as { role?: string }).role).toBe(GLOBAL_ROLES.USER);

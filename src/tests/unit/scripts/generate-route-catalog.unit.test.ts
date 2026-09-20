@@ -46,10 +46,10 @@ describe('generate-route-catalog', () => {
     ).toBe('AUTH');
     expect(
       classifyAccess(
-        "app.get('/', { preHandler: [app.authenticate, requireRole(GLOBAL_ROLES.ADMIN)] }, handler)",
+        "app.get('/', { preHandler: [app.authenticate, requireRole(GLOBAL_ROLES.SUPER_ADMIN)] }, handler)",
         permissionMap,
       ),
-    ).toBe('ROLE: admin');
+    ).toBe('ROLE: super_admin');
     expect(
       classifyAccess(
         "app.patch('/', { preHandler: [app.authenticate, requireOrganizationPermission(TENANCY_PERMISSIONS.ORGANIZATION_UPDATE)] }, handler)",

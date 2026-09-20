@@ -83,7 +83,7 @@ function resolveOrganizationPermissionsForRequest(
  * Throws ForbiddenError if the user's role is not in the allowed list.
  *
  * Usage:
- *   { preHandler: [app.authenticate, requireRole(GLOBAL_ROLES.SUPER_ADMIN, GLOBAL_ROLES.ADMIN)] }
+ *   { preHandler: [app.authenticate, requireRole(GLOBAL_ROLES.SUPER_ADMIN)] }
  */
 export function requireRole(
   ...allowedRoles: GlobalRole[]

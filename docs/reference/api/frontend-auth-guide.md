@@ -403,7 +403,7 @@ export interface Organization {
   updated_at: string;
 }
 // source: src/shared/constants/roles.constants.ts → GlobalRole
-export type GlobalRole = 'super_admin' | 'admin' | 'user';
+export type GlobalRole = 'super_admin' | 'user';
 
 // source: src/domains/user/user.types.ts → UserOutput (self projection)
 export interface MeUser {
