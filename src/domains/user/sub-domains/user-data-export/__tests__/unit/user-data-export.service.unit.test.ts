@@ -66,6 +66,8 @@ const asUserScope = (userPublicId: string) =>
 describe('UserDataExportService', () => {
   const userService = {
     findUserRecordByPublicId: vi.fn(),
+    // Hot read paths resolve the id inside their own context (no second transaction).
+    resolveInternalIdByPublicId: vi.fn().mockResolvedValue(1),
     requireUserRecordByPublicId: vi.fn(),
   };
   const exportRepository = {

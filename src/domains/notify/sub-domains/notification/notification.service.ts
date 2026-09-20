@@ -47,10 +47,22 @@ export class NotificationService {
     private readonly userService: UserService,
   ) {}
 
-  private async resolveUserId(user_public_id: string): Promise<number> {
-    const user = await this.userService.findUserRecordByPublicId(user_public_id);
-    if (!user) throw new UnauthorizedError();
-    return user.id;
+  /**
+   * Resolves the caller's internal id from **inside** the caller's database context.
+   *
+   * @remarks
+   * Every method here needs `user.id` to scope its query, and each used to fetch the whole user
+   * row through `UserService.findUserRecordByPublicId` BEFORE opening its own context. That opened
+   * a second transaction and held a second pooled checkout for a value the request already had the
+   * public id for: `GET /notify/notifications/unread-count` spent eight round trips and two
+   * checkouts to return one integer. Called inside the context, this joins the transaction that is
+   * already open — the same reuse `AuthMeContextService.getContext` documents. The DB pool is what
+   * runs out first under load, so halving the checkouts per request is the point.
+   */
+  private async resolveUserIdInContext(user_public_id: string): Promise<number> {
+    const userId = await this.userService.resolveInternalIdByPublicId(user_public_id);
+    if (userId === null) throw new UnauthorizedError();
+    return userId;
   }
 
   /**
@@ -63,10 +75,9 @@ export class NotificationService {
     options: NotificationListServiceOptions = {},
   ) {
     const limit = options.limit ?? PAGINATION.DEFAULT_LIMIT;
-    const userId = await this.resolveUserId(scope.userPublicId);
-    return withAppDatabaseContext(scope, () =>
+    return withAppDatabaseContext(scope, async () =>
       this.repository.findByUser(
-        userId,
+        await this.resolveUserIdInContext(scope.userPublicId),
         omitUndefined({
           after: options.after,
           limit,
@@ -78,39 +89,49 @@ export class NotificationService {
 
   /** Lists notification metadata for a GDPR data-export bundle (capped by caller). */
   async listForUserDataExport(options: { userPublicId: string; limit: number }) {
-    const userId = await this.resolveUserId(options.userPublicId);
     return withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ userPublicId: options.userPublicId }),
-      () => this.repository.listForUserDataExport(userId, options.limit),
+      async () =>
+        this.repository.listForUserDataExport(
+          await this.resolveUserIdInContext(options.userPublicId),
+          options.limit,
+        ),
     );
   }
 
   async get(public_id: string, scope: UserPrincipalDatabaseScope) {
-    const userId = await this.resolveUserId(scope.userPublicId);
-    return withAppDatabaseContext(scope, () =>
-      this.repository.findByPublicIdForUser(public_id, userId),
+    return withAppDatabaseContext(scope, async () =>
+      this.repository.findByPublicIdForUser(
+        public_id,
+        await this.resolveUserIdInContext(scope.userPublicId),
+      ),
     );
   }
 
   async markRead(public_id: string, scope: UserPrincipalDatabaseScope) {
-    const userId = await this.resolveUserId(scope.userPublicId);
-    return withAppDatabaseContext(scope, () => this.repository.markRead(public_id, userId));
+    return withAppDatabaseContext(scope, async () =>
+      this.repository.markRead(public_id, await this.resolveUserIdInContext(scope.userPublicId)),
+    );
   }
 
   async markAllRead(scope: UserPrincipalDatabaseScope) {
-    const userId = await this.resolveUserId(scope.userPublicId);
-    return withAppDatabaseContext(scope, () => this.repository.markAllReadForUser(userId));
+    return withAppDatabaseContext(scope, async () =>
+      this.repository.markAllReadForUser(await this.resolveUserIdInContext(scope.userPublicId)),
+    );
   }
 
   async getUnreadCount(scope: UserPrincipalDatabaseScope) {
-    const userId = await this.resolveUserId(scope.userPublicId);
-    return withAppDatabaseContext(scope, () => this.repository.countUnreadForUser(userId));
+    return withAppDatabaseContext(scope, async () =>
+      this.repository.countUnreadForUser(await this.resolveUserIdInContext(scope.userPublicId)),
+    );
   }
 
   async deleteNotification(public_id: string, scope: UserPrincipalDatabaseScope) {
-    const userId = await this.resolveUserId(scope.userPublicId);
-    return withAppDatabaseContext(scope, () =>
-      this.repository.deleteByPublicIdForUser(public_id, userId),
+    return withAppDatabaseContext(scope, async () =>
+      this.repository.deleteByPublicIdForUser(
+        public_id,
+        await this.resolveUserIdInContext(scope.userPublicId),
+      ),
     );
   }
 

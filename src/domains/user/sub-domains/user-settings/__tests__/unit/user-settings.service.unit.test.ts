@@ -45,6 +45,8 @@ const asUserScope = (userPublicId: string) =>
 describe('UserSettingsService', () => {
   const userService = {
     findUserRecordByPublicId: vi.fn().mockResolvedValue(user),
+    // Hot read paths resolve the id inside their own context (no second transaction).
+    resolveInternalIdByPublicId: vi.fn().mockResolvedValue(user.id),
   } as unknown as UserService;
 
   const settingsRepository = {
@@ -56,7 +58,7 @@ describe('UserSettingsService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(userService.findUserRecordByPublicId).mockResolvedValue(user as never);
+    vi.mocked(userService.resolveInternalIdByPublicId).mockResolvedValue(user.id);
   });
 
   it('get returns stored settings', async () => {
@@ -77,7 +79,7 @@ describe('UserSettingsService', () => {
   });
 
   it('get throws when user is missing', async () => {
-    vi.mocked(userService.findUserRecordByPublicId).mockResolvedValue(null);
+    vi.mocked(userService.resolveInternalIdByPublicId).mockResolvedValue(null);
     await expect(service.get(asUserScope('missing'))).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -88,7 +90,7 @@ describe('UserSettingsService', () => {
   });
 
   it('update throws when user is missing', async () => {
-    vi.mocked(userService.findUserRecordByPublicId).mockResolvedValue(null);
+    vi.mocked(userService.resolveInternalIdByPublicId).mockResolvedValue(null);
     await expect(service.update(asUserScope('missing'), { language: 'de' })).rejects.toBeInstanceOf(
       NotFoundError,
     );

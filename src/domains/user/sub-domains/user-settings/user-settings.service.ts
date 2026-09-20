@@ -15,7 +15,9 @@ import {
  * Read or merge the authenticated user's personalization toggles and locale preferences.
  *
  * @remarks
- * - **Algorithm:** resolve the user via {@link UserService.findUserRecordByPublicId}; `get`
+ * - **Algorithm:** resolve the owner's internal id via
+ *   {@link UserService.resolveInternalIdByPublicId}, **inside** the database context the read or
+ *   write already opens, so one transaction and one pooled checkout serve the whole request; `get`
  *   returns the serialized row (or platform defaults if no row exists); `update` validates the
  *   patch, drops `undefined` fields, and asks the repository to upsert-merge over the existing row.
  * - **Failure modes:** unknown user → {@link NotFoundError}; invalid body →
@@ -30,13 +32,23 @@ export class UserSettingsService {
     private readonly repository: UserSettingsRepository,
   ) {}
 
+  /**
+   * Resolves the owner's internal id. MUST be called inside the caller's database context — it
+   * joins that transaction instead of opening a second one for a value the caller already holds
+   * the public id for (the pooled-checkout amplification described on
+   * {@link UserService.resolveInternalIdByPublicId}).
+   */
+  private async requireUserIdInContext(user_public_id: string): Promise<number> {
+    const userId = await this.userService.resolveInternalIdByPublicId(user_public_id);
+    if (userId === null) throw new NotFoundError('User');
+    return userId;
+  }
+
   async get(scope: UserPrincipalDatabaseScope): Promise<UserSettingsOutput> {
     const user_public_id = scope.userPublicId;
-    const user = await this.userService.findUserRecordByPublicId(user_public_id);
-    if (!user) throw new NotFoundError('User');
     // auth.user_settings is FORCE RLS keyed on app.current_user_public_id — read inside the user context.
-    const settings = await withAppDatabaseContext(scope, () =>
-      this.repository.getByUserId(user.id),
+    const settings = await withAppDatabaseContext(scope, async () =>
+      this.repository.getByUserId(await this.requireUserIdInContext(user_public_id)),
     );
     return serializeUserSettings(settings);
   }
@@ -44,11 +56,12 @@ export class UserSettingsService {
   async update(scope: UserPrincipalDatabaseScope, body: unknown): Promise<UserSettingsOutput> {
     const user_public_id = scope.userPublicId;
     const parsed = validateUpdateUserSettings(body);
-    const user = await this.userService.findUserRecordByPublicId(user_public_id);
-    if (!user) throw new NotFoundError('User');
     // auth.user_settings is FORCE RLS keyed on app.current_user_public_id — upsert inside the user context.
-    const result = await withAppDatabaseContext(scope, () =>
-      this.repository.upsert(user.id, omitUndefined(parsed)),
+    const result = await withAppDatabaseContext(scope, async () =>
+      this.repository.upsert(
+        await this.requireUserIdInContext(user_public_id),
+        omitUndefined(parsed),
+      ),
     );
     return serializeUserSettings(result);
   }
@@ -61,11 +74,9 @@ export class UserSettingsService {
    * (Phase 6b of the principal campaign).
    */
   async getForInvitedUser(user_public_id: string): Promise<UserSettingsOutput> {
-    const user = await this.userService.findUserRecordByPublicId(user_public_id);
-    if (!user) throw new NotFoundError('User');
     const settings = await withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
-      () => this.repository.getByUserId(user.id),
+      async () => this.repository.getByUserId(await this.requireUserIdInContext(user_public_id)),
     );
     return serializeUserSettings(settings);
   }
@@ -77,11 +88,13 @@ export class UserSettingsService {
    */
   async updateForInvitedUser(user_public_id: string, body: unknown): Promise<UserSettingsOutput> {
     const parsed = validateUpdateUserSettings(body);
-    const user = await this.userService.findUserRecordByPublicId(user_public_id);
-    if (!user) throw new NotFoundError('User');
     const result = await withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
-      () => this.repository.upsert(user.id, omitUndefined(parsed)),
+      async () =>
+        this.repository.upsert(
+          await this.requireUserIdInContext(user_public_id),
+          omitUndefined(parsed),
+        ),
     );
     return serializeUserSettings(result);
   }

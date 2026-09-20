@@ -31,11 +31,22 @@ export class UserNotificationPreferencesService {
     private readonly repository: UserNotificationPreferencesRepository,
   ) {}
 
+  /**
+   * Resolves the owner's internal id. MUST be called inside the caller's database context — it
+   * joins that transaction rather than opening a second one just to turn a public id the request
+   * already carries into the internal id (see {@link UserService.resolveInternalIdByPublicId}).
+   */
+  private async requireUserIdInContext(user_public_id: string): Promise<number> {
+    const userId = await this.userService.resolveInternalIdByPublicId(user_public_id);
+    if (userId === null) throw new NotFoundError('User');
+    return userId;
+  }
+
   async get(scope: UserPrincipalDatabaseScope): Promise<NotificationPreferenceOutput[]> {
     const user_public_id = scope.userPublicId;
-    const user = await this.userService.findUserRecordByPublicId(user_public_id);
-    if (!user) throw new NotFoundError('User');
-    const rows = await withAppDatabaseContext(scope, () => this.repository.listByUserId(user.id));
+    const rows = await withAppDatabaseContext(scope, async () =>
+      this.repository.listByUserId(await this.requireUserIdInContext(user_public_id)),
+    );
     return serializeUserNotificationPreferenceList(rows);
   }
 
@@ -56,20 +67,19 @@ export class UserNotificationPreferencesService {
           'Organization-scoped notification preferences are not settable on this endpoint',
       });
     }
-    const user = await this.userService.findUserRecordByPublicId(user_public_id);
-    if (!user) throw new NotFoundError('User');
-    const rows = await withAppDatabaseContext(scope, () =>
-      this.repository.replaceAll(
-        user.id,
+    const rows = await withAppDatabaseContext(scope, async () => {
+      const userId = await this.requireUserIdInContext(user_public_id);
+      return this.repository.replaceAll(
+        userId,
         parsed.preferences.map((preference) => ({
           notification_type: preference.notification_type,
           channel: preference.channel,
           organization_id: preference.organization_id ?? null,
           is_enabled: preference.is_enabled,
         })),
-        user.id,
-      ),
-    );
+        userId,
+      );
+    });
     return serializeUserNotificationPreferenceList(rows);
   }
 }
