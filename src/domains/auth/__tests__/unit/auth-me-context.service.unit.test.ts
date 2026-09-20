@@ -59,11 +59,7 @@ describe('AuthMeContextService.getContext', () => {
     expect(userService.getMe).toHaveBeenCalledWith(
       expect.objectContaining({ userPublicId: 'usr_1' }),
     );
-    expect(organizationService.getByPublicId).toHaveBeenCalledWith(
-      'org_active',
-      'usr_1',
-      undefined,
-    );
+    expect(organizationService.getByPublicId).toHaveBeenCalledWith('org_active', 'usr_1');
     expect(authorizationService.resolveUserOrganizationPermissions).toHaveBeenCalledWith(
       'usr_1',
       'org_active',

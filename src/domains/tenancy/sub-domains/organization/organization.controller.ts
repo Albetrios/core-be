@@ -26,7 +26,7 @@ export function createOrganizationController(
   return {
     listOrganizations: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requireAuth(request);
-      const result = await service.list(request.query, auth.userId, auth.role);
+      const result = await service.list(request.query, auth.userId);
       return paginatedResponse(result.items, getRequestIdentifier(request), {
         per_page: result.limit,
         next: result.next_cursor,
@@ -37,13 +37,13 @@ export function createOrganizationController(
     getOrganization: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requireAuth(request);
       const id = requireOrganizationScope(request).organizationPublicId;
-      const data = await service.getByPublicId(id, auth.userId, auth.role);
+      const data = await service.getByPublicId(id, auth.userId);
       return successResponse(data, getRequestIdentifier(request));
     },
     getOrganizationBySlug: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requireAuth(request);
       const { slug } = (request.params as { slug: string }) ?? { slug: '' };
-      const data = await service.getBySlug(slug, auth.userId, auth.role);
+      const data = await service.getBySlug(slug, auth.userId);
       return successResponse(data, getRequestIdentifier(request));
     },
     createOrganization: async (request: FastifyRequest, _reply: FastifyReply) => {

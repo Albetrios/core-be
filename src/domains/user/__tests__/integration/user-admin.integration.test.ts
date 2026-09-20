@@ -9,7 +9,7 @@ import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { FastifyInstance } from 'fastify';
 
 /**
- * Admin user-management happy paths (`ROLE: super_admin, admin` routes) — the
+ * Admin user-management happy paths (`ROLE: super_admin` routes) — the
  * declared success status of every /users/:user_id admin route observed with a
  * super_admin caller.
  */

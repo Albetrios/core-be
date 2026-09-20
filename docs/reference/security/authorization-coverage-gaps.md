@@ -45,7 +45,7 @@ Answers "is every route — organization-level included — covered, and what is
 
 | Method | Path | Access | Bucket | Status |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/audit/logs` | ROLE: super_admin, admin | `global-role` | ⚠ partial (admin-deny) |
+| GET | `/api/v1/audit/logs` | ROLE: super_admin | `global-role` | ⚠ partial (admin-deny) |
 
 ### AUTH (30)
 
@@ -101,8 +101,8 @@ Answers "is every route — organization-level included — covered, and what is
 
 | Method | Path | Access | Bucket | Status |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/mcp` | ROLE: super_admin, admin | `global-role` | ⚠ partial (admin-deny) |
-| POST | `/api/v1/mcp` | ROLE: super_admin, admin | `global-role` | ⚠ partial (admin-deny) |
+| GET | `/api/v1/mcp` | ROLE: super_admin | `global-role` | ⚠ partial (admin-deny) |
+| POST | `/api/v1/mcp` | ROLE: super_admin | `global-role` | ⚠ partial (admin-deny) |
 
 ### NOTIFY (14)
 
@@ -182,12 +182,12 @@ Answers "is every route — organization-level included — covered, and what is
 
 | Method | Path | Access | Bucket | Status |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/users` | ROLE: super_admin, admin | `global-role` | ⚠ partial (admin-deny) |
-| GET | `/api/v1/users/:user_id` | ROLE: super_admin, admin | `global-role` | ✅ admin-deny e2e (Phase 2) |
-| PATCH | `/api/v1/users/:user_id` | ROLE: super_admin, admin | `global-role` | ✅ admin-deny e2e (Phase 2) |
-| DELETE | `/api/v1/users/:user_id` | ROLE: super_admin, admin | `global-role` | ✅ admin-deny e2e (Phase 2) |
-| POST | `/api/v1/users/:user_id/suspend` | ROLE: super_admin, admin | `global-role` | ✅ admin-deny e2e (Phase 2) |
-| POST | `/api/v1/users/:user_id/unsuspend` | ROLE: super_admin, admin | `global-role` | ✅ admin-deny e2e (Phase 2) |
+| GET | `/api/v1/users` | ROLE: super_admin | `global-role` | ⚠ partial (admin-deny) |
+| GET | `/api/v1/users/:user_id` | ROLE: super_admin | `global-role` | ✅ admin-deny e2e (Phase 2) |
+| PATCH | `/api/v1/users/:user_id` | ROLE: super_admin | `global-role` | ✅ admin-deny e2e (Phase 2) |
+| DELETE | `/api/v1/users/:user_id` | ROLE: super_admin | `global-role` | ✅ admin-deny e2e (Phase 2) |
+| POST | `/api/v1/users/:user_id/suspend` | ROLE: super_admin | `global-role` | ✅ admin-deny e2e (Phase 2) |
+| POST | `/api/v1/users/:user_id/unsuspend` | ROLE: super_admin | `global-role` | ✅ admin-deny e2e (Phase 2) |
 | GET | `/api/v1/users/me` | AUTH | `auth-self-list` | ✅ caller-scoped |
 | PATCH | `/api/v1/users/me` | AUTH | `auth-self-mutation` | ⚠ self; not asserted |
 | DELETE | `/api/v1/users/me` | AUTH | `auth-self-mutation` | ⚠ self; not asserted |

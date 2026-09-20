@@ -33,7 +33,7 @@ export const auditRoutesPlugin: FastifyPluginAsync = async (app) => {
     {
       ...MODERATE_AUTHED_RATE_LIMIT,
       onRequest: [app.authenticate],
-      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN, GLOBAL_ROLES.ADMIN)],
+      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN)],
       schema: {
         summary: 'List audit logs (admin)',
         description:

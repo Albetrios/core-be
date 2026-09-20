@@ -6,7 +6,7 @@
 Legend:
   PUBLIC  = No authentication required
   AUTH    = JWT authentication required
-  ROLE    = Global role required (super_admin, admin, user)
+  ROLE    = Global role required (super_admin, user)
   PERM    = Organization-scoped permission required
   TOKEN   = Credential enforced in-handler (non-JWT bearer token or session cookie)
   Columns after the path: S = success status · I = idempotency (req | -) · O = organization scope (both | team-only, 422 on personal)
@@ -16,7 +16,7 @@ Legend:
   Routes: 1
 ================================================================================
 
-  GET    /api/v1/audit/logs                                       200  -    both  ROLE: super_admin, admin
+  GET    /api/v1/audit/logs                                       200  -    both  ROLE: super_admin
 
 ================================================================================
   DOMAIN: AUTH (/api/v1/auth)
@@ -83,8 +83,8 @@ Legend:
   Routes: 2
 ================================================================================
 
-  GET    /api/v1/mcp                                              200  -    both  ROLE: super_admin, admin
-  POST   /api/v1/mcp                                              200  -    both  ROLE: super_admin, admin
+  GET    /api/v1/mcp                                              200  -    both  ROLE: super_admin
+  POST   /api/v1/mcp                                              200  -    both  ROLE: super_admin
 
 ================================================================================
   DOMAIN: NOTIFY (/api/v1/notify)
@@ -170,12 +170,12 @@ Legend:
   Routes: 18
 ================================================================================
 
-  GET    /api/v1/users                                            200  -    both  ROLE: super_admin, admin
-  GET    /api/v1/users/:user_id                                   200  -    both  ROLE: super_admin, admin
-  PATCH  /api/v1/users/:user_id                                   200  -    both  ROLE: super_admin, admin
-  DELETE /api/v1/users/:user_id                                   204  -    both  ROLE: super_admin, admin
-  POST   /api/v1/users/:user_id/suspend                           200  -    both  ROLE: super_admin, admin
-  POST   /api/v1/users/:user_id/unsuspend                         200  -    both  ROLE: super_admin, admin
+  GET    /api/v1/users                                            200  -    both  ROLE: super_admin
+  GET    /api/v1/users/:user_id                                   200  -    both  ROLE: super_admin
+  PATCH  /api/v1/users/:user_id                                   200  -    both  ROLE: super_admin
+  DELETE /api/v1/users/:user_id                                   204  -    both  ROLE: super_admin
+  POST   /api/v1/users/:user_id/suspend                           200  -    both  ROLE: super_admin
+  POST   /api/v1/users/:user_id/unsuspend                         200  -    both  ROLE: super_admin
   GET    /api/v1/users/me                                         200  -    both  AUTH
   PATCH  /api/v1/users/me                                         200  -    both  AUTH
   DELETE /api/v1/users/me                                         204  -    both  AUTH
@@ -270,4 +270,4 @@ Legend:
     upload:manage
 
   Global Roles:
-    super_admin                   admin                          user
+    super_admin                   user

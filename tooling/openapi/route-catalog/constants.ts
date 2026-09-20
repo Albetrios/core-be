@@ -55,14 +55,14 @@ export const SUPPLEMENTAL_ROUTES: ParsedRoute[] = [
   {
     method: 'GET',
     fullPath: '/api/v1/mcp',
-    access: 'ROLE: super_admin, admin',
+    access: 'ROLE: super_admin',
     domainKey: '/api/v1/mcp',
     domain: 'mcp',
   },
   {
     method: 'POST',
     fullPath: '/api/v1/mcp',
-    access: 'ROLE: super_admin, admin',
+    access: 'ROLE: super_admin',
     domainKey: '/api/v1/mcp',
     domain: 'mcp',
   },

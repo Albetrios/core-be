@@ -6,7 +6,6 @@ import {
 } from '@/shared/errors/index.js';
 import { assertTeamOrganization } from './organization-capability.js';
 import { env } from '@/shared/config/env.config.js';
-import { GLOBAL_ROLES, type GlobalRole } from '@/shared/constants/roles.constants.js';
 import {
   PRINCIPAL_SCOPE,
   MAINTENANCE_SCOPE,
@@ -316,18 +315,23 @@ export class OrganizationService {
     );
   }
 
-  private isGlobalAdmin(global_role?: GlobalRole): boolean {
-    return global_role === GLOBAL_ROLES.SUPER_ADMIN || global_role === GLOBAL_ROLES.ADMIN;
-  }
-
+  /**
+   * Membership gate for the single-organization reads.
+   *
+   * @remarks
+   * This used to short-circuit for a global admin. The bypass could never fire: these reads run in
+   * the caller's USER context, where `tenancy.organizations` is visible only through
+   * `organizations_user_discovery` (owner or active member). No tenancy policy carries an
+   * `app.global_admin` arm — that invisibility is deliberate and pinned by
+   * `tenancy-global-admin-invisibility.security.test.ts` — so an admin's read returned their own
+   * organizations either way and the bypass only decided whether the miss surfaced as a 404 here
+   * or as an empty row set one query later. A real cross-tenant admin view needs a SECURITY DEFINER
+   * resolver and a role-guarded route, not a branch here.
+   */
   private async assertUserCanAccessOrganization(
     user_public_id: string,
     organization_public_id: string,
-    global_role?: GlobalRole,
   ): Promise<void> {
-    if (this.isGlobalAdmin(global_role)) {
-      return;
-    }
     const canAccess = await this.repository.userCanAccessOrganization(
       user_public_id,
       organization_public_id,
@@ -344,7 +348,7 @@ export class OrganizationService {
    * `20260520000004_organization_discovery_and_invitation_lookup_rls.sql`). Without
    * this wrap the call returns empty when `DATABASE_RLS_SCOPED_CONTEXTS=true`.
    */
-  async list(query: unknown, user_public_id: string, global_role?: GlobalRole) {
+  async list(query: unknown, user_public_id: string) {
     const parsed = validateListOrganizationsQuery(query);
     const pagination = omitUndefined({
       after: parsed.after,
@@ -353,9 +357,7 @@ export class OrganizationService {
     return withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
       async () => {
-        const result = this.isGlobalAdmin(global_role)
-          ? await this.repository.findAll(pagination)
-          : await this.repository.findAllForUser(user_public_id, pagination);
+        const result = await this.repository.findAllForUser(user_public_id, pagination);
         return {
           ...result,
           items: await Promise.all(result.items.map((row) => this.toOrganizationOutput(row))),
@@ -364,15 +366,11 @@ export class OrganizationService {
     );
   }
 
-  async getByPublicId(
-    public_id: string,
-    user_public_id: string,
-    global_role?: GlobalRole,
-  ): Promise<OrganizationOutput> {
+  async getByPublicId(public_id: string, user_public_id: string): Promise<OrganizationOutput> {
     return withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
       async () => {
-        await this.assertUserCanAccessOrganization(user_public_id, public_id, global_role);
+        await this.assertUserCanAccessOrganization(user_public_id, public_id);
         const organization = await this.repository.findByPublicId(public_id);
         if (!organization) throw new NotFoundError('Organization');
         return this.toOrganizationOutput(organization);
@@ -380,21 +378,13 @@ export class OrganizationService {
     );
   }
 
-  async getBySlug(
-    slug: string,
-    user_public_id: string,
-    global_role?: GlobalRole,
-  ): Promise<OrganizationOutput> {
+  async getBySlug(slug: string, user_public_id: string): Promise<OrganizationOutput> {
     return withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
       async () => {
         const organization = await this.repository.findBySlug(slug);
         if (!organization) throw new NotFoundError('Organization');
-        await this.assertUserCanAccessOrganization(
-          user_public_id,
-          organization.public_id,
-          global_role,
-        );
+        await this.assertUserCanAccessOrganization(user_public_id, organization.public_id);
         return this.toOrganizationOutput(organization);
       },
     );

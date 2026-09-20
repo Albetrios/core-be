@@ -107,32 +107,6 @@ export class OrganizationRepository extends BaseRepository {
     return (rows[0] ?? null) as Organization | null;
   }
 
-  async findAll(pagination: OrganizationListPagination, _owner_user_id?: number) {
-    const { after, limit } = pagination;
-    const cursorCondition = buildAscendingCreatedAtIdCursorCondition(
-      organizations.created_at,
-      organizations.id,
-      parseListCursor(after),
-    );
-    const where = and(isNull(organizations.deleted_at), cursorCondition);
-    const rows = await getRequestDatabase()
-      .select()
-      .from(organizations)
-      .where(where)
-      .orderBy(asc(organizations.created_at), asc(organizations.id))
-      .limit(limit + 1);
-    const hasMore = rows.length > limit;
-    const items = (hasMore ? rows.slice(0, limit) : rows) as Organization[];
-    const lastItem = items.at(-1);
-    return {
-      items,
-      total: null,
-      limit,
-      has_more: hasMore,
-      next_cursor: hasMore && lastItem !== undefined ? createOpaqueCursorFromRow(lastItem) : null,
-    };
-  }
-
   async findAllForUser(user_public_id: string, pagination: OrganizationListPagination) {
     const { after, limit } = pagination;
     // The caller's internal id, resolved INSIDE this query rather than by a preceding round trip.

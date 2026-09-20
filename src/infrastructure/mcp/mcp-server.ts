@@ -436,10 +436,7 @@ export async function registerMcpRoute(
     throw new Error('MCP routes require Fastify authenticate decorator');
   }
 
-  const adminPreHandlers = [
-    app.authenticate,
-    requireRole(GLOBAL_ROLES.SUPER_ADMIN, GLOBAL_ROLES.ADMIN),
-  ] as const;
+  const adminPreHandlers = [app.authenticate, requireRole(GLOBAL_ROLES.SUPER_ADMIN)] as const;
 
   await app.register(
     async (scope) => {

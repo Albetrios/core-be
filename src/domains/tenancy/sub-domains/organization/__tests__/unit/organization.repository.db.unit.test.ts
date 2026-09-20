@@ -21,8 +21,9 @@ describe('OrganizationRepository (database)', () => {
     await seedAllPermissions();
   });
 
-  it('returns an empty page when no organizations exist', async () => {
-    const emptyPage = await repository.findAll({ limit: 20 });
+  it('returns an empty page when the caller belongs to no organizations', async () => {
+    const stranger = await createTestUser({ email: 'stranger@example.com' });
+    const emptyPage = await repository.findAllForUser(stranger.public_id, { limit: 20 });
     expect(emptyPage.items).toEqual([]);
     expect(emptyPage.total).toBeNull();
   });
@@ -49,7 +50,7 @@ describe('OrganizationRepository (database)', () => {
     const resolvedOwnerId = await repository.resolveUserIdByPublicId(owner.public_id);
     expect(resolvedOwnerId).toBe(owner.id);
 
-    const page = await repository.findAll({ limit: 20 });
+    const page = await repository.findAllForUser(owner.public_id, { limit: 20 });
     expect(page.items.some((row) => row.public_id === created.public_id)).toBe(true);
 
     await repository.updateStripeCustomerId(created.id, 'cus_test_123');

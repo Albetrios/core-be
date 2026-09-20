@@ -33,7 +33,7 @@ export const userRoutesPlugin: FastifyPluginAsync = async (app) => {
     '/',
     {
       onRequest: [app.authenticate],
-      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN, GLOBAL_ROLES.ADMIN)],
+      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN)],
       schema: {
         summary: 'List all users (admin)',
         description: 'Returns a paginated list of all users. Requires SUPER_ADMIN or ADMIN role.',
@@ -46,7 +46,7 @@ export const userRoutesPlugin: FastifyPluginAsync = async (app) => {
     '/:user_id',
     {
       onRequest: [app.authenticate],
-      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN, GLOBAL_ROLES.ADMIN)],
+      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN)],
       schema: {
         summary: 'Get user by ID (admin)',
         description: "Returns a specific user's profile. Requires SUPER_ADMIN or ADMIN role.",
@@ -62,7 +62,7 @@ export const userRoutesPlugin: FastifyPluginAsync = async (app) => {
       // route-#4: bound admin user-mutations so a compromised admin token cannot bulk-edit accounts.
       ...MODERATE_AUTHED_RATE_LIMIT,
       onRequest: [app.authenticate],
-      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN, GLOBAL_ROLES.ADMIN)],
+      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN)],
       schema: {
         summary: 'Update user (admin)',
         description: "Updates a user's profile or status. Requires SUPER_ADMIN or ADMIN role.",
@@ -79,7 +79,7 @@ export const userRoutesPlugin: FastifyPluginAsync = async (app) => {
       // route-#4: stronger bound on the destructive admin delete (matches DELETE /me).
       ...EXPENSIVE_AUTHED_RATE_LIMIT,
       onRequest: [app.authenticate],
-      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN, GLOBAL_ROLES.ADMIN)],
+      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN)],
       schema: {
         summary: 'Delete user (admin)',
         description: 'Permanently deletes a user account. Requires SUPER_ADMIN or ADMIN role.',
@@ -94,7 +94,7 @@ export const userRoutesPlugin: FastifyPluginAsync = async (app) => {
     {
       ...MODERATE_AUTHED_RATE_LIMIT,
       onRequest: [app.authenticate],
-      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN, GLOBAL_ROLES.ADMIN)],
+      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN)],
       schema: {
         summary: 'Suspend user (admin)',
         description:
@@ -110,7 +110,7 @@ export const userRoutesPlugin: FastifyPluginAsync = async (app) => {
     {
       ...MODERATE_AUTHED_RATE_LIMIT,
       onRequest: [app.authenticate],
-      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN, GLOBAL_ROLES.ADMIN)],
+      preHandler: [requireRole(GLOBAL_ROLES.SUPER_ADMIN)],
       schema: {
         summary: 'Unsuspend user (admin)',
         description: 'Reactivates a suspended user account. Requires SUPER_ADMIN or ADMIN role.',

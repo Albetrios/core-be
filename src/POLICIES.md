@@ -294,13 +294,13 @@ The canonical exports live under [src/shared/constants/](src/shared/constants/) 
 
 ## GLOBAL_ROLES
 
-- **Value**: `{ SUPER_ADMIN: 'super_admin', ADMIN: 'admin', USER: 'user' }`
+- **Value**: `{ SUPER_ADMIN: 'super_admin', USER: 'user' }`
 - **Source**: [src/shared/constants/roles.constants.ts](src/shared/constants/roles.constants.ts)
-- **Rationale**: Three-tier global role hierarchy independent of organization-scoped permissions. `super_admin` is reserved for ops; `admin` is the default escalation role for support; `user` is everyone else.
+- **Rationale**: Two-tier platform role, independent of organization-scoped permissions and granting nothing inside an organization. `super_admin` comes from the `GLOBAL_ADMIN_EMAILS` allowlist and is re-derived against live account state on every request; `user` is every other active account, and no guard tests for it. A third code, `admin`, was removed as never-issued: no mint path produced it, the auth middleware downgraded it on sight, and nine route guards accepted a value that could not occur.
 - **Consequences of change**:
-  - Adding a role → audit every JWT issuance path and `requireRole` call site.
-  - Removing a role → audit every Postgres row + JWT in flight; never remove without a multi-deploy migration window.
-- **Last reviewed**: 2026-05-28
+  - Adding a role → add the code that ISSUES it in the same change, then audit every JWT issuance path and `requireRole` call site. A role nobody mints is an authorization surface that reads as real and is not.
+  - Removing a role → audit every Postgres row + JWT in flight. `admin` was safe to remove immediately because nothing minted it, and the auth middleware re-derives any claim that is not `user`, so a token carrying the retired value fails closed rather than being trusted.
+- **Last reviewed**: 2026-09-20
 
 ## ORGANIZATION_TYPE_CAPABILITY_MATRIX
 

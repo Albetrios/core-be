@@ -57,7 +57,7 @@ describe('audit routes rate-limit + authorization policy', () => {
    */
   it('GET /logs keeps requireRole(SUPER_ADMIN, ADMIN) ahead of the limiter', () => {
     const options = findRouteOptions('get', '/logs');
-    expect(options).toContain('requireRole(GLOBAL_ROLES.SUPER_ADMIN, GLOBAL_ROLES.ADMIN)');
+    expect(options).toContain('requireRole(GLOBAL_ROLES.SUPER_ADMIN)');
     expect(options).toContain('onRequest: [app.authenticate]');
   });
 
