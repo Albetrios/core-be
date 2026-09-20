@@ -61,38 +61,6 @@ describe('createOrganizationController', () => {
 
   const controller = createOrganizationController(service, auditService);
 
-  it('listOrganizations returns paginated data with has_more', async () => {
-    vi.mocked(service.list).mockResolvedValueOnce({
-      items: [organization],
-      limit: 20,
-      total: null,
-      has_more: true,
-      next_cursor: 'organization_cursor_2',
-    } as never);
-    const response = await controller.listOrganizations(mockRequest(), mockReply());
-    expect(service.list).toHaveBeenCalledWith({}, userPublicId);
-    expect(response).toMatchObject({
-      data: [organization],
-      meta: {
-        pagination: expect.objectContaining({ has_more: true, next: 'organization_cursor_2' }),
-      },
-    });
-  });
-
-  it('listOrganizations returns has_more false when all items fit page', async () => {
-    vi.mocked(service.list).mockResolvedValueOnce({
-      items: [organization],
-      limit: 20,
-      total: null,
-      has_more: false,
-      next_cursor: null,
-    } as never);
-    const response = await controller.listOrganizations(mockRequest(), mockReply());
-    expect(response).toMatchObject({
-      meta: { pagination: expect.objectContaining({ has_more: false, next: null }) },
-    });
-  });
-
   it('getOrganization delegates to service', async () => {
     await controller.getOrganization(
       mockRequest({ params: { organization_id: organizationPublicId } }),

@@ -61,10 +61,64 @@ describe('createUserController', () => {
     put: vi.fn().mockResolvedValue({ email: false }),
   };
 
+  // `/users/me/organizations` serves tenancy's data under the caller's scope, so tenancy's
+  // service is injected here — the mirror of the audit service injected into the organization
+  // routes for `/tenancy/organization/audit-logs`.
+  const organizationService = {
+    listForUser: vi.fn().mockResolvedValue({
+      items: [],
+      limit: 20,
+      total: null,
+      has_more: false,
+      next_cursor: null,
+    }),
+  };
+
   const controller = createUserController({
     userService: userService as never,
     userSettingsService: userSettingsService as never,
     userNotificationPreferencesService: userNotificationPreferencesService as never,
+    organizationService: organizationService as never,
+  });
+
+  describe('listMyOrganizations', () => {
+    it('returns the caller own organizations in the paginated envelope', async () => {
+      organizationService.listForUser.mockResolvedValueOnce({
+        items: [{ id: 'org_1' }],
+        limit: 20,
+        total: null,
+        has_more: true,
+        next_cursor: 'organization_cursor_2',
+      });
+
+      const callerPublicId = generatePublicId('user');
+      const request = mockRequest({
+        auth: {
+          kind: 'user' as const,
+          userId: callerPublicId,
+          role: 'USER',
+          organizationPublicId: generatePublicId('organization'),
+        } as never,
+      });
+      const response = await controller.listMyOrganizations(request, {} as FastifyReply);
+
+      // The caller's own id scopes the read — there is no role branch and no way to ask for
+      // someone else's organizations through this route.
+      expect(organizationService.listForUser).toHaveBeenCalledWith({}, callerPublicId);
+      expect(response).toMatchObject({
+        data: [{ id: 'org_1' }],
+        meta: {
+          pagination: expect.objectContaining({ has_more: true, next: 'organization_cursor_2' }),
+        },
+      });
+    });
+
+    it('reports has_more false when the page holds everything', async () => {
+      const response = await controller.listMyOrganizations(mockRequest(), {} as FastifyReply);
+      expect(response).toMatchObject({
+        meta: { pagination: expect.objectContaining({ has_more: false, next: null }) },
+      });
+    });
   });
 
   it('getMe returns current user', async () => {

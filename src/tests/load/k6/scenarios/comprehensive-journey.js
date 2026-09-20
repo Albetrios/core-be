@@ -301,7 +301,7 @@ function phaseProfile() {
 }
 
 function phaseExplore() {
-  req('list-orgs', 'GET', '/tenancy/organizations');
+  req('list-orgs', 'GET', '/users/me/organizations');
   req('get-org', 'GET', '/tenancy/organization');
   req('get-organization-settings', 'GET', '/tenancy/organization/settings');
   req('list-members', 'GET', '/tenancy/organization/memberships');

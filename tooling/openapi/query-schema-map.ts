@@ -20,7 +20,7 @@ export const routeQuerySchemaMap: Record<string, ZodTypeAny> = {
   'GET /api/v1/audit/logs': ListAuditLogsQueryDto,
   'GET /api/v1/users': ListUsersDto,
   'GET /api/v1/billing/invoices': listInvoicesQueryDto,
-  'GET /api/v1/tenancy/organizations': listOrganizationsQueryDto,
+  'GET /api/v1/users/me/organizations': listOrganizationsQueryDto,
   'GET /api/v1/tenancy/organization/audit-logs': ListAuditLogsQueryDto,
   'GET /api/v1/tenancy/organization/api-keys': listOrganizationApiKeysQueryDto,
   'GET /api/v1/tenancy/organization/memberships': listMembershipsQueryDto,

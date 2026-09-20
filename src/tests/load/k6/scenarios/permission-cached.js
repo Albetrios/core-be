@@ -35,12 +35,12 @@ export function permissionCachedList() {
     'Content-Type': 'application/json',
   };
 
-  http.get(`${API_PREFIX}/tenancy/organizations`, {
+  http.get(`${API_PREFIX}/users/me/organizations`, {
     headers,
     tags: { name: 'permission-cached-orgs' },
   });
 
-  const response = http.get(`${API_PREFIX}/tenancy/organizations`, {
+  const response = http.get(`${API_PREFIX}/users/me/organizations`, {
     headers,
     tags: { name: 'permission-cached-orgs' },
   });

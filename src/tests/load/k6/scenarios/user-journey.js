@@ -16,7 +16,7 @@
  *   user      — GET /users/me, GET /users/me/settings, PATCH /users/me/settings,
  *               GET /users/me/notification-preferences
  *   auth      — GET /auth/me/sessions
- *   tenancy   — GET /tenancy/organizations, GET /tenancy/organization,
+ *   tenancy   — GET /users/me/organizations, GET /tenancy/organization,
  *               GET …/organization/settings, PATCH …/organization/settings,
  *               GET …/organization/memberships, GET …/organization/roles,
  *               GET …/organization/api-keys
@@ -147,7 +147,7 @@ function phaseProfile(authed) {
 }
 
 function phaseOrg(authed) {
-  const listOrgsRes = http.get(`${API_PREFIX}/tenancy/organizations`, {
+  const listOrgsRes = http.get(`${API_PREFIX}/users/me/organizations`, {
     headers: authed,
     tags: { name: 'list-orgs' },
   });

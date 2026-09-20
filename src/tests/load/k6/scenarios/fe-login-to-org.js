@@ -36,7 +36,7 @@ import { credentialPool } from '../helpers/pool.js';
  *               6  POST /tenancy/organizations               create the workspace
  *               7  POST /users/me/onboarding/complete        stamp the flag
  *               8  POST /auth/switch-to-organization         activate it
- *   Workspace  10  GET  /tenancy/organizations               switcher list
+ *   Workspace  10  GET  /users/me/organizations              switcher list
  *              11  GET  /tenancy/organizations/by-slug/:slug resolve the URL slug
  *   Dashboard  12  GET  /notify/notifications/unread-count   bell badge
  *              13  GET  /notify/notifications                inbox
@@ -127,7 +127,7 @@ const STEPS = [
   ['07-onboarding-complete', 'POST', '/users/me/onboarding/complete'],
   ['08-switch-org', 'POST', '/auth/switch-to-organization'],
   ['09-me-context-2', 'GET', '/auth/me/context'],
-  ['10-list-orgs', 'GET', '/tenancy/organizations'],
+  ['10-list-orgs', 'GET', '/users/me/organizations'],
   ['11-organization-by-slug', 'GET', '/tenancy/organizations/by-slug/:slug'],
   ['12-unread-count', 'GET', '/notify/notifications/unread-count'],
   ['13-notifications', 'GET', '/notify/notifications'],
@@ -381,7 +381,7 @@ export function feJourney() {
 
   // 10-14 — workspace and dashboard reads.
   const reads = [
-    ['10-list-orgs', '/tenancy/organizations'],
+    ['10-list-orgs', '/users/me/organizations'],
     ['11-organization-by-slug', `/tenancy/organizations/by-slug/${slug}`],
     ['12-unread-count', '/notify/notifications/unread-count'],
     ['13-notifications', '/notify/notifications'],

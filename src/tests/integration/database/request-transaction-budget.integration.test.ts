@@ -74,7 +74,7 @@ describe('Integration: per-request database transaction budget', () => {
     ['GET /users/me/notification-preferences', '/users/me/notification-preferences'],
     ['GET /notify/notifications', '/notify/notifications'],
     ['GET /notify/notifications/unread-count', '/notify/notifications/unread-count'],
-    ['GET /tenancy/organizations', '/tenancy/organizations'],
+    ['GET /tenancy/organizations', '/users/me/organizations'],
   ];
 
   for (const [name, path] of readRoutes) {

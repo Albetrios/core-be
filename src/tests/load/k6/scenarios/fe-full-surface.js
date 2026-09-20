@@ -119,7 +119,7 @@ const STEPS = [
   ['18-mark-all-read', 'POST', '/notify/notifications/mark-all-read'],
 
   // ── organization switcher + create, then scope the session ─────────────────
-  ['19-list-orgs', 'GET', '/tenancy/organizations'],
+  ['19-list-orgs', 'GET', '/users/me/organizations'],
   ['20-create-org', 'POST', '/tenancy/organizations'],
   ['21-switch-org', 'POST', '/auth/switch-to-organization'],
   ['22-me-context-2', 'GET', '/auth/me/context'],
@@ -891,7 +891,7 @@ export function feFullJourney() {
 
   step(
     '19-list-orgs',
-    http.get(`${API}/tenancy/organizations`, { headers: auth, tags: { name: '19-list-orgs' } }),
+    http.get(`${API}/users/me/organizations`, { headers: auth, tags: { name: '19-list-orgs' } }),
     [200],
   );
 

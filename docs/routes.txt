@@ -109,7 +109,7 @@ Legend:
 
 ================================================================================
   DOMAIN: TENANCY (/api/v1/tenancy)
-  Routes: 41
+  Routes: 40
 ================================================================================
 
   — Sub Domains —
@@ -150,7 +150,6 @@ Legend:
   GET    /api/v1/tenancy/organization/settings                    200  -    both  PERM: organization:read
   PATCH  /api/v1/tenancy/organization/settings                    200  -    both  PERM: organization:update
   POST   /api/v1/tenancy/organization/transfer-ownership          200  req  team  AUTH
-  GET    /api/v1/tenancy/organizations                            200  -    both  AUTH
   POST   /api/v1/tenancy/organizations                            200  req  both  AUTH
   GET    /api/v1/tenancy/organizations/by-slug/:slug              200  -    both  AUTH
   GET    /api/v1/tenancy/permissions                              200  -    both  AUTH
@@ -167,7 +166,7 @@ Legend:
 
 ================================================================================
   DOMAIN: USER (/api/v1/users)
-  Routes: 18
+  Routes: 19
 ================================================================================
 
   GET    /api/v1/users                                            200  -    both  ROLE: super_admin
@@ -186,6 +185,7 @@ Legend:
   GET    /api/v1/users/me/notification-preferences                200  -    both  AUTH
   PUT    /api/v1/users/me/notification-preferences                200  -    both  AUTH
   POST   /api/v1/users/me/onboarding/complete                     200  -    both  AUTH
+  GET    /api/v1/users/me/organizations                           200  -    both  AUTH
   GET    /api/v1/users/me/settings                                200  -    both  AUTH
   PATCH  /api/v1/users/me/settings                                200  -    both  AUTH
 

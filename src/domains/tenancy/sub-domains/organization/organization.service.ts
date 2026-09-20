@@ -348,7 +348,7 @@ export class OrganizationService {
    * `20260520000004_organization_discovery_and_invitation_lookup_rls.sql`). Without
    * this wrap the call returns empty when `DATABASE_RLS_SCOPED_CONTEXTS=true`.
    */
-  async list(query: unknown, user_public_id: string) {
+  async listForUser(query: unknown, user_public_id: string) {
     const parsed = validateListOrganizationsQuery(query);
     const pagination = omitUndefined({
       after: parsed.after,

@@ -44,7 +44,7 @@ export function run() {
 
   const endpoints = [
     ['users-me', `${API_PREFIX}/users/me`],
-    ['organizations', `${API_PREFIX}/tenancy/organizations`],
+    ['organizations', `${API_PREFIX}/users/me/organizations`],
     ['notifications', `${API_PREFIX}/notify/notifications`],
     ['unread-count', `${API_PREFIX}/notify/notifications/unread-count`],
   ];

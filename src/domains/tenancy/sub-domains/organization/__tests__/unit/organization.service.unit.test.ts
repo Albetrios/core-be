@@ -134,7 +134,7 @@ describe('OrganizationService', () => {
   });
 
   it('list returns paginated organizations', async () => {
-    const result = await service.list({ limit: 20 }, 'user_public');
+    const result = await service.listForUser({ limit: 20 }, 'user_public');
     expect(result.items).toHaveLength(1);
   });
 
