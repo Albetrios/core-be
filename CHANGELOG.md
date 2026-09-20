@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [6.0.2](https://github.com/albetrios/core-be/compare/v6.0.1...v6.0.2) (2026-09-19)
+
+
+### Documentation
+
+* **database:** clarify maintenance context and dead-letter semantics ([#1160](https://github.com/albetrios/core-be/issues/1160)) ([d868c92](https://github.com/albetrios/core-be/commit/d868c920f9e3c7bbc7406443711ed62e9a83042b))
+* **database:** clarify maintenance context semantics ([d868c92](https://github.com/albetrios/core-be/commit/d868c920f9e3c7bbc7406443711ed62e9a83042b))
+
 ## [6.0.1](https://github.com/albetrios/core-be/compare/v6.0.0...v6.0.1) (2026-09-19)
 
 
