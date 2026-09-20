@@ -31,11 +31,12 @@ import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permiss
 import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permission/permission.repository.js';
 import { assertCallerCanGrantPermissionCodes } from '@/domains/tenancy/sub-domains/permission/assert-grantable-permissions.util.js';
 import type { MembershipRepository } from './membership.repository.js';
-import type {
-  MembershipOutput,
-  MembershipRoleSummary,
-  MembershipRow,
-  MembershipUserSummary,
+import {
+  type MembershipOutput,
+  type MembershipRoleSummary,
+  type MembershipRow,
+  membershipStatusConsumesSeat,
+  type MembershipUserSummary,
 } from './membership.types.js';
 import {
   validateCreateMembership,
@@ -476,6 +477,7 @@ export class MembershipService {
     const organization_public_id = scope.organizationPublicId;
     const parsed = validateUpdateMembership(body);
     let affectedUserInternalId: number | undefined;
+    let seatUsageChanged = false;
     const result = await withAppDatabaseContext(scope, async () => {
       const organization =
         await this.organizationService.requireOrganizationRecordByPublicId(organization_public_id);
@@ -543,11 +545,24 @@ export class MembershipService {
       );
       if (!updated) throw new NotFoundError('Membership');
       affectedUserInternalId = updated.user_id;
+      // REQ-4: SUSPENDED does not occupy a seat, so crossing that line in either direction moves
+      // `seats_used` and has to reach Stripe. A role-only PATCH, or a status change that stays on
+      // the same side of the line, leaves the count alone and must NOT enqueue a job.
+      seatUsageChanged =
+        membershipStatusConsumesSeat(membership.status) !==
+        membershipStatusConsumesSeat(updated.status);
       return this.resolveAndSerializeMembership(updated, organization_public_id);
     });
     // sec-R11: invalidate AFTER commit so a racing recompute can't re-cache the stale role set.
     if (affectedUserInternalId !== undefined) {
       await this.invalidatePermissionsForMembership(affectedUserInternalId, organization_public_id);
+    }
+    // REQ-4: suspending a member frees a seat and reactivating one takes it back, exactly like the
+    // add/remove paths below — but this path never said so, so Stripe kept billing for a suspended
+    // seat until the next unrelated add or remove happened to reconcile it. Enqueued after the
+    // commit so the worker re-reads the settled count. Best-effort.
+    if (seatUsageChanged) {
+      this.enqueueSeatQuantitySync(organization_public_id);
     }
     return result;
   }

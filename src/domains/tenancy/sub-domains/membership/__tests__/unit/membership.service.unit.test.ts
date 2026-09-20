@@ -441,6 +441,63 @@ describe('MembershipService', () => {
       ).rejects.toBeInstanceOf(ConflictError);
       expect(membershipRepository.update).not.toHaveBeenCalled();
     });
+
+    // A suspend frees a billable seat and a reactivation takes one back, exactly like remove/add.
+    // Neither told billing, so Stripe kept charging for a suspended seat (and under-charged for a
+    // reactivated one) until some unrelated member change happened to reconcile the quantity.
+    describe('REQ-4 seat-quantity sync on a status change', () => {
+      /** Drives `update` with a starting status and the row the write returns. */
+      const updateStatus = async (previousStatus: string, nextStatus: string) => {
+        vi.mocked(membershipRepository.findByPublicId).mockResolvedValue({
+          ...membershipRow,
+          status: previousStatus,
+          joined_at: new Date(),
+        } as never);
+        vi.mocked(membershipRepository.update).mockResolvedValue({
+          ...membershipRow,
+          status: nextStatus,
+        } as never);
+        // Any SUSPENDED→ACTIVE reactivation re-runs the seat check first; keep it under the ceiling.
+        reserveSeatCeilingForMemberAdd.mockResolvedValue(10);
+        vi.mocked(membershipRepository.countActiveByOrganization).mockResolvedValue(1);
+        await seatEnforcedService.update(
+          asScope('org_public'),
+          'mem_public',
+          { status: nextStatus },
+          'updater_public',
+        );
+      };
+
+      it('reconciles the Stripe quantity when a member is suspended (the seat is freed)', async () => {
+        await updateStatus('ACTIVE', 'SUSPENDED');
+        expect(enqueueSeatQuantitySync).toHaveBeenCalledWith('org_public');
+      });
+
+      it('reconciles the Stripe quantity when a suspended member is reactivated', async () => {
+        await updateStatus('SUSPENDED', 'ACTIVE');
+        expect(enqueueSeatQuantitySync).toHaveBeenCalledWith('org_public');
+      });
+
+      it('leaves billing alone when the seat count did not move', async () => {
+        // INVITED and ACTIVE both occupy a seat, so crossing between them changes nothing to bill.
+        await updateStatus('INVITED', 'ACTIVE');
+        expect(enqueueSeatQuantitySync).not.toHaveBeenCalled();
+      });
+
+      it('leaves billing alone on a role-only change', async () => {
+        vi.mocked(membershipRepository.findByPublicId).mockResolvedValue(membershipRow as never);
+        vi.mocked(membershipRepository.update).mockResolvedValue(membershipRow as never);
+
+        await seatEnforcedService.update(
+          asScope('org_public'),
+          'mem_public',
+          { role_id: 'role_public' },
+          'updater_public',
+        );
+
+        expect(enqueueSeatQuantitySync).not.toHaveBeenCalled();
+      });
+    });
   });
 
   it('delete soft-deletes membership', async () => {

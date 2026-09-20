@@ -12,6 +12,7 @@ import {
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
 import type { MembershipRepository } from '@/domains/tenancy/sub-domains/membership/membership.repository.js';
+import type { MembershipSeatEnforcementPort } from '@/domains/tenancy/sub-domains/membership/membership.service.js';
 import type { UserService } from '@/domains/user/user.service.js';
 import type { MemberInvitationRepository } from './member-invitation.repository.js';
 import type {
@@ -137,6 +138,41 @@ export class MemberInvitationService {
     private readonly invitationRepository: MemberInvitationRepository,
     private readonly userService?: UserService,
   ) {}
+
+  /**
+   * REQ-4 Stripe seat-sync port, late-wired by the composition root.
+   *
+   * @remarks
+   * Only the enqueue half of `MembershipSeatEnforcementPort` is needed here: revoking is the one
+   * operation on this service that frees a seat, and freeing one never has to reserve anything. It
+   * is late-wired rather than a constructor param for the same reason as
+   * {@link MembershipService.wireSeatEnforcement} — billing depends on tenancy for `seats_used`, so
+   * a constructor dependency would close the cycle. Left `null` in minimal test harnesses, where
+   * the sync is simply skipped.
+   */
+  private seatQuantitySync: Pick<MembershipSeatEnforcementPort, 'enqueueSeatQuantitySync'> | null =
+    null;
+
+  /** Late-wires the billing seat-sync port (REQ-4); see {@link seatQuantitySync}. */
+  wireSeatQuantitySync(
+    seatQuantitySync: Pick<MembershipSeatEnforcementPort, 'enqueueSeatQuantitySync'>,
+  ): void {
+    this.seatQuantitySync = seatQuantitySync;
+  }
+
+  /**
+   * Best-effort enqueue of a Stripe seat-quantity reconciliation. Mirrors
+   * `MembershipService.enqueueSeatQuantitySync`: a Redis blip must never fail the revoke that
+   * triggered it.
+   */
+  private enqueueSeatQuantitySync(organizationPublicId: string): void {
+    if (!this.seatQuantitySync) return;
+    try {
+      this.seatQuantitySync.enqueueSeatQuantitySync(organizationPublicId);
+    } catch (error) {
+      logger.warn({ error, organizationPublicId }, 'member_invitation.seat_sync.enqueue_failed');
+    }
+  }
 
   /**
    * Issues an invitation (token + email) for an already-created `INVITED` membership — the invitation
@@ -317,7 +353,7 @@ export class MemberInvitationService {
     invitation_public_id: string,
   ): Promise<void> {
     const organization_public_id = scope.organizationPublicId;
-    return withAppDatabaseContext(scope, async () => {
+    await withAppDatabaseContext(scope, async () => {
       const organization = await this.organizationRepository.findByPublicId(organization_public_id);
       if (!organization) throw new NotFoundError('Organization');
       const row = await this.invitationRepository.findByPublicId(invitation_public_id);
@@ -333,6 +369,11 @@ export class MemberInvitationService {
       // the members table never shows a ghost invitee. accept remains the only path to ACTIVE.
       await this.membershipRepository.softDelete(membership.public_id, organization.id);
     });
+    // REQ-4: an INVITED membership holds a seat, so dropping it frees one — the same accounting the
+    // add/remove paths report. Without this a revoked invitation stayed billed until some unrelated
+    // member change happened to reconcile the quantity. After the commit, so the worker re-reads the
+    // settled count. Best-effort.
+    this.enqueueSeatQuantitySync(organization_public_id);
   }
 
   async resend(

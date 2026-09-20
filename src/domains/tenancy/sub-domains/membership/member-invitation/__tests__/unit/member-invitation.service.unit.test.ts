@@ -302,6 +302,43 @@ describe('MemberInvitationService', () => {
       expect(membershipRepository.softDelete).toHaveBeenCalledWith('mem_public_xyz', 1);
     });
 
+    // An INVITED membership holds a billable seat (it is counted so a burst of invites cannot
+    // overshoot the plan once everyone accepts). Dropping it frees that seat, so billing has to
+    // hear about it — without this the revoked invitation stayed billed until some unrelated
+    // member change happened to reconcile the quantity (REQ-4).
+    it('reconciles the Stripe seat quantity, because the invitation was holding a seat', async () => {
+      const enqueueSeatQuantitySync = vi.fn();
+      const seatSyncedService = new MemberInvitationService(
+        organizationRepository,
+        membershipRepository,
+        invitationRepository,
+        userService,
+      );
+      seatSyncedService.wireSeatQuantitySync({ enqueueSeatQuantitySync });
+
+      await seatSyncedService.revoke(asScope('org_public_abc'), 'inv_public_123');
+
+      expect(enqueueSeatQuantitySync).toHaveBeenCalledWith('org_public_abc');
+    });
+
+    it('does not reconcile when the revoke failed — the seat was never freed', async () => {
+      const enqueueSeatQuantitySync = vi.fn();
+      const seatSyncedService = new MemberInvitationService(
+        organizationRepository,
+        membershipRepository,
+        invitationRepository,
+        userService,
+      );
+      seatSyncedService.wireSeatQuantitySync({ enqueueSeatQuantitySync });
+      vi.mocked(invitationRepository.revoke).mockResolvedValue(null as never);
+
+      await expect(
+        seatSyncedService.revoke(asScope('org_public_abc'), 'inv_public_123'),
+      ).rejects.toBeInstanceOf(NotFoundError);
+
+      expect(enqueueSeatQuantitySync).not.toHaveBeenCalled();
+    });
+
     it('throws NotFoundError when organization is missing', async () => {
       vi.mocked(organizationRepository.findByPublicId).mockResolvedValue(null);
       await expect(

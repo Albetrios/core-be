@@ -95,6 +95,8 @@ export function createDomainContainers(
   // REQ-4: late-wire billing's subscription service into the membership service so seat enforcement
   // + Stripe seat reconciliation work in the worker process too (membership↔subscription cycle).
   tenancyDomain.membershipService.wireSeatEnforcement(billingDomain.subscriptionService);
+  // Same for invitation revoke, which frees the seat the invitation was holding.
+  tenancyDomain.memberInvitationService.wireSeatQuantitySync(billingDomain.subscriptionService);
 
   userDomain.userDataExportService.wireCrossDomainServices({
     authSessionService: authDomain.authSessionService,
