@@ -9,7 +9,7 @@ import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/mem
 import { BaseRepository } from '@/infrastructure/database/base-repository.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { runInsertWithPublicIdentifierRetry } from '@/shared/utils/infrastructure/postgres-error.util.js';
-import type { MembershipRow } from './membership.types.js';
+import { type MembershipRow, SEAT_CONSUMING_MEMBERSHIP_STATUSES } from './membership.types.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import { parseListCursor } from '@/shared/utils/http/pagination.util.js';
 import {
@@ -465,7 +465,7 @@ export class MembershipRepository extends BaseRepository {
       .where(
         and(
           eq(memberships.organization_id, organization_id),
-          inArray(memberships.status, ['ACTIVE', 'INVITED']),
+          inArray(memberships.status, [...SEAT_CONSUMING_MEMBERSHIP_STATUSES]),
           isNull(memberships.deleted_at),
         ),
       );

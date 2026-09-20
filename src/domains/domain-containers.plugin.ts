@@ -38,6 +38,11 @@ async function registerDomainContainers(application: FastifyInstance): Promise<v
   application.tenancyDomain.membershipService.wireSeatEnforcement(
     application.billingDomain.subscriptionService,
   );
+  // REQ-4: revoking an invitation frees the seat it was holding, so the invitation service needs
+  // the same port to report it (see MemberInvitationService.wireSeatQuantitySync).
+  application.tenancyDomain.memberInvitationService.wireSeatQuantitySync(
+    application.billingDomain.subscriptionService,
+  );
 
   application.userDomain.userDataExportService.wireCrossDomainServices({
     authSessionService: application.authDomain.authSessionService,

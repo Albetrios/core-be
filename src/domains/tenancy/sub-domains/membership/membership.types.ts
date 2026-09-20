@@ -1,4 +1,32 @@
 /**
+ * The membership statuses that occupy a billable seat (REQ-4).
+ *
+ * @remarks
+ * - **Algorithm:** an outstanding invitation already reserves a seat, so a burst of invites cannot
+ *   exceed the plan limit once everyone accepts; a SUSPENDED seat is not in use and is excluded.
+ * - **Failure modes:** none — a plain value.
+ * - **Side effects:** none.
+ * - **Notes:** the single definition behind BOTH sides of seat accounting: the
+ *   `countActiveByOrganization` predicate that produces `seats_used`, and
+ *   {@link membershipStatusConsumesSeat}, which decides whether a status change has to reconcile
+ *   the Stripe quantity. Keeping them apart is how a suspend stopped telling billing anything.
+ */
+export const SEAT_CONSUMING_MEMBERSHIP_STATUSES = ['ACTIVE', 'INVITED'] as const;
+
+/**
+ * Whether a membership in this status occupies a billable seat.
+ *
+ * @remarks
+ * - **Algorithm:** membership in {@link SEAT_CONSUMING_MEMBERSHIP_STATUSES}.
+ * - **Failure modes:** none — an unknown status reads as not consuming a seat, matching the
+ *   count query, which only counts the statuses it names.
+ * - **Side effects:** none.
+ */
+export function membershipStatusConsumesSeat(status: string): boolean {
+  return (SEAT_CONSUMING_MEMBERSHIP_STATUSES as readonly string[]).includes(status);
+}
+
+/**
  * Raw `tenancy.memberships` row shape from Drizzle. Holds internal numeric
  * ids and the soft-delete marker (`deleted_at`); do not return this shape
  * directly from HTTP handlers — serialize via {@link serializeMembership}.
