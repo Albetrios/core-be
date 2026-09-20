@@ -186,6 +186,18 @@ These four properties hold today and are what keep lock contention from becoming
 - New tenant-scoped table: add an RLS policy in its migration. The migration linter (`pnpm db:migrate:lint`) rejects schemas that omit RLS where it's required.
 - New worker: pick the right runner (`Tenant`, `Global`, `User`) and pass the right context payload. Don't call `getRequestDatabase()`; don't import from `database-context-runtime.ts`. The pre-commit `validate:domain` enforces this at the import-graph level.
 
+### One request, one context
+
+A non-nested `withAppDatabaseContext` is not free bookkeeping: it opens a transaction and **holds one pooled connection from BEGIN to COMMIT**. The measured ceiling of this service (~1,000 req/s on one instance, pool = 50) is set by that pool, not by CPU, so the number of contexts a request opens is close to a direct divisor of throughput.
+
+Nesting is already handled: a context whose scope matches the one above it **reuses the pinned checkout** instead of taking a second (`runPrincipalDatabaseContext` — same-organization reuse, and user-only scopes reuse any pinned handle). So the rule is about where you call things, not about adding machinery.
+
+- **Resolve ids inside the context that needs them.** The recurring defect is `public_id → internal id` resolved through a service that opens its own transaction, *before* opening the context the handler actually reads in: two checkouts, ~4 extra round trips, for a value the request already carried the public id for. Use {@link UserService.resolveInternalIdByPublicId} (one SECURITY DEFINER call, no context of its own) from inside the context — never `findUserRecordByPublicId` when only the id is wanted.
+- **Push the resolution into the query** where a repository can: `auth.resolve_user_id_by_public_id(...)` is STABLE, so it can sit in a `WHERE` clause and cost nothing extra (`OrganizationRepository.findAllForUser`).
+- **Keep writes that can fail out of a read's transaction.** `UserService.getMe` reads the profile and the personal organization in one context, but leaves the self-heal provisioning outside it, so a failed heal degrades to `null` instead of aborting a read that already succeeded.
+- **Presigning is not external I/O.** `resolveStoredMediaReadUrl` is a local signature with no network call, so it is safe inside a context. Genuine external I/O (Stripe, S3 `headObject`) is not — do it before or after.
+- Enforced by [request-transaction-budget.integration.test.ts](src/tests/integration/database/request-transaction-budget.integration.test.ts), which spies on `database.transaction` and holds the hot authenticated reads to one transaction each.
+
 ## transactional-outbox
 
 ### Purpose

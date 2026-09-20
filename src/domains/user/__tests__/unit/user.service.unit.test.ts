@@ -88,6 +88,8 @@ describe('UserService', () => {
   const repository = {
     findByEmail: vi.fn().mockResolvedValue(userRow),
     findByPublicId: vi.fn().mockResolvedValue(userRow),
+    // The cheap id-only resolver the hot read paths use instead of a full row fetch.
+    resolveInternalIdByPublicId: vi.fn().mockResolvedValue(userRow.id),
     findById: vi.fn().mockResolvedValue(userRow),
     update: vi.fn().mockResolvedValue(userRow),
     updatePassword: vi.fn().mockResolvedValue(userRow),
@@ -507,7 +509,8 @@ describe('UserService', () => {
     expect(repository.updatePassword).toHaveBeenCalledWith(userRow.public_id, 'new-hash');
     const internalId = await service.resolveInternalIdByPublicId(userRow.public_id);
     expect(internalId).toBe(1);
-    vi.mocked(repository.findByPublicId).mockResolvedValueOnce(null);
+    expect(repository.resolveInternalIdByPublicId).toHaveBeenCalledWith(userRow.public_id);
+    vi.mocked(repository.resolveInternalIdByPublicId).mockResolvedValueOnce(null);
     expect(await service.resolveInternalIdByPublicId('missing')).toBeNull();
   });
 

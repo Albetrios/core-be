@@ -16,7 +16,10 @@ import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { buildUserAvatarKeyPrefix } from '@/domains/upload/upload.constants.js';
 import type { UserRepository } from './user.repository.js';
 import { env } from '@/shared/config/env.config.js';
-import { ensurePersonalOrganizationPublicId } from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
+import {
+  ensurePersonalOrganizationPublicId,
+  resolvePersonalOrganizationPublicId,
+} from '@/domains/tenancy/sub-domains/organization/resolve-active-organization.js';
 import { UserSerializer } from './user.serializer.js';
 import { resolveStoredMediaReadUrl } from '@/shared/utils/infrastructure/media-url.util.js';
 import {
@@ -402,12 +405,26 @@ export class UserService {
     );
   }
 
+  /**
+   * Resolves a user's public id to the internal id, joining the caller's database context.
+   *
+   * @remarks
+   * - **Algorithm:** one `auth.resolve_user_id_by_public_id` SECURITY DEFINER call. It opens no
+   *   context of its own: called inside `withAppDatabaseContext` it runs on that transaction, and
+   *   because the resolver is SECURITY DEFINER it answers correctly whatever GUC is set.
+   * - **Failure modes:** `null` for an unknown or soft-deleted user. It needs SOME database handle,
+   *   so worker runtime throws when no context is open — call it inside one.
+   * - **Side effects:** none.
+   * - **Notes:** the cheap answer to "I only need `user.id` so I can scope the read I am about to
+   *   do". It used to open its own transaction and select the whole row, which is what made that
+   *   the expensive way to ask: callers resolved the id first and opened the real context second,
+   *   paying two pooled checkouts and four extra round trips per request. The DB pool is the
+   *   resource that runs out first under load, so the nesting matters more than the query does —
+   *   see `AuthMeContextService.getContext` for the same fix applied to `/auth/me/context`. Prefer
+   *   this over {@link UserService.findUserRecordByPublicId} whenever only the id is needed.
+   */
   async resolveInternalIdByPublicId(public_id: string): Promise<number | null> {
-    const user = await withAppDatabaseContext(
-      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: public_id }),
-      () => this.repository.findByPublicId(public_id),
-    );
-    return user?.id ?? null;
+    return this.repository.resolveInternalIdByPublicId(public_id);
   }
 
   private async assertAvatarObjectInStorage(
@@ -443,15 +460,20 @@ export class UserService {
     }
     // Bind the upload row to this owner explicitly (not just via the key prefix) so the ownership
     // check survives any future caller that doesn't derive the key from the prefix convention.
-    const ownerInternalId = await this.resolveInternalIdByPublicId(ownerPublicId);
-    if (ownerInternalId === null) {
-      throw new ValidationError('errors:validation.avatarNotFound');
-    }
-    await withAppDatabaseContext(PRINCIPAL_SCOPE.VERIFIED({ userPublicId: ownerPublicId }), () =>
-      this.offboardingUploadService!.assertKeyConfirmedForOwner({
-        fileKey: avatarKey,
-        userInternalId: ownerInternalId,
-      }),
+    // Both the id lookup and the check it feeds run in ONE context — the lookup used to open its
+    // own transaction first, for a value this method was handed the public id for.
+    await withAppDatabaseContext(
+      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: ownerPublicId }),
+      async () => {
+        const ownerInternalId = await this.resolveInternalIdByPublicId(ownerPublicId);
+        if (ownerInternalId === null) {
+          throw new ValidationError('errors:validation.avatarNotFound');
+        }
+        await this.offboardingUploadService!.assertKeyConfirmedForOwner({
+          fileKey: avatarKey,
+          userInternalId: ownerInternalId,
+        });
+      },
     );
   }
 
@@ -473,16 +495,33 @@ export class UserService {
 
   async getMe(scope: UserPrincipalDatabaseScope): Promise<UserOutput> {
     const publicId = scope.userPublicId;
-    const user = await withAppDatabaseContext(scope, () =>
-      this.repository.findByPublicId(publicId),
+    // The profile row and the personal-organization lookup share ONE transaction: both are
+    // user-scoped reads on the same GUC, and the nested context reuses the pinned checkout rather
+    // than taking a second one. This is the most-called authenticated route in the app, so the
+    // checkout it holds is the one worth halving.
+    const { user, existingPersonalOrganizationId } = await withAppDatabaseContext(
+      scope,
+      async () => {
+        const row = await this.repository.findByPublicId(publicId);
+        if (!row || row.deleted_at) throw new NotFoundError('User');
+        return {
+          user: row,
+          existingPersonalOrganizationId: env.PERSONAL_ORGANIZATION_ENABLED
+            ? ((await resolvePersonalOrganizationPublicId(row.id)) ?? null)
+            : null,
+        };
+      },
     );
-    if (!user || user.deleted_at) throw new NotFoundError('User');
-    // Self-heal: when personal organizations are enabled, provision on demand if missing so
-    // `personal_organization_id` is reliably non-null (never dead-ends onboarding). When
-    // personal is disabled this returns undefined and we report null, unchanged.
-    const personalOrganizationId = env.PERSONAL_ORGANIZATION_ENABLED
-      ? ((await ensurePersonalOrganizationPublicId(user.id)) ?? null)
-      : null;
+    // Self-heal, deliberately OUTSIDE the read transaction: when personal organizations are enabled
+    // and the user somehow has none, provision on demand so `personal_organization_id` is reliably
+    // non-null (never dead-ends onboarding). Provisioning writes several rows and can fail; keeping
+    // it out here means a failed self-heal degrades to `null` instead of aborting a profile read
+    // that had already succeeded. On the normal path (the organization exists) it never runs.
+    const personalOrganizationId =
+      existingPersonalOrganizationId ??
+      (env.PERSONAL_ORGANIZATION_ENABLED
+        ? ((await ensurePersonalOrganizationPublicId(user.id)) ?? null)
+        : null);
     return {
       ...(await this.toUserOutput(user)),
       personal_organization_id: personalOrganizationId,

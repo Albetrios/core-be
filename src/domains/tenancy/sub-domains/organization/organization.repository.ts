@@ -135,16 +135,11 @@ export class OrganizationRepository extends BaseRepository {
 
   async findAllForUser(user_public_id: string, pagination: OrganizationListPagination) {
     const { after, limit } = pagination;
-    const userId = await this.resolveUserIdByPublicId(user_public_id);
-    if (userId === null) {
-      return {
-        items: [],
-        total: null,
-        limit,
-        has_more: false,
-        next_cursor: null,
-      };
-    }
+    // The caller's internal id, resolved INSIDE this query rather than by a preceding round trip.
+    // `auth.resolve_user_id_by_public_id` is STABLE, so Postgres evaluates it once per statement;
+    // an unknown or soft-deleted user resolves to NULL, both comparisons below fail, and the page
+    // comes back empty — the same answer the separate lookup produced with an early return.
+    const userId = sql<number>`auth.resolve_user_id_by_public_id(${user_public_id})`;
     const cursorCondition = buildAscendingCreatedAtIdCursorCondition(
       organizations.created_at,
       organizations.id,

@@ -129,17 +129,35 @@ export class UserDataExportService {
     return this.crossDomainServices;
   }
 
+  /**
+   * Resolves the owner's internal id. MUST be called inside the caller's database context — it
+   * joins that transaction instead of opening a second one (see
+   * {@link UserService.resolveInternalIdByPublicId}). The worker-side paths below deliberately
+   * keep the full-row lookup: they run without a guaranteed pinned handle, and one of them needs
+   * the whole row anyway.
+   */
+  private async requireUserIdInContext(userPublicId: string): Promise<number> {
+    const userId = await this.userService.resolveInternalIdByPublicId(userPublicId);
+    if (userId === null) throw new NotFoundError('User');
+    return userId;
+  }
+
   async requestExport(
     scope: UserPrincipalDatabaseScope,
     options?: { requestId?: string },
   ): Promise<UserDataExportOutput> {
     const userPublicId = scope.userPublicId;
-    const user = await this.userService.findUserRecordByPublicId(userPublicId);
-    if (!user) throw new NotFoundError('User');
-
-    const existingPending = await withAppDatabaseContext(scope, () =>
-      this.exportRepository.findPendingOrProcessingByUserId(user.id),
-    );
+    // One context for the id lookup AND the pending check: the lookup used to open its own
+    // transaction first, holding a second pooled checkout for a value this request already has the
+    // public id for (see UserService.resolveInternalIdByPublicId).
+    const { userInternalId, existingPending } = await withAppDatabaseContext(scope, async () => {
+      const resolvedUserId = await this.requireUserIdInContext(userPublicId);
+      return {
+        userInternalId: resolvedUserId,
+        existingPending:
+          await this.exportRepository.findPendingOrProcessingByUserId(resolvedUserId),
+      };
+    });
     if (existingPending) {
       logger.info(
         { userPublicId, exportPublicId: existingPending.public_id },
@@ -159,7 +177,7 @@ export class UserDataExportService {
       row = await withAppDatabaseContext(scope, () =>
         this.exportRepository.create({
           public_id: exportPublicId,
-          user_id: user.id,
+          user_id: userInternalId,
           status: USER_DATA_EXPORT_STATUSES.PENDING,
           s3_key: s3Key,
           expires_at: expiresAt,
@@ -170,7 +188,7 @@ export class UserDataExportService {
         throw error;
       }
       const existingAfterRace = await withAppDatabaseContext(scope, () =>
-        this.exportRepository.findPendingOrProcessingByUserId(user.id),
+        this.exportRepository.findPendingOrProcessingByUserId(userInternalId),
       );
       if (existingAfterRace) {
         logger.info(
@@ -187,7 +205,7 @@ export class UserDataExportService {
         type: 'user_data_export',
         exportPublicId,
         userPublicId,
-        userInternalId: user.id,
+        userInternalId,
       },
       options?.requestId !== undefined ? { requestId: options.requestId } : undefined,
     );
@@ -202,11 +220,11 @@ export class UserDataExportService {
     exportPublicId: string,
   ): Promise<UserDataExportOutput> {
     const userPublicId = scope.userPublicId;
-    const user = await this.userService.findUserRecordByPublicId(userPublicId);
-    if (!user) throw new NotFoundError('User');
-
-    const row = await withAppDatabaseContext(scope, () =>
-      this.exportRepository.findByPublicIdAndUserId(exportPublicId, user.id),
+    const row = await withAppDatabaseContext(scope, async () =>
+      this.exportRepository.findByPublicIdAndUserId(
+        exportPublicId,
+        await this.requireUserIdInContext(userPublicId),
+      ),
     );
     if (!row) throw new NotFoundError('User data export');
 

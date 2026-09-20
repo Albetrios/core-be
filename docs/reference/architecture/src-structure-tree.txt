@@ -1824,6 +1824,7 @@ src/
     │   │   ├── migration-rollback.integration.test.ts
     │   │   ├── migrations-backward.integration.test.ts
     │   │   ├── migrations-forward.integration.test.ts
+    │   │   ├── request-transaction-budget.integration.test.ts
     │   │   ├── resource-quota-lock.integration.test.ts
     │   │   └── transaction-rollback.integration.test.ts
     │   ├── observability/

@@ -49,7 +49,8 @@ const notification = {
 
 describe('NotificationService', () => {
   const userService = {
-    findUserRecordByPublicId: vi.fn().mockResolvedValue(user),
+    // The id-only resolver the read paths call from inside their database context.
+    resolveInternalIdByPublicId: vi.fn().mockResolvedValue(user.id),
   } as unknown as UserService;
 
   const repository = {
@@ -72,7 +73,7 @@ describe('NotificationService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(userService.findUserRecordByPublicId).mockResolvedValue(user as never);
+    vi.mocked(userService.resolveInternalIdByPublicId).mockResolvedValue(user.id);
   });
 
   it('listForUser returns keyset paginated notifications', async () => {
@@ -102,7 +103,7 @@ describe('NotificationService', () => {
   });
 
   it('resolveUserId throws when user missing', async () => {
-    vi.mocked(userService.findUserRecordByPublicId).mockResolvedValue(null);
+    vi.mocked(userService.resolveInternalIdByPublicId).mockResolvedValue(null);
     await expect(service.listForUser(missingUserScope, { limit: 50 })).rejects.toBeInstanceOf(
       UnauthorizedError,
     );

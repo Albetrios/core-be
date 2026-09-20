@@ -88,6 +88,8 @@ const asUserScope = (userPublicId: string) =>
 describe('UserService — avatar lifecycle', () => {
   const repository = {
     findByPublicId: vi.fn(),
+    // Ownership binding resolves the owner's internal id inside the upload-check context.
+    resolveInternalIdByPublicId: vi.fn().mockResolvedValue(1),
     update: vi.fn(),
   } as unknown as UserRepository;
 

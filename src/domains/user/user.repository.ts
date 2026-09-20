@@ -65,6 +65,29 @@ export class UserRepository {
   }
 
   /**
+   * Resolves `auth.users.public_id` → internal id, and nothing else.
+   *
+   * @remarks
+   * Goes through the `auth.resolve_user_id_by_public_id` SECURITY DEFINER resolver rather than a
+   * direct SELECT, so it works from ANY database context — including one whose GUC names a
+   * different user, or an organization-scoped context where `auth.users` (FORCE RLS, self-scoped)
+   * would match zero rows. That is what lets a caller resolve the id inside the transaction it
+   * already has open instead of paying for a second one; see
+   * {@link UserService.resolveInternalIdByPublicId}. Returns `null` for an unknown or soft-deleted
+   * user (the resolver filters `deleted_at IS NULL`).
+   */
+  async resolveInternalIdByPublicId(public_id: string): Promise<number | null> {
+    const result = await getRequestDatabase().execute<{ id: string | number | null }>(
+      sql`SELECT auth.resolve_user_id_by_public_id(${public_id}) AS id`,
+    );
+    const rows = (
+      Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? [])
+    ) as { id: string | number | null }[];
+    const rawId = rows[0]?.id ?? null;
+    return rawId === null ? null : Number(rawId);
+  }
+
+  /**
    * Resolves a user by email for the pre-session authentication phase (login, forgot-password,
    * webauthn auth-options, OAuth find-or-create). Goes through the `auth.resolve_user_*` SECURITY
    * DEFINER resolver because `auth.users` is FORCE RLS and no `app.current_user_public_id` is set yet — a
