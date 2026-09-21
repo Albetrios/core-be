@@ -36,10 +36,6 @@ function resolveFallbackScope() {}
 | `sec-r4-I1`, `audit-#B2` in **comments** | audit-finding references into `docs/`; they are citations, not identifiers |
 | Digits in **values** | `LIMIT 100`, `z-[70]`, HTTP `401`, `[a-z0-9]` in a regex — the rule is about what a thing is *called*, not what it *contains* |
 
-## Known debt
-
-Roughly ninety test-local names (`page1`, `body1`, `token2`) predate this rule, concentrated in the `*.repository.db.unit.test.ts` suites. They are mechanical to fix and are not a reason to add more. New and changed code complies.
-
 ## Why this is a rule and not a preference
 
 The rename that produced it was not cosmetic. In core-fe an icon exported as `Building2` was looked up in a table keyed `Building`; the digit is exactly the kind of detail that survives a careless find-and-replace and leaves an `undefined` component at runtime, which is how it was caught. A naming scheme that cannot be renamed safely is a naming scheme that will not be renamed.

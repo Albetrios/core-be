@@ -203,16 +203,16 @@ describe('UserRepository (database)', () => {
       created.push(await createTestUser({ email: `page-user-${index}@example.com` }));
     }
 
-    const page1 = await repository.findMany({ limit: 2 });
-    expect(page1.items).toHaveLength(2);
-    expect(page1.has_more).toBe(true);
-    expect(page1.next_cursor).toBeTruthy();
+    const firstPage = await repository.findMany({ limit: 2 });
+    expect(firstPage.items).toHaveLength(2);
+    expect(firstPage.has_more).toBe(true);
+    expect(firstPage.next_cursor).toBeTruthy();
 
-    const page2 = await repository.findMany({ limit: 2, after: page1.next_cursor! });
-    const page1Ids = new Set(page1.items.map((row) => row.public_id));
+    const nextPage = await repository.findMany({ limit: 2, after: firstPage.next_cursor! });
+    const firstPageIds = new Set(firstPage.items.map((row) => row.public_id));
     // Disjoint — no user appears on both pages.
-    expect(page2.items.every((row) => !page1Ids.has(row.public_id))).toBe(true);
-    expect(page2.items.length).toBeGreaterThan(0);
+    expect(nextPage.items.every((row) => !firstPageIds.has(row.public_id))).toBe(true);
+    expect(nextPage.items.length).toBeGreaterThan(0);
     expect(created).toHaveLength(3);
   });
 });

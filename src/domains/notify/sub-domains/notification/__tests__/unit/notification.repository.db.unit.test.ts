@@ -211,20 +211,23 @@ describe('NotificationRepository (database)', () => {
       });
     }
 
-    const page1 = await repository.findByUser(user.id, { limit: 2 });
-    expect(page1.items).toHaveLength(2);
-    expect(page1.has_more).toBe(true);
-    expect(page1.next_cursor).toEqual(expect.any(String));
+    const firstPage = await repository.findByUser(user.id, { limit: 2 });
+    expect(firstPage.items).toHaveLength(2);
+    expect(firstPage.has_more).toBe(true);
+    expect(firstPage.next_cursor).toEqual(expect.any(String));
 
-    const page2 = await repository.findByUser(user.id, { limit: 2, after: page1.next_cursor! });
-    expect(page2.items).toHaveLength(1);
-    expect(page2.has_more).toBe(false);
-    expect(page2.next_cursor).toBeNull();
+    const nextPage = await repository.findByUser(user.id, {
+      limit: 2,
+      after: firstPage.next_cursor!,
+    });
+    expect(nextPage.items).toHaveLength(1);
+    expect(nextPage.has_more).toBe(false);
+    expect(nextPage.next_cursor).toBeNull();
 
     // The two pages are disjoint and together cover all three rows (the (created_at,id) keyset).
-    const page1Ids = page1.items.map((row) => row.id);
-    expect(page1Ids).not.toContain(page2.items[0]!.id);
-    expect(new Set([...page1Ids, page2.items[0]!.id]).size).toBe(3);
+    const firstPageIds = firstPage.items.map((row) => row.id);
+    expect(firstPageIds).not.toContain(nextPage.items[0]!.id);
+    expect(new Set([...firstPageIds, nextPage.items[0]!.id]).size).toBe(3);
   });
 
   it('findByUser computes a real total only when include_total is set', async () => {
