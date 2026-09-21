@@ -48,7 +48,7 @@ describe('Performance: N+1 Detection', () => {
 
     const start = performance.now();
     const response = await request
-      .get('/api/v1/tenancy/organizations')
+      .get('/api/v1/users/me/organizations')
       .set('Authorization', `Bearer ${token}`);
     const duration = performance.now() - start;
 

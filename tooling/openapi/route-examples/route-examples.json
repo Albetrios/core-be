@@ -1817,49 +1817,6 @@
       }
     }
   },
-  "GET /api/v1/tenancy/organizations": {
-    "responses": {
-      "200": {
-        "data": [],
-        "meta": {
-          "request_id": "9de5c22e-938f-44eb-9c43-c78061acdcfb",
-          "pagination": {
-            "per_page": 25,
-            "next": null,
-            "has_more": false
-          }
-        }
-      },
-      "400": {
-        "error": {
-          "type": "validation_error",
-          "code": "invalid_field",
-          "detail": "Legacy `page` pagination is no longer supported on this route. Use cursor-based pagination via `limit` and `after` (opaque cursor from `meta.pagination.next`).",
-          "documentation_url": "https://example.com/resource",
-          "errors": [
-            {
-              "field": "page",
-              "message": "Legacy `page` pagination is no longer supported on this route. Use cursor-based pagination via `limit` and `after` (opaque cursor from `meta.pagination.next`)."
-            }
-          ]
-        },
-        "meta": {
-          "request_id": "fa425207-9591-49e5-93f0-23c03617487c"
-        }
-      },
-      "401": {
-        "error": {
-          "type": "request_error",
-          "code": "unauthorized",
-          "detail": "Missing Authorization header",
-          "documentation_url": "https://example.com/resource"
-        },
-        "meta": {
-          "request_id": "0bfffe92-9423-42bb-9a12-5915ddb481c9"
-        }
-      }
-    }
-  },
   "GET /api/v1/tenancy/organizations/by-slug/:slug": {
     "responses": {
       "200": {
@@ -2160,6 +2117,49 @@
         },
         "meta": {
           "request_id": "1a31883f-f011-4da2-9eaa-e279129696a0"
+        }
+      }
+    }
+  },
+  "GET /api/v1/users/me/organizations": {
+    "responses": {
+      "200": {
+        "data": [],
+        "meta": {
+          "request_id": "9de5c22e-938f-44eb-9c43-c78061acdcfb",
+          "pagination": {
+            "per_page": 25,
+            "next": null,
+            "has_more": false
+          }
+        }
+      },
+      "400": {
+        "error": {
+          "type": "validation_error",
+          "code": "invalid_field",
+          "detail": "Legacy `page` pagination is no longer supported on this route. Use cursor-based pagination via `limit` and `after` (opaque cursor from `meta.pagination.next`).",
+          "documentation_url": "https://example.com/resource",
+          "errors": [
+            {
+              "field": "page",
+              "message": "Legacy `page` pagination is no longer supported on this route. Use cursor-based pagination via `limit` and `after` (opaque cursor from `meta.pagination.next`)."
+            }
+          ]
+        },
+        "meta": {
+          "request_id": "fa425207-9591-49e5-93f0-23c03617487c"
+        }
+      },
+      "401": {
+        "error": {
+          "type": "request_error",
+          "code": "unauthorized",
+          "detail": "Missing Authorization header",
+          "documentation_url": "https://example.com/resource"
+        },
+        "meta": {
+          "request_id": "0bfffe92-9423-42bb-9a12-5915ddb481c9"
         }
       }
     }

@@ -14,7 +14,7 @@ import { authHeaders } from '../helpers/auth.js';
  *
  * Routes loaded:
  * - GET /api/v1/users/me
- * - GET /api/v1/tenancy/organizations
+ * - GET /api/v1/users/me/organizations
  * - GET /api/v1/notify/notifications
  * - GET /api/v1/notify/notifications/unread-count
  * - GET /api/v1/tenancy/organization/memberships
@@ -53,9 +53,9 @@ export function apiStress() {
     'users/me 2xx': (r) => r.status >= 200 && r.status < 300,
   });
 
-  const orgsRes = http.get(`${API_PREFIX}/tenancy/organizations`, opts('tenancy-organizations'));
+  const orgsRes = http.get(`${API_PREFIX}/users/me/organizations`, opts('my-organizations'));
   check(orgsRes, {
-    'tenancy/organizations 2xx': (r) => r.status >= 200 && r.status < 300,
+    'users/me/organizations 2xx': (r) => r.status >= 200 && r.status < 300,
   });
 
   const notifRes = http.get(`${API_PREFIX}/notify/notifications`, opts('notify-notifications'));

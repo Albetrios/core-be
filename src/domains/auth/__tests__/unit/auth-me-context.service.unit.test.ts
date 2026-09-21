@@ -37,7 +37,7 @@ describe('AuthMeContextService.getContext', () => {
     const activeOrganization = { id: 'org_active', type: 'TEAM' };
     const userService = { getMe: vi.fn().mockResolvedValue({ id: 'usr_1', email: 'a@b.com' }) };
     const organizationService = {
-      list: vi
+      listForUser: vi
         .fn()
         .mockResolvedValue({ items: [activeOrganization, { id: 'org_2', type: 'PERSONAL' }] }),
       getByPublicId: vi.fn().mockResolvedValue(activeOrganization),
@@ -98,7 +98,7 @@ describe('AuthMeContextService.getContext', () => {
       }),
     };
     const organizationService = {
-      list: vi.fn(async () => ({ items: [activeOrganization] })),
+      listForUser: vi.fn(async () => ({ items: [activeOrganization] })),
       getByPublicId: vi.fn(async () => {
         userReadsFinished = true;
         return activeOrganization;
@@ -131,7 +131,7 @@ describe('AuthMeContextService.getContext', () => {
   it('returns a null active organization and no permissions when no active organization is in scope', async () => {
     const userService = { getMe: vi.fn().mockResolvedValue({ id: 'usr_1' }) };
     const organizationService = {
-      list: vi.fn().mockResolvedValue({ items: [] }),
+      listForUser: vi.fn().mockResolvedValue({ items: [] }),
       getByPublicId: vi.fn(),
     };
     const authorizationService = { resolveUserOrganizationPermissions: vi.fn() };
@@ -164,7 +164,7 @@ describe('AuthMeContextService.getActiveOrganizationContext', () => {
     const activeOrganization = { id: 'org_active', type: 'TEAM' };
     const userService = { getMe: vi.fn() };
     const organizationService = {
-      list: vi.fn(),
+      listForUser: vi.fn(),
       getByPublicId: vi.fn().mockResolvedValue(activeOrganization),
     };
     const authorizationService = {
@@ -192,6 +192,6 @@ describe('AuthMeContextService.getActiveOrganizationContext', () => {
     // The lean delta must NOT pull the heavier user / organizations[] payload (those are stable
     // across a switch and reused from the client's initial /me/context).
     expect(userService.getMe).not.toHaveBeenCalled();
-    expect(organizationService.list).not.toHaveBeenCalled();
+    expect(organizationService.listForUser).not.toHaveBeenCalled();
   });
 });

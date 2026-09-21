@@ -7,6 +7,7 @@ import {
 } from '@/shared/utils/http/request.util.js';
 import { validatePublicIdParam } from '@/shared/utils/identity/public-id-param.util.js';
 import { recordScopedAuditEvent } from '@/shared/utils/infrastructure/audit-request-context.util.js';
+import type { OrganizationService } from '@/domains/tenancy/sub-domains/organization/organization.service.js';
 import type { UserContainer } from './user.container.js';
 
 type AdminUserAuditAction =
@@ -44,12 +45,34 @@ export function createUserController({
   userService,
   userSettingsService,
   userNotificationPreferencesService,
+  organizationService,
 }: Pick<
   UserContainer,
   'userService' | 'userSettingsService' | 'userNotificationPreferencesService'
->) {
+> & { organizationService?: OrganizationService }) {
   return {
     // ── Self-service ──────────────────────────────────────────
+
+    /**
+     * `GET /users/me/organizations` — the organizations the caller belongs to.
+     *
+     * The data is tenancy's, the scope is the caller's, and the scope is what decides where the
+     * route lives: `/users/me/...` is this API's home for "mine", exactly as the collection root
+     * is its home for the admin view (`GET /users`, `GET /audit/logs`). The mirror image of
+     * `/tenancy/organization/audit-logs`, which mounts audit-domain data under tenancy because the
+     * active organization scopes it.
+     */
+    listMyOrganizations: async (request: FastifyRequest, _reply: FastifyReply) => {
+      if (!organizationService) throw new Error('Organization service not configured');
+      const auth = requireAuth(request);
+      const result = await organizationService.listForUser(request.query, auth.userId);
+      return paginatedResponse(result.items, getRequestIdentifier(request), {
+        per_page: result.limit,
+        next: result.next_cursor,
+        has_more: result.has_more,
+        ...(result.total !== null ? { estimated_total: result.total } : {}),
+      });
+    },
 
     getMe: async (request: FastifyRequest, _reply: FastifyReply) => {
       const _auth = requireAuth(request);

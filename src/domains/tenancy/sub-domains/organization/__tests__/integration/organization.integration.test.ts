@@ -59,11 +59,11 @@ describe('Organization Sub-Domain — Integration', () => {
     return { organization, token };
   }
 
-  describe('GET /api/v1/tenancy/organizations', () => {
+  describe('GET /api/v1/users/me/organizations', () => {
     it('returns 401 without authentication', async () => {
       const response = await injectUnauthenticated(app, {
         method: 'GET',
-        url: testApiPath('/tenancy/organizations'),
+        url: testApiPath('/users/me/organizations'),
       });
       expect(response.statusCode).toBe(401);
     });
@@ -73,7 +73,7 @@ describe('Organization Sub-Domain — Integration', () => {
       const token = await generateTestToken({ userId: user.public_id });
       const response = await injectAuthenticated(app, {
         method: 'GET',
-        url: testApiPath('/tenancy/organizations'),
+        url: testApiPath('/users/me/organizations'),
         token,
       });
       expect(response.statusCode).toBe(200);
@@ -100,7 +100,7 @@ describe('Organization Sub-Domain — Integration', () => {
       const token = await generateTestToken({ userId: user.public_id });
       const response = await injectAuthenticated(app, {
         method: 'GET',
-        url: testApiPath('/tenancy/organizations'),
+        url: testApiPath('/users/me/organizations'),
         token,
       });
 

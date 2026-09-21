@@ -62,13 +62,13 @@ describe('OpenAPI cursor pagination', () => {
   });
 
   it('includes cursor pagination guidance in operation descriptions', () => {
-    const operation = spec.paths['/api/v1/tenancy/organizations']?.get;
+    const operation = spec.paths['/api/v1/users/me/organizations']?.get;
     expect(operation?.description).toContain('cursor pagination');
     expect(operation?.description).toContain('meta.pagination.next');
   });
 
   it('documents that legacy page is no longer supported in operation descriptions', () => {
-    const operation = spec.paths['/api/v1/tenancy/organizations']?.get;
+    const operation = spec.paths['/api/v1/users/me/organizations']?.get;
     expect(operation?.description).toMatch(/legacy `page`.*no longer supported/i);
   });
 });

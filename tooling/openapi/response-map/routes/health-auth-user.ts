@@ -1,6 +1,6 @@
 /** OpenAPI success responses — health, auth, and current user. */
 import type { ResponseDefinition } from '@tooling/openapi/response-map/building-blocks.js';
-import { wrapSuccess } from '@tooling/openapi/response-map/building-blocks.js';
+import { wrapPaginated, wrapSuccess } from '@tooling/openapi/response-map/building-blocks.js';
 import * as schemas from '@tooling/openapi/response-map/resource-schemas.js';
 
 export const healthAuthUserRouteResponses: Record<string, ResponseDefinition> = {
@@ -350,6 +350,12 @@ export const healthAuthUserRouteResponses: Record<string, ResponseDefinition> = 
   'GET /api/v1/users/me': {
     statusCode: 200,
     schema: wrapSuccess(schemas.userSchema, schemas.userExample),
+    example: null,
+  },
+  // Tenancy data, user scope — the route lives under /users/me because the caller scopes it.
+  'GET /api/v1/users/me/organizations': {
+    statusCode: 200,
+    schema: wrapPaginated(schemas.organizationSchema, [schemas.organizationExample]),
     example: null,
   },
   'PATCH /api/v1/users/me': {

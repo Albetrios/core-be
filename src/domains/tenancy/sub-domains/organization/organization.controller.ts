@@ -24,16 +24,6 @@ export function createOrganizationController(
   auditService?: AuditService,
 ) {
   return {
-    listOrganizations: async (request: FastifyRequest, _reply: FastifyReply) => {
-      const auth = requireAuth(request);
-      const result = await service.list(request.query, auth.userId);
-      return paginatedResponse(result.items, getRequestIdentifier(request), {
-        per_page: result.limit,
-        next: result.next_cursor,
-        has_more: result.has_more,
-        ...(result.total !== null ? { estimated_total: result.total } : {}),
-      });
-    },
     getOrganization: async (request: FastifyRequest, _reply: FastifyReply) => {
       const auth = requireAuth(request);
       const id = requireOrganizationScope(request).organizationPublicId;

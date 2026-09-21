@@ -6,6 +6,8 @@ import {
 } from '@/shared/middlewares/rate-limit/rate-limit-presets.constants.js';
 import { GLOBAL_ROLES } from '@/shared/constants/index.js';
 import { requireRole } from '@/shared/utils/auth/authorization.util.js';
+import { rejectLegacyPagePagination } from '@/shared/utils/http/pagination.util.js';
+import { listOrganizationsQueryDto } from '@/domains/tenancy/sub-domains/organization/organization.dto.js';
 import { createUserController } from './user.controller.js';
 import { createUserDataExportController } from './sub-domains/user-data-export/user-data-export.controller.js';
 import { PutNotificationPreferencesDto } from './sub-domains/user-notification-preferences/user-notification-preferences.dto.js';
@@ -25,7 +27,14 @@ import {
  * role; data-export request is rate-limited via {@link EXPENSIVE_AUTHED_RATE_LIMIT}.
  */
 export const userRoutesPlugin: FastifyPluginAsync = async (app) => {
-  const controller = createUserController(app.userDomain);
+  // The caller's own organizations live at `/users/me/organizations`; the data is tenancy's, so
+  // its service is injected here the same way the audit service is injected into the organization
+  // routes for `/tenancy/organization/audit-logs`. Every container is composed before routes
+  // register, so this is always present in production wiring.
+  const controller = createUserController({
+    ...app.userDomain,
+    organizationService: app.tenancyDomain?.organizationService,
+  });
   const dataExportController = createUserDataExportController(app.userDomain.userDataExportService);
   const zodApplication = app.withTypeProvider<ZodTypeProvider>();
   // ── Admin user routes (require admin+ role) ────────────────
@@ -134,6 +143,23 @@ export const userRoutesPlugin: FastifyPluginAsync = async (app) => {
       },
     },
     controller.getMe,
+  );
+  zodApplication.get(
+    '/me/organizations',
+    {
+      onRequest: [app.authenticate],
+      preValidation: [rejectLegacyPagePagination],
+      schema: {
+        summary: 'List my organizations',
+        description:
+          "Returns the organizations the authenticated user owns or is an active member of, newest last. Always the caller's own organizations, whatever their global role.",
+        // Tagged with the owning domain, like `/tenancy/organization/audit-logs` is tagged
+        // `Audit Log` — the tag follows the data, the path follows the scope.
+        tags: ['Organization'],
+        querystring: listOrganizationsQueryDto,
+      },
+    },
+    controller.listMyOrganizations,
   );
   zodApplication.patch(
     '/me',

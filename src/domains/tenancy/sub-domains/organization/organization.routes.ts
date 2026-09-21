@@ -72,21 +72,11 @@ export function organizationRoutes(deps: OrganizationRoutesDeps): FastifyPluginA
 
   return async (app) => {
     const zodApplication = app.withTypeProvider<ZodTypeProvider>();
-    // Organization CRUD
-    zodApplication.get(
-      '/organizations',
-      {
-        schema: {
-          summary: 'List my organizations',
-          description: 'Returns all organizations the authenticated user is a member of.',
-          tags: ['Organization'],
-          querystring: listOrganizationsQueryDto,
-        },
-        onRequest: [app.authenticate],
-        preValidation: [rejectLegacyPagePagination],
-      },
-      organizationController.listOrganizations,
-    );
+    // Organization CRUD.
+    // The caller's own organizations are NOT listed here: that is `GET /users/me/organizations`,
+    // registered by the user domain. The collection root stays free for the admin "every
+    // organization" listing, matching `GET /users` and `GET /audit/logs` — collection root is the
+    // admin view, the caller's own view hangs off `/users/me`.
     zodApplication.get(
       '/organization',
       {

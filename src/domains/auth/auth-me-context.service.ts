@@ -63,7 +63,7 @@ export class AuthMeContextService {
     const [userScoped, myPermissions] = await Promise.all([
       withAppDatabaseContext(scope, async () => ({
         user: await this.userService.getMe(scope),
-        organizationsPage: await this.organizationService.list({}, userPublicId),
+        organizationsPage: await this.organizationService.listForUser({}, userPublicId),
         activeOrganization: activeOrganizationPublicId
           ? await this.organizationService.getByPublicId(activeOrganizationPublicId, userPublicId)
           : null,

@@ -64,7 +64,7 @@ export function authOnboarding() {
   sleep(0.5);
 
   // Step 3: List organizations
-  const orgsResponse = http.get(`${API_PREFIX}/tenancy/organizations`, {
+  const orgsResponse = http.get(`${API_PREFIX}/users/me/organizations`, {
     headers: authHeaders,
     tags: { name: 'auth-list-orgs' },
   });

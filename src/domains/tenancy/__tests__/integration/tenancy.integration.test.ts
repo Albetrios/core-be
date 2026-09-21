@@ -63,11 +63,11 @@ describe('Tenancy Domain — Integration', () => {
 
   // ─── Organizations ────────────────────────────────────────────
 
-  describe('GET /api/v1/tenancy/organizations', () => {
+  describe('GET /api/v1/users/me/organizations', () => {
     it('should return 401 without authentication', async () => {
       const response = await injectUnauthenticated(app, {
         method: 'GET',
-        url: testApiPath('/tenancy/organizations'),
+        url: testApiPath('/users/me/organizations'),
       });
       expect(response.statusCode).toBe(401);
     });
@@ -77,7 +77,7 @@ describe('Tenancy Domain — Integration', () => {
       const token = await generateTestToken({ userId: user.public_id });
       const response = await injectAuthenticated(app, {
         method: 'GET',
-        url: testApiPath('/tenancy/organizations'),
+        url: testApiPath('/users/me/organizations'),
         token: token,
       });
       expect(response.statusCode).toBe(200);

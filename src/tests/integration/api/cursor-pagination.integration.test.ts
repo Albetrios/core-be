@@ -37,7 +37,7 @@ describe('Cursor pagination — integration', () => {
 
     const firstPage = await injectAuthenticated(app, {
       method: 'GET',
-      url: testApiPath('/tenancy/organizations'),
+      url: testApiPath('/users/me/organizations'),
       token,
       query: { limit: '1' },
     });
@@ -50,7 +50,7 @@ describe('Cursor pagination — integration', () => {
 
     const secondPage = await injectAuthenticated(app, {
       method: 'GET',
-      url: testApiPath('/tenancy/organizations'),
+      url: testApiPath('/users/me/organizations'),
       token,
       query: { limit: '1', after: nextCursor ?? '' },
     });
@@ -67,7 +67,7 @@ describe('Cursor pagination — integration', () => {
 
     const response = await injectAuthenticated(app, {
       method: 'GET',
-      url: testApiPath('/tenancy/organizations'),
+      url: testApiPath('/users/me/organizations'),
       token,
       query: { page: '1', limit: '10' },
     });

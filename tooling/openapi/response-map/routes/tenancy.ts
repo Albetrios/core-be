@@ -5,11 +5,6 @@ import * as schemas from '@tooling/openapi/response-map/resource-schemas.js';
 
 export const tenancyRouteResponses: Record<string, ResponseDefinition> = {
   // ── Organization ──
-  'GET /api/v1/tenancy/organizations': {
-    statusCode: 200,
-    schema: wrapPaginated(schemas.organizationSchema, [schemas.organizationExample]),
-    example: null,
-  },
   'GET /api/v1/tenancy/organization': {
     statusCode: 200,
     schema: wrapSuccess(schemas.organizationSchema, schemas.organizationExample),
