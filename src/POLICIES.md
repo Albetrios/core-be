@@ -144,6 +144,16 @@ The canonical exports live under [src/shared/constants/](src/shared/constants/) 
   - Increasing → the dashboard's "last used" column lags by that much. Nothing else reads the field; there is no retention sweep, audit report or query that filters on it.
 - **Last reviewed**: 2026-09-21
 
+## CATALOG_MEMO_TTL_MILLISECONDS
+
+- **Value**: 60 000 ms (one minute)
+- **Source**: [src/shared/constants/ttl.constants.ts](src/shared/constants/ttl.constants.ts)
+- **Rationale**: How long the public catalogs (plans, permissions) are served from **process memory**. An in-process memo, not a Redis cache: the catalogs are global rather than scope-keyed and cannot change while the process runs — every writer is a migration or a CLI seed in a different process — so there is no invalidation to get wrong, only a staleness window. One minute is far tighter than the staleness those routes already promise: they send `Cache-Control: max-age=300`, so a browser or CDN may serve a five-minute-old catalog regardless.
+- **Consequences of change**:
+  - Decreasing → more queries on a public unauthenticated route that any caller can drive at the public rate limit.
+  - Increasing → a seeded catalog change takes longer to appear in a running process. Defensible up to the 300 s the `Cache-Control` header already allows; beyond that the header becomes the tighter promise, which would be confusing.
+- **Last reviewed**: 2026-09-21
+
 ## CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS
 
 - **Value**: 15 seconds

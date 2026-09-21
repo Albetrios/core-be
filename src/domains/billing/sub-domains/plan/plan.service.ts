@@ -1,3 +1,4 @@
+import { memoizePlanCatalog } from './plan-catalog-memo.js';
 import { NotFoundError } from '@/shared/errors/index.js';
 import type { PlanRepository } from './plan.repository.js';
 import type { PlanFeatures, PlanOutput } from './plan.types.js';
@@ -65,9 +66,25 @@ export class PlanService {
     return this.repository.findFreePlanSeatCeiling();
   }
 
+  /**
+   * The public catalog read, served from a one-minute in-process memo.
+   *
+   * @remarks
+   * - **Algorithm:** {@link memoizePlanCatalog} answers from memory, or runs the query once and
+   *   memoizes the serialized output; concurrent misses share one query.
+   * - **Failure modes:** a query failure propagates and is not memoized.
+   * - **Side effects:** module-level memo state.
+   * - **Notes:** only this method is memoized. Every plan read that makes a DECISION — the seat
+   *   ceiling (`getFreePlanSeatCeiling`), subscription create and change-plan
+   *   (`requireActivePlanByPublicId`), the Stripe price lookup — goes through a different
+   *   repository method and still reads Postgres. That separation is structural, not a
+   *   convention: those methods return the record, this one returns the public output shape.
+   */
   async list(): Promise<PlanOutput[]> {
-    const rows = await this.repository.findAllActive();
-    return rows.map(toOutput);
+    return memoizePlanCatalog(async () => {
+      const rows = await this.repository.findAllActive();
+      return rows.map(toOutput);
+    });
   }
 
   async getByPublicId(public_id: string): Promise<PlanOutput> {

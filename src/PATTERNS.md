@@ -304,6 +304,8 @@ sequenceDiagram
 - **Metric**: the cache module records `read_cache_requests_total{cache,result}` so its hit ratio is observable. A cache nobody measured is a cache nobody can defend.
 - No environment kill switch. A ≤ 60 s TTL self-heals and reverting the caller is the switch; a flag would be one more untested branch on a hot path.
 
+**When it is not a Redis cache at all.** This pattern is for data that is scope-keyed and changes at runtime. Global data that can only change at deploy or seed time — the public plan catalog, the permission catalog — takes a module-level TTL memo instead ([migration-version.ts](src/infrastructure/database/migration/migration-version.ts) is the template), with no key, no invalidation and no metric. Name those `<thing>-memo.ts`, never `<thing>.cache.ts`, so this contract is not applied to something that does not need it. The comparison table and the three things a memo still owes are in the reference doc.
+
 Full write-up, including when *not* to cache: [docs/reference/runtime/read-caching.md](docs/reference/runtime/read-caching.md).
 
 ## import-paths

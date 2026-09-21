@@ -184,6 +184,22 @@ export const CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS = 15;
  */
 export const API_KEY_LAST_USED_THROTTLE_TTL_SECONDS = 60;
 
+/**
+ * How long the public catalogs (plans, permissions) are served from process memory, in ms.
+ *
+ * @remarks
+ * An in-process memo, not a Redis cache — the catalogs are global rather than scope-keyed, and
+ * cannot change while the process runs: every writer is a migration or a CLI seed in a different
+ * process. So there is no invalidation to get wrong, only a staleness window.
+ *
+ * One minute is deliberately far tighter than the staleness those routes already promise: they
+ * send `Cache-Control: max-age=300`, so a browser or CDN may serve a five-minute-old catalog
+ * regardless. Raising this toward that figure would be defensible; the reason not to is that a
+ * deploy-time catalog change should appear on the next process anyway, and a short window keeps
+ * the "did my seed take effect?" answer quick.
+ */
+export const CATALOG_MEMO_TTL_MILLISECONDS = MILLISECONDS_PER_MINUTE;
+
 /** Worker queue last-job heartbeat key TTL in Redis (seconds). */
 export const WORKER_QUEUE_HEARTBEAT_TTL_SECONDS = SECONDS_PER_DAY;
 

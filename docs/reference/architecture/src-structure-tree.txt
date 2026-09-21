@@ -323,6 +323,7 @@ src/
     │   │   │   ├── seed/
     │   │   │   │   ├── index.ts
     │   │   │   │   └── plan.reference.seed.ts
+    │   │   │   ├── plan-catalog-memo.ts
     │   │   │   ├── plan.controller.ts
     │   │   │   ├── plan.dto.ts
     │   │   │   ├── plan.overview.md
@@ -897,6 +898,7 @@ src/
     │   │   │   ├── assert-grantable-permissions.util.ts
     │   │   │   ├── authorization.service.ts
     │   │   │   ├── permission-cache.service.ts
+    │   │   │   ├── permission-catalog-memo.ts
     │   │   │   ├── permission.controller.ts
     │   │   │   ├── permission.dto.ts
     │   │   │   ├── permission.overview.md
@@ -2089,6 +2091,8 @@ src/
     │   │   └── static-verification-code-gate.unit.test.ts
     │   ├── database/
     │   │   └── role-least-privilege-migration.policy.unit.test.ts
+    │   ├── domains/
+    │   │   └── catalog-memo.unit.test.ts
     │   ├── errors/
     │   │   ├── app.error.unit.test.ts
     │   │   ├── auth.error.unit.test.ts

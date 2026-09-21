@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NotFoundError } from '@/shared/errors/index.js';
+import { resetPlanCatalogMemoForTests } from '@/domains/billing/sub-domains/plan/plan-catalog-memo.js';
 import { PlanService } from '@/domains/billing/sub-domains/plan/plan.service.js';
 import type { PlanRepository } from '@/domains/billing/sub-domains/plan/plan.repository.js';
 
@@ -29,6 +30,9 @@ describe('PlanService', () => {
   const service = new PlanService(repository);
 
   beforeEach(() => {
+    // `list()` is memoized in process for a minute, so without this the second case in this file
+    // would assert against the first case's catalog.
+    resetPlanCatalogMemoForTests();
     vi.clearAllMocks();
     vi.mocked(repository.findByPublicId).mockResolvedValue(planRow as never);
     vi.mocked(repository.findById).mockResolvedValue(planRow as never);

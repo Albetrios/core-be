@@ -8,6 +8,7 @@ import {
 } from '@/tests/chaos/helpers/toxiproxy.client.js';
 import { CHAOS_REDIS_PROXY_NAME } from '@/tests/chaos/chaos.constants.js';
 import { createListeningChaosTestApplicationHarness } from '@/tests/chaos/helpers/chaos-app.js';
+import { resetPlanCatalogMemoForTests } from '@/domains/billing/sub-domains/plan/plan-catalog-memo.js';
 import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { generateTestToken } from '@/tests/helpers/test-auth.js';
@@ -36,6 +37,9 @@ describe('Chaos resilience: Redis outage for Redis-backed billing rate-limit sto
     await withTemporaryListeningProxyAdministrativelyDisabledForChaosAssertion(
       CHAOS_REDIS_PROXY_NAME,
       async () => {
+        // Without this the catalog memo answers from memory and the assertion holds trivially,
+        // whatever the rate limiter does with Redis gone — which is the thing under test.
+        resetPlanCatalogMemoForTests();
         const catalogueResponseAwaitingIsolation =
           await chaosListeningFastifyApplicationAwaitingIsolation.inject({
             method: 'GET',
