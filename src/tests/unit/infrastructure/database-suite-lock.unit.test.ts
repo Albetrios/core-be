@@ -4,12 +4,13 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { acquireDatabaseSuiteLock } from '@/tests/database-suite-lock.js';
+import { PROJECT_SLUG } from '@/shared/constants/project-identity.constants.js';
 
 const TEST_DATABASE_URL = 'postgresql://lock-spec@localhost:5432/lock-spec';
 
 function lockPathFor(databaseUrl: string): string {
   const fingerprint = createHash('sha256').update(databaseUrl).digest('hex').slice(0, 12);
-  return join(tmpdir(), `core-be-test-database-${fingerprint}.lock`);
+  return join(tmpdir(), `${PROJECT_SLUG}-test-database-${fingerprint}.lock`);
 }
 
 /** A pid that cannot be running: the kernel rejects it, so `kill(pid, 0)` always throws ESRCH. */

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { PROJECT_SLUG } from '@/shared/constants/project-identity.constants.js';
 
 type LockHolder = { pid: number; startedAt: string; command: string };
 
@@ -19,7 +20,7 @@ let lockPathHeldByThisProcess: string | null = null;
 function resolveLockPath(): string {
   const databaseUrl = process.env.DATABASE_URL ?? 'unset';
   const fingerprint = createHash('sha256').update(databaseUrl).digest('hex').slice(0, 12);
-  return join(tmpdir(), `core-be-test-database-${fingerprint}.lock`);
+  return join(tmpdir(), `${PROJECT_SLUG}-test-database-${fingerprint}.lock`);
 }
 
 function readHolder(lockPath: string): LockHolder | null {
