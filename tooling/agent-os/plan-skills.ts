@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveGitMetadata } from '@tooling/setup/codegen/project-identity.util.js';
 import { loadConfig } from '@tooling/setup/common/config.js';
+import { gitEnvironmentWithoutInheritedRepository } from '@tooling/setup/common/git-environment.js';
 
 const repositoryRoot = process.cwd();
 // Resolve the trunk from setup.config.json rather than hardcoding it (no-static-branch-names).
@@ -43,7 +44,14 @@ function globToRegExp(glob: string): RegExp {
 function changedFromGit(base: string): string[] {
   const run = (command: string): string[] => {
     try {
-      return execSync(command, { cwd: repositoryRoot, encoding: 'utf8' })
+      return execSync(command, {
+        cwd: repositoryRoot,
+        encoding: 'utf8',
+        // A hook's GIT_DIR/GIT_PREFIX outrank `cwd`: without the strip this
+        // reports another repository's diff, and `git status --porcelain`
+        // prints paths relative to the prefix rather than the repository root.
+        env: gitEnvironmentWithoutInheritedRepository(),
+      })
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean);
