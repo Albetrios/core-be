@@ -174,6 +174,23 @@ See also [api-versioning.md](../api/api-versioning.md).
 
 All tiers share one root **`vitest.config.ts`**. Named projects live in **`tooling/vitest/projects.ts`**. Scripts filter with **`--project <name>`** (for example `default`, `unit`, `e2e`, `contract`, `chaos`). Default **`pnpm test`** runs the **`default`** project only (excludes contract, chaos, and smoke).
 
+### Run one database suite at a time
+
+`fileParallelism: false` on the database-backed projects (`unit-db`, `e2e`, `integration`,
+`security`, `performance`, `smoke`) serialises files **within** a run — it says nothing about two
+runs. Start a second one against the same Postgres and each will `TRUNCATE ... RESTART IDENTITY`
+between the other's fixture inserts.
+
+The result does not look like what it is. You get a foreign-key violation (SQLSTATE 23503) inside
+some unrelated suite, which reads as a regression in the code under test, plus a wall clock several
+times the usual one. It has cost more than one debugging round.
+
+`src/tests/global-setup.ts` now claims a lock keyed on `DATABASE_URL`, so the second run **fails
+immediately** with the holder's pid and command instead of producing a confusing result. A crashed
+run's lock is taken over automatically (dead pid), and two runs against two different databases do
+not block each other. If a suite refuses to start and the named process is genuinely gone, delete
+the lock file the message points at.
+
 ---
 
 ## Coverage reports

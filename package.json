@@ -26,7 +26,7 @@
     "health": "./tooling/validate/health-check.sh",
     "health:fix": "./tooling/validate/health-check.sh --fix",
     "quality": "pnpm health && pnpm sonar:scan",
-    "validate": "pnpm lint && pnpm typecheck",
+    "validate": "pnpm lint && pnpm typecheck && pnpm docs:lint",
     "validate:domain": "tsx src/scripts/validators/domain/validate-domain.ts",
     "validate:domain:strict": "tsx src/scripts/validators/domain/validate-domain.ts --strict",
     "validate:domain:coverage": "tsx src/scripts/validators/domain/validate-domain-coverage.ts --strict",

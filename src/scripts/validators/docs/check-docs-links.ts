@@ -11,6 +11,7 @@
  *
  * Usage: pnpm docs:links:check
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
@@ -134,6 +135,41 @@ function collectMarkdownFiles(path: string, out: string[]): void {
   }
 }
 
+/**
+ * Drops gitignored files from the scan set.
+ *
+ * @remarks
+ * - **Algorithm:** one `git check-ignore --stdin` over every collected path; it echoes back only
+ *   the ignored ones. Exit status 1 means "none ignored", which is a result rather than an error.
+ * - **Failure modes:** if git is unavailable or errors for any other reason, every file is scanned
+ *   — the previous behaviour. This filter narrows the gate; it must never be the reason the gate
+ *   stops running.
+ * - **Side effects:** one child process.
+ * - **Notes:** without this the gate fails locally on files CI never sees. A scratch
+ *   `*REPORT*.md` left in `docs/` is gitignored, absent from a fresh clone, and its stale links
+ *   made `pnpm docs:links:check` permanently red on one machine — which is how a gate stops being
+ *   read at all.
+ */
+function withoutGitIgnoredFiles(paths: string[]): string[] {
+  if (paths.length === 0) return paths;
+  try {
+    const ignoredOutput = execFileSync('git', ['check-ignore', '--stdin'], {
+      input: paths.join('\n'),
+      encoding: 'utf-8',
+      cwd: REPO_ROOT,
+    });
+    const ignored = new Set(
+      ignoredOutput
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+    );
+    return paths.filter((path) => !ignored.has(path));
+  } catch {
+    return paths;
+  }
+}
+
 function isExternalOrAnchor(target: string): boolean {
   const trimmed = target.trim();
   if (!trimmed || trimmed.startsWith('#')) return true;
@@ -190,14 +226,16 @@ function citedPathExists(cited: string): boolean {
 }
 
 function main(): void {
-  const files: string[] = [];
+  const collected: string[] = [];
   for (const root of SCAN_ROOTS) {
     try {
-      collectMarkdownFiles(root, files);
+      collectMarkdownFiles(root, collected);
     } catch {
       // optional path missing
     }
   }
+  // Gitignored files are not part of the repo CI sees, so their links are not this gate's problem.
+  const files = withoutGitIgnoredFiles(collected);
 
   const staleHits: string[] = [];
   const brokenLinks: string[] = [];
