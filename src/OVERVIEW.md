@@ -90,6 +90,7 @@ These patterns are implemented identically across the codebase. See [src/PATTERN
 - **`soft-delete`** — most user/organization-owned tables tombstone with `deleted_at`; immutable ledgers (audit, billing) hard-delete only after retention windows.
 - **`rls-context`** — workers and request handlers wrap DB I/O in context helpers that `SET LOCAL app.current_organization_public_id`. Workers must not import request-scoped DB context.
 - **`transactional-outbox`** — outbound side effects (mail, webhook delivery) are written to an outbox table inside the originating transaction and dispatched by a separate worker with at-least-once semantics.
+- **`read-caching`** — a polled read may be served from Redis, keyed on the verified scope, invalidated after commit by writing a short-lived tombstone rather than deleting. Most reads do not qualify; the bar and the reasoning are in the pattern.
 - **`import-paths`** — `@/` alias for all cross-folder imports inside `src/` (`@tooling/` in tooling); same-folder `./` only, never `../` traversal.
 
 ## End-to-end flows
@@ -112,6 +113,8 @@ Deliberate business, UX, and security trade-offs encoded as constants. Full rati
 - **`MAX_FAILED_LOGIN_ATTEMPTS = 10` / `ACCOUNT_LOCKOUT_MINUTES = 30`** — credential-stuffing deterrent.
 - **`IDEMPOTENCY_RESPONSE_CACHE_TTL_SECONDS = 86 400`** — mirrors Stripe's 24 h replay window.
 - **`PERMISSION_CACHE_DEFAULT_TTL_SECONDS = 300`** — safety net for cross-process permission-cache invalidation.
+- **`NOTIFICATION_UNREAD_COUNT_CACHE_TTL_SECONDS = 60`** — backstop on the polled unread badge, for the two writers that cannot name a user.
+- **`CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS = 15`** — how long a freshness tombstone blocks repopulation; sized to the in-flight read, not to the cache.
 - **`STUCK_SENDING_LEASE_MINUTES = 15`** — outbox + Stripe-webhook reclaim window after worker crash.
 - **`PAGINATION = { DEFAULT_LIMIT: 25, MAX_LIMIT: 100 }`** — list endpoint defaults; cursor pagination only.
 - **`GDPR_EXPORT_MAX_ROWS_PER_TABLE = 1 000`** — bounded export bundle size.

@@ -17,6 +17,7 @@ In-app notification rows: the user-visible feed. Rows are created via `createAnd
 - **Tenant-scoped**: notifications belong to a `(user, organization)` pair. Reads are scoped through the standard tenant context.
 - **Read state is monotonic**: `unread → read → dismissed`. Marking a dismissed notification "unread" is not allowed.
 - **Best-effort fan-out**: a notification fan-out failure does not roll back the originating transaction (it's a downstream side effect).
+- **The unread count is cached, and the error only goes one way**: `GET /notify/notifications/unread-count` is served from Redis (`notify:unread-count:<userPublicId>`, 60 s) because every open tab polls it. Every write that names a user invalidates after commit — mark-read, mark-all-read, delete, and the invite-accepted fan-out. The two writers that cannot name a user (the retention sweep, which deletes by `created_at`, and the enqueue-rollback delete, which holds only a row id) are bounded by the TTL alone, and both only ever remove rows — so a stale badge reads **high**, never low. It can show a notification that is gone; it cannot hide one that arrived. Contract: [read-caching](src/PATTERNS.md).
 
 ## Lifecycle
 
@@ -32,7 +33,7 @@ stateDiagram-v2
 
 ## Events
 
-- Consumes: no domain events — notification rows are created via `createAndDispatchNotification` (persist + enqueue channel dispatch), then delivered asynchronously by the `notification` BullMQ worker.
+- Consumes: `MEMBER_INVITATION_EVENT.ACCEPTED` — the one cross-domain producer, fanning a notification out to the organization's `membership:manage` holders and invalidating each recipient's cached unread count. Every other notification row is created directly via `createAndDispatchNotification` (persist + enqueue channel dispatch), then delivered asynchronously by the `notification` BullMQ worker.
 
 ## Failure modes
 

@@ -1,5 +1,9 @@
-import { eventBus, type DomainEvent } from '@/core/events/event-bus.js';
-import { createAndDispatchNotification } from '@/domains/notify/sub-domains/notification/notification-dispatch.service.js';
+import { eventBus, runEnqueueAfterCommit, type DomainEvent } from '@/core/events/event-bus.js';
+import { invalidateCachedUnreadNotificationCounts } from '@/domains/notify/sub-domains/notification/notification-unread-count.cache.js';
+import {
+  createAndDispatchNotification,
+  resolveNotificationRecipientPublicIds,
+} from '@/domains/notify/sub-domains/notification/notification-dispatch.service.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import {
   MEMBER_INVITATION_EVENT,
@@ -43,6 +47,44 @@ async function onMemberInvitationAcceptedEvent(event: DomainEvent): Promise<void
         'notify.member_invitation_accepted.dispatch.failed',
       );
     }
+  }
+  await invalidateRecipientUnreadCounts(payload.recipient_user_ids, event.type);
+}
+
+/**
+ * Drops each recipient's cached unread count, so the badge reflects the notification they were
+ * just sent instead of waiting out the TTL.
+ *
+ * @remarks
+ * - **Algorithm:** two halves, on opposite sides of the commit. The internal-id → public-id
+ *   resolve runs HERE, inside the accept's live database context, because after commit there is
+ *   no handle to resolve with. The tombstone write is deferred to `runEnqueueAfterCommit`.
+ * - **Failure modes:** entirely best-effort — a failure leaves a badge low for at most the cache
+ *   TTL, which must never be allowed to fail an invitation accept. Logged, never rethrown.
+ * - **Side effects:** one SECURITY DEFINER resolve; one short-lived Redis key per recipient, after
+ *   the transaction commits.
+ * - **Notes:** the split is what lets the tombstone be short. Invalidating from inside the
+ *   transaction would be *correct* — a tombstone, unlike a `DEL`, refuses the racing populate
+ *   rather than being overwritten by it — but the tombstone would then have to outlive the rest of
+ *   the transaction too, and sizing it for that means holding the key cold far longer than the
+ *   race needs. Deferring past the commit makes the window just the in-flight read, which is what
+ *   `CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS` is sized for. It also means a rolled-back
+ *   accept invalidates nothing, which the pre-commit version got wrong.
+ */
+async function invalidateRecipientUnreadCounts(
+  recipientUserIds: readonly number[],
+  eventType: string,
+): Promise<void> {
+  try {
+    const recipientPublicIds = await resolveNotificationRecipientPublicIds(recipientUserIds);
+    await runEnqueueAfterCommit(async () => {
+      await invalidateCachedUnreadNotificationCounts(recipientPublicIds);
+    });
+  } catch (error) {
+    logger.warn(
+      { err: error, eventType },
+      'notify.member_invitation_accepted.unread_cache_invalidate.failed',
+    );
   }
 }
 

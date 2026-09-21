@@ -181,6 +181,12 @@
       "skillPath": "agent-os/skills/production-hardening-guard/SKILL.md",
       "computedHash": "bc652179b48038ccb1ac271d75c8ffcd134287a47aec4e0471e2e24c6bea89bc"
     },
+    "read-cache-guard": {
+      "source": "local",
+      "sourceType": "local",
+      "skillPath": "agent-os/skills/read-cache-guard/SKILL.md",
+      "computedHash": "d6617c0963ed3cf2c10558a7cf57531a212b7092e04cb8e2f64b55ba8f4f4199"
+    },
     "rls-tenant-isolation-guard": {
       "source": "local",
       "sourceType": "local",
@@ -215,7 +221,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/skill-index/SKILL.md",
-      "computedHash": "526737775735a7a987a86aeb556c0de16721782b5e064801de1489b3f43de40b"
+      "computedHash": "30d4ec3a3ed2c1313b7a5b49916d28ab7ef5c13e3b1d99c782a3c06fa6f8bebc"
     },
     "split-to-prs": {
       "source": "local",

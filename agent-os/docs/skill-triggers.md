@@ -24,6 +24,7 @@ When you edit a file matching a pattern below, invoke the listed skill(s). Gener
 | `src/**/*.ts` | change-completeness-guard | Finishing any code change — own tests + cross-cutting suites + docs + rules + skills move with it |
 | `src/**/*.ts` | tsdoc-export-guard | Public export added/renamed — TSDoc summary (+ @remarks on service/worker/policy) |
 | `src/OVERVIEW.md`, `src/PATTERNS.md`, `src/FLOWS.md`, `src/POLICIES.md` | system-narrative-maintainer | System-level narratives |
+| `src/domains/**/*.cache.ts`, `src/infrastructure/cache/redis-tombstone-cache.util.ts` | read-cache-guard | Redis read caches — key scope, tombstone invalidation, fail-open, TTL, tests |
 | `src/domains/**/*.validator.ts`, `src/domains/**/*.serializer.ts` | test-generator | Pure-layer units + domain e2e per the testing pyramid |
 | `src/domains/**/seed/**`, `src/scripts/seed/**` | seed-maintainer | Keep per-domain seeds aligned with schemas + routes |
 | `src/infrastructure/database/contexts/**`, `src/domains/**/*.worker.ts` | rls-tenant-isolation-guard | DB context wrappers, workers, and RLS migrations — tenant isolation |

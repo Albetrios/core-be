@@ -124,6 +124,26 @@ The canonical exports live under [src/shared/constants/](src/shared/constants/) 
   - Increasing → latency on legitimate retries when the leader process crashes mid-recompute.
 - **Last reviewed**: 2026-05-28
 
+## NOTIFICATION_UNREAD_COUNT_CACHE_TTL_SECONDS
+
+- **Value**: 60 seconds
+- **Source**: [src/shared/constants/ttl.constants.ts](src/shared/constants/ttl.constants.ts)
+- **Rationale**: Backstop on the per-user unread-notification count in Redis — not the invalidation strategy. Every write that names a user (mark-read, mark-all-read, delete, the invite-accepted fan-out) invalidates immediately; the TTL exists for the two writers that cannot name one, the retention sweep (deletes by `created_at`) and the enqueue-rollback delete (holds only a row id). It is an independent literal, deliberately not an alias of `SESSION_TOKEN_CACHE_TTL_SECONDS`, so retuning one does not silently retune the other.
+- **Consequences of change**:
+  - Decreasing → more Postgres counts on a route every open tab polls, which is the pool cost this cache exists to remove.
+  - Increasing → a badge stays wrong for longer after a sweep, always in the user's favour (it can show a notification that is gone; it cannot hide one that arrived).
+- **Last reviewed**: 2026-09-21
+
+## CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS
+
+- **Value**: 15 seconds
+- **Source**: [src/shared/constants/ttl.constants.ts](src/shared/constants/ttl.constants.ts)
+- **Rationale**: How long a **freshness** invalidation tombstone blocks repopulation of a read cache. Sized to the race, not to the cache: it only has to outlive the in-flight read that already fetched a pre-write value and has yet to issue its `SET … NX`, a window the request-path statement timeout (`DATABASE_HTTP_STATEMENT_TIMEOUT_MS`, 5 s) already bounds — so 15 s carries roughly a 3x margin. A **revocation** tombstone is a different quantity and must not use this: it has to outlive the cached positive entry it overrides (see `SESSION_TOKEN_CACHE_TTL_SECONDS`).
+- **Consequences of change**:
+  - Decreasing below the statement-timeout window → reopens the read-through race the tombstone exists to close: a slow reader can install a pre-write value after the marker expires.
+  - Increasing toward a cache's own TTL → correctness is unaffected, but every write leaves its key cold for that long, so the users interacting most lose the cache entirely.
+- **Last reviewed**: 2026-09-21
+
 ## MAX_FAILED_LOGIN_ATTEMPTS
 
 - **Value**: 10 attempts

@@ -16,6 +16,7 @@ describe('NotificationDispatch', () => {
     create: vi.fn().mockResolvedValue(42),
     findOrganizationPublicIdByOrganizationId: vi.fn().mockResolvedValue('org_public'),
     deleteByInternalId: vi.fn().mockResolvedValue(undefined),
+    resolveUserPublicIdsByInternalIds: vi.fn().mockResolvedValue(['usr_one', 'usr_two']),
   } as unknown as NotificationRepository;
 
   const dispatch = createNotificationDispatch(notificationRepository);
@@ -100,5 +101,37 @@ describe('NotificationDispatch', () => {
     ).rejects.toBe(lookupError);
 
     expect(notificationRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('resolves recipient public ids through the repository batch resolver', async () => {
+    // The invite-accepted handler needs public ids to key each recipient's unread-count cache,
+    // and it has only internal ids. This is the seam; it lives on the dispatch because that is
+    // the repository handle a cross-domain event handler is allowed to reach.
+    await expect(dispatch.resolveRecipientPublicIds([11, 22])).resolves.toEqual([
+      'usr_one',
+      'usr_two',
+    ]);
+    expect(notificationRepository.resolveUserPublicIdsByInternalIds).toHaveBeenCalledWith([11, 22]);
+  });
+
+  it('the module-level resolver refuses to run before the container wired the dispatch', async () => {
+    // Boot-order bug, not a runtime condition — an unconfigured singleton quietly answering []
+    // would skip every cache invalidation instead of failing somewhere a human would see it.
+    // Imported fresh rather than reusing the file's module instance, so this does not depend on
+    // no earlier test in this file having configured the singleton.
+    vi.resetModules();
+    const fresh = await import(
+      '@/domains/notify/sub-domains/notification/notification-dispatch.service.js'
+    );
+
+    await expect(fresh.resolveNotificationRecipientPublicIds([1])).rejects.toThrow(
+      /Notification dispatch is not configured/,
+    );
+
+    fresh.configureNotificationDispatch(fresh.createNotificationDispatch(notificationRepository));
+    await expect(fresh.resolveNotificationRecipientPublicIds([11, 22])).resolves.toEqual([
+      'usr_one',
+      'usr_two',
+    ]);
   });
 });

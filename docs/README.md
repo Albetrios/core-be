@@ -130,6 +130,7 @@ Grouped index: **[deployment/README.md](deployment/README.md)** (`setup/`, `ci-c
 | [integrations/codex-cloud-agent-setup-archive.md](integrations/codex-cloud-agent-setup-archive.md) | Reference-only notes for removed Codex Cloud session setup attempts; local Codex still uses `.codex/` + `agent-os/`. |
 | [integrations/cursor-agent-system.md](integrations/cursor-agent-system.md)                         | Skills, rules, subagents, and MCP map for Cursor / coding agents.                                   |
 | [reference/runtime/internationalization.md](reference/runtime/internationalization.md)           | Translation keys, locales, error/success messages.                                                  |
+| [reference/runtime/read-caching.md](reference/runtime/read-caching.md)                           | Redis read caches: the four layers, the tombstone protocol, scope-keyed keys — and when not to cache. |
 | [reference/testing/load-testing.md](reference/testing/load-testing.md)                           | k6 and Autocannon; keep in sync with [src/tests/load/k6/README.md](../src/tests/load/k6/README.md). |
 
 ---

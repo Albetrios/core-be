@@ -43,6 +43,7 @@
     ],
     "security-hardening": [
       "rls-tenant-isolation-guard",
+      "read-cache-guard",
       "dependency-security",
       "production-hardening-guard",
       "path-to-production-gate"

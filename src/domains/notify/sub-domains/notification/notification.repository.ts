@@ -259,6 +259,30 @@ export class NotificationRepository {
     return totalMarked;
   }
 
+  /**
+   * Batch-resolves recipient internal ids to public ids, for keying their per-user caches.
+   *
+   * @remarks
+   * Goes through the `auth.resolve_user_public_ids_by_ids` SECURITY DEFINER function rather than
+   * joining `auth.users`: that table is FORCE RLS and self-scoped, so a join from the
+   * organization-scoped context this runs in matches zero rows. Same resolver the audit
+   * serializer uses for the same reason. Empty input answers without a round trip.
+   */
+  async resolveUserPublicIdsByInternalIds(userInternalIds: readonly number[]): Promise<string[]> {
+    if (userInternalIds.length === 0) return [];
+    const userIdValues = sql.join(
+      userInternalIds.map((userInternalId) => sql`${userInternalId}`),
+      sql`, `,
+    );
+    const result = await this.db().execute(
+      sql`SELECT public_id FROM auth.resolve_user_public_ids_by_ids(ARRAY[${userIdValues}]::bigint[])`,
+    );
+    const rows = (
+      Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? [])
+    ) as { public_id: string }[];
+    return rows.map((row) => row.public_id);
+  }
+
   async countUnreadForUser(user_id: number): Promise<number> {
     const result = await this.db()
       .select({ count: count() })

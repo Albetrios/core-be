@@ -24,6 +24,8 @@ export type NotificationDispatch = {
     input: CreateNotificationInput,
     options?: { requestId?: string },
   ): Promise<void>;
+  /** Internal recipient ids → public ids, for keying their per-user caches. */
+  resolveRecipientPublicIds(userInternalIds: readonly number[]): Promise<string[]>;
 };
 
 /**
@@ -66,6 +68,10 @@ export function createNotificationDispatch(
         options?.requestId !== undefined ? { requestId: options.requestId } : undefined,
       );
     },
+
+    async resolveRecipientPublicIds(userInternalIds: readonly number[]): Promise<string[]> {
+      return notificationRepository.resolveUserPublicIdsByInternalIds(userInternalIds);
+    },
   };
 }
 
@@ -107,4 +113,27 @@ export async function createAndDispatchNotification(
     );
   }
   await notificationDispatch.createAndDispatchNotification(input, options);
+}
+
+/**
+ * Resolves notification recipients' public ids through the configured dispatch.
+ *
+ * @remarks
+ * - **Algorithm:** delegates to the repository's SECURITY DEFINER batch resolver.
+ * - **Failure modes:** `ConfigurationError` when the dispatch is unset; repository errors
+ *   propagate to the caller, which treats them as best-effort.
+ * - **Side effects:** none (read-only).
+ * - **Notes:** the cache is keyed on public ids while the invite-accepted event carries internal
+ *   ones; this is the seam between them, and it lives here because the dispatch singleton is
+ *   already the repository handle domain event handlers are allowed to reach.
+ */
+export async function resolveNotificationRecipientPublicIds(
+  userInternalIds: readonly number[],
+): Promise<string[]> {
+  if (!notificationDispatch) {
+    throw new ConfigurationError(
+      'Notification dispatch is not configured. Call configureNotificationDispatch from notify.container.',
+    );
+  }
+  return notificationDispatch.resolveRecipientPublicIds(userInternalIds);
 }

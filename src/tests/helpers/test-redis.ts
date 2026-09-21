@@ -17,6 +17,10 @@ const TEST_REDIS_PREFIXES = [
   'auth:email_verify_resend_cooldown:',
   'auth:email_code_verify_attempts:',
   'auth:email_otp_verify_attempts:',
+  // Read caches keyed on a public id. `TRUNCATE ... RESTART IDENTITY` recycles ids, so one case's
+  // cached count (or its invalidation tombstone, which blocks the next `SET NX`) would otherwise
+  // be served to the next case's user of the same id.
+  'notify:unread-count:',
 ] as const;
 
 /**
