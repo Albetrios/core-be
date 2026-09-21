@@ -5,8 +5,7 @@ import { createTestApp } from '@/tests/helpers/test-app.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { seedPermissions } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
-import { TENANCY_PERMISSIONS } from '@/domains/tenancy/tenancy.permissions.js';
-import { BILLING_PERMISSIONS } from '@/domains/billing/billing.permissions.js';
+import { ownerPermissionCodesForOrganizationType } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
 import { generateTestToken } from '@/tests/helpers/test-auth.js';
 import { injectAuthenticated } from '@/tests/helpers/test-http-inject.helper.js';
 import type { FastifyInstance } from 'fastify';
@@ -27,15 +26,18 @@ describe('Cross-domain e2e: tenancy + billing organization', () => {
     await cleanupDatabase();
     // cleanupDatabase() truncates tenancy.role_permissions; organization
     // provisioning (organization-provisioning.ts) inserts role_permissions
-    // referencing every tenancy permission code, so the permission reference
-    // rows must be present or the POST below fails with the
-    // role_permissions_permission_code_permissions_code_fk FK violation.
-    // Re-seed the full tenancy catalog (idempotent ON CONFLICT DO NOTHING),
-    // mirroring the organization-onboarding e2e.
-    await seedPermissions([
-      ...Object.values(TENANCY_PERMISSIONS),
-      ...Object.values(BILLING_PERMISSIONS),
-    ]);
+    // referencing every code it grants the owner, so those permission
+    // reference rows must be present or the POST below fails with the
+    // role_permissions_permission_code_permissions_code_fk FK violation —
+    // surfacing here as a 500 on create.
+    //
+    // Derived from the provisioning function itself rather than hand-listed:
+    // a hand-listed tenancy + billing catalog went stale the moment
+    // provisioning also started granting the notify codes, and this suite is
+    // where that showed up. `cleanupDatabase()` exempts tenancy.permissions as
+    // reference data, so a developer machine that has been seeded keeps the
+    // rows and hides the gap — CI, which only migrates, does not.
+    await seedPermissions([...ownerPermissionCodesForOrganizationType('TEAM')]);
   });
 
   it('creates organization then reads billing plans and subscriptions', async () => {
