@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { resetPlanCatalogMemoForTests } from '@/domains/billing/sub-domains/plan/plan-catalog-memo.js';
 import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { createTestApp } from '@/tests/helpers/test-app.js';
 import {
@@ -152,6 +153,12 @@ describe('Performance: billing list routes stay O(1) in cross-domain work', () =
     }
 
     await injectUnauthenticated(app, { method: 'GET', url: testApiPath('/billing/plans') });
+
+    // The warm-up also fills the route's in-process catalog memo, and a memoized read is a
+    // property lookup — it would pass this budget with any number of queries behind it, turning a
+    // query-count tripwire into a measurement of nothing. Drop the memo so the timed call does the
+    // work the budget is about.
+    resetPlanCatalogMemoForTests();
 
     const started = performance.now();
     const response = await injectUnauthenticated(app, {

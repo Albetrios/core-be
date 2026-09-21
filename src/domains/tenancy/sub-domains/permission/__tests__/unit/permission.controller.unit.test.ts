@@ -20,37 +20,31 @@ function mockReply(): FastifyReply {
   return reply as unknown as FastifyReply;
 }
 
-const samplePermissionRow = {
+// The service now returns the SERIALIZED shape — it memoizes the response rather than the raw
+// rows, so the `created_at` Date is converted once inside the memo instead of on every request.
+const sampleSerializedPermission = {
   code: 'billing:read',
   name: 'Billing read',
   description: null,
   category: 'billing',
-  created_at: new Date('2026-01-01T00:00:00.000Z'),
+  created_at: '2026-01-01T00:00:00.000Z',
 };
 
 describe('createPermissionController', () => {
   it('listPermissions returns paginated, serialized permissions', async () => {
     const service = {
-      list: vi.fn().mockResolvedValue([samplePermissionRow]),
+      list: vi.fn().mockResolvedValue([sampleSerializedPermission]),
     } as unknown as PermissionService;
     const controller = createPermissionController(service);
     const response = await controller.listPermissions(mockRequest(), mockReply());
     expect(service.list).toHaveBeenCalled();
     expect(response).toBeDefined();
-    expect(response?.data).toEqual([
-      {
-        code: 'billing:read',
-        name: 'Billing read',
-        description: null,
-        category: 'billing',
-        created_at: samplePermissionRow.created_at.toISOString(),
-      },
-    ]);
+    expect(response?.data).toEqual([sampleSerializedPermission]);
   });
 
   it('listPermissions returns reply when If-None-Match matches catalog ETag', async () => {
     const service = {
-      list: vi.fn().mockResolvedValue([samplePermissionRow]),
+      list: vi.fn().mockResolvedValue([sampleSerializedPermission]),
     } as unknown as PermissionService;
     const controller = createPermissionController(service);
     const firstReply = mockReply();

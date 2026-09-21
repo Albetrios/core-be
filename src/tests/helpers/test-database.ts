@@ -1,6 +1,8 @@
 import { database } from '@/infrastructure/database/connection.js';
 import { sql } from '@/infrastructure/database/connection.js';
 import { env } from '@/shared/config/env.config.js';
+import { resetPlanCatalogMemoForTests } from '@/domains/billing/sub-domains/plan/plan-catalog-memo.js';
+import { resetPermissionCatalogMemoForTests } from '@/domains/tenancy/sub-domains/permission/permission-catalog-memo.js';
 import { cleanupTestRedis } from '@/tests/helpers/test-redis.js';
 
 const MAX_CLEANUP_RETRIES = 3;
@@ -57,6 +59,10 @@ export async function cleanupDatabase(): Promise<void> {
         END $$;
       `;
       await cleanupTestRedis();
+      // In-process memos are invisible to a TRUNCATE. A suite that seeds a catalog and asserts on
+      // it would otherwise read the previous file's memory.
+      resetPlanCatalogMemoForTests();
+      resetPermissionCatalogMemoForTests();
       return;
     } catch (error) {
       const isDeadlockOrTimeout =

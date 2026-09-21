@@ -126,6 +126,45 @@ No environment kill switch. A ≤ 60 s TTL self-heals, and reverting the caller 
 
 ---
 
+## The other kind: an in-process memo
+
+Not everything that avoids a repeat query is a read cache, and treating the two the same is how a
+memo ends up carrying invalidation machinery it does not need — or a cache ends up without any.
+
+The Redis pattern above exists for data that is **scope-keyed** and **changes under you**. Some
+data is neither. The public plan catalog and the permission catalog are global — `billing.plans`
+and `tenancy.permissions` have no tenant column and no per-caller row filtering — and neither can
+change while the API process is running: every writer is a migration or a CLI seed in a different
+process. For that shape there is nothing to key on, nothing to invalidate, and no write choke point
+to hook, so a Redis cache would be four layers of machinery answering a question nobody asked.
+
+Those use a **module-level TTL memo** instead, following
+[`migration-version.ts`](../../../src/infrastructure/database/migration/migration-version.ts):
+
+| | Redis read cache | In-process memo |
+| --- | --- | --- |
+| Data | scope-keyed, changes at runtime | global, changes only at deploy or seed |
+| Key | `<domain>:<thing>:<scope public id>` | none — one value |
+| Invalidation | tombstone after every write, in API and workers | none; the TTL is the whole story |
+| Shared across processes | yes | no — each process holds its own |
+| Name it | `<thing>.cache.ts` | `<thing>-memo.ts` — **not** `.cache.ts`, or `read-cache-guard` will hold it to a contract it does not need |
+
+Three things a memo still owes:
+
+1. **Single-flight.** A public unauthenticated route can be driven cold by anyone, so expiry under
+   load would otherwise send every concurrent request to the database at once. Share the in-flight
+   promise (`readiness-probes.util.ts` is the precedent).
+2. **Never memoize a rejection**, and clear the in-flight slot on failure — otherwise one transient
+   blip becomes a full TTL of outage.
+3. **A `reset…ForTests()` called from `cleanupDatabase`.** A `TRUNCATE` cannot reach process
+   memory, so without it one suite's catalog answers the next one's assertions. And any test that
+   asserts something about the *database path* — a chaos probe, a query-count budget — must reset
+   between probes itself: a per-file reset does not help a single test that probes repeatedly, and
+   the failure mode is a test that stays green while proving nothing.
+
+The thing a memo does **not** owe is `read_cache_requests_total`. It is measuring a different
+trade: not a pool checkout removed, but a public route that stops touching Postgres at all.
+
 ## What is cached today
 
 | Cache | Key | TTL | Invalidated by |
@@ -134,6 +173,9 @@ No environment kill switch. A ≤ 60 s TTL self-heals, and reverting the caller 
 | Organization permissions | `perm:…` | MFA-session window | membership / role / permission writes (+ Sentry on failure) |
 | Organization locale | i18n locale cache | short | organization-settings write |
 | Unread notification count | `notify:unread-count:<userPublicId>` | 60 s | mark-read, mark-all-read, delete (only when a row went), invite-accepted fan-out — all post-commit, 15 s tombstone |
+
+Memoized in process (not Redis, per the section above): the public plan catalog
+(`plan-catalog-memo.ts`) and the permission catalog (`permission-catalog-memo.ts`), 60 s each.
 
 Deliberately **not** cached, with reasons: "my organizations" (one transaction already; presigned URLs in the payload; invalidation spans every membership, rename and logo change), membership and role lists (one transaction, batched, and searchable), and the personal-organization id (two in-transaction round trips would become one Redis hop — not worth an invalidation surface).
 
