@@ -30,6 +30,7 @@ import {
   resolveFrontendSlug,
 } from '@tooling/setup/codegen/project-identity.util.js';
 import { loadConfigIfExists, saveConfig } from '@tooling/setup/common/config.js';
+import { gitEnvironmentWithoutInheritedRepository } from '@tooling/setup/common/git-environment.js';
 import type { SetupConfig } from '@tooling/setup/common/types.js';
 import * as log from '@tooling/setup/common/logger.js';
 
@@ -346,6 +347,7 @@ function rewriteProseIdentity(options: {
     cwd: REPOSITORY_ROOT,
     encoding: 'utf-8',
     maxBuffer: 64 * 1024 * 1024,
+    env: gitEnvironmentWithoutInheritedRepository(),
   })
     .split('\0')
     .filter((entry) => entry.length > 0);
@@ -419,6 +421,7 @@ function renameSlugNamedFiles(options: {
     cwd: REPOSITORY_ROOT,
     encoding: 'utf-8',
     maxBuffer: 64 * 1024 * 1024,
+    env: gitEnvironmentWithoutInheritedRepository(),
   })
     .split('\0')
     .filter((entry) => entry.length > 0);
@@ -445,7 +448,12 @@ function renameSlugNamedFiles(options: {
     renamed.push(`${relativePath} → ${nextPath}`);
     if (options.dryRun) continue;
     try {
-      execFileSync('git', ['mv', relativePath, nextPath], { cwd: REPOSITORY_ROOT });
+      // Without the strip, an inherited GIT_PREFIX is prepended to both
+      // pathspecs and the rename lands outside the repository root.
+      execFileSync('git', ['mv', relativePath, nextPath], {
+        cwd: REPOSITORY_ROOT,
+        env: gitEnvironmentWithoutInheritedRepository(),
+      });
     } catch {
       // Untracked-by-git checkouts fall back to a plain rename.
       renameSync(resolve(REPOSITORY_ROOT, relativePath), resolve(REPOSITORY_ROOT, nextPath));
@@ -501,6 +509,7 @@ function reportResidualLiterals(previousSlug: string, previousOwner: string): vo
           cwd: REPOSITORY_ROOT,
           encoding: 'utf-8',
           maxBuffer: 32 * 1024 * 1024,
+          env: gitEnvironmentWithoutInheritedRepository(),
         },
       );
     } catch {

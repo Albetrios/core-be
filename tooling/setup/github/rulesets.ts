@@ -33,6 +33,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runGhAuthPreflight } from './auth-preflight.js';
+import { gitEnvironmentWithoutInheritedRepository } from '@tooling/setup/common/git-environment.js';
 
 const RULESETS_DIRECTORY = resolve(import.meta.dirname, '../../../.github/rulesets');
 
@@ -65,6 +66,9 @@ function repositoryFromGitRemote(): string | undefined {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 5_000,
+      // This remote decides which repository rulesets are pushed to, so an
+      // inherited GIT_DIR must not be allowed to answer for a different one.
+      env: gitEnvironmentWithoutInheritedRepository(),
     }).trim();
 
     const sshMatch = remoteUrl.match(/git@github\.com:([^/]+\/[^/.]+?)(?:\.git)?$/);

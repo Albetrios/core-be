@@ -31,6 +31,10 @@ import {
   identityLiterals,
   scanProjectIdentityLiterals,
 } from '@tooling/setup/codegen/validate-project-identity-literals.js';
+import {
+  gitEnvironmentWithoutInheritedRepository,
+  INHERITED_GIT_REPOSITORY_VARIABLES,
+} from '@tooling/setup/common/git-environment.js';
 import type { SetupConfig } from '@tooling/setup/common/types.js';
 
 function buildConfig(overrides?: {
@@ -263,30 +267,69 @@ describe('project identity — text rewrites', () => {
     // Built as a throwaway repo rather than asserted against this one: the fixture slug is
     // `acme-api`, which appears nowhere in this repository, so scanning the real tree would pass
     // no matter what the scanner does. A test that cannot fail is worse than no test.
+    //
+    // Run under a POISONED git environment — the shape `git` hands every hook it spawns, which is
+    // how `pnpm test:unit` sees the world from `.husky/pre-push`. Those variables outrank `cwd`,
+    // so an unsanitized `git init`/`git add` here would re-target the decoy (in the hook's case,
+    // the developer's own repository, whose index it overwrites), and an unsanitized `git ls-files`
+    // inside the scanner would list the decoy's files, none of which resolve under `scratch` —
+    // leaving the symlink assertion below passing vacuously, over zero scanned files.
     const scratch = mkdtempSync(join(tmpdir(), 'identity-symlink-'));
+    const decoy = mkdtempSync(join(tmpdir(), 'identity-decoy-'));
+    const restoreGitEnvironment = new Map(
+      INHERITED_GIT_REPOSITORY_VARIABLES.map((variable) => [variable, process.env[variable]]),
+    );
     try {
-      const git = (...arguments_: string[]): void => {
-        execFileSync('git', arguments_, { cwd: scratch, stdio: 'ignore' });
+      const git = (cwd: string, ...arguments_: string[]): void => {
+        execFileSync('git', arguments_, {
+          cwd,
+          stdio: 'ignore',
+          env: gitEnvironmentWithoutInheritedRepository(),
+        });
       };
-      git('init', '-q');
 
+      // A real repository with its own tracked file, so a regression re-targets somewhere
+      // plausible rather than just making `git` error out.
+      git(decoy, 'init', '-q');
+      writeFileSync(join(decoy, 'decoy.json'), '{ "server": "decoy" }\n');
+      git(decoy, 'add', '-A');
+
+      // The exact shape `git` hands a hook running inside a worktree (git 2.54).
+      process.env.GIT_DIR = join(decoy, '.git');
+      process.env.GIT_INDEX_FILE = join(decoy, '.git', 'index');
+      process.env.GIT_WORK_TREE = decoy;
+      process.env.GIT_COMMON_DIR = join(decoy, '.git');
+      process.env.GIT_OBJECT_DIRECTORY = join(decoy, '.git', 'objects');
+      process.env.GIT_PREFIX = '';
+
+      git(scratch, 'init', '-q');
       writeFileSync(join(scratch, 'private.json'), '{ "server": "acme-api" }\n');
+      writeFileSync(join(scratch, 'tracked.json'), '{ "server": "acme-api" }\n');
       writeFileSync(join(scratch, '.gitignore'), 'private.json\n');
       symlinkSync('private.json', join(scratch, 'link.json'));
-      git('add', '-A');
+      git(scratch, 'add', '-A');
 
       const { violations } = scanProjectIdentityLiterals({
         snapshot: buildProjectIdentitySnapshot(buildConfig()),
         projectRoot: scratch,
         generatedPaths: [],
       });
+      const flagged = violations.map((violation) => violation.file);
 
       // Sanity: the literal really is reachable through the link, so a passing assertion below
       // means the scanner skipped it — not that the fixture was inert.
       expect(readFileSync(join(scratch, 'link.json'), 'utf-8')).toContain('acme-api');
-      expect(violations.map((violation) => violation.file)).not.toContain('link.json');
+      // Anti-vacuity: the scan reached THIS repository's tracked files. Without it the symlink
+      // assertion holds just as well over an empty scan of somebody else's tree.
+      expect(flagged).toContain('tracked.json');
+      expect(flagged).not.toContain('link.json');
     } finally {
+      for (const [variable, value] of restoreGitEnvironment) {
+        if (value === undefined) delete process.env[variable];
+        else process.env[variable] = value;
+      }
       rmSync(scratch, { recursive: true, force: true });
+      rmSync(decoy, { recursive: true, force: true });
     }
   });
 

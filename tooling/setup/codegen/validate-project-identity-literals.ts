@@ -22,6 +22,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
+import { gitEnvironmentWithoutInheritedRepository } from '@tooling/setup/common/git-environment.js';
+
 import type { ProjectIdentitySnapshot } from './project-identity.util.js';
 
 /** A file+reason pair permitting the identity literal to appear verbatim. */
@@ -101,6 +103,11 @@ function listTrackedFiles(projectRoot: string): string[] {
     cwd: projectRoot,
     encoding: 'utf-8',
     maxBuffer: 64 * 1024 * 1024,
+    // `projectRoot` is only honored once the inherited GIT_DIR/GIT_INDEX_FILE
+    // are gone. Run from a hook (pre-commit, pre-push) they win over `cwd`, and
+    // this lists the hook's repository instead — which makes the gate scan a
+    // tree it was never pointed at, and pass vacuously when no path lines up.
+    env: gitEnvironmentWithoutInheritedRepository(),
   });
   return stdout.split('\0').filter((entry) => entry.length > 0);
 }

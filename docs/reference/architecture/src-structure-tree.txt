@@ -2050,6 +2050,7 @@ src/
     │   ├── ci/
     │   │   ├── codegraph-git-hooks.policy.unit.test.ts
     │   │   ├── dependabot-ci-triage.policy.unit.test.ts
+    │   │   ├── git-hook-environment.policy.unit.test.ts
     │   │   ├── github-actions-node24.policy.unit.test.ts
     │   │   ├── github-actions-workflow-run-references.policy.unit.test.ts
     │   │   ├── github-environment-protection.policy.unit.test.ts
