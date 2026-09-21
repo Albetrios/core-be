@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.0.0](https://github.com/albetrios/core-be/compare/v6.0.2...v7.0.0) (2026-09-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** move the caller's organization list to GET /users/me/organizations ([#1166](https://github.com/albetrios/core-be/issues/1166))
+
+### Added
+
+* **api:** move the caller's organization list to GET /users/me/organizations ([#1166](https://github.com/albetrios/core-be/issues/1166)) ([689adc2](https://github.com/albetrios/core-be/commit/689adc2a70fd7cd5cd4e1f90c10b1cf508ebb8ac))
+
+
+### Fixed
+
+* **tenancy:** reconcile the Stripe seat quantity on suspend and invitation revoke ([#1162](https://github.com/albetrios/core-be/issues/1162)) ([08b0ff8](https://github.com/albetrios/core-be/commit/08b0ff81de14b7bc6721daf6d4abd747ebfd74aa))
+* **tooling:** stop inherited git hook variables re-targeting scoped git calls ([#1178](https://github.com/albetrios/core-be/issues/1178)) ([4018855](https://github.com/albetrios/core-be/commit/4018855111bda0e3ac9875bc2fa4a23fc1d5c5c1))
+
+
+### Performance
+
+* **catalog:** serve the public plan and permission lists from memory ([#1174](https://github.com/albetrios/core-be/issues/1174)) ([68b23ef](https://github.com/albetrios/core-be/commit/68b23ef49bc6c43f2b1ebaf4eb805b26eb996116))
+* **db:** serve the hot authenticated reads from one transaction ([#1164](https://github.com/albetrios/core-be/issues/1164)) ([a7234e6](https://github.com/albetrios/core-be/commit/a7234e6d1fbfe824347de10135687f80492683a2))
+* **notify:** serve the unread-count badge from Redis ([#1170](https://github.com/albetrios/core-be/issues/1170)) ([2a412f5](https://github.com/albetrios/core-be/commit/2a412f5f4e143a834307c556ab505c225437e0b8))
+* **tenancy:** throttle the API-key last-used write off the hot path ([#1172](https://github.com/albetrios/core-be/issues/1172)) ([382e5e7](https://github.com/albetrios/core-be/commit/382e5e72c18a18d7315e3157465a2b4f3c091e8a))
+
+
+### Changed
+
+* **tenancy:** delete the global-role paths that could never fire ([#1165](https://github.com/albetrios/core-be/issues/1165)) ([6b1887c](https://github.com/albetrios/core-be/commit/6b1887ce41a9a37fe1d5f6680e55c4d054041cd1))
+* **tests:** name test locals for what distinguishes them, not a digit ([#1176](https://github.com/albetrios/core-be/issues/1176)) ([3ba7c64](https://github.com/albetrios/core-be/commit/3ba7c647bcf770758779d5653afe598a45318605))
+
+
+### Documentation
+
+* **load-testing:** how to measure a change that already merged ([#1175](https://github.com/albetrios/core-be/issues/1175)) ([2913362](https://github.com/albetrios/core-be/commit/291336266648e01f0cf2c56e5db9b87a6e8003b4))
+* **observability:** list the read-cache hit-ratio metric ([#1173](https://github.com/albetrios/core-be/issues/1173)) ([8328197](https://github.com/albetrios/core-be/commit/83281977fc7ed68e5c2aebb52f5c207e37b05533))
+* **rules:** ban digits in the names we own ([#1169](https://github.com/albetrios/core-be/issues/1169)) ([60c3df1](https://github.com/albetrios/core-be/commit/60c3df122fec4ab0cecc7416ff501566381e9b18))
+
 ## [6.0.2](https://github.com/albetrios/core-be/compare/v6.0.1...v6.0.2) (2026-09-19)
 
 
