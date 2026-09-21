@@ -241,7 +241,7 @@
     "disposable-email-domains-js": "^1.25.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
-    "fastify": "^5.12.4",
+    "fastify": "^5.12.5",
     "fastify-plugin": "^6.0.0",
     "fastify-type-provider-zod": "^7.0.0",
     "i18next": "^26.4.2",
