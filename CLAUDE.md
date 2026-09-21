@@ -462,7 +462,7 @@ Local SonarQube quality gate (pre-commit): `pnpm sonar:up` / `sonar:scan` / `son
 - `pnpm routes:examples` — refresh `tooling/openapi/route-examples/route-examples.json` (sanitized request/response samples per route+status, embedded in OpenAPI as `captured` examples) from a capture run: `ROUTE_EXAMPLE_CAPTURE=1 pnpm test && pnpm routes:examples`
 - `pnpm ci:local` — PR gate: validate + domain + routes + migrate lint + env example + full test
 - `pnpm ci:quality` — static CI quality slice (audit, validate, domain, contract tests, routes, env example, migrate lint)
-- `pnpm validate` — lint + typecheck (`biome check` covers lint + formatting; no separate format:check step)
+- `pnpm validate` — lint + typecheck + markdown lint (`biome check` covers lint + formatting; `docs:lint` is folded in because markdownlint otherwise runs only at pre-commit/pre-push, and a `--no-verify` commit skips it)
 - `pnpm test:bench` — autocannon single-endpoint benchmark
 - `pnpm validate:domain` — validate domain structure (CI gate)
 - `pnpm deps:audit` — run `pnpm audit` (must pass; CI fails on any vulnerability)

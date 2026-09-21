@@ -5,6 +5,7 @@
  */
 import '@/shared/config/load-env-files.js';
 import { execSync } from 'node:child_process';
+import { acquireDatabaseSuiteLock } from '@/tests/database-suite-lock.js';
 import postgres from 'postgres';
 import { LOCAL_DATABASE_NAME } from '@/shared/constants/project-identity.constants.js';
 
@@ -46,26 +47,32 @@ function forceLocalDatabaseForNonCiTestRun(): void {
  * when contract / property / unit-only test slices set their respective
  * `*_TESTS_ONLY` / `VITEST_SKIP_DATABASE` env vars.
  */
-export default async function globalSetup(): Promise<void> {
+export default async function globalSetup(): Promise<() => void> {
   process.env.NODE_ENV ??= 'development';
   forceLocalDatabaseForNonCiTestRun();
 
   /** Contract tests mock outbound HTTP — skip Postgres churn (offline CI slice). See `pnpm test:contract`. */
   if (process.env.CONTRACT_TESTS_ENABLED === 'true') {
-    return;
+    return () => {};
   }
 
   /** fast-check property slice — pure validators, no DB. See `pnpm test:property`. */
   if (process.env.PROPERTY_TESTS_ENABLED === 'true') {
-    return;
+    return () => {};
   }
 
   /** PR unit lane — unit + global policy scans without Postgres. See reusable-vitest-unit-only.yml. */
   if (process.env.VITEST_SKIP_DATABASE === 'true') {
-    return;
+    return () => {};
   }
 
   process.env.DATABASE_URL ??= LOCAL_TEST_DATABASE_URL;
+
+  // Past every early return, this run WILL touch Postgres — so claim it. Placed here rather than
+  // at the top so the no-database lanes (contract, property, the PR unit lane) never take a lock
+  // they do not need.
+  const releaseDatabaseSuiteLock = acquireDatabaseSuiteLock();
+
   const migrationUrl = process.env.DATABASE_URL;
   if (!migrationUrl) {
     throw new Error('DATABASE_URL must be set for test global setup');
@@ -82,7 +89,7 @@ export default async function globalSetup(): Promise<void> {
       'Test database unavailable — skipping global setup. Start Docker: docker compose up -d',
     );
     await sql.end({ timeout: 5_000 }).catch(() => {});
-    return;
+    return releaseDatabaseSuiteLock;
   }
 
   try {
@@ -240,4 +247,6 @@ export default async function globalSetup(): Promise<void> {
   } finally {
     await sql.end({ timeout: 5_000 });
   }
+
+  return releaseDatabaseSuiteLock;
 }

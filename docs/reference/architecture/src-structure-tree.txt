@@ -2138,6 +2138,7 @@ src/
     │   │   │   ├── circuit-breaker.unit.test.ts
     │   │   │   └── retry-with-backoff.unit.test.ts
     │   │   ├── boot-tls-guards.unit.test.ts
+    │   │   ├── database-suite-lock.unit.test.ts
     │   │   └── migration-error-hint.unit.test.ts
     │   ├── middleware/
     │   │   ├── api-key-auth.middleware.unit.test.ts
@@ -2310,6 +2311,7 @@ src/
     │   │   └── webhook-worker-no-schema-import.policy.unit.test.ts
     │   ├── per-org-row-caps.unit.test.ts
     │   └── unit.overview.md
+    ├── database-suite-lock.ts
     ├── global-setup.ts
     └── setup.ts
 ├── FLOWS.md
