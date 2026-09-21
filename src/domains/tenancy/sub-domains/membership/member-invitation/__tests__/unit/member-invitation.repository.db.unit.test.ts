@@ -71,34 +71,34 @@ describe('MemberInvitationRepository.findByOrganizationId (keyset cursor paginat
     const { owner, organization, membership } = await setupOrganizationWithMembership();
     await createInvitations(repository, membership.id, owner.id, 3);
 
-    const page1 = await repository.findByOrganizationId(organization.id, { limit: 2 });
+    const firstPage = await repository.findByOrganizationId(organization.id, { limit: 2 });
 
-    expect(page1.items).toHaveLength(2);
-    expect(page1.has_more).toBe(true);
-    expect(page1.next_cursor).toBeTypeOf('string');
-    expect(page1.total).toBeNull();
+    expect(firstPage.items).toHaveLength(2);
+    expect(firstPage.has_more).toBe(true);
+    expect(firstPage.next_cursor).toBeTypeOf('string');
+    expect(firstPage.total).toBeNull();
   });
 
   it('navigates pages with `after` cursor without repeating items', async () => {
     const { owner, organization, membership } = await setupOrganizationWithMembership();
     await createInvitations(repository, membership.id, owner.id, 3);
 
-    const page1 = await repository.findByOrganizationId(organization.id, { limit: 2 });
-    expect(page1.has_more).toBe(true);
-    expect(page1.next_cursor).toBeTypeOf('string');
+    const firstPage = await repository.findByOrganizationId(organization.id, { limit: 2 });
+    expect(firstPage.has_more).toBe(true);
+    expect(firstPage.next_cursor).toBeTypeOf('string');
 
-    const page2 = await repository.findByOrganizationId(organization.id, {
+    const nextPage = await repository.findByOrganizationId(organization.id, {
       limit: 2,
-      after: page1.next_cursor!,
+      after: firstPage.next_cursor!,
     });
 
-    const page1Ids = new Set(page1.items.map((item) => item.id));
-    for (const item of page2.items) {
-      expect(page1Ids.has(item.id)).toBe(false);
+    const firstPageIds = new Set(firstPage.items.map((item) => item.id));
+    for (const item of nextPage.items) {
+      expect(firstPageIds.has(item.id)).toBe(false);
     }
-    expect(page1.items.length + page2.items.length).toBe(3);
-    expect(page2.has_more).toBe(false);
-    expect(page2.next_cursor).toBeNull();
+    expect(firstPage.items.length + nextPage.items.length).toBe(3);
+    expect(nextPage.has_more).toBe(false);
+    expect(nextPage.next_cursor).toBeNull();
   });
 
   it('returns has_more=false and next_cursor=null when total fits exactly within limit', async () => {

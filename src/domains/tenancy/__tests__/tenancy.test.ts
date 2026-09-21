@@ -240,30 +240,30 @@ describe('Tenancy Domain — flows (memberships, leave, roles)', () => {
         });
       }
 
-      const page1 = await injectAuthenticated(app, {
+      const firstPage = await injectAuthenticated(app, {
         url: testApiPath('/tenancy/organization/memberships?sort=name&order=asc&limit=2'),
         token,
       });
-      expect(page1.statusCode).toBe(200);
-      const body1 = page1.json() as {
+      expect(firstPage.statusCode).toBe(200);
+      const firstPageBody = firstPage.json() as {
         data: Array<{ id: string }>;
         meta: { pagination: { next?: string | null } };
       };
-      expect(body1.data).toHaveLength(2);
-      const cursor = body1.meta.pagination.next;
+      expect(firstPageBody.data).toHaveLength(2);
+      const cursor = firstPageBody.meta.pagination.next;
       expect(typeof cursor).toBe('string');
 
-      const page2 = await injectAuthenticated(app, {
+      const nextPage = await injectAuthenticated(app, {
         url: testApiPath(
           `/tenancy/organization/memberships?sort=name&order=asc&limit=2&after=${encodeURIComponent(cursor!)}`,
         ),
         token,
       });
-      expect(page2.statusCode).toBe(200);
-      const body2 = page2.json() as { data: Array<{ id: string }> };
+      expect(nextPage.statusCode).toBe(200);
+      const nextPageBody = nextPage.json() as { data: Array<{ id: string }> };
       // No overlap between pages — the keyset advanced past the boundary row.
-      const page1Ids = new Set(body1.data.map((row) => row.id));
-      for (const row of body2.data) expect(page1Ids.has(row.id)).toBe(false);
+      const firstPageIds = new Set(firstPageBody.data.map((row) => row.id));
+      for (const row of nextPageBody.data) expect(firstPageIds.has(row.id)).toBe(false);
 
       // Reusing a name-asc cursor under order=desc must reset to the first page (fingerprint guard),
       // not 400 and not interleave.

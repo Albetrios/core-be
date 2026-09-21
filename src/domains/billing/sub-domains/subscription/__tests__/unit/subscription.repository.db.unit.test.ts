@@ -177,15 +177,17 @@ describe('SubscriptionRepository (database)', () => {
   });
 
   it('audit-#10: rejects a second subscription with a duplicate provider_subscription_id', async () => {
-    const owner1 = await createTestUser();
-    const organization1 = await createTestOrganization({ ownerUserId: owner1.id });
-    const owner2 = await createTestUser();
-    const organization2 = await createTestOrganization({ ownerUserId: owner2.id });
+    const subscribedOwner = await createTestUser();
+    const subscribedOrganization = await createTestOrganization({
+      ownerUserId: subscribedOwner.id,
+    });
+    const otherOwner = await createTestUser();
+    const otherOrganization = await createTestOrganization({ ownerUserId: otherOwner.id });
     const plan = await createTestPlan();
     const providerSubscriptionId = `sub_dup_${Date.now()}`;
 
     await repository.create({
-      organization_id: organization1.id,
+      organization_id: subscribedOrganization.id,
       plan_id: plan.id,
       billing_cycle: 'MONTHLY',
       status: 'ACTIVE',
@@ -198,7 +200,7 @@ describe('SubscriptionRepository (database)', () => {
     // different organization) is now blocked by idx_subscriptions_provider_subscription_id_unique.
     await expect(
       repository.create({
-        organization_id: organization2.id,
+        organization_id: otherOrganization.id,
         plan_id: plan.id,
         billing_cycle: 'MONTHLY',
         status: 'ACTIVE',
