@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import pino from 'pino';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import {
   buildFastifyServerOptions,
@@ -91,5 +92,53 @@ describe('logger.util', () => {
     expect(() => localLogger.info('boot')).not.toThrow();
 
     vi.doUnmock('node:module');
+  });
+});
+
+/**
+ * The unit above asserts the formatter redacts. This asserts the thing that was
+ * actually broken: what pino EMITS. `formatters.log` runs before the
+ * serializers, so a formatter that deep-copied an Error by its enumerable keys
+ * handed `stdSerializers.err` an empty object and the line shipped as
+ * `"error":{}` — no message, no stack — from all ~108 call sites.
+ */
+describe('logger.util — emitted error output', () => {
+  function captureLine(log: (instance: pino.Logger) => void): Record<string, unknown> {
+    const lines: string[] = [];
+    const instance = pino(
+      {
+        level: 'error',
+        // Mirrors the two options logger.util.ts passes; the interaction between
+        // them is the whole point of this test.
+        serializers: { err: pino.stdSerializers.err, error: pino.stdSerializers.err },
+        formatters: { log: (object) => redactSensitive(object) },
+      },
+      { write: (line: string) => lines.push(line) },
+    );
+    log(instance);
+    return JSON.parse(lines[0] ?? '{}') as Record<string, unknown>;
+  }
+
+  it.each([['error'], ['err']])('emits message and stack under the %s key', (key) => {
+    const emitted = captureLine((instance) => {
+      instance.error({ [key]: new Error('connection refused') }, 'boom');
+    });
+
+    const logged = emitted[key] as { type?: string; message?: string; stack?: string };
+    expect(logged.message).toBe('connection refused');
+    expect(logged.type).toBe('Error');
+    expect(logged.stack).toContain('connection refused');
+  });
+
+  it('still keeps a secret out of the emitted line', () => {
+    const emitted = captureLine((instance) => {
+      instance.error(
+        { error: new Error('GET https://api.example.com/v1?access_token=super-secret') },
+        'boom',
+      );
+    });
+
+    expect(JSON.stringify(emitted)).not.toContain('super-secret');
+    expect(JSON.stringify(emitted)).toContain(SENSITIVE_REDACTION_PLACEHOLDER);
   });
 });

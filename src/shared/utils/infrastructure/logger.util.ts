@@ -21,13 +21,19 @@ export const logger = pino({
     paths: [...PINO_REDACT_PATHS],
     censor: '[REDACTED]',
   },
-  // sec-r5-observability: Pino's default behaviour serialises `Error` objects
-  // as `{}` because `name`/`message`/`stack` are non-enumerable. Every
-  // `logger.error({ error }, ...)` and `logger.fatal({ error }, ...)` call in
-  // the codebase therefore landed in production logs with the actual failure
-  // reason dropped. Apply `stdSerializers.err` to both `err` (the pino
-  // convention) and `error` (the convention this codebase uses) so every
-  // log site benefits without a per-call code change.
+  // sec-r5-observability: `Error` objects serialise as `{}` by default because
+  // `name`/`message`/`stack` are non-enumerable, so every
+  // `logger.error({ error }, ...)` and `logger.fatal({ error }, ...)` landed in
+  // production logs with the failure reason dropped. `stdSerializers.err` is
+  // applied to both `err` (the pino convention) and `error` (the convention this
+  // codebase uses) so every log site benefits without a per-call change.
+  //
+  // These serializers are only half the fix, and on their own they did nothing:
+  // pino runs `formatters.log` FIRST, and the `redactSensitive` formatter below
+  // used to deep-copy by enumerable key — so what reached a serializer was
+  // already an empty object, not an `Error`. `redactSensitive` now returns a real
+  // `Error` copy for errors, which is what keeps this pair working. Neither half
+  // is redundant: the formatter preserves the error, these render it.
   serializers: {
     err: pino.stdSerializers.err,
     error: pino.stdSerializers.err,
