@@ -19,6 +19,7 @@ import {
 import { TENANCY_PERMISSIONS } from '@/domains/tenancy/tenancy.permissions.js';
 import { NOTIFY_PERMISSIONS } from '@/domains/notify/notify.permissions.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { redisConnection } from '@/infrastructure/cache/redis.client.js';
 import { api_keys } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.schema.js';
 type ApiKeyCreateResponse = {
   data: { api_key: { id: string }; raw_key: string };
@@ -129,6 +130,44 @@ describe('Security: Organization API key authentication', () => {
       headers: { authorization: `ApiKey ${rawKey}` },
     });
     expect(response.statusCode).toBe(200);
+  });
+
+  it('still refuses a revoked key on the very next request after a throttled one', async () => {
+    // The `last_used_at` write is gated by a once-a-minute Redis claim, so the SECOND request with
+    // a key skips the transaction that used to run on every one. This pins that the skip touches
+    // only that write: authentication itself still resolves against Postgres each time, so a key
+    // revoked between requests is refused immediately rather than for as long as some window.
+    //
+    // It matters because the gate sits in `authenticate`, one line above the code that decides the
+    // request succeeds — a future refactor that hoisted the claim, or short-circuited on it, would
+    // turn a throttle into a cache and this is the assertion that would notice.
+    const { rawKey, apiKeyPublicId } = await createApiKeyWithPermissions([
+      TENANCY_PERMISSIONS.API_KEY_READ,
+      TENANCY_PERMISSIONS.API_KEY_MANAGE,
+    ]);
+
+    const authenticatedRequest = async () =>
+      injectRoute(app, {
+        method: 'GET',
+        url: testApiPath('/tenancy/organization/api-keys'),
+        headers: { authorization: `ApiKey ${rawKey}` },
+      });
+
+    // First claims the throttle window; second is the throttled one.
+    expect((await authenticatedRequest()).statusCode).toBe(200);
+    // Prove the throttle actually engaged rather than assuming it. Without this the test would
+    // still pass if Redis were unreachable and every request fell back to writing — and it would
+    // then be asserting nothing about the throttled path at all.
+    await expect(redisConnection.exists(`apikey:last-used:${apiKeyPublicId}`)).resolves.toBe(1);
+    expect((await authenticatedRequest()).statusCode).toBe(200);
+
+    await database
+      .update(api_keys)
+      .set({ status: 'REVOKED' })
+      .where(eq(api_keys.public_id, apiKeyPublicId));
+
+    // Still inside the throttle window, so this request would skip the write if it got that far.
+    expect((await authenticatedRequest()).statusCode).toBe(401);
   });
 
   it('rejects an organization API key on a user-only route that requires a real user', async () => {

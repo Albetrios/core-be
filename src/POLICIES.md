@@ -134,6 +134,16 @@ The canonical exports live under [src/shared/constants/](src/shared/constants/) 
   - Increasing → a badge stays wrong for longer after a sweep, always in the user's favour (it can show a notification that is gone; it cannot hide one that arrived).
 - **Last reviewed**: 2026-09-21
 
+## API_KEY_LAST_USED_THROTTLE_TTL_SECONDS
+
+- **Value**: 60 seconds
+- **Source**: [src/shared/constants/ttl.constants.ts](src/shared/constants/ttl.constants.ts)
+- **Rationale**: How long one recorded API-key `last_used_at` write suppresses the next. Matches the `interval '1 minute'` predicate the `UPDATE` itself carries (audit-#8) — the two throttle the same thing from opposite sides: the SQL stops the row write, this stops the transaction around it, which was the only transaction an authenticated API-key request opened. Not a cache: the claim is never read back, so nothing about authentication depends on it and a revoked key is still refused on the very next request.
+- **Consequences of change**:
+  - Decreasing → more transactions per key, approaching one per request at zero.
+  - Increasing → the dashboard's "last used" column lags by that much. Nothing else reads the field; there is no retention sweep, audit report or query that filters on it.
+- **Last reviewed**: 2026-09-21
+
 ## CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS
 
 - **Value**: 15 seconds

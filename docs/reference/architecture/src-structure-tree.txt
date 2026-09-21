@@ -778,6 +778,7 @@ src/
     │   │   │   ├── organization-api-key/
     │   │   │   │   ├── __tests__/
     │   │   │   │   │   ├── unit/
+    │   │   │   │   │   │   ├── organization-api-key-last-used.throttle.unit.test.ts
     │   │   │   │   │   │   ├── organization-api-key-tombstone-retention.processor.boundary.unit.test.ts
     │   │   │   │   │   │   ├── organization-api-key-tombstone-retention.worker.unit.test.ts
     │   │   │   │   │   │   ├── organization-api-key.controller.unit.test.ts
@@ -797,6 +798,7 @@ src/
     │   │   │   │   │   ├── organization-api-key-tombstone-retention.constants.ts
     │   │   │   │   │   ├── organization-api-key-tombstone-retention.processor.ts
     │   │   │   │   │   └── organization-api-key-tombstone-retention.worker.ts
+    │   │   │   │   ├── organization-api-key-last-used.throttle.ts
     │   │   │   │   ├── organization-api-key.controller.ts
     │   │   │   │   ├── organization-api-key.dto.ts
     │   │   │   │   ├── organization-api-key.overview.md

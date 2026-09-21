@@ -21,6 +21,9 @@ const TEST_REDIS_PREFIXES = [
   // cached count (or its invalidation tombstone, which blocks the next `SET NX`) would otherwise
   // be served to the next case's user of the same id.
   'notify:unread-count:',
+  // Not a cache — the once-a-minute claim that gates the API-key `last_used_at` write. A leftover
+  // claim makes the next case's key skip its write and fail an assertion about `last_used_at`.
+  'apikey:last-used:',
 ] as const;
 
 /**

@@ -8,6 +8,7 @@ import {
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from '@/domains/tenancy/sub-domains/organization/organization.repository.js';
+import { claimApiKeyLastUsedWrite } from './organization-api-key-last-used.throttle.js';
 import type { OrganizationApiKeyRepository } from './organization-api-key.repository.js';
 import type { AuthorizationService } from '@/domains/tenancy/sub-domains/permission/authorization.service.js';
 import type { PermissionRepository } from '@/domains/tenancy/sub-domains/permission/permission.repository.js';
@@ -215,13 +216,19 @@ export class OrganizationApiKeyService {
     for (const candidate of candidates) {
       if (!hashCompare(candidate.key_hash, key_hash)) continue;
       if (candidate.expires_at && candidate.expires_at <= now) continue;
-      // The resolver already returned the owning organization public id (FORCE RLS on
-      // tenancy.organizations means we cannot read it here without an organization context). Establish that
-      // context so the last_used_at touch passes the api_keys tenant-isolation policy.
-      await withAppDatabaseContext(
-        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: candidate.organization_public_id }),
-        () => this.apiKeyRepository.touchLastUsedAt(candidate.public_id),
-      );
+      // Claim the write before opening anything. This was the only transaction an authenticated
+      // API-key request opened, and it ran on every request even though the UPDATE inside it is
+      // itself throttled to a minute — so the connection was held to execute a statement that
+      // usually matched no row. The Redis claim moves that decision ahead of the BEGIN.
+      if (await claimApiKeyLastUsedWrite(candidate.public_id)) {
+        // The resolver already returned the owning organization public id (FORCE RLS on
+        // tenancy.organizations means we cannot read it here without an organization context). Establish that
+        // context so the last_used_at touch passes the api_keys tenant-isolation policy.
+        await withAppDatabaseContext(
+          PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: candidate.organization_public_id }),
+          () => this.apiKeyRepository.touchLastUsedAt(candidate.public_id),
+        );
+      }
       return {
         public_id: candidate.public_id,
         organization_public_id: candidate.organization_public_id,
