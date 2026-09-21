@@ -93,22 +93,22 @@ describe('rate-limit-presets', () => {
       '@/shared/middlewares/rate-limit/rate-limit-presets.constants.js'
     );
     const keyGenerator = STRICT_PUBLIC_PER_EMAIL_RATE_LIMIT_OPTIONS.keyGenerator;
-    const keyFromAttempt1 = await keyGenerator?.({
+    const keyFromFirstIp = await keyGenerator?.({
       ip: '203.0.113.7',
       body: { email: 'victim@example.com' },
     } as never);
-    const keyFromAttempt2 = await keyGenerator?.({
+    const keyFromDifferentIp = await keyGenerator?.({
       ip: '198.51.100.4', // Different IP — bucket must still collapse on the same email.
       body: { email: 'victim@example.com' },
     } as never);
-    expect(keyFromAttempt1).toBe(keyFromAttempt2);
+    expect(keyFromFirstIp).toBe(keyFromDifferentIp);
 
     // And different emails yield different buckets.
     const otherKey = await keyGenerator?.({
       ip: '203.0.113.7',
       body: { email: 'someone-else@example.com' },
     } as never);
-    expect(otherKey).not.toBe(keyFromAttempt1);
+    expect(otherKey).not.toBe(keyFromFirstIp);
   });
 
   it('per-email key generator falls back to IP when the body has no usable email', async () => {
