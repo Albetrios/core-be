@@ -9,6 +9,11 @@ import { PAGINATION } from '@/shared/constants/pagination.constants.js';
 import { omitUndefined } from '@/shared/utils/validation/omit-undefined.util.js';
 import type { NotificationRepository } from './notification.repository.js';
 import type { UserService } from '@/domains/user/user.service.js';
+import {
+  getCachedUnreadNotificationCount,
+  invalidateCachedUnreadNotificationCount,
+  setCachedUnreadNotificationCount,
+} from './notification-unread-count.cache.js';
 
 /**
  * Options forwarded from controllers/event handlers into {@link NotificationService.listForUser}.
@@ -109,30 +114,59 @@ export class NotificationService {
   }
 
   async markRead(public_id: string, scope: UserPrincipalDatabaseScope) {
-    return withAppDatabaseContext(scope, async () =>
+    const result = await withAppDatabaseContext(scope, async () =>
       this.repository.markRead(public_id, await this.resolveUserIdInContext(scope.userPublicId)),
     );
+    // After the commit: invalidating first would let a concurrent read repopulate the pre-write
+    // count, which is the race the tombstone exists to close.
+    await invalidateCachedUnreadNotificationCount(scope.userPublicId);
+    return result;
   }
 
   async markAllRead(scope: UserPrincipalDatabaseScope) {
-    return withAppDatabaseContext(scope, async () =>
+    const result = await withAppDatabaseContext(scope, async () =>
       this.repository.markAllReadForUser(await this.resolveUserIdInContext(scope.userPublicId)),
     );
+    await invalidateCachedUnreadNotificationCount(scope.userPublicId);
+    return result;
   }
 
+  /**
+   * The unread badge — polled by every open tab, and the reason this cache exists.
+   *
+   * @remarks
+   * - **Algorithm:** Redis first; on a miss, count in Postgres and populate. The cache is read
+   *   only here, after the route's `authenticate` has produced the scope, because Redis sits
+   *   outside RLS — reading it earlier would hand one user another's count.
+   * - **Failure modes:** a Redis outage reads as a miss and the count comes from Postgres.
+   * - **Side effects:** one Redis read, and a write on a miss.
+   * - **Notes:** a hit skips the whole database round trip, which for this route was the entire
+   *   request: a transaction, a `set_config`, an id resolve and a `COUNT`, to return one integer.
+   */
   async getUnreadCount(scope: UserPrincipalDatabaseScope) {
-    return withAppDatabaseContext(scope, async () =>
+    const cached = await getCachedUnreadNotificationCount(scope.userPublicId);
+    if (cached !== null) return cached;
+
+    const count = await withAppDatabaseContext(scope, async () =>
       this.repository.countUnreadForUser(await this.resolveUserIdInContext(scope.userPublicId)),
     );
+    await setCachedUnreadNotificationCount(scope.userPublicId, count);
+    return count;
   }
 
   async deleteNotification(public_id: string, scope: UserPrincipalDatabaseScope) {
-    return withAppDatabaseContext(scope, async () =>
+    const result = await withAppDatabaseContext(scope, async () =>
       this.repository.deleteByPublicIdForUser(
         public_id,
         await this.resolveUserIdInContext(scope.userPublicId),
       ),
     );
+    // Only when a row actually went. A miss here is a 404, and tombstoning on one would let a
+    // caller cold-start their own cache at will by deleting ids that do not exist. Deleting an
+    // already-READ notification does not change the count either, but the row's read state is not
+    // in hand at this point and that redundant invalidation costs one Postgres count at worst.
+    if (result) await invalidateCachedUnreadNotificationCount(scope.userPublicId);
+    return result;
   }
 
   /**

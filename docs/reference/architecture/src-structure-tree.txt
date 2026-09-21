@@ -468,6 +468,7 @@ src/
     │   │   │   ├── __tests__/
     │   │   │   │   ├── integration/
     │   │   │   │   │   ├── notification-detail.integration.test.ts
+    │   │   │   │   │   ├── notification-unread-count-cache.integration.test.ts
     │   │   │   │   │   └── notification.integration.test.ts
     │   │   │   │   └── unit/
     │   │   │   │   │   ├── events/
@@ -478,6 +479,7 @@ src/
     │   │   │   │   │   ├── notification-email-content.unit.test.ts
     │   │   │   │   │   ├── notification-email-idempotency.unit.test.ts
     │   │   │   │   │   ├── notification-retention.processor.db.unit.test.ts
+    │   │   │   │   │   ├── notification-unread-count.cache.unit.test.ts
     │   │   │   │   │   ├── notification.controller.unit.test.ts
     │   │   │   │   │   ├── notification.job.schema.unit.test.ts
     │   │   │   │   │   ├── notification.queue.unit.test.ts
@@ -505,6 +507,7 @@ src/
     │   │   │   │   ├── notification-retention.worker.ts
     │   │   │   │   └── notification.worker.ts
     │   │   │   ├── notification-dispatch.service.ts
+    │   │   │   ├── notification-unread-count.cache.ts
     │   │   │   ├── notification.controller.ts
     │   │   │   ├── notification.dto.ts
     │   │   │   ├── notification.overview.md
@@ -1115,6 +1118,7 @@ src/
     │   ├── cache.overview.md
     │   ├── redis-lock.util.ts
     │   ├── redis-prefix.util.ts
+    │   ├── redis-tombstone-cache.util.ts
     │   ├── redis-topology-warn.util.ts
     │   ├── redis-url.parse.util.ts
     │   ├── redis-url.util.ts
@@ -2090,7 +2094,8 @@ src/
     │   ├── infrastructure/
     │   │   ├── cache/
     │   │   │   ├── redis-client.lifecycle.unit.test.ts
-    │   │   │   └── redis-prefix.util.unit.test.ts
+    │   │   │   ├── redis-prefix.util.unit.test.ts
+    │   │   │   └── redis-tombstone-cache.util.unit.test.ts
     │   │   ├── database/
     │   │   │   ├── base-repository.pagination.unit.test.ts
     │   │   │   ├── batch-delete.util.db.unit.test.ts

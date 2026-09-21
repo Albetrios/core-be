@@ -134,6 +134,42 @@ export const PERMISSION_CACHE_DEFAULT_TTL_SECONDS = MFA_SESSION_TTL_SECONDS;
 /** SETNX lock TTL while recomputing permissions (seconds). */
 export const PERMISSION_CACHE_RECOMPUTE_LOCK_TTL_SECONDS = 15;
 
+/**
+ * Cached per-user unread-notification count TTL in Redis (seconds).
+ *
+ * @remarks
+ * A backstop, not the invalidation strategy: every write that names a user invalidates
+ * immediately. It bounds the two writers that cannot — the retention sweep (deletes by
+ * `created_at`, never learning which users it touched) and the enqueue-rollback delete (holds only
+ * a row id) — so a minute is the worst case for a badge that is wrong in the user's favour.
+ *
+ * Deliberately its own literal rather than an alias of {@link SESSION_TOKEN_CACHE_TTL_SECONDS}:
+ * the two happen to agree today, but they answer different questions (how long a revoked bearer
+ * may still be honoured, versus how long a badge may lag), and aliasing would make retuning one
+ * silently retune the other.
+ */
+export const NOTIFICATION_UNREAD_COUNT_CACHE_TTL_SECONDS = 60;
+
+/**
+ * How long a FRESHNESS invalidation tombstone blocks repopulation, in seconds.
+ *
+ * @remarks
+ * Not the same quantity as the cache's own TTL, and using the cache TTL here is the mistake this
+ * constant exists to prevent. A freshness tombstone has exactly one job: outlive the in-flight
+ * read that already fetched a pre-write value and has yet to issue its `SET … NX`. That window is
+ * bounded by the request-path statement timeout (`DATABASE_HTTP_STATEMENT_TIMEOUT_MS`, 5 s) plus
+ * the transaction teardown and one Redis hop, so 15 s carries roughly a 3x margin.
+ *
+ * Making it the full cache TTL would be safe but wasteful: every write would leave the key cold
+ * for a minute, and a user working through their notification inbox would knock the cache out for
+ * exactly as long as they keep using it — the opposite of what the cache is for.
+ *
+ * A **revocation** tombstone is a different thing and must NOT use this: it has to outlive the
+ * cached positive entry it is overriding, or a revoked bearer keeps working. See
+ * `session-token-cache.service.ts`, which uses its own full TTL for that reason.
+ */
+export const CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS = 15;
+
 /** Worker queue last-job heartbeat key TTL in Redis (seconds). */
 export const WORKER_QUEUE_HEARTBEAT_TTL_SECONDS = SECONDS_PER_DAY;
 

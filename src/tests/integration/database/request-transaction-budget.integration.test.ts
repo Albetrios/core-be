@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { invalidateCachedUnreadNotificationCount } from '@/domains/notify/sub-domains/notification/notification-unread-count.cache.js';
 import { database } from '@/infrastructure/database/connection.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
@@ -30,6 +31,7 @@ const TRANSACTIONS_PER_READ = 1;
 describe('Integration: per-request database transaction budget', () => {
   let app: FastifyInstance;
   let token: string;
+  let userPublicId: string;
 
   beforeAll(async () => {
     const { app: testApplication } = await createTestApp();
@@ -43,6 +45,7 @@ describe('Integration: per-request database transaction budget', () => {
   beforeEach(async () => {
     await cleanupDatabase();
     const user = await createTestUser({ isEmailVerified: true });
+    userPublicId = user.public_id;
     token = await generateTestToken({ userId: user.public_id });
   });
 
@@ -53,10 +56,19 @@ describe('Integration: per-request database transaction budget', () => {
    * also pays the session-token lookup, and that cost belongs to the auth middleware, not to the
    * handler under test. Counting the second call isolates the handler — and matches the steady
    * state, where the session cache is warm for all but the first request of a session.
+   *
+   * `coolCache` runs between the two calls, for a route whose own read cache the warm-up would
+   * otherwise fill. Without it the measured call is a cache hit at zero transactions and the
+   * assertion passes no matter what the Postgres path does — a budget that cannot fail is not a
+   * budget. Cooling it back down keeps this measuring the thing that actually costs a checkout.
    */
-  async function countTransactionsForRead(url: string): Promise<number> {
+  async function countTransactionsForRead(
+    url: string,
+    coolCache?: () => Promise<void>,
+  ): Promise<number> {
     const warmup = await injectAuthenticated(app, { method: 'GET', url, token });
     expect(warmup.statusCode).toBe(200);
+    await coolCache?.();
 
     const transactionSpy = vi.spyOn(database, 'transaction');
     try {
@@ -68,20 +80,35 @@ describe('Integration: per-request database transaction budget', () => {
     }
   }
 
-  const readRoutes: readonly [name: string, path: string][] = [
+  const readRoutes: readonly [name: string, path: string, coolCache?: () => Promise<void>][] = [
     ['GET /users/me', '/users/me'],
     ['GET /users/me/settings', '/users/me/settings'],
     ['GET /users/me/notification-preferences', '/users/me/notification-preferences'],
     ['GET /notify/notifications', '/notify/notifications'],
-    ['GET /notify/notifications/unread-count', '/notify/notifications/unread-count'],
-    ['GET /tenancy/organizations', '/users/me/organizations'],
+    [
+      'GET /notify/notifications/unread-count',
+      '/notify/notifications/unread-count',
+      // A tombstone, not a delete — the same call the write paths make, so this measures the miss
+      // exactly as production sees it (the populate that follows is `NX`-refused, which costs
+      // nothing this test counts).
+      async () => {
+        await invalidateCachedUnreadNotificationCount(userPublicId);
+      },
+    ],
+    ['GET /users/me/organizations', '/users/me/organizations'],
   ];
 
-  for (const [name, path] of readRoutes) {
-    it(`${name} opens at most ${TRANSACTIONS_PER_READ} transaction`, async () => {
-      expect(await countTransactionsForRead(testApiPath(path))).toBeLessThanOrEqual(
-        TRANSACTIONS_PER_READ,
-      );
+  for (const [name, path, coolCache] of readRoutes) {
+    it(`${name} opens exactly ${TRANSACTIONS_PER_READ} transaction`, async () => {
+      const observed = await countTransactionsForRead(testApiPath(path), coolCache);
+
+      // The upper bound is the budget. The lower bound is the guard on the budget: a route that
+      // reaches Postgres but was measured at zero was not measured at all — its read cache stayed
+      // warm through `coolCache`, or a mock swallowed the call — and an upper bound alone would
+      // report that as a pass. If a route legitimately becomes free, delete it from this table
+      // rather than relaxing this.
+      expect(observed).toBeGreaterThan(0);
+      expect(observed).toBeLessThanOrEqual(TRANSACTIONS_PER_READ);
     });
   }
 });

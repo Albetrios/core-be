@@ -36,6 +36,7 @@ let databaseRlsCheckoutHoldSeconds: Histogram<'path'> | null = null;
 let processUnhandledRejectionsTotal: Counter<'process'> | null = null;
 let eventBusHandlerFailuresTotal: Counter<'event_type'> | null = null;
 let commitDispatchDurabilityFallbacksTotal: Counter | null = null;
+let readCacheRequestsTotal: Counter<'cache' | 'result'> | null = null;
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: single registration site for all Prometheus instruments — boilerplate, intentionally long
 function registerOn(registry: Registry): void {
@@ -191,6 +192,13 @@ function registerOn(registry: Registry): void {
     help: 'Post-commit dispatch tasks that fell back from durable Redis persistence to the lossy in-memory onCommit path because the Redis RPUSH failed. Any non-zero value is a durability-degradation signal — the side effect is lost if the process dies before flush',
     registers: [registry],
   });
+
+  readCacheRequestsTotal = new Counter({
+    name: 'read_cache_requests_total',
+    help: 'Read-through cache lookups by cache name and result (hit | miss). A cache whose hit ratio sits near zero is pure overhead — it is paying a Redis round trip to still ask Postgres — and one whose ratio collapses after a deploy usually means an invalidation became too broad. Alert on a sustained drop, not on an absolute value: the right ratio differs per cache',
+    labelNames: ['cache', 'result'],
+    registers: [registry],
+  });
 }
 
 function bindMetricHandlesFromRegistry(registry: Registry): void {
@@ -233,6 +241,9 @@ function bindMetricHandlesFromRegistry(registry: Registry): void {
   commitDispatchDurabilityFallbacksTotal = registry.getSingleMetric(
     'commit_dispatch_durability_fallbacks_total',
   ) as Counter;
+  readCacheRequestsTotal = registry.getSingleMetric('read_cache_requests_total') as Counter<
+    'cache' | 'result'
+  >;
   registeredMetricsRegistry = registry;
 }
 
@@ -462,4 +473,23 @@ export function recordCommitDispatchDurabilityFallback(): void {
   ensurePrometheusMetricsRegistered(getMetricsRegistry());
   if (!commitDispatchDurabilityFallbacksTotal) return;
   commitDispatchDurabilityFallbacksTotal.inc();
+}
+
+/**
+ * Records one read-through cache lookup.
+ *
+ * @remarks
+ * - **Algorithm:** increments `read_cache_requests_total{cache,result}`; a no-op when metrics are
+ *   disabled or the registry has not been built.
+ * - **Failure modes:** none — never throws into a read path.
+ * - **Side effects:** one counter increment.
+ * - **Notes:** `cache` is the cache's own name (`notify_unread_count`), not the Redis key, so the
+ *   label stays bounded — a per-key label would be unbounded cardinality. Without this, a cache is
+ *   unfalsifiable: it either helps or quietly costs a round trip per request and nothing says which.
+ */
+export function recordReadCacheRequest(cache: string, result: 'hit' | 'miss'): void {
+  if (!isMetricsEnabled()) return;
+  ensurePrometheusMetricsRegistered(getMetricsRegistry());
+  if (!readCacheRequestsTotal) return;
+  readCacheRequestsTotal.inc({ cache, result });
 }

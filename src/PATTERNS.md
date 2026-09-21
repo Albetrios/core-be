@@ -240,6 +240,72 @@ sequenceDiagram
 - New outbound side effect: write the row inside the originating transaction, never enqueue from inside the transaction (Redis is not transactional with Postgres). The event-bus emission outside the transaction is the cue for the BullMQ enqueue.
 - Inbound webhook receiver (Stripe-shaped): persist the inbound event with `status=processing` keyed on the provider's `event.id`, then run the work; if the same event arrives twice, the unique constraint rejects it. Reclaim leases via `STRIPE_WEBHOOK_STUCK_PROCESSING_LEASE_MINUTES`.
 
+## read-caching
+
+### Purpose
+
+A read cache trades a bounded amount of staleness for a pool checkout. Because the pool is this service's throughput ceiling (see **rls-context → One request, one context**), that trade is worth making for a read that is polled — and not worth making for anything else, because the cost is never zero: a cache that misses has spent a Redis round trip to still ask Postgres, and a cache that is wrong is wrong *outside* RLS, where being wrong means showing one caller another's data.
+
+So the bar is deliberately high: a read earns a cache by being **frequent, scope-keyed, and cheap to be slightly stale about**. Most reads are not.
+
+### Where it lives
+
+Four layers, each owning one decision. Nothing else may talk to Redis for a read cache.
+
+| Layer | File | Owns |
+| --- | --- | --- |
+| Client | [redis.client.ts](src/infrastructure/cache/redis.client.ts) | the one ioredis connection. It applies the deployment key prefix itself — build **logical** keys only, never include the prefix |
+| Protocol | [redis-tombstone-cache.util.ts](src/infrastructure/cache/redis-tombstone-cache.util.ts) | read (tombstone = miss) · populate with `SET … EX … NX` · invalidate by writing a short-lived **tombstone**, never `DEL` |
+| Domain cache module | `<domain>/…/<thing>.cache.ts` | key shape, TTL constant, stored shape, and the `getCached…` / `setCached…` / `invalidateCached…` trio. Example: [notification-unread-count.cache.ts](src/domains/notify/sub-domains/notification/notification-unread-count.cache.ts) |
+| Caller | the service (or the controller, for a serialized payload) | reading **after** authorization, and invalidating **after commit** at every write choke point — in the API *and* in workers |
+
+This keeps [cache.overview.md](src/infrastructure/cache/cache.overview.md)'s "no generic cache abstraction" rule: the shared util is not a cache, it is the three-command race protocol, and it exists because that protocol was already hand-written once in [session-token-cache.service.ts](src/domains/auth/sub-domains/auth-session/session-token-cache.service.ts) for revoked bearers and getting it subtly wrong the second time is the likely failure.
+
+### Implementation
+
+```mermaid
+sequenceDiagram
+  participant C as client
+  participant A as authenticate + permission preHandler
+  participant S as service
+  participant R as Redis
+  participant PG as Postgres
+  C->>A: GET (bearer)
+  A-->>C: 401 / 403 — never reaches the cache
+  A->>S: verified scope
+  S->>R: GET <domain>:<thing>:<scope public id>
+  alt hit
+    R-->>S: value
+    S-->>C: 200 (no pool checkout at all)
+  else miss, or tombstone, or Redis down
+    S->>PG: withAppDatabaseContext(scope, …)
+    PG-->>S: value
+    S->>R: SET … EX ttl NX (loses to a racing invalidation)
+    S-->>C: 200
+  end
+```
+
+**Why the invalidation writes a tombstone instead of deleting.** A `DEL` leaves a read-through race that a TTL does not bound: a reader that fetched from Postgres just before a write committed can `SET` its now-stale answer *after* the delete, and that value then serves for a full TTL. The tombstone reads back as a miss and blocks the `NX` populate, so the stale answer is refused and the next reader goes to Postgres.
+
+**And why the tombstone is short.** It is sized to the race, not to the cache: it only has to outlive the in-flight read that is about to issue its `SET … NX`, which the request-path statement timeout already bounds at 5 s — hence `CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS` (15 s). Reaching for the cache's own TTL is safe but leaves the key cold for a full minute after every write, so a user working through their inbox knocks the cache out for exactly as long as they keep using it. The one tombstone that *does* take the full cache TTL is a **revocation** tombstone, which must outlive the positive entry it overrides or the revoked thing keeps working (`session-token-cache.service.ts`). Invalidating **before** commit is what forces the first kind to be sized like the second, since the tombstone would then also have to cover the rest of the transaction — defer with `runEnqueueAfterCommit` instead, which additionally means a rolled-back write invalidates nothing.
+
+**Why the key comes from the scope, never from a request parameter.** Redis sits outside RLS. Postgres would refuse a cross-tenant read; Redis will hand over whatever key it is asked for. So the key is built from the verified scope the handler received — `UserPrincipalDatabaseScope` → per user, `OrganizationPrincipalDatabaseScope` → per organization — and a cached read happens only after the route's `authenticate` and permission preHandler have run.
+
+**Failing open is the rule.** Every Redis error logs `<cache>.cache.<operation>.failed` and falls through to Postgres, because Postgres remains the source of truth on every miss. The one asymmetry: when stale data would be a *security* problem rather than a wrong number, a failed invalidation is also reported to Sentry — see the permission cache. A wrong unread badge is not that; a stale permission set is.
+
+### How to apply
+
+- **Key**: `<domain>:<thing>:<scope public id>`, logical (no deployment prefix), from the verified scope.
+- **TTL**: ≤ 60 s, declared in [ttl.constants.ts](src/shared/constants/ttl.constants.ts) with its own literal — not aliased to an unrelated cache's constant — and documented in [POLICIES.md](src/POLICIES.md). The tombstone TTL is a **separate** number: `CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS` for freshness, the cache's own TTL only for revocation.
+- **Stored shape**: JSON-safe only. No `Date` objects, no class instances; serialize first.
+- **Invalidate after commit**, at *every* write choke point for that key, including worker paths. A writer that cannot name the scope (a retention sweep deleting by `created_at`) cannot invalidate — that is what the TTL bounds, and the direction of the resulting error belongs in the cache module's TSDoc.
+- **Register the key prefix** in `TEST_REDIS_PREFIXES` ([test-redis.ts](src/tests/helpers/test-redis.ts)). Test teardown recycles ids, so an un-cleared entry — or its tombstone, which blocks the next `SET NX` — leaks into the next case.
+- **Tests, five of them**: a hit serving a value Postgres has since changed; invalidation on each write path; scope isolation with two warm callers; the route's own gate (401/403) refusing while the entry is warm; and Redis-down falling back. Worked example: [notification-unread-count-cache.integration.test.ts](src/domains/notify/sub-domains/notification/__tests__/integration/notification-unread-count-cache.integration.test.ts).
+- **Metric**: the cache module records `read_cache_requests_total{cache,result}` so its hit ratio is observable. A cache nobody measured is a cache nobody can defend.
+- No environment kill switch. A ≤ 60 s TTL self-heals and reverting the caller is the switch; a flag would be one more untested branch on a hot path.
+
+Full write-up, including when *not* to cache: [docs/reference/runtime/read-caching.md](docs/reference/runtime/read-caching.md).
+
 ## import-paths
 
 ### Purpose

@@ -1,9 +1,18 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const createAndDispatchNotificationMock = vi.fn();
+const resolveRecipientPublicIdsMock = vi.fn();
 vi.mock('@/domains/notify/sub-domains/notification/notification-dispatch.service.js', () => ({
   createAndDispatchNotification: (...arguments_: unknown[]) =>
     createAndDispatchNotificationMock(...arguments_),
+  resolveNotificationRecipientPublicIds: (...arguments_: unknown[]) =>
+    resolveRecipientPublicIdsMock(...arguments_),
+}));
+
+const invalidateUnreadCountsMock = vi.fn();
+vi.mock('@/domains/notify/sub-domains/notification/notification-unread-count.cache.js', () => ({
+  invalidateCachedUnreadNotificationCounts: (...arguments_: unknown[]) =>
+    invalidateUnreadCountsMock(...arguments_),
 }));
 
 describe('member-invitation-accepted notification handler (item #10)', () => {
@@ -32,6 +41,10 @@ describe('member-invitation-accepted notification handler (item #10)', () => {
   beforeEach(() => {
     createAndDispatchNotificationMock.mockReset();
     createAndDispatchNotificationMock.mockResolvedValue(undefined);
+    resolveRecipientPublicIdsMock.mockReset();
+    resolveRecipientPublicIdsMock.mockResolvedValue([]);
+    invalidateUnreadCountsMock.mockReset();
+    invalidateUnreadCountsMock.mockResolvedValue(undefined);
   });
 
   it('fans out one in-app+email notification per manager recipient', async () => {
@@ -74,5 +87,41 @@ describe('member-invitation-accepted notification handler (item #10)', () => {
     ).resolves.not.toThrow();
 
     expect(createAndDispatchNotificationMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops each recipient cached unread count, keyed on the public id', async () => {
+    // The event carries internal ids; the cache is keyed on public ids. Resolving between the two
+    // is the only reason this handler touches the dispatch a second time — if that resolve is
+    // skipped or the wrong ids are forwarded, the badge silently lags a whole TTL behind a
+    // notification the user was just sent.
+    resolveRecipientPublicIdsMock.mockResolvedValue(['usr_first', 'usr_second']);
+
+    await emitAccepted({
+      recipient_user_ids: [11, 22],
+      organization_id: 7,
+      organization_name: 'Acme',
+      invitee_name: 'Dana Scully',
+    });
+
+    expect(resolveRecipientPublicIdsMock).toHaveBeenCalledWith([11, 22]);
+    expect(invalidateUnreadCountsMock).toHaveBeenCalledWith(['usr_first', 'usr_second']);
+  });
+
+  it('a failed cache invalidation never escapes the handler', async () => {
+    // Accepting an invitation must not fail because Redis did. The cost of swallowing is a badge
+    // that stays low until the TTL expires, which the cache module documents as the bounded error.
+    resolveRecipientPublicIdsMock.mockRejectedValue(new Error('redis down'));
+
+    await expect(
+      emitAccepted({
+        recipient_user_ids: [11],
+        organization_id: 7,
+        organization_name: 'Acme',
+        invitee_name: 'X',
+      }),
+    ).resolves.not.toThrow();
+
+    expect(createAndDispatchNotificationMock).toHaveBeenCalledTimes(1);
+    expect(invalidateUnreadCountsMock).not.toHaveBeenCalled();
   });
 });
