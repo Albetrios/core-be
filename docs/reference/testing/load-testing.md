@@ -182,6 +182,45 @@ from noise.
 step, so one rate-limited step at the end can read as a 6% success rate while all business routes were
 100% healthy. Quote per-route results alongside it.
 
+## Measuring a performance change that is already merged
+
+The section above tells you how to trust a before/after. This one is about the case where there is
+no "before" left to run: the change shipped, `main` contains it, and someone asks whether it helped.
+
+**You need two checkouts, not one.** Pick the last commit before the first change in the campaign
+and treat it as the baseline; `main` is the other side. Each side needs its own `db:migrate` and
+`db:seed:full`, because the database state has to match the code that reads it. Then apply the four
+rules above in full — replicate each side twice, run the pair in both orders. That is four runs
+minimum, and on a co-located box the 2.07x identical-configuration spread means anything less is
+not a measurement.
+
+**Budget the wall clock honestly.** Four journey runs plus two seeds is not a thing to slot between
+other work, and a box that is also running a browser or an editor is not a box that can produce the
+number. Check `vm.loadavg` and `vm.swapusage` with the cluster down first; uniform inflation across
+every route is the signature that you measured the machine instead of the code.
+
+### What to read, for a caching or transaction-count change
+
+| Metric | What it tells you |
+| --- | --- |
+| Per-route p95 | The user-visible effect. Read this **before** the aggregate — a change to three routes barely moves a mix of sixteen. |
+| `pg_pool_waiting` | Requests queued for a connection. This is the ceiling a transaction-count change is aimed at. |
+| `database_rls_active_checkouts` | Should fall if contexts were folded. |
+| `database_rls_checkout_hold_seconds` | How long each checkout pins its connection. |
+| `read_cache_requests_total{cache,result}` | The hit ratio, per cache. |
+
+**A cache's hit ratio is its falsification test, and it must come from a realistic journey.** A
+synthetic loop against one endpoint will show a ratio near 100% and prove nothing — the number only
+means something when writes are invalidating at the rate they really do. A ratio near zero under a
+real journey means that cache is paying a Redis round trip to still ask Postgres, and the correct
+response is to remove it. Measuring it exists to make that outcome possible, not to confirm a
+decision already made.
+
+**Counts are not throughput.** A transaction-per-request budget (see
+[`request-transaction-budget.integration.test.ts`](../../../src/tests/integration/database/request-transaction-budget.integration.test.ts))
+proves a route stopped taking two pool checkouts. It does not prove the service got faster, and the
+two claims should not be reported as if they were the same one.
+
 ## Post-run settle check (drain + assert clean)
 
 After a load (or e2e) batch, `pnpm load:settle-check` proves the async fabric finished every job the run started — nothing stuck in a queue, the event-bus / outbox side effects flushed, and nothing dead-lettered. Run it against the **same** API + worker the load test hit (workers must be running so the backlog can drain):
