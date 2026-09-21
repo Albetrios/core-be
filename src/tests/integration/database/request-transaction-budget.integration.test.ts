@@ -3,6 +3,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 import { invalidateCachedUnreadNotificationCount } from '@/domains/notify/sub-domains/notification/notification-unread-count.cache.js';
 import { database } from '@/infrastructure/database/connection.js';
+import {
+  createMembership,
+  createRoleWithPermissions,
+  seedPermissions,
+} from '@/domains/tenancy/__tests__/factories/permission.factory.js';
+import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { createTestApp } from '@/tests/helpers/test-app.js';
@@ -25,13 +31,29 @@ import { injectAuthenticated } from '@/tests/helpers/test-http-inject.helper.js'
  * Reads here are worth one transaction each. If a change pushes one of these over budget, the
  * likely cause is a lookup that should have happened INSIDE the context the handler already opens
  * — see `UserService.resolveInternalIdByPublicId`.
+ *
+ * **Why an organization-scoped row is worth its extra fixture.** `GET /billing/subscriptions` makes
+ * TWO `withAppDatabaseContext` calls and still costs one transaction, and the reason is three files
+ * away from the route. `SubscriptionService.decorateWithSeatCounts` reaches across into
+ * `MembershipService.countActiveMembers`, which mints a fresh
+ * `PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId })`; the reuse predicate in
+ * `database-context.ts` matches on the **organization public id alone**, not on scope kind, so the
+ * nested call reuses the handle the outer context pinned rather than taking a second checkout.
+ * (That outer pin is the service's own — `organization-rls-transaction.middleware.ts` is a no-op
+ * stub today and pins nothing.) Narrow that predicate, move the seat count outside the context, or
+ * have it resolve a different organization, and this route silently doubles its pool cost with
+ * nothing else objecting. Hence the row.
  */
 const TRANSACTIONS_PER_READ = 1;
+
+const ORGANIZATION_SCOPED_PERMISSIONS = ['subscription:read'];
 
 describe('Integration: per-request database transaction budget', () => {
   let app: FastifyInstance;
   let token: string;
   let userPublicId: string;
+  let organizationToken: string;
+  let organizationPublicId: string;
 
   beforeAll(async () => {
     const { app: testApplication } = await createTestApp();
@@ -46,7 +68,22 @@ describe('Integration: per-request database transaction budget', () => {
     await cleanupDatabase();
     const user = await createTestUser({ isEmailVerified: true });
     userPublicId = user.public_id;
+    // The user-only token stays exactly as it was, so the user-scoped rows keep measuring what
+    // they measured before the organization fixture existed.
     token = await generateTestToken({ userId: user.public_id });
+
+    await seedPermissions(ORGANIZATION_SCOPED_PERMISSIONS);
+    const organization = await createTestOrganization({ ownerUserId: user.id });
+    const role = await createRoleWithPermissions({
+      organizationId: organization.id,
+      permissionCodes: ORGANIZATION_SCOPED_PERMISSIONS,
+    });
+    await createMembership({ userId: user.id, organizationId: organization.id, roleId: role.id });
+    organizationPublicId = organization.public_id;
+    organizationToken = await generateTestToken({
+      userId: user.public_id,
+      organizationPublicId: organization.public_id,
+    });
   });
 
   /**
@@ -62,45 +99,74 @@ describe('Integration: per-request database transaction budget', () => {
    * assertion passes no matter what the Postgres path does — a budget that cannot fail is not a
    * budget. Cooling it back down keeps this measuring the thing that actually costs a checkout.
    */
-  async function countTransactionsForRead(
-    url: string,
-    coolCache?: () => Promise<void>,
-  ): Promise<number> {
-    const warmup = await injectAuthenticated(app, { method: 'GET', url, token });
-    expect(warmup.statusCode).toBe(200);
-    await coolCache?.();
+  async function countTransactionsForRead(options: {
+    url: string;
+    organizationScoped?: boolean;
+    coolCache?: () => Promise<void>;
+  }): Promise<number> {
+    const request = options.organizationScoped
+      ? { token: organizationToken, organizationPublicId }
+      : { token };
+
+    const warmup = await injectAuthenticated(app, { method: 'GET', url: options.url, ...request });
+    expect(warmup.statusCode, warmup.body).toBe(200);
+    await options.coolCache?.();
 
     const transactionSpy = vi.spyOn(database, 'transaction');
     try {
-      const response = await injectAuthenticated(app, { method: 'GET', url, token });
-      expect(response.statusCode).toBe(200);
+      const response = await injectAuthenticated(app, {
+        method: 'GET',
+        url: options.url,
+        ...request,
+      });
+      expect(response.statusCode, response.body).toBe(200);
       return transactionSpy.mock.calls.length;
     } finally {
       transactionSpy.mockRestore();
     }
   }
 
-  const readRoutes: readonly [name: string, path: string, coolCache?: () => Promise<void>][] = [
-    ['GET /users/me', '/users/me'],
-    ['GET /users/me/settings', '/users/me/settings'],
-    ['GET /users/me/notification-preferences', '/users/me/notification-preferences'],
-    ['GET /notify/notifications', '/notify/notifications'],
-    [
-      'GET /notify/notifications/unread-count',
-      '/notify/notifications/unread-count',
+  type ReadRoute = {
+    name: string;
+    path: string;
+    /** Send the organization-claim token and organization header instead of the user-only token. */
+    organizationScoped?: boolean;
+    coolCache?: () => Promise<void>;
+  };
+
+  const readRoutes: readonly ReadRoute[] = [
+    { name: 'GET /users/me', path: '/users/me' },
+    { name: 'GET /users/me/settings', path: '/users/me/settings' },
+    {
+      name: 'GET /users/me/notification-preferences',
+      path: '/users/me/notification-preferences',
+    },
+    { name: 'GET /notify/notifications', path: '/notify/notifications' },
+    {
+      name: 'GET /notify/notifications/unread-count',
+      path: '/notify/notifications/unread-count',
       // A tombstone, not a delete — the same call the write paths make, so this measures the miss
       // exactly as production sees it (the populate that follows is `NX`-refused, which costs
       // nothing this test counts).
-      async () => {
+      coolCache: async () => {
         await invalidateCachedUnreadNotificationCount(userPublicId);
       },
-    ],
-    ['GET /users/me/organizations', '/users/me/organizations'],
+    },
+    { name: 'GET /users/me/organizations', path: '/users/me/organizations' },
+    {
+      name: 'GET /billing/subscriptions',
+      path: '/billing/subscriptions',
+      organizationScoped: true,
+    },
   ];
 
-  for (const [name, path, coolCache] of readRoutes) {
-    it(`${name} opens exactly ${TRANSACTIONS_PER_READ} transaction`, async () => {
-      const observed = await countTransactionsForRead(testApiPath(path), coolCache);
+  for (const route of readRoutes) {
+    it(`${route.name} opens exactly ${TRANSACTIONS_PER_READ} transaction`, async () => {
+      const observed = await countTransactionsForRead({
+        url: testApiPath(route.path),
+        ...(route.organizationScoped === true ? { organizationScoped: true } : {}),
+        ...(route.coolCache ? { coolCache: route.coolCache } : {}),
+      });
 
       // The upper bound is the budget. The lower bound is the guard on the budget: a route that
       // reaches Postgres but was measured at zero was not measured at all — its read cache stayed
