@@ -151,3 +151,97 @@ describe('redactSensitiveUrl', () => {
     );
   });
 });
+
+/**
+ * `Object.entries` sees only own ENUMERABLE properties, and an Error keeps
+ * `name` / `message` / `stack` non-enumerable — so the generic object walk
+ * copied none of them and every error collapsed to `{}`. Pino runs
+ * `formatters.log` before its serializers, so `stdSerializers.err` never saw an
+ * Error and every `logger.error({ error }, …)` in the codebase shipped without a
+ * message or a stack.
+ */
+describe('redactSensitive — Error values', () => {
+  it('keeps the message and stack instead of collapsing to an empty object', () => {
+    const error = new Error('connection refused');
+
+    const redacted = redactSensitive(error);
+
+    expect(redacted).toBeInstanceOf(Error);
+    expect(redacted.message).toBe('connection refused');
+    expect(redacted.stack).toContain('connection refused');
+    expect(Object.keys(redacted as unknown as Record<string, unknown>)).not.toContain('name');
+  });
+
+  it('survives nested inside a log object', () => {
+    const redacted = redactSensitive({ error: new Error('boom'), scope: 'worker' }) as {
+      error: Error;
+      scope: string;
+    };
+
+    expect(redacted.error).toBeInstanceOf(Error);
+    expect(redacted.error.message).toBe('boom');
+    expect(redacted.scope).toBe('worker');
+  });
+
+  it('redacts a secret in the message and in the stack header, keeping the frames', () => {
+    const error = new Error('GET https://api.example.com/v1?access_token=super-secret');
+
+    const redacted = redactSensitive(error);
+
+    expect(redacted.message).toContain(SENSITIVE_REDACTION_PLACEHOLDER);
+    expect(redacted.message).not.toContain('super-secret');
+    expect(redacted.stack).not.toContain('super-secret');
+    // The frames below the header line must survive the substitution.
+    expect(redacted.stack).toContain('at ');
+  });
+
+  it('redacts sensitive own properties an error carries', () => {
+    const error = Object.assign(new Error('auth failed'), {
+      statusCode: 401,
+      access_token: 'leaked',
+    });
+
+    const redacted = redactSensitive(error) as unknown as Record<string, unknown>;
+
+    expect(redacted.statusCode).toBe(401);
+    expect(redacted.access_token).toBe(SENSITIVE_REDACTION_PLACEHOLDER);
+  });
+
+  it('carries the cause across without making it enumerable', () => {
+    const redacted = redactSensitive(new Error('outer', { cause: new Error('inner') })) as Error & {
+      cause?: Error;
+    };
+
+    expect(redacted.cause).toBeInstanceOf(Error);
+    expect(redacted.cause?.message).toBe('inner');
+    expect(Object.keys(redacted as unknown as Record<string, unknown>)).not.toContain('cause');
+  });
+
+  it('never mutates the error it was handed', () => {
+    const error = Object.assign(new Error('GET /x?token=abc'), { token: 'abc' });
+
+    redactSensitive(error);
+
+    expect(error.message).toBe('GET /x?token=abc');
+    expect(error.token).toBe('abc');
+  });
+
+  it('returns the same copy for an error reachable twice (no infinite walk)', () => {
+    const error = new Error('shared');
+    const redacted = redactSensitive({ first: error, second: error }) as {
+      first: Error;
+      second: Error;
+    };
+
+    expect(redacted.first).toBe(redacted.second);
+    expect(redacted.first.message).toBe('shared');
+  });
+});
+
+describe('redactSensitiveUrl — relative paths', () => {
+  it('does not double the question mark when redacting a relative URL', () => {
+    expect(redactSensitiveUrl('/v1/callback?token=abc&id=1')).toBe(
+      `/v1/callback?token=${SENSITIVE_REDACTION_PLACEHOLDER}&id=1`,
+    );
+  });
+});
