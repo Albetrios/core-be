@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { BILLING_PERMISSIONS } from '@/domains/billing/billing.permissions.js';
+import { NOTIFY_PERMISSIONS } from '@/domains/notify/notify.permissions.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { seedPermissions } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
@@ -20,6 +21,7 @@ describe('team organization provisioning (database)', () => {
     await seedPermissions([
       ...Object.values(TENANCY_PERMISSIONS),
       ...Object.values(BILLING_PERMISSIONS),
+      ...Object.values(NOTIFY_PERMISSIONS),
     ]);
   });
 
@@ -45,6 +47,43 @@ describe('team organization provisioning (database)', () => {
     const granted = rows.map((row) => row.permission_code);
     expect(granted).toContain(BILLING_PERMISSIONS.SUBSCRIPTION_READ);
     expect(granted).toContain(BILLING_PERMISSIONS.SUBSCRIPTION_MANAGE);
+  });
+
+  it('grants notify (webhook) permissions to TEAM organization owners', async () => {
+    // Regression: webhook:read / webhook:manage were seeded into
+    // tenancy.permissions and granted to NO role in ANY organization, ever. So
+    // /notify/webhooks answered 403 to every caller including the owner, and the
+    // frontend's integrations panel rendered an API-keys list under a heading
+    // promising "API keys and webhooks". A permission nothing can hold is not a
+    // boundary, it is a dead route.
+    const user = await createTestUser();
+
+    const result = await provisionOrganizationWithOwner({
+      name: 'Acme Notify',
+      slug: 'acme-team-notify-provision',
+      type: 'TEAM',
+      ownerUserId: user.id,
+    });
+
+    const codes = ownerPermissionCodesForOrganizationType('TEAM');
+    expect(codes).toContain(NOTIFY_PERMISSIONS.WEBHOOK_READ);
+    expect(codes).toContain(NOTIFY_PERMISSIONS.WEBHOOK_MANAGE);
+
+    const rows = await database
+      .select({ permission_code: role_permissions.permission_code })
+      .from(role_permissions)
+      .where(eq(role_permissions.role_id, result.roleId));
+
+    const granted = rows.map((row) => row.permission_code);
+    expect(granted).toContain(NOTIFY_PERMISSIONS.WEBHOOK_READ);
+    expect(granted).toContain(NOTIFY_PERMISSIONS.WEBHOOK_MANAGE);
+  });
+
+  it('does not grant notify permissions to PERSONAL organization owners', () => {
+    // Webhooks are a TEAM surface, exactly like billing.
+    const codes = ownerPermissionCodesForOrganizationType('PERSONAL');
+    expect(codes).not.toContain(NOTIFY_PERMISSIONS.WEBHOOK_READ);
+    expect(codes).not.toContain(NOTIFY_PERMISSIONS.WEBHOOK_MANAGE);
   });
 
   it('does not grant billing permissions to PERSONAL organization owners', async () => {
