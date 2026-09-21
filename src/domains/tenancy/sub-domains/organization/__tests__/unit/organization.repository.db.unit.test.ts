@@ -171,15 +171,15 @@ describe('OrganizationRepository (database)', () => {
     const other = await createTestUser({ email: 'count-other@test.com' });
     expect(await repository.countActiveOwnedByUser(owner.id)).toBe(0);
 
-    const org1 = await createTestOrganization({ ownerUserId: owner.id });
+    const organizationToDelete = await createTestOrganization({ ownerUserId: owner.id });
     await createTestOrganization({ ownerUserId: owner.id });
     expect(await repository.countActiveOwnedByUser(owner.id)).toBe(2);
     // Orgs owned by a different user don't count toward this owner.
     expect(await repository.countActiveOwnedByUser(other.id)).toBe(0);
 
     // A soft-deleted organization drops out of the count (softDelete requires deletion_started_at first).
-    await repository.markDeletionStarted(org1.public_id);
-    await repository.softDelete(org1.public_id);
+    await repository.markDeletionStarted(organizationToDelete.public_id);
+    await repository.softDelete(organizationToDelete.public_id);
     expect(await repository.countActiveOwnedByUser(owner.id)).toBe(1);
   });
 });
