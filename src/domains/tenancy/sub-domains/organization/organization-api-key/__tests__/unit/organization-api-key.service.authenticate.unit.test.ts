@@ -5,6 +5,14 @@ import {
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 
+const claimLastUsedWrite = vi.fn().mockResolvedValue(true);
+vi.mock(
+  '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key-last-used.throttle.js',
+  () => ({
+    claimApiKeyLastUsedWrite: (...args: unknown[]) => claimLastUsedWrite(...args),
+  }),
+);
+
 vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
@@ -57,6 +65,7 @@ describe('OrganizationApiKeyService.authenticate', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    claimLastUsedWrite.mockResolvedValue(true);
   });
 
   it('returns auth match for valid prefix + hash and touches last_used_at', async () => {
@@ -96,5 +105,32 @@ describe('OrganizationApiKeyService.authenticate', () => {
     vi.mocked(apiKeyRepository.findActiveByKeyPrefix).mockResolvedValue([]);
     const result = await service.authenticate('ak_unknown', 'hash', () => true);
     expect(result).toBeNull();
+  });
+
+  it('skips the last_used_at write when the throttle window is already claimed', async () => {
+    // The point of the throttle. `touchLastUsedAt` is wrapped in `withAppDatabaseContext`, which
+    // opens a transaction and holds a pooled connection — and it was the ONLY transaction an
+    // authenticated API-key request opened. Skipping it here is the whole saving; the request
+    // still authenticates identically.
+    vi.mocked(apiKeyRepository.findActiveByKeyPrefix).mockResolvedValue([candidate] as never);
+    claimLastUsedWrite.mockResolvedValue(false);
+
+    const result = await service.authenticate('ak_prefix', 'candidate-hash', () => true);
+
+    expect(result).toEqual({
+      public_id: 'apikey_public_abc',
+      organization_public_id: 'org_public_abc',
+      scopes: ['read'],
+    });
+    expect(claimLastUsedWrite).toHaveBeenCalledWith('apikey_public_abc');
+    expect(apiKeyRepository.touchLastUsedAt).not.toHaveBeenCalled();
+  });
+
+  it('never claims a throttle window for a key that failed to authenticate', async () => {
+    // A claim on a rejected key would let an attacker spraying a known public id suppress the
+    // legitimate holder's `last_used_at` — small, but it is free not to have.
+    vi.mocked(apiKeyRepository.findActiveByKeyPrefix).mockResolvedValue([candidate] as never);
+    await service.authenticate('ak_prefix', 'wrong-hash', () => false);
+    expect(claimLastUsedWrite).not.toHaveBeenCalled();
   });
 });

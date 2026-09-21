@@ -170,6 +170,20 @@ export const NOTIFICATION_UNREAD_COUNT_CACHE_TTL_SECONDS = 60;
  */
 export const CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS = 15;
 
+/**
+ * How long one recorded `last_used_at` write suppresses the next, in seconds.
+ *
+ * @remarks
+ * Matches the `interval '1 minute'` predicate the `UPDATE` itself carries (audit-#8), because the
+ * two throttle the same thing from opposite sides: the SQL stops the row write, this stops the
+ * transaction around it. Setting them apart would not break anything — it would just mean one
+ * gate does nothing.
+ *
+ * The only consumer of `last_used_at` is a dashboard column, so the cost of a skipped write is a
+ * timestamp up to this old. There is no retention sweep, audit report or query that filters on it.
+ */
+export const API_KEY_LAST_USED_THROTTLE_TTL_SECONDS = 60;
+
 /** Worker queue last-job heartbeat key TTL in Redis (seconds). */
 export const WORKER_QUEUE_HEARTBEAT_TTL_SECONDS = SECONDS_PER_DAY;
 
