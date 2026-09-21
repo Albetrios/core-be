@@ -239,7 +239,7 @@
     "argon2": "^0.45.1",
     "bullmq": "^6.3.6",
     "disposable-email-domains-js": "^1.25.0",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.0",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.4",
     "fastify-plugin": "^6.0.0",
