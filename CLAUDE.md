@@ -49,6 +49,7 @@ Detail and examples live in scoped Cursor rules (auto-attach when editing `src/*
 
 - **[full-names-only.mdc](.cursor/rules/full-names-only.mdc)** — no abbreviations in identifiers OR prose (`organization` not `org`, incl. plurals/compounds); intentional compact WIRE literals are the only survivors — the `org_` public-id prefix, the JWT claim keys `org`/`sv`, third-party payloads; Fastify `req`/`reply` exempt
 - **[object-params.mdc](.cursor/rules/object-params.mdc)** — options objects for 2+ params; repos and framework callbacks exempt
+- **[no-digits-in-names.mdc](agent-os/rules/no-digits-in-names.mdc)** — no digits in identifiers we own (`firstPage`, never `page1`); a digit is a version, a duplicate or a shrug. Exempt: the API `v1` segment, vendor/standard names (`S3`, `OAuth2`, `SHA256`), a third-party export renamed **at the import**, audit-finding citations in comments, and digits in values
 - Sub-domain folders **must** prefix with domain/resource name (`organization-settings`, `webhook-event`, …)
 
 ## Domain Structure
