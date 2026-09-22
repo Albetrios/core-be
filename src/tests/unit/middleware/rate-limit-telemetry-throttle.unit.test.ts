@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { shouldEmitRateLimitTelemetry } from '@/shared/middlewares/rate-limit/rate-limit-telemetry-throttle.js';
 
 /**
- * The rate-limit `onExceeding` observers fire on every throttle-adjacent request; under
- * concentrated load that floods Pino + Sentry. `shouldEmitRateLimitTelemetry` caps emission to
+ * The rate-limit `onExceeded` observers fire on every REJECTED request, and a caller that has hit
+ * its limit keeps hitting it; under a sustained burst that floods Pino + Sentry with a fact the
+ * first line already established. `shouldEmitRateLimitTelemetry` caps emission to
  * once per key per window. Each test uses a unique key because the throttle map is module-level
  * (process-wide by design).
  */

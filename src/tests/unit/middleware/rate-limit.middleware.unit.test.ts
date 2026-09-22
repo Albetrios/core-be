@@ -98,6 +98,40 @@ describe('rate-limit.middleware', () => {
     expect(options.allowList({ url: testApiPath('/auth/login') })).toBe(false);
   });
 
+  /*
+   * Regression: the observer was wired to `onExceeding`, which — despite the name —
+   * `@fastify/rate-limit` calls on every request it ALLOWS
+   * (`if (!isExceeded) { …; params.onExceeding(req, key); return }`). So the global limiter
+   * logged a WARN `rate_limit.exceeded` + a Sentry breadcrumb for normal 200 traffic, and
+   * emitted NOTHING for the requests it actually rejected with a 429. Both halves are asserted
+   * here, because fixing one without the other is how the signal got inverted in the first place.
+   */
+  it('reports the requests it REJECTED, not the ones it allowed', async () => {
+    application = Fastify();
+    await application.register(rateLimitMiddleware);
+    await application.ready();
+
+    const options = rateLimitPlugin.mock.calls.at(-1)![1] as {
+      onExceeded?: (request: unknown, key: string) => void;
+      onExceeding?: unknown;
+    };
+    expect(options.onExceeded).toBeTypeOf('function');
+    expect(options.onExceeding).toBeUndefined();
+
+    const { logger } = await import('@/shared/utils/infrastructure/logger.util.js');
+    const { Sentry } = await import('@/infrastructure/observability/sentry/sentry.js');
+    options.onExceeded!(
+      { ip: '198.51.100.7', method: 'POST', url: testApiPath('/auth/login'), routeOptions: {} },
+      'ip:198.51.100.7',
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'rate_limit.exceeded', key: 'ip:198.51.100.7' }),
+    );
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'rate_limit', level: 'warning' }),
+    );
+  });
+
   it('registers in-memory rate limiting when Redis is not configured', async () => {
     const previousFlag = process.env.RUN_REDIS_TESTS;
     delete process.env.RUN_REDIS_TESTS;

@@ -18,10 +18,15 @@ function buildRateLimitKeyFromIpAddress(request: FastifyRequest): string {
 }
 
 /**
- * Shared `onExceeding` observer wired into every preset below so a throttled per-email / per-user /
+ * Shared `onExceeded` observer wired into every preset below so a throttled per-email / per-user /
  * per-organization request surfaces its bucket key. Emits the same structured `rate_limit.exceeded` warning
  * as the global limiter plus a warning-level Sentry breadcrumb for trace context. Observe-only — it
- * never changes throttling behavior. Matches the `onExceeding` signature `(request, key)`.
+ * never changes throttling behavior. Matches the `onExceeded` signature `(request, key)`.
+ *
+ * `onExceeded`, not `onExceeding` — see the note on the global limiter's observer in
+ * `rate-limit.middleware.ts`: `@fastify/rate-limit` calls `onExceeding` on every request it
+ * ALLOWS, so these presets were reporting normal traffic as throttled and reporting nothing
+ * when a caller was actually cut off.
  */
 function recordRouteRateLimitExceeded(request: FastifyRequest, key: string): void {
   // Throttle the WARN + Sentry breadcrumb per key (see rate-limit-telemetry-throttle.ts) so a
@@ -152,7 +157,7 @@ export const STRICT_PUBLIC_RATE_LIMIT = {
       max: STRICT_PUBLIC_ROUTE_MAX_REQUESTS_PER_WINDOW,
       timeWindow: MILLISECONDS_PER_MINUTE,
       keyGenerator: buildRateLimitKeyFromIpAddress,
-      onExceeding: recordRouteRateLimitExceeded,
+      onExceeded: recordRouteRateLimitExceeded,
     },
   },
 } as const;
@@ -178,7 +183,7 @@ export const STRICT_PUBLIC_PER_EMAIL_RATE_LIMIT_OPTIONS: RateLimitOptions = {
   timeWindow: STRICT_PUBLIC_PER_EMAIL_WINDOW_MS,
   hook: 'preHandler',
   keyGenerator: buildRateLimitKeyFromRequestBodyEmail,
-  onExceeding: recordRouteRateLimitExceeded,
+  onExceeded: recordRouteRateLimitExceeded,
 };
 
 const STRICT_AUTHED_MAX_REQUESTS_PER_WINDOW = RATE_LIMIT_CAPS_RELAXED ? 5000 : 10;
@@ -196,7 +201,7 @@ export const STRICT_AUTHED_RATE_LIMIT = {
       timeWindow: MILLISECONDS_PER_MINUTE,
       hook: 'preHandler' as const,
       keyGenerator: buildRateLimitKeyFromAuthenticatedUserOrIpAddress,
-      onExceeding: recordRouteRateLimitExceeded,
+      onExceeded: recordRouteRateLimitExceeded,
     },
   },
 } as const;
@@ -209,7 +214,7 @@ export const MODERATE_AUTHED_RATE_LIMIT = {
       timeWindow: MILLISECONDS_PER_MINUTE,
       hook: 'preHandler' as const,
       keyGenerator: buildRateLimitKeyFromAuthenticatedUserOrIpAddress,
-      onExceeding: recordRouteRateLimitExceeded,
+      onExceeded: recordRouteRateLimitExceeded,
     },
   },
 } as const;
@@ -221,7 +226,7 @@ export const REFRESH_RATE_LIMIT = {
       max: 30,
       timeWindow: MILLISECONDS_PER_MINUTE,
       keyGenerator: buildRateLimitKeyFromIpAddress,
-      onExceeding: recordRouteRateLimitExceeded,
+      onExceeded: recordRouteRateLimitExceeded,
     },
   },
 } as const;
@@ -233,7 +238,7 @@ export const WEBHOOK_RATE_LIMIT = {
       max: RATE_LIMIT_CAPS_RELAXED ? 5000 : 60,
       timeWindow: MILLISECONDS_PER_MINUTE,
       keyGenerator: buildRateLimitKeyFromIpAddress,
-      onExceeding: recordRouteRateLimitExceeded,
+      onExceeded: recordRouteRateLimitExceeded,
     },
   },
 } as const;
@@ -259,7 +264,7 @@ export const PUBLIC_READ_RATE_LIMIT = {
       max: RATE_LIMIT_CAPS_RELAXED ? 5000 : 60,
       timeWindow: MILLISECONDS_PER_MINUTE,
       keyGenerator: buildRateLimitKeyFromIpAddress,
-      onExceeding: recordRouteRateLimitExceeded,
+      onExceeded: recordRouteRateLimitExceeded,
     },
   },
 } as const;
@@ -279,7 +284,7 @@ export const ORGANIZATION_SCOPED_AUTHED_RATE_LIMIT = {
       timeWindow: MILLISECONDS_PER_MINUTE,
       hook: 'preHandler' as const,
       keyGenerator: buildRateLimitKeyFromOrganizationActorOrIpAddress,
-      onExceeding: recordRouteRateLimitExceeded,
+      onExceeded: recordRouteRateLimitExceeded,
     },
   },
 } as const;
@@ -292,7 +297,7 @@ export const EXPENSIVE_AUTHED_RATE_LIMIT = {
       timeWindow: 5 * MILLISECONDS_PER_MINUTE,
       hook: 'preHandler' as const,
       keyGenerator: buildRateLimitKeyFromAuthenticatedUserOrIpAddress,
-      onExceeding: recordRouteRateLimitExceeded,
+      onExceeded: recordRouteRateLimitExceeded,
     },
   },
 } as const;
