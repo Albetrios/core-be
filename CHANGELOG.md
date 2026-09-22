@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.0.1](https://github.com/albetrios/core-be/compare/v7.0.0...v7.0.1) (2026-09-22)
+
+
+### Fixed
+
+* **observability:** keep the message and stack in every error log ([#1179](https://github.com/albetrios/core-be/issues/1179)) ([8f2cced](https://github.com/albetrios/core-be/commit/8f2ccedf9551fd24e9fee747c6f2c69c919c0ab9))
+* **tenancy:** grant the webhook permissions an owner could never hold ([#1180](https://github.com/albetrios/core-be/issues/1180)) ([8748727](https://github.com/albetrios/core-be/commit/87487273d95ec2fd69f8e9413daf4f8dafb486a2))
+
 ## [7.0.0](https://github.com/albetrios/core-be/compare/v6.0.2...v7.0.0) (2026-09-21)
 
 
