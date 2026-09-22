@@ -4,7 +4,7 @@ import { BILLING_PERMISSIONS } from '@/domains/billing/billing.permissions.js';
 import { NOTIFY_PERMISSIONS } from '@/domains/notify/notify.permissions.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
-import { seedPermissions } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
+import { seedAllPermissions } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
 import { TENANCY_PERMISSIONS } from '@/domains/tenancy/tenancy.permissions.js';
 import {
   DEFAULT_TEAM_ROLES,
@@ -18,11 +18,10 @@ import { database } from '@/infrastructure/database/connection.js';
 describe('team organization provisioning (database)', () => {
   beforeEach(async () => {
     await cleanupDatabase();
-    await seedPermissions([
-      ...Object.values(TENANCY_PERMISSIONS),
-      ...Object.values(BILLING_PERMISSIONS),
-      ...Object.values(NOTIFY_PERMISSIONS),
-    ]);
+    // Seed the whole catalog, not a per-domain subset: the owner grant spans tenancy, audit,
+    // upload, billing and notify, and every code carries a role_permissions → permissions FK,
+    // so an enumerated subset breaks provisioning the next time a permission is added.
+    await seedAllPermissions();
   });
 
   it('grants billing permissions to TEAM organization owners', async () => {

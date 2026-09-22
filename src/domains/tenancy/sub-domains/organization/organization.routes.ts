@@ -21,7 +21,6 @@ import { TENANCY_PERMISSIONS } from '@/domains/tenancy/tenancy.permissions.js';
 import { AUDIT_PERMISSIONS } from '@/domains/audit/audit.permissions.js';
 import {
   createOrganizationDto,
-  listOrganizationsQueryDto,
   organizationSlugParamsDto,
   updateOrganizationDto,
   uploadLogoDto,

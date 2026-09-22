@@ -10,7 +10,7 @@ import {
   injectUnauthenticated,
 } from '@/tests/helpers/test-http-inject.helper.js';
 import {
-  seedPermissions,
+  seedAllPermissions,
   createRoleWithPermissions,
   createMembership,
 } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
@@ -43,7 +43,8 @@ describe('Security: Session invalidation', () => {
 
   beforeEach(async () => {
     await cleanupDatabase();
-    await seedPermissions(Object.values(TENANCY_PERMISSIONS));
+    // Whole catalog, not the tenancy subset: provisioning grants audit and upload codes too.
+    await seedAllPermissions();
   });
 
   async function createActiveUserWithToken() {

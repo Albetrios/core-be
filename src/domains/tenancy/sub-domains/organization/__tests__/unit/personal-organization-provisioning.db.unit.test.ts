@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { sql } from '@/infrastructure/database/connection.js';
-import { seedPermissions } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
-import { TENANCY_PERMISSIONS } from '@/domains/tenancy/tenancy.permissions.js';
+import { seedAllPermissions } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
 import { env } from '@/shared/config/env.config.js';
 import { provisionPersonalOrganization } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
 import {
@@ -17,8 +16,9 @@ import {
 describe('personal organization provisioning (database)', () => {
   beforeEach(async () => {
     await cleanupDatabase();
-    // The owner role is granted every tenancy permission; the codes must exist as reference rows.
-    await seedPermissions(Object.values(TENANCY_PERMISSIONS));
+    // The owner grant spans tenancy, audit and upload; seed the whole catalog rather than a
+    // subset so adding a permission cannot break provisioning through the FK.
+    await seedAllPermissions();
   });
 
   it('provisions a PERSONAL organization with a null slug owned by the user', async () => {
@@ -185,7 +185,7 @@ describe('personal organization provisioning (database)', () => {
     afterEach(async () => {
       env.PERSONAL_ORGANIZATION_ENABLED = originalPersonalEnabled;
       // Restore the catalog so sibling suites relying on it are unaffected.
-      await seedPermissions(Object.values(TENANCY_PERMISSIONS));
+      await seedAllPermissions();
     });
 
     it('READ path (ensurePersonalOrganizationPublicId) degrades to undefined, never throws', async () => {
