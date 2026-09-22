@@ -1,3 +1,4 @@
+import type { RateLimitOptions } from '@fastify/rate-limit';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mockEnv = vi.hoisted(() => ({
@@ -173,5 +174,26 @@ describe('rate-limit-presets', () => {
       auth: undefined,
     } as never);
     expect(unauthenticated).toBe('ip:203.0.113.7');
+  });
+  /*
+   * Regression (same defect as the global limiter's): `@fastify/rate-limit` calls `onExceeding`
+   * on every request it ALLOWS — `if (!isExceeded) { …; params.onExceeding(req, key); return }` —
+   * so every preset wired there warned about traffic that was served and stayed silent for the
+   * callers it actually cut off. Asserted across ALL of them rather than a sample: there are nine
+   * wirings, and one left behind is one surface still reporting the opposite of what happened.
+   */
+  it('every preset reports the requests it REJECTED, not the ones it allowed', async () => {
+    const presets = await import('@/shared/middlewares/rate-limit/rate-limit-presets.constants.js');
+    const limiterOptions = Object.entries(presets).map(([name, preset]) => {
+      const candidate = preset as { config?: { rateLimit?: RateLimitOptions } } & RateLimitOptions;
+      return [name, candidate.config?.rateLimit ?? candidate] as const;
+    });
+    expect(limiterOptions.length).toBeGreaterThan(0);
+
+    for (const [name, options] of limiterOptions) {
+      expect(options, `${name} declares no limiter options`).toBeDefined();
+      expect(options.onExceeded, `${name} must observe onExceeded`).toBeTypeOf('function');
+      expect(options.onExceeding, `${name} must NOT observe onExceeding`).toBeUndefined();
+    }
   });
 });

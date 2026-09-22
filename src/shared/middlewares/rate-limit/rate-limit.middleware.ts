@@ -10,10 +10,18 @@ import { createRedisFallbackRateLimitStore } from '@/shared/middlewares/rate-lim
 import { shouldEmitRateLimitTelemetry } from '@/shared/middlewares/rate-limit/rate-limit-telemetry-throttle.js';
 
 /**
- * Observes a request that is about to be throttled by the global limiter: emits a structured
+ * Observes a request the global limiter has just REJECTED: emits a structured
  * `rate_limit.exceeded` warning (with the resolved bucket key) and a warning-level Sentry
  * breadcrumb so the next captured error carries the throttle context. Purely additive — it
- * does not alter limiter behavior. Matches the `onExceeding` signature `(request, key)`.
+ * does not alter limiter behavior. Matches the `onExceeded` signature `(request, key)`.
+ *
+ * Wired to `onExceeded`, NOT `onExceeding`. Despite the name, `@fastify/rate-limit` calls
+ * `onExceeding` on every request that is **not** exceeded — it is the allowed path, not an
+ * approaching-the-limit path (`if (!isExceeded) { …; params.onExceeding(req, key); return }`).
+ * Wired there, this warned about traffic that was served normally and said nothing at all
+ * about the requests that actually got a 429: the signal was inverted, and the throttle in
+ * `rate-limit-telemetry-throttle.ts` was added to cap the resulting flood of WARNs "for
+ * requests that still returned 200" rather than to stop emitting them.
  */
 function recordGlobalRateLimitExceeded(request: FastifyRequest, key: string): void {
   // Throttle the WARN + Sentry breadcrumb per key so a single hot IP/NAT cannot flood logs
@@ -101,8 +109,9 @@ const rateLimitMiddleware: FastifyPluginAsync = async (app) => {
     // Last-resort guard only — the fallback store below already degrades to in-process limiting
     // on Redis errors, so this should never actually skip. See @remarks above.
     skipOnError: true,
-    // Observe-only: surface every throttled request as a structured log + Sentry breadcrumb.
-    onExceeding: recordGlobalRateLimitExceeded,
+    // Observe-only: surface every REJECTED request as a structured log + Sentry breadcrumb.
+    // `onExceeded` fires for the 429s; `onExceeding` would fire for everything else.
+    onExceeded: recordGlobalRateLimitExceeded,
   };
 
   // Use Redis when configured; the chaos suite sets RUN_REDIS_TESTS=0 to force in-memory
