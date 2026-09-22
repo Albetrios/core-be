@@ -304,9 +304,9 @@ export const permissionSchema = {
 };
 
 export const permissionExample = {
-  code: 'ORGANIZATION_READ',
-  name: 'Read Organization',
-  description: 'View organization details and settings',
-  category: 'organization',
+  code: 'organization:read',
+  name: 'View Organization',
+  description: null,
+  category: 'tenancy',
   created_at: '2026-01-01T00:00:00.000Z',
 };

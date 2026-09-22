@@ -277,10 +277,11 @@ describe('Member Roles Sub-Domain — Integration', () => {
   // guard rather than a 403.
   describe('PERSONAL organization no-custom-roles guard (HTTP-level coverage)', () => {
     // provisionPersonalOrganization / provisionOrganizationWithOwner insert a role_permissions
-    // row per tenancy code (FK → permissions.code, ON DELETE RESTRICT), so every code must exist
-    // before provisioning — the suite-level beforeEach only seeds the role subset.
-    async function seedAllTenancyPermissions() {
-      await seedPermissions(Object.values(TENANCY_PERMISSIONS));
+    // row per granted code (FK → permissions.code, ON DELETE RESTRICT), so every code must exist
+    // before provisioning — the suite-level beforeEach only seeds the role subset. Seed the whole
+    // catalog: the owner grant spans tenancy, audit and upload.
+    async function seedOwnerGrantPermissions() {
+      await seedAllPermissions();
     }
 
     async function countRoles(organizationId: number): Promise<number> {
@@ -292,7 +293,7 @@ describe('Member Roles Sub-Domain — Integration', () => {
     }
 
     it('rejects POST /roles on a PERSONAL organization with 422 (errors:personalOrganizationNoRoles) and creates no role', async () => {
-      await seedAllTenancyPermissions();
+      await seedOwnerGrantPermissions();
       const owner = await createTestUser();
       const provisioned = await provisionPersonalOrganization(owner.id);
       const token = await generateTestToken({
@@ -328,7 +329,7 @@ describe('Member Roles Sub-Domain — Integration', () => {
     });
 
     it('positive contrast: the SAME POST /roles succeeds (200) on a TEAM organization — the guard is type-specific, not a blanket block', async () => {
-      await seedAllTenancyPermissions();
+      await seedOwnerGrantPermissions();
       const owner = await createTestUser();
       const team = await provisionOrganizationWithOwner({
         name: 'Role-Guard Contrast Team',

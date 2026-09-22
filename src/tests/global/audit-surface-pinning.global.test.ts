@@ -34,6 +34,9 @@ const REVIEWED_AUDIT_IMPORTERS = new Set<string>([
   'src/domains/tenancy/sub-domains/organization/organization.routes.ts',
   // GDPR data-export bundles include the user's actor-scoped audit rows.
   'src/domains/user/sub-domains/user-data-export/user-data-export.service.ts',
+  // Owner-role grant includes audit-log:read, so the audit-log route is reachable by the
+  // organization that owns the logs rather than by nobody at all.
+  'src/domains/tenancy/sub-domains/organization/organization-provisioning.ts',
 ]);
 
 function collectAuditImporters(directory: string, accumulator: string[] = []): string[] {

@@ -20,6 +20,7 @@ import {
 } from '@/tests/helpers/test-auth.js';
 import {
   seedPermissions,
+  seedAllPermissions,
   createRoleWithPermissions,
   createMembership,
 } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
@@ -1167,10 +1168,11 @@ describe('Membership Sub-Domain — Integration', () => {
   // and lands squarely on the single-member guard rather than a 403.
   describe('PERSONAL organization single-member guard (HTTP-level coverage)', () => {
     // provisionPersonalOrganization / provisionOrganizationWithOwner insert a role_permissions
-    // row per tenancy code (FK → permissions.code, ON DELETE RESTRICT), so every code must exist
-    // before provisioning — the suite-level beforeEach only seeds the membership subset.
-    async function seedAllTenancyPermissions() {
-      await seedPermissions(Object.values(TENANCY_PERMISSIONS));
+    // row per granted code (FK → permissions.code, ON DELETE RESTRICT), so every code must exist
+    // before provisioning — the suite-level beforeEach only seeds the membership subset. Seed the
+    // whole catalog: the owner grant spans tenancy, audit and upload.
+    async function seedOwnerGrantPermissions() {
+      await seedAllPermissions();
     }
 
     // The error handler translates `error.messageKey` via `request.t`. The standard test app does
@@ -1202,7 +1204,7 @@ describe('Membership Sub-Domain — Integration', () => {
     }
 
     async function setupPersonalOrganizationOwner() {
-      await seedAllTenancyPermissions();
+      await seedOwnerGrantPermissions();
       const owner = await createTestUser();
       const provisioned = await provisionPersonalOrganization(owner.id);
       const token = await generateTestToken({
@@ -1260,7 +1262,7 @@ describe('Membership Sub-Domain — Integration', () => {
     });
 
     it('positive contrast: the SAME POST /memberships succeeds (200) on a TEAM organization — the guard is type-specific, not a blanket block', async () => {
-      await seedAllTenancyPermissions();
+      await seedOwnerGrantPermissions();
       const owner = await createTestUser();
       const team = await provisionOrganizationWithOwner({
         name: 'Personal-Guard Contrast Team',

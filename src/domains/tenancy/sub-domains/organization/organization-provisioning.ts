@@ -1,7 +1,9 @@
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
+import { AUDIT_PERMISSIONS } from '@/domains/audit/audit.permissions.js';
 import { BILLING_PERMISSIONS } from '@/domains/billing/billing.permissions.js';
 import { NOTIFY_PERMISSIONS } from '@/domains/notify/notify.permissions.js';
 import { TENANCY_PERMISSIONS } from '@/domains/tenancy/tenancy.permissions.js';
+import { UPLOAD_PERMISSIONS } from '@/domains/upload/upload.permissions.js';
 import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.schema.js';
 import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.schema.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
@@ -15,7 +17,7 @@ import {
 /** Name of the auto-provisioned, undeletable owner role created with every organization. */
 export const OWNER_ROLE_NAME = 'Owner';
 
-/** Every tenancy permission code — the owner role is granted the full set. */
+/** Every tenancy permission code — part of the set the owner role is granted. */
 const ALL_TENANCY_PERMISSION_CODES: readonly string[] = Object.values(TENANCY_PERMISSIONS);
 
 const ALL_BILLING_PERMISSION_CODES: readonly string[] = Object.values(BILLING_PERMISSIONS);
@@ -34,21 +36,38 @@ const ALL_BILLING_PERMISSION_CODES: readonly string[] = Object.values(BILLING_PE
 const ALL_NOTIFY_PERMISSION_CODES: readonly string[] = Object.values(NOTIFY_PERMISSIONS);
 
 /**
+ * Audit and upload permission codes — granted to every owner, TEAM and PERSONAL alike.
+ *
+ * @remarks
+ * Both were the same dead-permission shape the notify codes above describe: seeded into
+ * `tenancy.permissions` and granted to no role anywhere, so the routes enforcing them
+ * answered 403 to every caller including the organization's own owner. Unlike billing and
+ * notify these are not team surfaces — `/tenancy/organization/audit-logs` and `/uploads` are
+ * both organization-scope `both`, and a personal workspace needs `upload:manage` to set its
+ * own logo — so withholding them from PERSONAL would recreate the dead route it fixes.
+ */
+const ALL_AUDIT_PERMISSION_CODES: readonly string[] = Object.values(AUDIT_PERMISSIONS);
+
+const ALL_UPLOAD_PERMISSION_CODES: readonly string[] = Object.values(UPLOAD_PERMISSIONS);
+
+/**
  * Permission codes granted to the auto-provisioned Owner role.
- * TEAM organizations also receive billing read/manage so the creator can use `/billing/*`,
- * and notify read/manage so they can use `/notify/webhooks/*`.
+ * Every owner receives the tenancy, audit and upload codes; TEAM organizations additionally
+ * receive billing read/manage so the creator can use `/billing/*`, and notify read/manage so
+ * they can use `/notify/webhooks/*`.
  */
 export function ownerPermissionCodesForOrganizationType(
   type: ProvisionOrganizationInput['type'],
 ): readonly string[] {
+  const everyOwnerCodes = [
+    ...ALL_TENANCY_PERMISSION_CODES,
+    ...ALL_AUDIT_PERMISSION_CODES,
+    ...ALL_UPLOAD_PERMISSION_CODES,
+  ];
   if (type === 'TEAM') {
-    return [
-      ...ALL_TENANCY_PERMISSION_CODES,
-      ...ALL_BILLING_PERMISSION_CODES,
-      ...ALL_NOTIFY_PERMISSION_CODES,
-    ];
+    return [...everyOwnerCodes, ...ALL_BILLING_PERMISSION_CODES, ...ALL_NOTIFY_PERMISSION_CODES];
   }
-  return ALL_TENANCY_PERMISSION_CODES;
+  return everyOwnerCodes;
 }
 
 /** A default, immutable non-owner role auto-provisioned into every TEAM organization. */
@@ -69,6 +88,13 @@ export interface DefaultTeamRole {
  * @remarks
  * - Every entry is `is_system: true` (immutable — cannot be edited or deleted via the role API),
  *   matching the Owner role.
+ * - **Admin** holds every permission except `organization:delete`, so the name matches the
+ *   capability: it can manage members, roles, invitations, API keys, webhooks, notification
+ *   policies, billing and audit logs. Escalation to Owner stays closed on three independent
+ *   paths — `assertCallerCanGrantPermissionCodes` limits any grant to codes the caller already
+ *   holds (so an Admin can never hand out `organization:delete`), the same guard runs on
+ *   membership create and update (so an Admin cannot assign the Owner role to anyone), and
+ *   `is_system` blocks editing the Owner role itself.
  * - **Member** and **Viewer** always include `organization:read` so any assigned member can load
  *   the organization dashboard (the frontend's landing surface gates on `organization:read`).
  * - PERSONAL organizations are single-member and reject custom roles, so they receive only Owner;
@@ -79,7 +105,8 @@ export interface DefaultTeamRole {
 export const DEFAULT_TEAM_ROLES: readonly DefaultTeamRole[] = [
   {
     name: 'Admin',
-    description: 'Manage members and invitations; read organization settings, roles and billing.',
+    description:
+      'Run the organization: members, roles, invitations, API keys, webhooks, billing and audit logs. Cannot delete the organization.',
     permissionCodes: [
       TENANCY_PERMISSIONS.ORGANIZATION_READ,
       TENANCY_PERMISSIONS.ORGANIZATION_UPDATE,
@@ -87,8 +114,17 @@ export const DEFAULT_TEAM_ROLES: readonly DefaultTeamRole[] = [
       TENANCY_PERMISSIONS.MEMBERSHIP_MANAGE,
       TENANCY_PERMISSIONS.INVITATION_MANAGE,
       TENANCY_PERMISSIONS.ROLE_READ,
+      TENANCY_PERMISSIONS.ROLE_MANAGE,
       TENANCY_PERMISSIONS.API_KEY_READ,
+      TENANCY_PERMISSIONS.API_KEY_MANAGE,
+      TENANCY_PERMISSIONS.NOTIFICATION_POLICY_READ,
+      TENANCY_PERMISSIONS.NOTIFICATION_POLICY_MANAGE,
       BILLING_PERMISSIONS.SUBSCRIPTION_READ,
+      BILLING_PERMISSIONS.SUBSCRIPTION_MANAGE,
+      NOTIFY_PERMISSIONS.WEBHOOK_READ,
+      NOTIFY_PERMISSIONS.WEBHOOK_MANAGE,
+      AUDIT_PERMISSIONS.AUDIT_LOG_READ,
+      UPLOAD_PERMISSIONS.UPLOAD_MANAGE,
     ],
   },
   {
@@ -125,8 +161,8 @@ export interface ProvisionOrganizationResult {
 
 /**
  * Atomically bootstrap an organization with full owner access: organization row →
- * system `Owner` role → every tenancy permission granted to it (plus billing and notify
- * read/manage for TEAM organizations) → the owner's ACTIVE membership. Without this, a freshly created
+ * system `Owner` role → every tenancy, audit and upload permission granted to it (plus billing
+ * and notify read/manage for TEAM organizations) → the owner's ACTIVE membership. Without this, a freshly created
  * organization's owner resolves zero permissions (the permission path is a strict
  * role→membership join with no owner shortcut).
  *
