@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.0.2](https://github.com/albetrios/core-be/compare/v7.0.1...v7.0.2) (2026-09-22)
+
+
+### Fixed
+
+* **rate-limit:** report the requests we rejected, not the ones we served ([#1183](https://github.com/albetrios/core-be/issues/1183)) ([4718c57](https://github.com/albetrios/core-be/commit/4718c57971d153f7e733ffd557b68d723f0855aa))
+
 ## [7.0.1](https://github.com/albetrios/core-be/compare/v7.0.0...v7.0.1) (2026-09-22)
 
 
