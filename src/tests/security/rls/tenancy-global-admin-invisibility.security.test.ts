@@ -4,6 +4,7 @@ import { database } from '@/infrastructure/database/connection.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { provisionPersonalOrganization } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
+import { seedAllPermissions } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
 import { grantCoreBeAppRoleForTests } from '@/tests/helpers/rls-matrix.helper.js';
 
 /**
@@ -44,6 +45,9 @@ describe('Security: app.global_admin does not expose tenancy tables', () => {
 
   beforeEach(async () => {
     await cleanupDatabase();
+    // Provisioning grants the owner every code the catalog holds, and role_permissions carries an
+    // FK to permissions — so seed the whole catalog, never a subset that a later addition breaks.
+    await seedAllPermissions();
   });
 
   it('cannot read tenancy.organizations or tenancy.memberships under global-admin alone', async () => {
