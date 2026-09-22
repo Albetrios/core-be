@@ -1,5 +1,6 @@
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { BILLING_PERMISSIONS } from '@/domains/billing/billing.permissions.js';
+import { NOTIFY_PERMISSIONS } from '@/domains/notify/notify.permissions.js';
 import { TENANCY_PERMISSIONS } from '@/domains/tenancy/tenancy.permissions.js';
 import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.schema.js';
 import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.schema.js';
@@ -20,14 +21,32 @@ const ALL_TENANCY_PERMISSION_CODES: readonly string[] = Object.values(TENANCY_PE
 const ALL_BILLING_PERMISSION_CODES: readonly string[] = Object.values(BILLING_PERMISSIONS);
 
 /**
+ * Every notify permission code — webhooks are a TEAM organization surface.
+ *
+ * @remarks
+ * These codes were seeded into `tenancy.permissions` but granted to no role in
+ * any organization, ever. `/notify/webhooks` therefore answered 403 to every
+ * caller including the organization's own owner, and the frontend's integrations
+ * panel — which gates its webhook section on `webhook:read` — rendered an
+ * API-keys list under a heading that promised "API keys and webhooks". A
+ * permission nothing can hold is not a security boundary, it is a dead route.
+ */
+const ALL_NOTIFY_PERMISSION_CODES: readonly string[] = Object.values(NOTIFY_PERMISSIONS);
+
+/**
  * Permission codes granted to the auto-provisioned Owner role.
- * TEAM organizations also receive billing read/manage so the creator can use `/billing/*`.
+ * TEAM organizations also receive billing read/manage so the creator can use `/billing/*`,
+ * and notify read/manage so they can use `/notify/webhooks/*`.
  */
 export function ownerPermissionCodesForOrganizationType(
   type: ProvisionOrganizationInput['type'],
 ): readonly string[] {
   if (type === 'TEAM') {
-    return [...ALL_TENANCY_PERMISSION_CODES, ...ALL_BILLING_PERMISSION_CODES];
+    return [
+      ...ALL_TENANCY_PERMISSION_CODES,
+      ...ALL_BILLING_PERMISSION_CODES,
+      ...ALL_NOTIFY_PERMISSION_CODES,
+    ];
   }
   return ALL_TENANCY_PERMISSION_CODES;
 }
@@ -106,8 +125,8 @@ export interface ProvisionOrganizationResult {
 
 /**
  * Atomically bootstrap an organization with full owner access: organization row →
- * system `Owner` role → every tenancy permission granted to it (plus billing read/manage
- * for TEAM organizations) → the owner's ACTIVE membership. Without this, a freshly created
+ * system `Owner` role → every tenancy permission granted to it (plus billing and notify
+ * read/manage for TEAM organizations) → the owner's ACTIVE membership. Without this, a freshly created
  * organization's owner resolves zero permissions (the permission path is a strict
  * role→membership join with no owner shortcut).
  *

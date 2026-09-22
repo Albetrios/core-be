@@ -26,8 +26,8 @@ organizations, and how the active organization is carried as a signed token clai
   degrades to the pre-existing value (usually `null`) and returns 200 rather than 500; the user
   simply heals on a later read. The explicit `switch-to-personal` action still surfaces a genuine
   provisioning failure (it cannot silently succeed). Provisioning depends on the seeded
-  `permissions` reference catalog (the owner role is granted every code); it is present in every
-  real environment.
+  `permissions` reference catalog (a TEAM owner is granted every tenancy, billing and notify
+  code; a PERSONAL owner every tenancy code); it is present in every real environment.
 - The `PERSONAL` organization has a **null slug** (never user-facing — its app URL is `/`) and is
   **immutable**: it cannot be deleted or have its ownership transferred (`409
 personalOrganizationImmutable`); it is removed only when the account is deleted (cascade).
