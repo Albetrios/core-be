@@ -18,6 +18,7 @@ import {
 } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
 import { createTestSubscription } from '@/domains/billing/__tests__/factories/subscription.factory.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
@@ -220,7 +221,7 @@ describe('Billing Subscription Mutations — Integration', () => {
       // The two non-owner members are now SUSPENDED; the owner stays ACTIVE.
       const statusOf = async (userId: number) =>
         (
-          await database
+          await getOperatorDatabase()
             .select({ status: memberships.status })
             .from(memberships)
             .where(
@@ -257,7 +258,7 @@ describe('Billing Subscription Mutations — Integration', () => {
 
       expect(response.statusCode).toBe(200);
       const ownerStatus = (
-        await database
+        await getOperatorDatabase()
           .select({ status: memberships.status })
           .from(memberships)
           .where(

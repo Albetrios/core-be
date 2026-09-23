@@ -6,6 +6,11 @@ import { createTestUser } from '@/tests/factories/user.factory.js';
 import { generateSuperAdminToken } from '@/tests/helpers/test-auth.js';
 import { injectAuthenticated } from '@/tests/helpers/test-http-inject.helper.js';
 import { AuditRepository } from '@/domains/audit/audit.repository.js';
+import {
+  type RequestScopedPostgresDatabase,
+  runWithPinnedDatabaseHandle,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import type { FastifyInstance } from 'fastify';
 
 /**
@@ -44,6 +49,15 @@ const ONE_MINUTE_MS = 60_000;
 describe('Audit Domain — Integration', () => {
   let app: FastifyInstance;
   const repository = new AuditRepository();
+  // Seeds go through the REAL repository, pinned to the operator connection. These rows are
+  // paging fixtures for a super-admin read, not the behaviour under test; under
+  // `pnpm test:rls-role` the pool under test is `core_be_app`, whose tenant-scoped INSERT
+  // policy would reject a fixture written with no organization context.
+  const seedAuditRow = (row: Parameters<AuditRepository['insert']>[0]) =>
+    runWithPinnedDatabaseHandle(
+      getOperatorDatabase() as unknown as RequestScopedPostgresDatabase,
+      () => repository.insert(row),
+    );
 
   beforeAll(async () => {
     const testApp = await createTestApp();
@@ -63,7 +77,7 @@ describe('Audit Domain — Integration', () => {
     const actions: string[] = [];
     for (let index = 0; index < count; index += 1) {
       const action = `audit.seeded.${index}`;
-      await repository.insert({
+      await seedAuditRow({
         actor_user_id: actorId,
         action,
         resource_type: 'user',
@@ -223,7 +237,7 @@ describe('Audit Domain — Integration', () => {
 
       // A newer row lands mid-walk. It sorts ahead of everything on page 1, which is exactly the
       // insert that shifts an OFFSET window by one and makes page 2 repeat a row.
-      await repository.insert({
+      await seedAuditRow({
         actor_user_id: user.id,
         action: 'audit.seeded.concurrent',
         resource_type: 'user',
@@ -259,7 +273,7 @@ describe('Audit Domain — Integration', () => {
 
       const sharedInstant = new Date(BASE_INSTANT);
       for (let index = 0; index < 4; index += 1) {
-        await repository.insert({
+        await seedAuditRow({
           actor_user_id: user.id,
           action: `audit.tied.${index}`,
           resource_type: 'user',
@@ -348,7 +362,7 @@ describe('Audit Domain — Integration', () => {
     it('strips internal ids and redacts secret-bearing metadata keys on the wire', async () => {
       const user = await createTestUser();
       const token = await generateSuperAdminToken(user.public_id);
-      await repository.insert({
+      await seedAuditRow({
         actor_user_id: user.id,
         action: 'auth.mfa.enrolled',
         resource_type: 'user',

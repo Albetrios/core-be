@@ -832,4 +832,95 @@ describe('UploadService', () => {
       ),
     ).rejects.toThrow('S3_BUCKET is not configured');
   });
+
+  /**
+   * `upload.uploads` splits across two disjoint RLS arms: the owner arm sees only
+   * `organization_id IS NULL`, the tenant arm only one organization's rows. So the scope that
+   * FOUND a row is the only one that can UPDATE it. Reading an organization-scoped upload under the
+   * tenant arm and then writing it under the user arm matches zero rows and surfaces as a 404 on a
+   * row that plainly exists — which is exactly how organization logos could be created but never
+   * confirmed or deleted in production, invisible to every test that runs on an RLS-bypassing role.
+   *
+   * The context wrapper is mocked here, so these tests reproduce the split explicitly: the
+   * repository only "sees" the organization row while the organization scope is active, and each
+   * write records which scope it ran under.
+   */
+  describe('UploadService writes reuse the scope that found the row', () => {
+    const ORGANIZATION_PUBLIC_ID = 'org_activeorganization01';
+
+    async function simulateRlsArms() {
+      const { withAppDatabaseContext } = await import(
+        '@/infrastructure/database/contexts/database-context.js'
+      );
+      let activeScope: { organizationPublicId?: string } | undefined;
+      vi.mocked(withAppDatabaseContext).mockImplementation((async (
+        scope: unknown,
+        callback: (handle: unknown) => Promise<unknown>,
+      ) => {
+        const previous = activeScope;
+        activeScope = scope as { organizationPublicId?: string };
+        try {
+          return await callback(undefined);
+        } finally {
+          activeScope = previous;
+        }
+      }) as never);
+      const organizationRow = {
+        ...uploadRow,
+        user_id: 99,
+        organization_id: 10,
+        file_key: `pending/${uploadRow.file_key}`,
+        status: 'PENDING',
+      };
+      // The owner arm cannot see an organization-scoped row; the tenant arm can.
+      vi.mocked(repository.findByPublicId).mockImplementation((async () =>
+        activeScope?.organizationPublicId ? organizationRow : null) as never);
+      return { scopeAtCall: () => activeScope, organizationRow };
+    }
+
+    it('soft-deletes an organization upload under the organization scope, not the user scope', async () => {
+      const { scopeAtCall } = await simulateRlsArms();
+      const scopesAtWrite: unknown[] = [];
+      vi.mocked(repository.softDeleteByPublicId).mockImplementation((async () => {
+        scopesAtWrite.push(scopeAtCall());
+        // Under the user arm this UPDATE would match zero rows.
+        return scopeAtCall()?.organizationPublicId ? uploadRow : null;
+      }) as never);
+
+      await service.deleteUpload(uploadPublicId, userPublicId, ORGANIZATION_PUBLIC_ID);
+
+      expect(scopesAtWrite).toHaveLength(1);
+      expect(scopesAtWrite[0]).toMatchObject({ organizationPublicId: ORGANIZATION_PUBLIC_ID });
+    });
+
+    it('confirms an organization upload under the organization scope, not the user scope', async () => {
+      const { scopeAtCall } = await simulateRlsArms();
+      vi.mocked(objectStorage.verifyUploadedObject).mockResolvedValueOnce({
+        contentType: 'image/png',
+        contentLength: 1024,
+      });
+      vi.mocked(objectStorage.getObjectFirstBytes).mockResolvedValueOnce({
+        body: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]),
+        contentType: 'image/png',
+      });
+      vi.mocked(objectStorage.copyObject).mockResolvedValueOnce(undefined);
+      vi.mocked(objectStorage.deleteObject).mockResolvedValueOnce(true);
+      const scopesAtWrite: unknown[] = [];
+      vi.mocked(repository.markConfirmedByPublicId).mockImplementation((async () => {
+        scopesAtWrite.push(scopeAtCall());
+        return scopeAtCall()?.organizationPublicId ? { ...uploadRow, status: 'UPLOADED' } : null;
+      }) as never);
+
+      // This is the call that returned 404 for every organization logo before the fix.
+      const result = await service.confirmUpload(
+        uploadPublicId,
+        userPublicId,
+        ORGANIZATION_PUBLIC_ID,
+      );
+
+      expect(result.status).toBe('UPLOADED');
+      expect(scopesAtWrite).toHaveLength(1);
+      expect(scopesAtWrite[0]).toMatchObject({ organizationPublicId: ORGANIZATION_PUBLIC_ID });
+    });
+  });
 });

@@ -4,6 +4,7 @@ import { Queue, QueueEvents } from 'bullmq';
 import { desc, eq } from 'drizzle-orm';
 
 import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { webhook_delivery_attempts } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
 import {
   createWebhookDeliveryWorker,
@@ -72,7 +73,7 @@ describe('webhook-delivery.worker — status transitions', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getOperatorDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),
@@ -100,7 +101,7 @@ describe('webhook-delivery.worker — status transitions', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
 
-    const rows = await database
+    const rows = await getOperatorDatabase()
       .select()
       .from(webhook_delivery_attempts)
       .where(eq(webhook_delivery_attempts.webhook_id, webhook.id))
@@ -121,7 +122,7 @@ describe('webhook-delivery.worker — status transitions', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getOperatorDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),
@@ -146,7 +147,7 @@ describe('webhook-delivery.worker — status transitions', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
 
-    const rows = await database
+    const rows = await getOperatorDatabase()
       .select()
       .from(webhook_delivery_attempts)
       .where(eq(webhook_delivery_attempts.id, pendingAttempt!.id));
@@ -165,7 +166,7 @@ describe('webhook-delivery.worker — status transitions', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getOperatorDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),
@@ -217,7 +218,7 @@ describe('webhook-delivery.worker — status transitions', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getOperatorDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),

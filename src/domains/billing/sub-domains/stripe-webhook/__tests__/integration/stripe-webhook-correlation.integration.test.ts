@@ -16,6 +16,7 @@ vi.mock('@/infrastructure/payment/stripe.client.js', async (importOriginal) => {
 });
 
 import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { stripe_webhook_events } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook.schema.js';
 import { createStripeWebhookWorker } from '@/domains/billing/sub-domains/stripe-webhook/workers/stripe-webhook.worker.js';
 import { createWorkerContainers } from '@/worker-containers.js';
@@ -130,7 +131,7 @@ describe('stripe-webhook — worker correlation id propagation', () => {
 
     await completion;
 
-    const rows = await database
+    const rows = await getOperatorDatabase()
       .select()
       .from(stripe_webhook_events)
       .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId))

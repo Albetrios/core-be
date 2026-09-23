@@ -6,6 +6,7 @@ import { injectUnauthenticated, injectRoute } from '@/tests/helpers/test-http-in
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { env } from '@/shared/config/env.config.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestPlan } from '@/tests/factories/plan.factory.js';
@@ -123,7 +124,7 @@ describe('Stripe Webhook Sub-Domain — Integration', () => {
       expect(typeof firstBody.meta.request_id).toBe('string');
       expect(firstBody.meta.request_id.length).toBeGreaterThan(0);
 
-      const ledgerRows = await database
+      const ledgerRows = await getOperatorDatabase()
         .select()
         .from(stripe_webhook_events)
         .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId));

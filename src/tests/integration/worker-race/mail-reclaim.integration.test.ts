@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 
 import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { mail_outbox } from '@/infrastructure/mail/mail-outbox.schema.js';
 import {
   insertMailOutbox,
@@ -24,7 +25,7 @@ describe('Integration: mail outbox sending reclaim', () => {
 
     expect(await tryClaimPendingMailOutbox(mailOutboxId)).toBe('claimed');
 
-    await database
+    await getOperatorDatabase()
       .update(mail_outbox)
       .set({ updated_at: new Date(Date.now() - 60 * 60_000) })
       .where(eq(mail_outbox.id, mailOutboxId));
@@ -33,7 +34,7 @@ describe('Integration: mail outbox sending reclaim', () => {
 
     expect(reclaimedIds).toEqual([mailOutboxId]);
 
-    const rows = await database
+    const rows = await getOperatorDatabase()
       .select({ status: mail_outbox.status })
       .from(mail_outbox)
       .where(eq(mail_outbox.id, mailOutboxId));

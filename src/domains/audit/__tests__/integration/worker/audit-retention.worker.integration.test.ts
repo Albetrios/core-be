@@ -17,6 +17,7 @@ import { createTestUser } from '@/tests/factories/user.factory.js';
 import { env } from '@/shared/config/env.config.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 
 /**
  * Verifies the audit retention worker purges rows older than AUDIT_RETENTION_DAYS.
@@ -65,20 +66,22 @@ describe('audit-retention.worker — purge', () => {
     // read/delete only (no INSERT arm), and with DATABASE_MAINTENANCE_URL provisioned
     // locally the maintenance pool is RLS-subject core_be_maintenance — seeding through
     // it is (correctly) rejected by the audit.logs INSERT policy.
-    await database.insert(logs).values([
-      {
-        actor_user_id: user.id,
-        action: 'user.login.stale',
-        resource_type: 'user',
-        created_at: staleCreatedAt,
-      },
-      {
-        actor_user_id: user.id,
-        action: 'user.login.recent',
-        resource_type: 'user',
-        created_at: recentCreatedAt,
-      },
-    ]);
+    await getOperatorDatabase()
+      .insert(logs)
+      .values([
+        {
+          actor_user_id: user.id,
+          action: 'user.login.stale',
+          resource_type: 'user',
+          created_at: staleCreatedAt,
+        },
+        {
+          actor_user_id: user.id,
+          action: 'user.login.recent',
+          resource_type: 'user',
+          created_at: recentCreatedAt,
+        },
+      ]);
 
     const jobId = `audit-retention-${randomUUID()}`;
     const completion = waitForJobCompletion(queueEvents!, jobId);
@@ -112,20 +115,22 @@ describe('audit-retention.worker — purge', () => {
 
     await ensureAuditLogPartitionsForTimestamps([justPastCutoff, justInsideRetention]);
 
-    await database.insert(logs).values([
-      {
-        actor_user_id: user.id,
-        action: 'user.login.just_past_cutoff',
-        resource_type: 'user',
-        created_at: justPastCutoff,
-      },
-      {
-        actor_user_id: user.id,
-        action: 'user.login.just_inside_retention',
-        resource_type: 'user',
-        created_at: justInsideRetention,
-      },
-    ]);
+    await getOperatorDatabase()
+      .insert(logs)
+      .values([
+        {
+          actor_user_id: user.id,
+          action: 'user.login.just_past_cutoff',
+          resource_type: 'user',
+          created_at: justPastCutoff,
+        },
+        {
+          actor_user_id: user.id,
+          action: 'user.login.just_inside_retention',
+          resource_type: 'user',
+          created_at: justInsideRetention,
+        },
+      ]);
 
     const jobId = `audit-retention-${randomUUID()}`;
     const completion = waitForJobCompletion(queueEvents!, jobId);

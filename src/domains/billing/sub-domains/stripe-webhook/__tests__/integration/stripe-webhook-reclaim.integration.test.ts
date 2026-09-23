@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { stripe_webhook_events } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook.schema.js';
 import { StripeWebhookEventRepository } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook-event.repository.js';
 import { STRIPE_WEBHOOK_STUCK_PROCESSING_LEASE_MINUTES } from '@/shared/constants/index.js';
@@ -10,7 +11,7 @@ describe('Stripe webhook reclaim — integration', () => {
   const stripeEventId = `evt_reclaim_int_${Date.now()}`;
 
   afterEach(async () => {
-    await database
+    await getOperatorDatabase()
       .delete(stripe_webhook_events)
       .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId));
   });
@@ -28,7 +29,7 @@ describe('Stripe webhook reclaim — integration', () => {
 
     // The row is NOT transitioned by the sweep — the worker's
     // tryClaimEvent → tryReclaimEvent does that when it dequeues.
-    const rowsAfterSweep = await database
+    const rowsAfterSweep = await getOperatorDatabase()
       .select({ processing_status: stripe_webhook_events.processing_status })
       .from(stripe_webhook_events)
       .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId));
@@ -43,7 +44,7 @@ describe('Stripe webhook reclaim — integration', () => {
     });
     expect(claimResult).toBe('reclaimed');
 
-    const rowsAfterClaim = await database
+    const rowsAfterClaim = await getOperatorDatabase()
       .select({ processing_status: stripe_webhook_events.processing_status })
       .from(stripe_webhook_events)
       .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId));
@@ -60,12 +61,12 @@ describe('Stripe webhook reclaim — integration', () => {
     const stuckUpdatedAt = new Date(
       Date.now() - (STRIPE_WEBHOOK_STUCK_PROCESSING_LEASE_MINUTES + 1) * 60_000,
     );
-    await database
+    await getOperatorDatabase()
       .update(stripe_webhook_events)
       .set({ updated_at: stuckUpdatedAt })
       .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId));
 
-    const beforeSweep = await database
+    const beforeSweep = await getOperatorDatabase()
       .select({ attempt_count: stripe_webhook_events.attempt_count })
       .from(stripe_webhook_events)
       .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId));
@@ -75,7 +76,7 @@ describe('Stripe webhook reclaim — integration', () => {
     expect(sweepResult.candidateStripeEventIds).toContain(stripeEventId);
 
     // Sweep is a pure read — `attempt_count` is unchanged after the call.
-    const afterSweep = await database
+    const afterSweep = await getOperatorDatabase()
       .select({
         processing_status: stripe_webhook_events.processing_status,
         attempt_count: stripe_webhook_events.attempt_count,
@@ -90,7 +91,7 @@ describe('Stripe webhook reclaim — integration', () => {
     const reclaimed = await repository.tryReclaimEvent(stripeEventId);
     expect(reclaimed).toBe(true);
 
-    const afterReclaim = await database
+    const afterReclaim = await getOperatorDatabase()
       .select({
         processing_status: stripe_webhook_events.processing_status,
         attempt_count: stripe_webhook_events.attempt_count,
@@ -115,7 +116,7 @@ describe('Stripe webhook reclaim — integration', () => {
     await repository.tryReclaimEvent(stripeEventId);
 
     const failedAfterReclaim = await repository.countFailedEvents();
-    const stillFailedRows = await database
+    const stillFailedRows = await getOperatorDatabase()
       .select({ count: sql<number>`count(*)::int` })
       .from(stripe_webhook_events)
       .where(eq(stripe_webhook_events.processing_status, 'failed'));

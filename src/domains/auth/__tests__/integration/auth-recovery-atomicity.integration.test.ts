@@ -8,6 +8,7 @@ import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUserWithPassword } from '@/tests/factories/user.factory.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { users } from '@/domains/user/user.schema.js';
 import { verification_tokens } from '@/domains/auth/sub-domains/auth-method/verification-token/verification-token.schema.js';
 import { AuthSessionRepository } from '@/domains/auth/sub-domains/auth-session/auth-session.repository.js';
@@ -25,18 +26,20 @@ async function seedUserWithResetToken(password: string) {
   const { user } = await createTestUserWithPassword({ password });
   const rawToken = randomBytes(32).toString('hex');
   const tokenHash = createHash('sha256').update(rawToken).digest('hex');
-  await database.insert(verification_tokens).values({
-    token_type: 'PASSWORD_RESET',
-    token_hash: tokenHash,
-    user_id: user.id,
-    email: user.email,
-    expires_at: new Date(Date.now() + 3_600_000),
-  });
+  await getOperatorDatabase()
+    .insert(verification_tokens)
+    .values({
+      token_type: 'PASSWORD_RESET',
+      token_hash: tokenHash,
+      user_id: user.id,
+      email: user.email,
+      expires_at: new Date(Date.now() + 3_600_000),
+    });
   return { user, rawToken, tokenHash };
 }
 
 async function readPasswordHash(userId: number): Promise<string | null> {
-  const rows = await database
+  const rows = await getOperatorDatabase()
     .select({ password_hash: users.password_hash })
     .from(users)
     .where(eq(users.id, userId));
@@ -44,7 +47,7 @@ async function readPasswordHash(userId: number): Promise<string | null> {
 }
 
 async function readTokenUsedAt(tokenHash: string): Promise<Date | null> {
-  const rows = await database
+  const rows = await getOperatorDatabase()
     .select({ used_at: verification_tokens.used_at })
     .from(verification_tokens)
     .where(eq(verification_tokens.token_hash, tokenHash));
@@ -114,7 +117,7 @@ describe('Auth recovery atomicity — password reset', () => {
     expect(body.data.access_token).toBeTruthy();
     expect(response.headers['set-cookie']).toBeDefined();
     // The reset also marks the email verified — the reset token proves control of the address.
-    const [reset] = await database
+    const [reset] = await getOperatorDatabase()
       .select({ is_email_verified: users.is_email_verified })
       .from(users)
       .where(eq(users.id, user.id));
