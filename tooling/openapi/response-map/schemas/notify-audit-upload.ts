@@ -66,35 +66,43 @@ export const webhookEventSchema = {
   },
 };
 
+// Verbatim entries from AVAILABLE_WEBHOOK_EVENTS (webhook-event.repository.ts). The former
+// third example, `member.invited`, is not dispatchable — no such event type exists, and the
+// membership events are `membership.created` / `.updated` / `.deleted`.
 export const webhookEventExamples = [
-  { event: 'subscription.created', description: 'Fired when a new subscription is created' },
-  { event: 'subscription.updated', description: 'Fired when a subscription is modified' },
-  { event: 'member.invited', description: 'Fired when a member invitation is created' },
+  { event: 'organization.created', description: 'When an organization is created' },
+  { event: 'membership.created', description: 'When a membership is created' },
+  { event: 'subscription.cancelled', description: 'When a subscription is cancelled' },
 ];
 
 // ── Delivery Attempt ──
+// Mirrors WebhookDeliveryAttemptSerializer.many (the sec-r4-D6 list projection) field for
+// field. `id` and `webhook_id` are ABSENT on purpose: sec-T #17 strips both bigserials before
+// the response leaves the server, so documenting them told clients to read values that are
+// never sent — and implied the platform leaks internal ids. `payload` and `response_body` are
+// likewise excluded from the list shape.
 export const deliveryAttemptSchema = {
   type: 'object',
   properties: {
-    id: { type: 'string' },
-    webhook_id: { type: 'string' },
     event_type: { type: 'string' },
-    status_code: { type: 'integer', nullable: true },
-    response_time_ms: { type: 'integer', nullable: true },
-    success: { type: 'boolean' },
-    error_message: { type: 'string', nullable: true },
+    event_key: { type: 'string', nullable: true },
+    status: { type: 'string', enum: ['PENDING', 'SENT', 'FAILED'] },
+    http_status_code: { type: 'integer', nullable: true },
+    sent_at: { type: 'string', format: 'date-time', nullable: true },
+    attempt_count: { type: 'integer' },
+    next_retry_at: { type: 'string', format: 'date-time', nullable: true },
     created_at: { type: 'string', format: 'date-time' },
   },
 };
 
 export const deliveryAttemptExample = {
-  id: 'da_w1r4x9k3m7n2p5q8',
-  webhook_id: 'whk_p5q8w1r4x9k3m7n2a1b2c',
   event_type: 'subscription.created',
-  status_code: 200,
-  response_time_ms: 245,
-  success: true,
-  error_message: null,
+  event_key: 'sub_p5q8w1r4x9k3m7n2a1b2c',
+  status: 'SENT',
+  http_status_code: 200,
+  sent_at: '2026-02-14T10:00:00.000Z',
+  attempt_count: 1,
+  next_retry_at: null,
   created_at: '2026-02-14T10:00:00.000Z',
 };
 
