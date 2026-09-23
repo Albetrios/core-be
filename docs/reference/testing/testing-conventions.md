@@ -84,11 +84,49 @@ src/domains/<domain>/sub-domains/<resource>/__tests__/
 | **Integration**        | `pnpm test:integration` | Cross-domain in-process contracts         |
 | **Domain integration** | `pnpm test:e2e`         | `src/domains/**/__tests__/integration/**` |
 | **Security**           | `pnpm test:security`    | Auth, CORS, JWT, RLS                      |
+| **RLS application role** | `pnpm test:rls-role`  | The e2e lane, on an RLS-subject connection |
 | **Performance**        | `pnpm test:performance` | N+1, concurrency                          |
 | **Load**               | `pnpm load:*`           | k6 against running API                    |
 | **Smoke**              | `pnpm test:api-smoke`   | Live API after seed                       |
 | **Global**             | `pnpm test:global`      | Route catalog, consistency                |
 | **Coverage**           | `pnpm test:coverage`    | Full suite + Stage 5 thresholds           |
+
+### Why `pnpm test:rls-role` exists
+
+Every other lane connects with a role that **bypasses** row-level security: Compose creates
+`POSTGRES_USER: core` as a superuser, and the local operator role carries `rolbypassrls`. So a
+path that reaches a FORCE RLS table **without a database context** matches no policy arm, reads
+zero rows, and reports success — and looks green everywhere it is tested. That is not
+hypothetical: organization and account deletion tombstoned no uploads for months that way.
+
+The `RLS security (non-superuser)` job covers the other half. It asserts what the *policies*
+permit, using helpers that opt into `core_be_app` per statement. What it cannot see is whether
+the *application* obeys them, because the connection underneath is still the superuser.
+
+`pnpm test:rls-role` opens the pool under test as `core_be_app` for the whole connection, so the
+role applies to every statement — including ones inside the application's own transactions.
+
+**Fixtures use a separate elevated handle.** `src/tests/helpers/elevated-database.ts` exists
+because the harness does things the application never does: `TRUNCATE`ing every table between
+suites, and seeding deliberately cross-tenant rows. Without the split the suites die on
+`permission denied for table users` inside `cleanupDatabase` before asserting anything. The two
+root factories (`user.factory.ts`, `organization.factory.ts`) deliberately do **not** use it —
+they insert through the same context the application uses, because "can this row be created the
+way production creates it" is worth asserting for the two tables every other fixture hangs off.
+
+A test that passes normally and fails under this runner is depending on an RLS bypass — either
+the code is missing a context, or the fixture is writing somewhere it should not. Both are worth
+knowing. When it is the fixture, the symptom is a silent zero-row write, which reads as an
+application bug: a soft-delete that updated nothing made a switch-organization test look like an
+authorization hole until the fixture was moved onto the elevated handle.
+
+Only `e2e` is covered today. `integration` and `security` fixtures still write directly to FORCE
+RLS tables without a context; converting them is the same work already done for the e2e
+factories.
+
+```bash
+pnpm test:rls-role
+```
 
 ---
 

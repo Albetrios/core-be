@@ -448,6 +448,7 @@ Local SonarQube quality gate (pre-commit): `pnpm sonar:up` / `sonar:scan` / `son
 - `pnpm test:coverage` — all tests with V8 coverage (CI)
 - `pnpm test:performance` — performance tests
 - `pnpm test:security` — security test suite
+- `pnpm test:rls-role` — runs the **e2e** lane with the pool under test opened as the RLS-subject `core_be_app` role. Every other lane connects as a role that BYPASSES row-level security (Compose's `POSTGRES_USER: core` is a superuser; the local operator role carries `rolbypassrls`), so a path reaching a FORCE RLS table without a database context reads rows there and **none** in production. Harness fixtures keep a separate elevated handle (`src/tests/helpers/elevated-database.ts`). CI job: `RLS application role (whole connection)`
 - `pnpm test:chaos` — Toxiproxy chaos / fault-injection suite (`tooling/vitest/chaos.config.ts`; see `docs/reference/reliability/chaos-testing.md`)
 - `pnpm test:contract` — outbound HTTP contracts for Stripe, Resend, S3 (`tooling/vitest/contract.config.ts`; see `docs/reference/testing/contract-tests.md`)
 - `pnpm chaos:up` / `pnpm chaos:down` — start/stop the Toxiproxy sidecar (`docker compose --profile chaos`)

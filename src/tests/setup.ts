@@ -90,7 +90,44 @@ process.env.I18N_REPORT_MISSING_KEYS ??= 'false';
 process.env.LOG_PRETTY ??= 'true';
 process.env.SENTRY_REDUCED_SAMPLING ??= 'false';
 process.env.SENTRY_DEBUG ??= 'true';
+/**
+ * Re-opens the pool under test as a specific Postgres role when `TEST_DATABASE_ROLE` is set,
+ * stashing the elevated URL for the harness's own use first.
+ *
+ * @remarks
+ * Applied AFTER {@link forceLocalDatabaseForNonCiTestRun}, which is the point: that function
+ * deliberately swaps in the elevated `core_be_operator` handle, and that role carries
+ * `rolbypassrls`. So by default **no test in this repo has row-level security applied to it** —
+ * a path that reaches a FORCE RLS table without a database context reads rows here and returns
+ * none in production. `pnpm test:rls-role` sets this to `core_be_app` to close that.
+ *
+ * It has to be its own variable rather than a pre-rewritten `DATABASE_URL`, because the
+ * machine-local env file is loaded with `override: true` and would clobber an injected URL —
+ * silently putting the lane back on the bypassing role while still reporting green.
+ *
+ * Only the pool under test moves. `TEST_ELEVATED_DATABASE_URL` keeps the original for
+ * `src/tests/helpers/elevated-database.ts`, because the harness truncates every table between
+ * suites and seeds cross-tenant fixtures — neither of which the application role may do.
+ */
+function applyRequestedDatabaseRole(): void {
+  const role = process.env.TEST_DATABASE_ROLE;
+  if (!role) return;
+  if (!/^[a-z_][a-z0-9_]*$/.test(role)) {
+    throw new Error(`TEST_DATABASE_ROLE must be a bare Postgres role name, received: ${role}`);
+  }
+  const current = process.env.DATABASE_URL;
+  if (!current) return;
+
+  process.env.TEST_ELEVATED_DATABASE_URL = current;
+  const url = new URL(current);
+  // libpq applies `options` at connection time, so the role covers every statement on the
+  // connection — including ones inside the application's own transactions.
+  url.searchParams.set('options', `-c role=${role}`);
+  process.env.DATABASE_URL = url.toString();
+}
+
 forceLocalDatabaseForNonCiTestRun();
+applyRequestedDatabaseRole();
 process.env.DATABASE_SSL_ENABLED = 'false';
 /**
  * Mirror CI (which leaves this unset → schema default `true`). `.env.development` pins it to

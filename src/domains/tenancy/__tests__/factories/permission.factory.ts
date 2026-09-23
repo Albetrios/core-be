@@ -1,4 +1,5 @@
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { permissions } from '@/domains/tenancy/sub-domains/permission/permission.schema.js';
 import { SYSTEM_PERMISSIONS } from '@/domains/tenancy/sub-domains/permission/seed/permission.reference.seed.js';
 import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.schema.js';
@@ -19,7 +20,7 @@ export async function seedPermissions(codes: string[]): Promise<void> {
     category: code.split(':')[0] ?? 'general',
   }));
 
-  await database
+  await getElevatedDatabase()
     .insert(permissions)
     .values(values)
     .onConflictDoNothing({ target: permissions.code });
@@ -52,7 +53,7 @@ export interface CreateRoleWithPermissionsOptions {
 export async function createRoleWithPermissions(options: CreateRoleWithPermissionsOptions) {
   const publicId = generatePublicId('memberRole');
 
-  const [role] = await database
+  const [role] = await getElevatedDatabase()
     .insert(roles)
     .values({
       public_id: publicId,
@@ -64,13 +65,15 @@ export async function createRoleWithPermissions(options: CreateRoleWithPermissio
     .returning();
 
   if (options.permissionCodes.length > 0) {
-    await database.insert(role_permissions).values(
-      options.permissionCodes.map((permissionCode) => ({
-        role_id: role!.id,
-        permission_code: permissionCode,
-        created_by_user_id: options.createdByUserId,
-      })),
-    );
+    await getElevatedDatabase()
+      .insert(role_permissions)
+      .values(
+        options.permissionCodes.map((permissionCode) => ({
+          role_id: role!.id,
+          permission_code: permissionCode,
+          created_by_user_id: options.createdByUserId,
+        })),
+      );
   }
 
   return role!;
@@ -89,7 +92,7 @@ export interface CreateMembershipOptions {
 export async function createMembership(options: CreateMembershipOptions) {
   const publicId = generatePublicId('memberRole');
 
-  const [membership] = await database
+  const [membership] = await getElevatedDatabase()
     .insert(memberships)
     .values({
       public_id: publicId,

@@ -59,11 +59,22 @@ function productionImportersOf(moduleFragment: string): string[] {
   } catch {
     // no matches
   }
-  return output
-    .split('\n')
-    .filter(Boolean)
-    .filter((filePath) => !/\.test\.ts$/.test(filePath))
-    .sort();
+  return (
+    output
+      .split('\n')
+      .filter(Boolean)
+      .filter((filePath) => !/\.test\.ts$/.test(filePath))
+      // Production code only. This ledger exists because importing a verified minter is a claim
+      // of "I authenticated this identity myself" — an authority claim, and authority is a
+      // property of the deployed application. Test fixtures mint verified scopes for the opposite
+      // reason: to seed rows through the SAME context production uses instead of out-privileging
+      // the policy that guards them (see `user.factory.ts`, `organization.factory.ts`,
+      // `test-auth.ts`, which is what makes `pnpm test:rls-role` possible). Ledgering those would
+      // record harness setup as a security decision and make the real list harder to read.
+      .filter((filePath) => !filePath.startsWith('src/tests/'))
+      .filter((filePath) => !filePath.includes('/__tests__/'))
+      .sort()
+  );
 }
 
 describe('verified-principal-scope usage ledger', () => {

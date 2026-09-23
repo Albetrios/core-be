@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { api_keys } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -18,7 +19,7 @@ export async function createTestApiKey(options: CreateApiKeyOptions) {
   const publicId = generatePublicId('organizationApiKey');
   const rawKey = randomBytes(24).toString('hex');
   const keyHash = createHash('sha256').update(rawKey).digest('hex');
-  const [apiKey] = await database
+  const [apiKey] = await getElevatedDatabase()
     .insert(api_keys)
     .values({
       public_id: publicId,

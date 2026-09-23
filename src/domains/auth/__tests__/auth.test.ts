@@ -10,6 +10,7 @@ import { createTestUser, createTestUserWithPassword } from '@/tests/factories/us
 import { generateTestToken, generateTestTokenAndSession } from '@/tests/helpers/test-auth.js';
 import { seedRecentStepUpForTestUser } from '@/tests/helpers/test-step-up.helper.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { auth_methods } from '@/domains/auth/sub-domains/auth-method/auth-method.schema.js';
 import { verification_tokens } from '@/domains/auth/sub-domains/auth-method/verification-token/verification-token.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
@@ -399,7 +400,7 @@ describe('Auth Domain — Route gates (e2e)', () => {
       const tokenHash = createHash('sha256').update(rawToken).digest('hex');
       const expiresAt = new Date(Date.now() + 3_600_000); // 1 hour
 
-      await database.insert(verification_tokens).values({
+      await getElevatedDatabase().insert(verification_tokens).values({
         token_type: 'PASSWORD_RESET',
         token_hash: tokenHash,
         user_id: user.id,
@@ -681,14 +682,16 @@ describe('Auth Domain — Route gates (e2e)', () => {
       // methods. Seed one verified primary auth method directly so the list
       // response has an item to inspect for the B4 (public_id, no bigserial)
       // shape contract.
-      await database.insert(auth_methods).values({
-        public_id: generatePublicId('authMethod'),
-        user_id: user.id,
-        method_type: 'EMAIL_CODE',
-        is_primary: true,
-        verified_at: new Date(),
-        created_by_user_id: user.id,
-      });
+      await getElevatedDatabase()
+        .insert(auth_methods)
+        .values({
+          public_id: generatePublicId('authMethod'),
+          user_id: user.id,
+          method_type: 'EMAIL_CODE',
+          is_primary: true,
+          verified_at: new Date(),
+          created_by_user_id: user.id,
+        });
       const token = await generateTestToken({ userId: user.public_id });
       const response = await injectAuthenticated(app, {
         url: testApiPath('/auth/me/auth-methods'),

@@ -1,4 +1,5 @@
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { mfa_methods } from '@/domains/auth/sub-domains/auth-mfa/auth-mfa-method.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -14,7 +15,7 @@ export interface CreateMfaMethodOptions {
  */
 export async function createTestMfaMethod(options: CreateMfaMethodOptions) {
   const publicId = generatePublicId('authMethod');
-  const [method] = await database
+  const [method] = await getElevatedDatabase()
     .insert(mfa_methods)
     .values({
       public_id: publicId,

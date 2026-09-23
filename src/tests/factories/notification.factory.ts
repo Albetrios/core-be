@@ -1,4 +1,5 @@
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { notifications } from '@/domains/notify/sub-domains/notification/notification.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -15,7 +16,7 @@ export interface CreateNotificationOptions {
  */
 export async function createTestNotification(options: CreateNotificationOptions) {
   const publicId = generatePublicId('notification');
-  const [notification] = await database
+  const [notification] = await getElevatedDatabase()
     .insert(notifications)
     .values({
       public_id: publicId,

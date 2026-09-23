@@ -1,4 +1,5 @@
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { organization_notification_policies } from '@/domains/tenancy/sub-domains/organization/organization-notification-policy/organization-notification-policy.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -16,7 +17,7 @@ export interface CreateNotificationPolicyOptions {
  */
 export async function createTestNotificationPolicy(options: CreateNotificationPolicyOptions) {
   const publicId = generatePublicId('organizationNotificationPolicy');
-  const [policy] = await database
+  const [policy] = await getElevatedDatabase()
     .insert(organization_notification_policies)
     .values({
       public_id: publicId,
