@@ -32,7 +32,17 @@ export const MONITORED_BULLMQ_QUEUE_NAMES = [
 
 const queueClientsByName = new Map<string, Queue>();
 
-function getOrCreateQueueClient(queueName: string): Queue {
+/**
+ * A `Queue` client for `queueName`, created once and reused for the process lifetime.
+ *
+ * @remarks
+ * Exported because the Redis-saturation sampler probes the same queues on its own tick and
+ * was opening, script-loading and closing a fresh client per queue per pass. Sharing this
+ * pool costs it nothing: every queue it watches is already in
+ * {@link MONITORED_BULLMQ_QUEUE_NAMES}. Same reasoning as `getDeadLetterQueueClient`.
+ * Released by {@link closeBullMQMetricsQueues} at shutdown.
+ */
+export function getOrCreateQueueClient(queueName: string): Queue {
   const existing = queueClientsByName.get(queueName);
   if (existing) return existing;
   const queue = new Queue(queueName, { connection: getBullMQConnectionOptions() });

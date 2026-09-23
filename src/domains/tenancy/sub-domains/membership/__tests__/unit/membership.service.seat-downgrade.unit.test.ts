@@ -43,13 +43,15 @@ const _asScope = (organizationPublicId: string) =>
 describe('MembershipService.suspendExcessActiveMembersToFitCeiling (F2 downgrade enforcement)', () => {
   const organizationRecord = { id: 1, public_id: 'org_public', owner_user_id: 99 };
   const requireOrganizationRecordByPublicId = vi.fn().mockResolvedValue(organizationRecord);
-  const resolveUserPublicIdByInternalId = vi.fn(async (id: number) => `user_${id}`);
+  const resolveUserPublicIdsByInternalIds = vi.fn(
+    async (ids: readonly number[]) => new Map(ids.map((id) => [id, `user_${id}`])),
+  );
   const countActiveByOrganization = vi.fn();
   const suspendExcessActiveMembers = vi.fn();
 
   const organizationService = {
     requireOrganizationRecordByPublicId,
-    resolveUserPublicIdByInternalId,
+    resolveUserPublicIdsByInternalIds,
   } as never;
   const membershipRepository = {
     countActiveByOrganization,
@@ -70,7 +72,9 @@ describe('MembershipService.suspendExcessActiveMembersToFitCeiling (F2 downgrade
   beforeEach(() => {
     vi.clearAllMocks();
     requireOrganizationRecordByPublicId.mockResolvedValue(organizationRecord);
-    resolveUserPublicIdByInternalId.mockImplementation(async (id: number) => `user_${id}`);
+    resolveUserPublicIdsByInternalIds.mockImplementation(
+      async (ids: readonly number[]) => new Map(ids.map((id) => [id, `user_${id}`])),
+    );
   });
 
   it('suspends exactly the excess active members, passes the owner so it is never suspended, and purges each one’s permission cache', async () => {
@@ -92,6 +96,10 @@ describe('MembershipService.suspendExcessActiveMembersToFitCeiling (F2 downgrade
     // cannot re-cache the pre-suspension permission set.
     expect(invalidatePermissionsMock).toHaveBeenCalledWith('user_11', 'org_public');
     expect(invalidatePermissionsMock).toHaveBeenCalledWith('user_12', 'org_public');
+    // …resolved in ONE lookup for the whole set, not one per suspended member. A downgrade can
+    // suspend an unbounded number of members, so a per-member resolve scaled round trips with it.
+    expect(resolveUserPublicIdsByInternalIds).toHaveBeenCalledTimes(1);
+    expect(resolveUserPublicIdsByInternalIds).toHaveBeenCalledWith([11, 12]);
   });
 
   it('is a no-op when the active members already fit the ceiling (excess <= 0)', async () => {
