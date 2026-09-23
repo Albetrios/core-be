@@ -9,7 +9,7 @@ import {
   PRINCIPAL_SCOPE,
   withAppDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { users } from '@/domains/user/user.schema.js';
 import { and, eq, ne } from 'drizzle-orm';
 import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
@@ -19,10 +19,10 @@ async function persistActiveSessionForToken(
   userPublicId: string,
   token: string,
 ): Promise<string | null> {
-  // Fixture lookup on the elevated handle: `auth.users` is FORCE RLS and this runs before any
+  // Fixture lookup on the operator connection: `auth.users` is FORCE RLS and this runs before any
   // request context exists, so under `pnpm test:rls-role` the ordinary pool sees nothing here —
   // which silently yielded no session and turned every authenticated assertion into a 401.
-  const [user] = await getElevatedDatabase()
+  const [user] = await getOperatorDatabase()
     .select({ id: users.id })
     .from(users)
     .where(eq(users.public_id, userPublicId))
@@ -83,10 +83,10 @@ async function alignUserWithSuperAdminAllowlist(userPublicId: string): Promise<v
   // leave a committed user already holding the allowlist email — the reassignment below
   // would then violate idx_users_email_unique in suites that never truncate (mcp-auth).
   // Hard-delete any OTHER row holding the email first; this is a test-only helper.
-  await getElevatedDatabase()
+  await getOperatorDatabase()
     .delete(users)
     .where(and(eq(users.email, superAdminEmail), ne(users.public_id, userPublicId)));
-  await getElevatedDatabase()
+  await getOperatorDatabase()
     .update(users)
     .set({
       email: superAdminEmail,

@@ -5,7 +5,6 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { withTransaction } from '@/infrastructure/database/transaction.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { users } from '@/domains/user/user.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 

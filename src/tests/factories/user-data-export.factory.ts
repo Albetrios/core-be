@@ -1,5 +1,4 @@
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { user_data_exports } from '@/domains/user/sub-domains/user-data-export/user-data-export.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -13,7 +12,7 @@ export interface CreateUserDataExportOptions {
  */
 export async function createTestUserDataExport(options: CreateUserDataExportOptions) {
   const publicId = generatePublicId('userDataExport');
-  const [exportRow] = await getElevatedDatabase()
+  const [exportRow] = await database
     .insert(user_data_exports)
     .values({
       public_id: publicId,

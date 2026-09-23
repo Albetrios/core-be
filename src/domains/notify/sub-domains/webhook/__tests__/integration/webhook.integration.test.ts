@@ -3,7 +3,6 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { redisConnection } from '@/infrastructure/cache/redis.client.js';
 import { buildIdempotencyCacheKey } from '@/shared/utils/idempotency/idempotency-key.util.js';
 import { createTestApp } from '@/tests/helpers/test-app.js';
@@ -128,7 +127,7 @@ describe('Webhook Sub-Domain — Integration', () => {
           createdByUserId: owner.id,
         });
         const orderedCreatedAt = new Date(baseCreatedAt + index * 1_000);
-        await getElevatedDatabase()
+        await database
           .update(webhooks)
           .set({ created_at: orderedCreatedAt, updated_at: orderedCreatedAt })
           .where(eq(webhooks.id, webhook.id));
@@ -208,7 +207,7 @@ describe('Webhook Sub-Domain — Integration', () => {
           sent_at: new Date(),
           attempt_count: 1,
         });
-        await getElevatedDatabase()
+        await database
           .update(webhook_delivery_attempts)
           .set({ created_at: new Date(baseCreatedAt + index * 1_000) })
           .where(eq(webhook_delivery_attempts.id, attempt.id));

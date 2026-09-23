@@ -9,7 +9,6 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUserWithPassword } from '@/tests/factories/user.factory.js';
 import { generateTestToken } from '@/tests/helpers/test-auth.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { auth_methods } from '@/domains/auth/sub-domains/auth-method/auth-method.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { FastifyInstance } from 'fastify';
@@ -107,15 +106,13 @@ describe('Auth Method Sub-Domain — Integration', () => {
 
       // The last-login-capable guard counts auth_methods rows; give the user a
       // PASSWORD method row so removing the email-code is not removing the last one.
-      await getElevatedDatabase()
-        .insert(auth_methods)
-        .values({
-          public_id: generatePublicId('authMethod'),
-          user_id: user.id,
-          method_type: 'PASSWORD',
-          is_primary: true,
-          verified_at: new Date(),
-        });
+      await database.insert(auth_methods).values({
+        public_id: generatePublicId('authMethod'),
+        user_id: user.id,
+        method_type: 'PASSWORD',
+        is_primary: true,
+        verified_at: new Date(),
+      });
 
       // EMAIL_CODE is the only type this endpoint may create (route-#3).
       const create = await injectAuthenticated(app, {

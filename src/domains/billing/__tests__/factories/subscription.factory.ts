@@ -1,5 +1,5 @@
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { subscriptions } from '@/domains/billing/sub-domains/subscription/subscription.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -53,7 +53,7 @@ export async function createTestSubscription(options: CreateTestSubscriptionOpti
       ? options.providerSubscriptionId
       : `sub_test_${generatePublicId('subscription')}`;
 
-  const [subscription] = await getElevatedDatabase()
+  const [subscription] = await getOperatorDatabase()
     .insert(subscriptions)
     .values({
       public_id: generatePublicId('subscription'),

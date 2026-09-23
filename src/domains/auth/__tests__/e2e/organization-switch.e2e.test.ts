@@ -14,7 +14,7 @@ import {
   provisionOrganizationWithOwner,
 } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
@@ -272,7 +272,7 @@ describe('Auth e2e: organization switch', () => {
       });
       // Give `user` a SUSPENDED membership in the team (joined_at set so the row is a
       // previously-active member who was suspended, not a never-joined invite).
-      await getElevatedDatabase()
+      await getOperatorDatabase()
         .insert(memberships)
         .values({
           public_id: generatePublicId('membership'),
@@ -315,7 +315,7 @@ describe('Auth e2e: organization switch', () => {
       // organization was never deleted, the switch legitimately returned 200, and the test read
       // as an authorization bug. That silent zero-row write is the same failure mode that let
       // offboarding erase nothing.
-      await getElevatedDatabase()
+      await getOperatorDatabase()
         .update(organizations)
         .set({ deleted_at: new Date() })
         .where(eq(organizations.id, team.organization.id));

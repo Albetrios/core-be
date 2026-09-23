@@ -1,5 +1,5 @@
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { webhooks } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { encryptFieldSecret } from '@/shared/utils/security/field-secret-encryption.util.js';
@@ -17,7 +17,7 @@ export interface CreateWebhookOptions {
  */
 export async function createTestWebhook(options: CreateWebhookOptions) {
   const publicId = generatePublicId('webhook');
-  const [webhook] = await getElevatedDatabase()
+  const [webhook] = await getOperatorDatabase()
     .insert(webhooks)
     .values({
       public_id: publicId,

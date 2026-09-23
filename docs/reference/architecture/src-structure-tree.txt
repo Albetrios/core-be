@@ -1795,9 +1795,9 @@ src/
     │   │   │   └── test-http-inject.helper.unit.test.ts
     │   ├── audit-log-partition.helper.ts
     │   ├── database-context-mock.helper.ts
-    │   ├── elevated-database.ts
     │   ├── fast-check-property.util.ts
     │   ├── object-storage-mock.helper.ts
+    │   ├── operator-database.ts
     │   ├── principal-scope.helper.ts
     │   ├── redis-mock.helper.ts
     │   ├── registered-route.util.ts

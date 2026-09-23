@@ -12,7 +12,6 @@ import {
 } from '@/domains/audit/workers/audit-outbox-drain.processor.js';
 import { users } from '@/domains/user/user.schema.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 
@@ -31,22 +30,20 @@ describe('Integration: audit transactional outbox drain', () => {
   });
 
   it('drains a PENDING tenantless row into audit.logs and empties the outbox', async () => {
-    await getElevatedDatabase().insert(users).values({
+    await database.insert(users).values({
       public_id: ACTOR_PUBLIC_ID,
       email: 'audit-drain@example.com',
       email_hash: 'audit-drain-hash',
     });
-    await getElevatedDatabase()
-      .insert(audit_outbox)
-      .values({
-        status: 'PENDING',
-        actor_user_public_id: ACTOR_PUBLIC_ID,
-        organization_public_id: null,
-        action: 'user.login',
-        resource_type: 'user',
-        severity: 'INFO',
-        metadata: { source: 'audit-outbox-drain.integration' },
-      });
+    await database.insert(audit_outbox).values({
+      status: 'PENDING',
+      actor_user_public_id: ACTOR_PUBLIC_ID,
+      organization_public_id: null,
+      action: 'user.login',
+      resource_type: 'user',
+      severity: 'INFO',
+      metadata: { source: 'audit-outbox-drain.integration' },
+    });
 
     expect(await pendingOutboxCount()).toBe(1);
 
@@ -74,7 +71,7 @@ describe('Integration: audit transactional outbox drain', () => {
   });
 
   it('marks an unresolvable-actor row FAILED and writes no audit.logs row', async () => {
-    await getElevatedDatabase().insert(audit_outbox).values({
+    await database.insert(audit_outbox).values({
       status: 'PENDING',
       actor_user_public_id: 'usr_doesnotexist00000001',
       organization_public_id: null,
@@ -101,26 +98,24 @@ describe('Integration: audit transactional outbox drain', () => {
     // The scheduler can run on >1 replica. `claimPendingBatch` uses FOR UPDATE SKIP LOCKED so
     // two drainers racing the same backlog partition the rows instead of both copying a row into
     // audit.logs (a duplicate ledger entry). The single-drainer test above cannot prove this.
-    await getElevatedDatabase().insert(users).values({
+    await database.insert(users).values({
       public_id: ACTOR_PUBLIC_ID,
       email: 'audit-drain-concurrent@example.com',
       email_hash: 'audit-drain-concurrent-hash',
     });
 
     const ROW_COUNT = 24;
-    await getElevatedDatabase()
-      .insert(audit_outbox)
-      .values(
-        Array.from({ length: ROW_COUNT }, (_, index) => ({
-          status: 'PENDING' as const,
-          actor_user_public_id: ACTOR_PUBLIC_ID,
-          organization_public_id: null,
-          action: 'user.login',
-          resource_type: 'user',
-          severity: 'INFO',
-          metadata: { source: 'audit-outbox-drain.concurrent', index },
-        })),
-      );
+    await database.insert(audit_outbox).values(
+      Array.from({ length: ROW_COUNT }, (_, index) => ({
+        status: 'PENDING' as const,
+        actor_user_public_id: ACTOR_PUBLIC_ID,
+        organization_public_id: null,
+        action: 'user.login',
+        resource_type: 'user',
+        severity: 'INFO',
+        metadata: { source: 'audit-outbox-drain.concurrent', index },
+      })),
+    );
     expect(await pendingOutboxCount()).toBe(ROW_COUNT);
 
     // Two independent drain contexts (two worker replicas) racing the same backlog.
@@ -156,7 +151,7 @@ describe('Integration: audit transactional outbox drain', () => {
     // still commits. This proves the failed row does NOT wedge the batch on the real driver — raw
     // `SAVEPOINT` via execute() does not survive postgres-js's transaction-error state, so the
     // nested transaction is the supported mechanism.
-    await getElevatedDatabase().insert(users).values({
+    await database.insert(users).values({
       public_id: ACTOR_PUBLIC_ID,
       email: 'audit-drain-savepoint@example.com',
       email_hash: 'audit-drain-savepoint-hash',

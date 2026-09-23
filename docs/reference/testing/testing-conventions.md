@@ -106,7 +106,7 @@ the *application* obeys them, because the connection underneath is still the sup
 `pnpm test:rls-role` opens the pool under test as `core_be_app` for the whole connection, so the
 role applies to every statement — including ones inside the application's own transactions.
 
-**Fixtures use a separate elevated handle.** `src/tests/helpers/elevated-database.ts` exists
+**Fixtures use the operator connection.** `src/tests/helpers/operator-database.ts` exists
 because the harness does things the application never does: `TRUNCATE`ing every table between
 suites, and seeding deliberately cross-tenant rows. Without the split the suites die on
 `permission denied for table users` inside `cleanupDatabase` before asserting anything. The two
@@ -118,7 +118,7 @@ A test that passes normally and fails under this runner is depending on an RLS b
 the code is missing a context, or the fixture is writing somewhere it should not. Both are worth
 knowing. When it is the fixture, the symptom is a silent zero-row write, which reads as an
 application bug: a soft-delete that updated nothing made a switch-organization test look like an
-authorization hole until the fixture was moved onto the elevated handle.
+authorization hole until the fixture was moved onto the operator connection.
 
 Only `e2e` is covered today. `integration` and `security` fixtures still write directly to FORCE
 RLS tables without a context; converting them is the same work already done for the e2e

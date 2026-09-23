@@ -323,8 +323,8 @@ jobs:
     # rather than only where a test opts in. A path that reaches a FORCE RLS table without a
     # database context matches no policy arm, reads zero rows and reports success; that is how
     # organization and account deletion came to erase no uploads with every check green, and it
-    # is invisible on the RLS-exempt superuser every other job uses. Harness fixtures keep a
-    # separate elevated handle (`src/tests/helpers/elevated-database.ts`) because TRUNCATE and
+    # is invisible on the RLS-exempt superuser every other job uses. Harness fixtures use the
+    # operator connection (`src/tests/helpers/operator-database.ts`) because TRUNCATE and
     # cross-tenant seeding are not things the application role may do.
     services:
       postgres:

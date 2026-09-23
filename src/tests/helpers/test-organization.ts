@@ -1,5 +1,4 @@
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
@@ -140,7 +139,7 @@ export async function seedUploadForOrganization(options: {
 }): Promise<SeedUploadForOrganizationResult> {
   const bucket = getEnv().S3_BUCKET ?? 'test-bucket';
   const publicId = generatePublicId('organization');
-  const [row] = await getElevatedDatabase()
+  const [row] = await database
     .insert(uploads)
     .values({
       public_id: publicId,

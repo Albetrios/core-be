@@ -8,7 +8,6 @@ import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUserWithPassword } from '@/tests/factories/user.factory.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { users } from '@/domains/user/user.schema.js';
 import { verification_tokens } from '@/domains/auth/sub-domains/auth-method/verification-token/verification-token.schema.js';
 import { AuthSessionRepository } from '@/domains/auth/sub-domains/auth-session/auth-session.repository.js';
@@ -26,15 +25,13 @@ async function seedUserWithResetToken(password: string) {
   const { user } = await createTestUserWithPassword({ password });
   const rawToken = randomBytes(32).toString('hex');
   const tokenHash = createHash('sha256').update(rawToken).digest('hex');
-  await getElevatedDatabase()
-    .insert(verification_tokens)
-    .values({
-      token_type: 'PASSWORD_RESET',
-      token_hash: tokenHash,
-      user_id: user.id,
-      email: user.email,
-      expires_at: new Date(Date.now() + 3_600_000),
-    });
+  await database.insert(verification_tokens).values({
+    token_type: 'PASSWORD_RESET',
+    token_hash: tokenHash,
+    user_id: user.id,
+    email: user.email,
+    expires_at: new Date(Date.now() + 3_600_000),
+  });
   return { user, rawToken, tokenHash };
 }
 

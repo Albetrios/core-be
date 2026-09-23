@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { webhook_delivery_attempts } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
 import { processWebhookDeliveryAttempt } from '@/domains/notify/sub-domains/webhook/webhook-delivery/workers/webhook-delivery.worker.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
@@ -32,7 +31,7 @@ describe('Integration: webhook-delivery worker concurrency race', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await getElevatedDatabase()
+    const [pendingAttempt] = await database
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),

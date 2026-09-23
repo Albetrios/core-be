@@ -105,9 +105,11 @@ process.env.SENTRY_DEBUG ??= 'true';
  * machine-local env file is loaded with `override: true` and would clobber an injected URL —
  * silently putting the lane back on the bypassing role while still reporting green.
  *
- * Only the pool under test moves. `TEST_ELEVATED_DATABASE_URL` keeps the original for
- * `src/tests/helpers/elevated-database.ts`, because the harness truncates every table between
- * suites and seeds cross-tenant fixtures — neither of which the application role may do.
+ * Only the pool under test moves. The original URL is kept in `DATABASE_OPERATOR_URL` — the
+ * harness's existing elevated connection, the same one this file and `global-setup.ts` already
+ * prefer — for `src/tests/helpers/operator-database.ts`, because the harness truncates every
+ * table between suites and seeds cross-tenant fixtures, neither of which the application role
+ * may do. Locally it is already set; in CI (superuser, no operator URL) it is set here.
  */
 function applyRequestedDatabaseRole(): void {
   const role = process.env.TEST_DATABASE_ROLE;
@@ -118,7 +120,7 @@ function applyRequestedDatabaseRole(): void {
   const current = process.env.DATABASE_URL;
   if (!current) return;
 
-  process.env.TEST_ELEVATED_DATABASE_URL = current;
+  process.env.DATABASE_OPERATOR_URL ??= current;
   const url = new URL(current);
   // libpq applies `options` at connection time, so the role covers every statement on the
   // connection — including ones inside the application's own transactions.

@@ -10,7 +10,6 @@ import {
 } from '@/tests/helpers/test-http-inject.helper.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestPlan } from '@/tests/factories/plan.factory.js';
@@ -399,7 +398,7 @@ describe('Membership Sub-Domain — Integration', () => {
         organizationId: organization.id,
         permissionCodes: [TENANCY_PERMISSIONS.MEMBERSHIP_READ],
       });
-      const [inviteeMembership] = await getElevatedDatabase()
+      const [inviteeMembership] = await database
         .insert(memberships)
         .values({
           public_id: generatePublicId('membership'),
@@ -525,7 +524,7 @@ describe('Membership Sub-Domain — Integration', () => {
         organizationId: organization.id,
         permissionCodes: [],
       });
-      const [membership] = await getElevatedDatabase()
+      const [membership] = await database
         .insert(memberships)
         .values({
           public_id: generatePublicId('membership'),
@@ -568,7 +567,7 @@ describe('Membership Sub-Domain — Integration', () => {
         organizationId: organization.id,
         permissionCodes: [TENANCY_PERMISSIONS.MEMBERSHIP_READ],
       });
-      const [inviteeMembership] = await getElevatedDatabase()
+      const [inviteeMembership] = await database
         .insert(memberships)
         .values({
           public_id: generatePublicId('membership'),
@@ -680,7 +679,7 @@ describe('Membership Sub-Domain — Integration', () => {
         organizationId: organization.id,
         permissionCodes: [TENANCY_PERMISSIONS.MEMBERSHIP_READ],
       });
-      const [inviteeMembership] = await getElevatedDatabase()
+      const [inviteeMembership] = await database
         .insert(memberships)
         .values({
           public_id: generatePublicId('membership'),
@@ -730,7 +729,7 @@ describe('Membership Sub-Domain — Integration', () => {
 
     it('rejects resend on a revoked invitation (400)', async () => {
       const { organization, adminToken, invitation } = await createPendingInvitationForResend();
-      await getElevatedDatabase()
+      await database
         .update(member_invitations)
         .set({ revoked_at: new Date() })
         .where(eq(member_invitations.id, invitation.id));

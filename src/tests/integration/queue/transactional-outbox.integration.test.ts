@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq, sql as drizzleSql } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import {
   organizationRequestDatabaseStorage,
   type RequestScopedPostgresDatabase,

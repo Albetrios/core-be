@@ -12,7 +12,6 @@ import { createTestSubscription } from '@/domains/billing/__tests__/factories/su
 import { buildStripeWebhookTestSignatureHeader } from '@/tests/contract/helpers/stripe-signature.js';
 import { stripe_webhook_events } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook.schema.js';
 import { database } from '@/infrastructure/database/connection.js';
-import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { env } from '@/shared/config/env.config.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
