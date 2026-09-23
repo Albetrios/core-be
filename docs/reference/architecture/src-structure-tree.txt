@@ -1853,6 +1853,8 @@ src/
     │   │   ├── permission-cache-version.integration.test.ts
     │   │   ├── redis-primitives.integration.test.ts
     │   │   └── shutdown-drain.integration.test.ts
+    │   ├── upload/
+    │   │   └── upload-offboarding-erasure.integration.test.ts
     │   ├── worker-race/
     │   │   ├── mail-claim-race.integration.test.ts
     │   │   ├── mail-race.integration.test.ts
@@ -2078,7 +2080,6 @@ src/
     │   │   ├── reusable-workflow-permissions.policy.unit.test.ts
     │   │   ├── route-param-schemas.policy.unit.test.ts
     │   │   ├── rulesets.policy.unit.test.ts
-    │   │   ├── run-as-application-role.unit.test.ts
     │   │   ├── setup-mac-tools.policy.unit.test.ts
     │   │   ├── stryker-config.policy.unit.test.ts
     │   │   └── supply-chain-sbom.policy.unit.test.ts

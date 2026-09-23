@@ -84,34 +84,11 @@ src/domains/<domain>/sub-domains/<resource>/__tests__/
 | **Integration**        | `pnpm test:integration` | Cross-domain in-process contracts         |
 | **Domain integration** | `pnpm test:e2e`         | `src/domains/**/__tests__/integration/**` |
 | **Security**           | `pnpm test:security`    | Auth, CORS, JWT, RLS                      |
-| **RLS application role** | `pnpm test:rls-role`  | Every lane above, on an RLS-subject connection |
 | **Performance**        | `pnpm test:performance` | N+1, concurrency                          |
 | **Load**               | `pnpm load:*`           | k6 against running API                    |
 | **Smoke**              | `pnpm test:api-smoke`   | Live API after seed                       |
 | **Global**             | `pnpm test:global`      | Route catalog, consistency                |
 | **Coverage**           | `pnpm test:coverage`    | Full suite + Stage 5 thresholds           |
-
-### Why `pnpm test:rls-role` exists
-
-Every other lane connects with a role that **bypasses** row-level security: Compose creates
-`POSTGRES_USER: core` as a superuser, and the local operator role carries `rolbypassrls`. So a
-code path that reaches a FORCE RLS table **without a database context** matches no policy arm,
-reads zero rows, and reports success — and it looks perfectly green everywhere it is tested,
-because the test roles never apply the policy. That is not hypothetical: organization and
-account deletion tombstoned no uploads for months that way, with full CI green.
-
-The RLS security job covers the other half — it asserts what the *policies* permit, using
-helpers that opt into `core_be_app` per statement. What it cannot see is whether the
-*application* obeys them, because the connection underneath is still the superuser.
-
-`pnpm test:rls-role` closes that: it rewrites `DATABASE_URL` with libpq's `options=-c role=…`,
-so the role applies to the whole connection — including statements inside the application's own
-transactions. A suite that passes normally and fails under this runner is depending on an RLS
-bypass, which is exactly the bug class worth finding.
-
-```bash
-pnpm test:rls-role
-```
 
 ---
 
