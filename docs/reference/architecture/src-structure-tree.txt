@@ -2002,6 +2002,7 @@ src/
     │   │   ├── billing-subscriptions-with-check.security.test.ts
     │   │   ├── bola-cross-tenant.security.test.ts
     │   │   ├── core-be-app-role-privileges.security.test.ts
+    │   │   ├── data-migration-as-owner.security.test.ts
     │   │   ├── force-rls-policies-restrict.security.test.ts
     │   │   ├── membership-name-sort-resolver.security.test.ts
     │   │   ├── membership-search-resolver.security.test.ts
@@ -2212,6 +2213,7 @@ src/
     │   │   ├── generate-route-catalog.unit.test.ts
     │   │   ├── lint-migrations-concurrent-index.unit.test.ts
     │   │   ├── lint-migrations-drop-index.unit.test.ts
+    │   │   ├── lint-migrations-force-rls-data-migration.unit.test.ts
     │   │   ├── lint-migrations-rollback.unit.test.ts
     │   │   ├── lint-migrations-row-security-guc.unit.test.ts
     │   │   ├── lint-migrations-timestamp.unit.test.ts

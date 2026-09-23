@@ -14,6 +14,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseMigrationExecutionMode } from '@/infrastructure/database/migration/migration-execution-mode.js';
+import { EXPECTED_FORCE_RLS_TABLES } from '@/infrastructure/database/utils/force-rls-tables.constants.js';
 
 /** Identifiers of every rule {@link lintMigrationFileContent} can report; used for header-comment allow-lists. */
 export const migrationSafetyRuleIds = [
@@ -25,6 +26,7 @@ export const migrationSafetyRuleIds = [
   'concurrent_index_requires_non_transactional',
   'create_index_without_concurrently',
   'disable_row_security_guc',
+  'force_rls_data_migration_without_owner_bracket',
   'drop_column',
   'drop_index_without_concurrently',
   'drop_table',
@@ -56,6 +58,8 @@ const ruleFixHints: Record<MigrationSafetyRuleId, string> = {
     'Prefer CREATE INDEX CONCURRENTLY in a non-transactional migration. This repo runs each file inside a transaction, so CONCURRENTLY cannot run as-is; split the index into a follow-up migration that runs outside a transaction, or explicitly allow this rule with a documented reason.',
   disable_row_security_guc:
     'Migrations must not SET / RESET the `row_security` GUC. Postgres enforces RLS on FORCE ROW LEVEL SECURITY tables for any non-privileged session role; SECURITY DEFINER functions already run as their owner and bypass RLS through ownership, not by toggling row_security. Drop the SET row_security clause and rely on SECURITY DEFINER + GRANT EXECUTE.',
+  force_rls_data_migration_without_owner_bracket:
+    'The migrator is RLS-subject (core_be_migrator is a member of core_be_owner and FORCE ROW LEVEL SECURITY binds owners), so a data migration that touches a FORCE RLS table is either rejected (writes) or silently handed zero rows (reads). Bracket EVERY FORCE RLS table the file writes OR reads with `ALTER TABLE <table> NO FORCE ROW LEVEL SECURITY` before the data statements and `ALTER TABLE <table> FORCE ROW LEVEL SECURITY` after, in a transactional migration so a failure rolls FORCE back too. Model: 20260921000000_team_owner_notify_permissions_backfill.sql.',
   drop_column:
     'Stop application writes, deploy, then drop the column in a later migration (contract phase).',
   drop_index_without_concurrently:
@@ -592,6 +596,71 @@ function findNonTransactionalBreakpointViolations(
   return violations;
 }
 
+/**
+ * Migrations applied after the role taxonomy run under an RLS-subject migrator, so this rule
+ * only binds them. Earlier files ran as a role that bypassed RLS and are historical record.
+ */
+const RLS_SUBJECT_MIGRATOR_SINCE = '20260827050000';
+
+const dataWriteStatementPattern = /\b(insert\s+into|update|delete\s+from)\s/i;
+
+/** SQL with `--` comments stripped, so prose that names a table is not mistaken for a statement. */
+function stripSqlLineComments(fileContent: string): string {
+  return fileContent
+    .split('\n')
+    .map((line) => {
+      const commentIndex = line.indexOf('--');
+      return commentIndex === -1 ? line : line.slice(0, commentIndex);
+    })
+    .join('\n');
+}
+
+/**
+ * Flags a data migration that touches a FORCE RLS table without lifting FORCE around it.
+ *
+ * @remarks
+ * - **Why:** `core_be_migrator` is a member of `core_be_owner`, and FORCE ROW LEVEL SECURITY
+ *   binds table owners — so the migrator is RLS-subject on data, by design. A write to a FORCE
+ *   RLS table is rejected; a READ from one returns zero rows. The second is the dangerous case:
+ *   an `INSERT ... SELECT` whose source is FORCE RLS inserts nothing and reports success.
+ *   Hosted migrations run as a provider owner that bypasses RLS, so both pass there and fail
+ *   only where the migrator is RLS-subject — which is exactly how
+ *   `20260921000000_team_owner_notify_permissions_backfill` blocked every later migration.
+ * - **Algorithm:** skip files before {@link RLS_SUBJECT_MIGRATOR_SINCE} and files with no data
+ *   statement. Otherwise every FORCE RLS table named anywhere in the SQL — write target or read
+ *   source — must be lifted with `NO FORCE` and re-applied with `FORCE` in the same file.
+ * - **Notes:** the table list is {@link EXPECTED_FORCE_RLS_TABLES}, the same source the RLS
+ *   matrix asserts against, so a newly forced table is covered here without a second list.
+ */
+function findForceRlsDataMigrationViolations(filename: string, fileContent: string): Violation[] {
+  if (filename.slice(0, RLS_SUBJECT_MIGRATOR_SINCE.length) <= RLS_SUBJECT_MIGRATOR_SINCE) return [];
+  const sqlOnly = stripSqlLineComments(fileContent);
+  if (!dataWriteStatementPattern.test(sqlOnly)) return [];
+
+  const violations: Violation[] = [];
+  for (const { schemaName, tableName } of EXPECTED_FORCE_RLS_TABLES) {
+    const qualified = `${schemaName}.${tableName}`;
+    const escaped = qualified.replace('.', '\\.');
+    if (!new RegExp(`\\b${escaped}\\b`, 'i').test(sqlOnly)) continue;
+    const lifted = new RegExp(
+      `alter\\s+table\\s+${escaped}\\s+no\\s+force\\s+row\\s+level\\s+security`,
+      'i',
+    ).test(sqlOnly);
+    const reapplied = new RegExp(
+      `alter\\s+table\\s+${escaped}\\s+force\\s+row\\s+level\\s+security`,
+      'i',
+    ).test(sqlOnly);
+    if (lifted && reapplied) continue;
+    violations.push({
+      filename,
+      lineNumber: 1,
+      ruleId: 'force_rls_data_migration_without_owner_bracket',
+      message: `${qualified}: ${ruleFixHints.force_rls_data_migration_without_owner_bracket}`,
+    });
+  }
+  return violations;
+}
+
 function findRowSecurityGucViolations(filename: string, fileContent: string): Violation[] {
   const violations: Violation[] = [];
   const lines = fileContent.split('\n');
@@ -639,6 +708,7 @@ export function lintMigrationFileContent(
   }
 
   violations.push(...findRowSecurityGucViolations(filename, fileContent));
+  violations.push(...findForceRlsDataMigrationViolations(filename, fileContent));
 
   const statements = splitSqlStatements(fileContent);
 
