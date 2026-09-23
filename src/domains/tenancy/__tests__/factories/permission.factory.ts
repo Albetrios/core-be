@@ -1,4 +1,3 @@
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { permissions } from '@/domains/tenancy/sub-domains/permission/permission.schema.js';
 import { SYSTEM_PERMISSIONS } from '@/domains/tenancy/sub-domains/permission/seed/permission.reference.seed.js';

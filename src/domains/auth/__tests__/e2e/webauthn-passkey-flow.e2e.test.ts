@@ -10,7 +10,6 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { generateTestTokenWithActiveSession } from '@/tests/helpers/test-auth.js';
 import { seedRecentStepUpForTestUser } from '@/tests/helpers/test-step-up.helper.js';
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { webauthn_credentials } from '@/domains/auth/sub-domains/auth-webauthn/webauthn-credential.schema.js';
 import type { FastifyInstance } from 'fastify';
