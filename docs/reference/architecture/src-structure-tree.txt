@@ -2004,6 +2004,7 @@ src/
     │   │   ├── billing-subscriptions-with-check.security.test.ts
     │   │   ├── bola-cross-tenant.security.test.ts
     │   │   ├── core-be-app-role-privileges.security.test.ts
+    │   │   ├── force-rls-policies-restrict.security.test.ts
     │   │   ├── membership-name-sort-resolver.security.test.ts
     │   │   ├── membership-search-resolver.security.test.ts
     │   │   ├── organization-provisioning-rls.security.test.ts
@@ -2022,6 +2023,7 @@ src/
     │   │   ├── tenant-isolation.security.test.ts
     │   │   ├── tenant-rls-concurrency.security.test.ts
     │   │   ├── upload-rls.security.test.ts
+    │   │   ├── uploads-offboarding-rls.security.test.ts
     │   │   ├── user-public-id-resolver.security.test.ts
     │   │   ├── worker-context-rls-backstop.security.test.ts
     │   │   ├── worker-rls-context.security.test.ts

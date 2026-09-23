@@ -375,7 +375,8 @@ export class AuthSessionService {
    *   via a valid access token for this session; only the access token moves. The previously
    *   held token immediately fails `verifyActiveAccessToken` (hash drift).
    * - **Failure modes:** `UnauthorizedError` when the session is gone or revoked.
-   * - **Side effects:** one UPDATE on `auth.sessions`; two Redis cache invalidations.
+   * - **Side effects:** one UPDATE on `auth.sessions`; one Redis cache invalidation — the
+   *   PREVIOUS token's entry. The new token's key is left untouched so it stays cacheable.
    */
   async rebindAccessToken({
     sessionPublicId,
@@ -402,7 +403,13 @@ export class AuthSessionService {
           nextTokenHash,
           activeOrganizationId,
         );
-        await invalidateCachedSessionToken(nextTokenHash);
+        // The NEW hash is deliberately NOT invalidated here. `signAccessToken` sets
+        // `jti: randomUUID()`, so a freshly minted token's hash is globally unique and cannot
+        // have a stale cache entry to clear. Writing the revocation tombstone under it instead
+        // poisoned the key for SESSION_TOKEN_CACHE_TTL_SECONDS, and because
+        // `setCachedSessionTokenValid` populates with `NX` the new token could not be cached at
+        // all for that window — every authenticated request after an organization switch fell
+        // through to Postgres for a full minute.
       },
     );
   }

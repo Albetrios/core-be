@@ -64,6 +64,7 @@ describe('AuthSessionService', () => {
       expires_at: new Date('2026-12-31T00:00:00.000Z'),
     }),
     rotateTokenHash: vi.fn().mockResolvedValue(undefined),
+    rotateTokenHashAndOrganization: vi.fn().mockResolvedValue(undefined),
     rotateSessionCredentials: vi.fn().mockResolvedValue({ public_id: 'session_public' }),
   } as unknown as AuthSessionRepository;
 
@@ -372,5 +373,35 @@ describe('AuthSessionService', () => {
 
     // The session is already revoked — do NOT call revokeAllByUserId a second time.
     expect(sessionRepository.revokeAllByUserId).not.toHaveBeenCalled();
+  });
+
+  it('rebindAccessToken invalidates the PREVIOUS token hash only, never the new one', async () => {
+    const { invalidateCachedSessionToken, setCachedSessionTokenValid } = await import(
+      '@/domains/auth/sub-domains/auth-session/session-token-cache.service.js'
+    );
+    vi.mocked(invalidateCachedSessionToken).mockClear();
+    vi.mocked(sessionRepository.findByPublicId).mockResolvedValue({
+      public_id: 'session_public',
+      user_id: user.id,
+      token_hash: 'previous-token-hash',
+      is_revoked: false,
+    } as never);
+    await service.rebindAccessToken({
+      sessionPublicId: 'session_public',
+      nextAccessToken: 'next-access-token',
+      activeOrganizationId: 7,
+    });
+
+    // Writing the revocation tombstone under the NEW hash poisoned that key for
+    // SESSION_TOKEN_CACHE_TTL_SECONDS, and since `setCachedSessionTokenValid` populates with
+    // `NX` the new token then could not be cached at all — every request for a minute after an
+    // organization switch fell through to Postgres. It defended against nothing: `jti` is a
+    // random UUID, so a freshly minted token's hash can never carry a stale entry.
+    const invalidatedHashes = vi
+      .mocked(invalidateCachedSessionToken)
+      .mock.calls.map(([hash]) => hash);
+    expect(invalidatedHashes).toContain('previous-token-hash');
+    expect(invalidatedHashes).toHaveLength(1);
+    expect(setCachedSessionTokenValid).not.toHaveBeenCalled();
   });
 });
