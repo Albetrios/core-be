@@ -73,7 +73,7 @@ To gain confidence in the **whole system** (not just health endpoints), run both
      pnpm load:stress:api
      ```
 
-   - Hits: `GET /api/v1/users/me`, `GET /api/v1/tenancy/organizations`, `GET /api/v1/notify/notifications`, `GET /api/v1/notify/notifications/unread-count`, `GET /api/v1/tenancy/organization/memberships` with up to 100 VUs. The active organization rides the token's `org` claim, so `TEST_ORG_ID` scopes the token (via `switchToOrganization`) rather than appearing in the path.
+   - Hits: `GET /api/v1/users/me`, `GET /api/v1/users/me/organizations`, `GET /api/v1/notify/notifications`, `GET /api/v1/notify/notifications/unread-count`, `GET /api/v1/tenancy/organization/memberships` with up to 100 VUs. The active organization rides the token's `org` claim, so `TEST_ORG_ID` scopes the token (via `switchToOrganization`) rather than appearing in the path.
 
 3. **Optional — auth flow**: `pnpm load:auth`
    - Stresses login + profile + list organizations (ramping load profile; see thresholds in `src/tests/load/k6/scenarios/auth-onboarding.js`).
@@ -266,7 +266,7 @@ The same signals are observable live via `GET /readyz` (verbose), `GET /metrics`
 - **Auth**: Bearer token (TEST_TOKEN) + TEST_ORG_ID for memberships
 - **Env**: `TEST_TOKEN` (required), `TEST_ORG_ID` (required for memberships). Get via `pnpm tool:load-test-credentials`.
 - **Run**: `pnpm load:stress:api` after exporting TEST_TOKEN and TEST_ORG_ID.
-- **Routes**: users/me, tenancy/organizations, notify/notifications, notify/notifications/unread-count, tenancy/organization/memberships (active organization from the token claim; `TEST_ORG_ID` scopes the token, not the path). Stress profile: 20→50→100 VUs.
+- **Routes**: users/me, users/me/organizations, notify/notifications, notify/notifications/unread-count, tenancy/organization/memberships (active organization from the token claim; `TEST_ORG_ID` scopes the token, not the path). Stress profile: 20→50→100 VUs.
 
 ### 3. Auth onboarding
 
@@ -335,8 +335,8 @@ not abort the journey.
 **The second `me/context` after the organization switch is a benchmark, not a fidelity claim.** core-fe does
 **not** make that call — `switch-to-organization` already returns the active-organization context inline and
 the client writes it into its cache with `setQueryData` (verified against live responses: the switch
-payload's `active_organization` and `my_permissions` are byte-identical to what the re-read returns,
-and `organizations[]` differs only by the `is_active` flag). The step exists because that route is
+payload's `active_organization` and `my_permissions` are byte-identical to what the re-read returns).
+The step exists because that route is
 the largest single consumer of API time in the run — 100 calls / ~16% of total — which makes it the
 benchmark any caching work has to beat. Of its four reads only `my_permissions` is Redis-cached
 today. When reading the report, treat step 09 as a **caching target**, not as production traffic, and

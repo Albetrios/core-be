@@ -50,7 +50,7 @@ below show where the value comes from; the runbook above shows the workflow.
 
 ## 1. S3 (AWS) — uploads / presigned URLs
 
-**Used for:** `POST /api/v1/upload` (presigned upload URLs).
+**Used for:** `POST /api/v1/uploads` (presigned upload URLs).
 
 | .env variable          | Where to get it                 |
 | ---------------------- | ------------------------------- |

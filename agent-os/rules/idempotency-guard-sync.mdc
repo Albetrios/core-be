@@ -8,7 +8,7 @@ alwaysApply: false
 
 When you change any matched file, read `agent-os/skills/idempotency-guard/SKILL.md` and verify:
 
-- A **new externally-mutating write** (creates/charges/transfers state) sets `config: { idempotencyRequired: true }` — **merged into the existing `config` object**, not clobbered by spreading a rate-limit preset at the top level. Update the "8 routes" count in `docs/reference/api/frontend-auth-guide.md`.
+- A **new externally-mutating write** (creates/charges/transfers state) sets `config: { idempotencyRequired: true }` — **merged into the existing `config` object**, not clobbered by spreading a rate-limit preset at the top level. Update the "13 routes" count in `docs/reference/api/frontend-auth-guide.md`.
 - Stripe mutation helpers in `stripe.client.ts` accept and forward `options.idempotencyKey` as Stripe's native `RequestOptions.idempotencyKey`; the controller reads the request `X-Idempotency-Key` header (`readIdempotencyKey`) and threads it controller → service → client. Add a contract test asserting `matchHeader('idempotency-key', …)`.
 - The completed Redis entry is written **post-commit** (dispatched from `request-lifecycle.middleware.ts`), never in `onSend`; rollback `DEL`s the placeholder.
 - Secret-bearing bodies stay excluded (`responseBodyContainsSecretFields`); new token-issuance routes go in `IDEMPOTENCY_EXCLUDED_ROUTE_PATTERNS`; new single-use secret fields in the secret-field name lists.

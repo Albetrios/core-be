@@ -52,9 +52,9 @@ These skills ship with **Cursor** under `~/.cursor/skills-cursor/`. They are **n
 - **create-subagent** / **shell** — unless building custom agent workflows outside core-be conventions
 - **automate** / **loop** — automation outside normal PR/feature workflow
 
-## core-be project skills (40)
+## core-be project skills (45)
 
-**40 total** — 38 actionable skills plus **skill-index** (meta) and **cursor-global-skills** (this reference). **lint-warnings-handler** is a detail skill invoked via **code-smells-and-best-practices**, not counted separately.
+**45 total** — 42 actionable skills plus **skill-index** (meta) and **cursor-global-skills** (this reference). **lint-warnings-handler** is a detail skill invoked via **code-smells-and-best-practices**, not counted separately.
 
 For the full list and triggers, read **`agent-os/skills/skill-index/SKILL.md`**.
 

@@ -59,7 +59,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/cursor-global-skills/SKILL.md",
-      "computedHash": "681127ad9b3dd65c89a9d1e89139ce8d03a319f9ff55bae532e45aa599e1d8de"
+      "computedHash": "9232fc75f485a059625d703e6a916e9fa3275d5b0397732c69fb7aa534c309ea"
     },
     "db-migration-maintainer": {
       "source": "local",
@@ -197,7 +197,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/route-catalog/SKILL.md",
-      "computedHash": "07d3cf7023b13259045914abc874ca187e41fca67b748f3bb3e5def1996c4966"
+      "computedHash": "ad94123cb009fa29f73349dd81a15698c7b2714f73b248cc82168e25031b1662"
     },
     "route-schema-doc-guard": {
       "source": "local",

@@ -384,7 +384,7 @@ flowchart LR
 
 | Skill                          | Path                                                     | When to invoke                                            |
 | ------------------------------ | -------------------------------------------------------- | --------------------------------------------------------- |
-| **skill-index**                | `.cursor/skills/skill-index/SKILL.md`                    | **First** — full catalog and triggers (44 project skills) |
+| **skill-index**                | `.cursor/skills/skill-index/SKILL.md`                    | **First** — full catalog and triggers (45 project skills) |
 | domain-generator               | `.cursor/skills/domain-generator/SKILL.md`               | New domain/sub-domain scaffold                            |
 | route-catalog                  | `.cursor/skills/route-catalog/SKILL.md`                  | Any change to `*.routes.ts`                               |
 | route-schema-doc-guard         | `.cursor/skills/route-schema-doc-guard/SKILL.md`         | Route `schema: { summary, description, tags }`          |

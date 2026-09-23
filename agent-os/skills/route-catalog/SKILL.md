@@ -109,7 +109,7 @@ Legend:
   ...
 
   — Membership —
-  POST   /api/v1/tenancy/organization/invitations                200  req  team  PERM: invitation:manage
+  DELETE /api/v1/tenancy/organization/invitations/:invitation_id  204  -    both  PERM: invitation:manage
   POST   /api/v1/tenancy/organization/memberships                200  req  team  PERM: membership:manage
   ...
 
@@ -139,10 +139,10 @@ Legend:
   Team-only (O)   : <count>
 
 ================================================================================
-  IDEMPOTENCY-REQUIRED WRITES (8) — X-Idempotency-Key required
+  IDEMPOTENCY-REQUIRED WRITES (13) — X-Idempotency-Key required
 ================================================================================
 
-  <the 8 routes whose I column is `req` — listed automatically>
+  <the 13 routes whose I column is `req` — listed automatically>
 
 ================================================================================
   DEPRECATED ROUTES (<count>) — Sunset / Deprecation headers

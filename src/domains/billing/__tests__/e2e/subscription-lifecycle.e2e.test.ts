@@ -14,7 +14,7 @@ import {
 } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
 import type { FastifyInstance } from 'fastify';
 
-const BILLING_PERMISSIONS = ['subscription:read', 'subscription:manage', 'plan:read'];
+const BILLING_PERMISSIONS = ['subscription:read', 'subscription:manage'];
 
 describe('Billing e2e: subscription lifecycle', () => {
   let app: FastifyInstance;

@@ -58,7 +58,7 @@ flowchart TD
 1. Open Neon console → production project → **Restore** or create branch from PITR **≤ 15 minutes** before failure.
 2. Update `DATABASE_URL` in Railway (API + worker) to the restored branch/endpoint.
 3. Run `pnpm db:migrate` against the restored database (idempotent; fixes schema drift).
-4. Verify row counts on critical tables (`tenancy.organizations`, `billing.subscriptions`, `auth.auth_sessions`).
+4. Verify row counts on critical tables (`tenancy.organizations`, `billing.subscriptions`, `auth.sessions`).
 
 ### 2. Redis (Railway Redis database)
 
