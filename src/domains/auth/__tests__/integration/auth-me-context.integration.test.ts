@@ -26,7 +26,6 @@ interface AuthMeContextBody {
     active_organization: { id: string; type: string } | null;
     my_permissions: string[];
     global_role: string | null;
-    organizations: Array<{ id: string; is_active: boolean }>;
   };
 }
 
@@ -79,7 +78,7 @@ describe('GET /api/v1/auth/me/context — Integration', () => {
     expect(response.statusCode).toBe(401);
   });
 
-  it('returns the caller context: identity, active organization, permissions, and switcher list', async () => {
+  it('returns the caller context: identity, active organization, and permissions', async () => {
     const { user, organization, token } = await setupAuthorizedUser();
 
     const response = await injectAuthenticated(app, {
@@ -95,9 +94,10 @@ describe('GET /api/v1/auth/me/context — Integration', () => {
     expect(body.data.active_organization?.id).toBe(organization.public_id);
     expect(body.data.active_organization?.type).toBe('TEAM');
     expect(body.data.my_permissions).toContain('organization:read');
-    expect(Array.isArray(body.data.organizations)).toBe(true);
-    expect(body.data.organizations.find((o) => o.id === organization.public_id)?.is_active).toBe(
-      true,
-    );
+    // The switcher list is NOT here — it moved to `GET /users/me/organizations`,
+    // which pages. Embedded, it was a flat array with no cursor filled by a
+    // default-paginated read, so a caller in more than 25 organizations was
+    // silently truncated with no way to ask for the rest.
+    expect(body.data).not.toHaveProperty('organizations');
   });
 });

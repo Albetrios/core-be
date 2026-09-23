@@ -44,26 +44,21 @@ export class AuthMeContextService {
     const userPublicId = scope.userPublicId;
     const activeOrganizationPublicId: string | undefined = scope.organizationPublicId;
 
-    // The four reads are independent — every input comes from `options`, and none consumes
-    // another's result — but they do NOT all want the same database context, and that, not
-    // their ordering, is what this route costs.
+    // `getMe` and `getByPublicId` both open the user-scoped principal context: the
+    // SAME guc, the SAME value. Called separately that is two transactions, two
+    // `SELECT set_config(...)` round trips and two pooled checkouts held at once.
+    // Opening the user context ONCE lets both take the reuse branch in
+    // `withAppDatabaseContext` and share a single checkout — the amplification that
+    // made a 50-connection pool starve at 50 users. They serialize on that one
+    // connection, trading a little latency at low load for connections, the resource
+    // that runs out first.
     //
-    // `getMe`, `list` and `getByPublicId` each open the user-scoped principal context:
-    // the SAME guc, the SAME value. Called separately that is three transactions, three
-    // `SELECT set_config(...)` round trips and three pooled checkouts held at once — measured
-    // at six BEGINs for one request. Opening the user context ONCE lets all three take the
-    // reuse branch in `withAppDatabaseContext` and share a single checkout, which is the
-    // amplification that made a 50-connection pool starve at 50 users.
-    //
-    // They serialize on that one connection, so this trades a little latency at low load for a
-    // 3x cut in connections held per request — the resource that actually runs out first.
     // `resolveUserOrganizationPermissions` stays outside: it drives a DIFFERENT guc
-    // (`app.current_organization_public_id`), so it must keep its own transaction and can still
-    // overlap with the block below.
+    // (`app.current_organization_public_id`), so it must keep its own transaction and
+    // can still overlap with the block below.
     const [userScoped, myPermissions] = await Promise.all([
       withAppDatabaseContext(scope, async () => ({
         user: await this.userService.getMe(scope),
-        organizationsPage: await this.organizationService.listForUser({}, userPublicId),
         activeOrganization: activeOrganizationPublicId
           ? await this.organizationService.getByPublicId(activeOrganizationPublicId, userPublicId)
           : null,
@@ -75,15 +70,13 @@ export class AuthMeContextService {
           )
         : Promise.resolve<string[]>([]),
     ]);
-    const { user, organizationsPage, activeOrganization } = userScoped;
+    const { user, activeOrganization } = userScoped;
 
     return {
       user,
       activeOrganization,
-      activeOrganizationPublicId: activeOrganizationPublicId ?? null,
       myPermissions,
       globalRole: globalRole ?? null,
-      organizations: organizationsPage.items,
     };
   }
 

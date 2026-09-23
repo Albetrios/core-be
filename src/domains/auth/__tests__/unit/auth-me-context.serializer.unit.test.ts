@@ -30,10 +30,8 @@ const baseData = (overrides: Partial<AuthMeContextData> = {}): AuthMeContextData
     updated_at: '2026-01-01T00:00:00.000Z',
   },
   activeOrganization: organization('org_active', 'TEAM'),
-  activeOrganizationPublicId: 'org_active',
   myPermissions: ['organization:read', 'membership:manage'],
   globalRole: null,
-  organizations: [organization('org_active', 'TEAM'), organization('org_other', 'PERSONAL')],
   ...overrides,
 });
 
@@ -46,18 +44,20 @@ describe('serializeAuthMeContext', () => {
     expect(output.global_role).toBeNull();
   });
 
-  it('flags only the active organization with is_active in the switcher list', () => {
+  // The switcher list moved to `GET /users/me/organizations`, which pages.
+  // Embedded here it was a flat array with no cursor, filled by a
+  // default-paginated read — a caller in more than 25 organizations was
+  // silently truncated with no way to ask for the rest.
+  it('does not carry the organization list', () => {
     const output = serializeAuthMeContext(baseData());
-    expect(output.organizations.find((o) => o.id === 'org_active')?.is_active).toBe(true);
-    expect(output.organizations.find((o) => o.id === 'org_other')?.is_active).toBe(false);
+    expect(output).not.toHaveProperty('organizations');
   });
 
-  it('marks no organization active when there is no active organization', () => {
+  it('serializes a caller with no active organization', () => {
     const output = serializeAuthMeContext(
-      baseData({ activeOrganization: null, activeOrganizationPublicId: null, myPermissions: [] }),
+      baseData({ activeOrganization: null, myPermissions: [] }),
     );
     expect(output.active_organization).toBeNull();
     expect(output.my_permissions).toEqual([]);
-    expect(output.organizations.every((o) => o.is_active === false)).toBe(true);
   });
 });
