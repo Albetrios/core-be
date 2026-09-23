@@ -15,7 +15,6 @@ vi.mock('@/infrastructure/payment/stripe.client.js', async (importOriginal) => {
   };
 });
 
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { stripe_webhook_events } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook.schema.js';
 import { createStripeWebhookWorker } from '@/domains/billing/sub-domains/stripe-webhook/workers/stripe-webhook.worker.js';

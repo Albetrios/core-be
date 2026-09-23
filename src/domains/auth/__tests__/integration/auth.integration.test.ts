@@ -5,7 +5,6 @@ import { injectUnauthenticated, injectRoute } from '@/tests/helpers/test-http-in
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { eq } from 'drizzle-orm';
 import { createTestUserWithPassword } from '@/tests/factories/user.factory.js';
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { users } from '@/domains/user/user.schema.js';
 import type { FastifyInstance } from 'fastify';

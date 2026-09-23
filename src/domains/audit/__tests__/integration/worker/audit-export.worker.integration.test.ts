@@ -5,7 +5,6 @@ import {
 } from '@/infrastructure/database/contexts/database-context.js';
 import { gunzipSync } from 'node:zlib';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';

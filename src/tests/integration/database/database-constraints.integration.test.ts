@@ -4,7 +4,6 @@ import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestWebhook } from '@/tests/factories/webhook.factory.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { webhooks } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';

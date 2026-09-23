@@ -7,7 +7,6 @@ import { injectUnauthenticated } from '@/tests/helpers/test-http-inject.helper.j
 import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUserWithPassword } from '@/tests/factories/user.factory.js';
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { users } from '@/domains/user/user.schema.js';
 import { verification_tokens } from '@/domains/auth/sub-domains/auth-method/verification-token/verification-token.schema.js';

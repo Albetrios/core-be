@@ -11,7 +11,6 @@ import {
   runAuditOutboxDrainJob,
 } from '@/domains/audit/workers/audit-outbox-drain.processor.js';
 import { users } from '@/domains/user/user.schema.js';
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';

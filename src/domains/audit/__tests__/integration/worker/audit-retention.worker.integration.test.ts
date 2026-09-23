@@ -16,7 +16,6 @@ import { ensureAuditLogPartitionsForTimestamps } from '@/tests/helpers/audit-log
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { env } from '@/shared/config/env.config.js';
 import type { WorkerHandle } from '@/infrastructure/queue/bootstrap.js';
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 
 /**

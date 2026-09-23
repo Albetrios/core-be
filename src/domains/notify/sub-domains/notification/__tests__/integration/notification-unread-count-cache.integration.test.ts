@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { redisConnection } from '@/infrastructure/cache/redis.client.js';
 import { notifications } from '@/domains/notify/sub-domains/notification/notification.schema.js';

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { mail_outbox } from '@/infrastructure/mail/mail-outbox.schema.js';
 import { insertMailOutbox } from '@/infrastructure/mail/mail-outbox.repository.js';
