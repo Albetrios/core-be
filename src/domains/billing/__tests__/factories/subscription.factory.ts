@@ -1,4 +1,3 @@
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { subscriptions } from '@/domains/billing/sub-domains/subscription/subscription.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';

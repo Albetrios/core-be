@@ -107,11 +107,13 @@ export function recordUnscopedDatabaseAccess(): void {
   }
 
   let isNewCallSite = false;
-  if (callSite !== undefined && !seenCallSites.has(callSite)) {
-    if (seenCallSites.size < MAX_TRACKED_CALL_SITES) {
-      seenCallSites.add(callSite);
-      isNewCallSite = true;
-    }
+  if (
+    callSite !== undefined &&
+    !seenCallSites.has(callSite) &&
+    seenCallSites.size < MAX_TRACKED_CALL_SITES
+  ) {
+    seenCallSites.add(callSite);
+    isNewCallSite = true;
   }
 
   try {

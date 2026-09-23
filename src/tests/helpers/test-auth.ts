@@ -4,7 +4,6 @@ import { env } from '@/shared/config/env.config.js';
 import { MILLISECONDS_PER_DAY } from '@/shared/constants/index.js';
 import { signAccessToken } from '@/shared/utils/security/jwt.util.js';
 import { AuthSessionRepository } from '@/domains/auth/sub-domains/auth-session/auth-session.repository.js';
-import { database } from '@/infrastructure/database/connection.js';
 import {
   PRINCIPAL_SCOPE,
   withAppDatabaseContext,

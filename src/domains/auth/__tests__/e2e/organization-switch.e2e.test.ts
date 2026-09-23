@@ -13,7 +13,6 @@ import {
   provisionPersonalOrganization,
   provisionOrganizationWithOwner,
 } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
-import { database } from '@/infrastructure/database/connection.js';
 import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
