@@ -20,7 +20,12 @@ describe('Integration: BullMQ noop job smoke', () => {
   afterAll(async () => {
     if (worker) await worker.close();
     if (queueEvents) await queueEvents.close();
-    if (queue) await queue.close();
+    if (queue) {
+      // `removeOnComplete` drops the job, not the queue's meta/id/events keys — obliterate them so
+      // every run does not leave another uniquely named queue behind in Redis.
+      await queue.obliterate({ force: true });
+      await queue.close();
+    }
   });
 
   it('should enqueue and process a noop job end-to-end', async () => {
@@ -63,10 +68,10 @@ describe('Integration: BullMQ noop job smoke', () => {
  * Every queue is uniquely named, so cases never share state.
  */
 describe('Integration: BullMQ runtime under burst, retry and dead-letter', () => {
-  const opened: { close: () => Promise<unknown> }[] = [];
+  const cleanups: (() => Promise<void>)[] = [];
 
   afterEach(async () => {
-    while (opened.length > 0) await opened.pop()?.close();
+    while (cleanups.length > 0) await cleanups.pop()?.();
     await closeDeadLetterQueues();
   });
 
@@ -81,7 +86,15 @@ describe('Integration: BullMQ runtime under burst, retry and dead-letter', () =>
       ...getDefaultWorkerOptions(),
     });
     attachDeadLetterAndAlerting(worker, queueName);
-    opened.push(worker, queueEvents, queue);
+    cleanups.push(async () => {
+      // Worker first, so nothing is active; then remove every key the case wrote — its queue and
+      // its dead-letter queue — so repeated runs leave Redis as they found it.
+      await worker.close();
+      await queueEvents.close();
+      await queue.obliterate({ force: true });
+      await getDeadLetterQueueClient(getDeadLetterQueueName(queueName)).obliterate({ force: true });
+      await queue.close();
+    });
     await Promise.all([
       queue.waitUntilReady(),
       queueEvents.waitUntilReady(),
