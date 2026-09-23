@@ -135,15 +135,14 @@ is issued — the same `session_id` keeps working, and a later refresh re-mints 
     "user": { "id": "usr_…", "email": "…", "is_mfa_enabled": false, "onboarding_completed": true },
     "active_organization": { "id": "org_…", "type": "TEAM" },
     "my_permissions": ["organization:read", "membership:manage"],
-    "global_role": null,
-    "organizations": [{ "id": "org_…", "type": "TEAM", "is_active": true }]
+    "global_role": null
   }
 }
 ```
 
 - **`type` vs `my_permissions` — render on the intersection.** The organization `type` says what the organization **kind** allows (only a `TEAM` organization can invite members); `my_permissions` is what **this caller** may do in the active organization (resolved permission codes). Show a team-only action only when `type === 'TEAM'` **and** the caller holds the permission.
-- **`organizations`** is the organization-switcher list, each flagged `is_active` — render it directly.
-- **Switch flow (one call):** `POST /auth/switch-to-organization` (or `…-personal`) re-mints the token **and returns the active-organization delta** — `{ access_token, active_organization, my_permissions, global_role }`. Swap your in-memory Bearer for the new `access_token`, repaint from `active_organization` + `my_permissions`, and flip `is_active` in your cached `organizations[]`. The `user` and organization-switcher list are stable across a switch, so **no follow-up `GET /auth/me/context` is needed** — re-fetch the full context only on a cold reload.
+- **The organization-switcher list is NOT here.** It lives at `GET /users/me/organizations`, which is **paginated** — follow the cursor to the end before rendering, or a user in more than one page of organizations silently loses the rest from their switcher. It was embedded in this response once, as a flat array with no cursor filled by a default-limit read, which is exactly the truncation this split fixes. Derive each row's "is this the active one?" by comparing its `id` to `active_organization.id`.
+- **Switch flow (one call):** `POST /auth/switch-to-organization` (or `…-personal`) re-mints the token **and returns the active-organization delta** — `{ access_token, active_organization, my_permissions, global_role }`. Swap your in-memory Bearer for the new `access_token` and repaint from `active_organization` + `my_permissions`. The `user` is stable across a switch, so **no follow-up `GET /auth/me/context` is needed** — re-fetch the full context only on a cold reload. Your cached organization list is stable too: switching changes which organization is active, not which ones you belong to, so re-derive the active row from the new `active_organization.id` rather than re-fetching the list.
 - **Join flow:** `POST /tenancy/invitations/{invitation_id}/accept` returns the joined `organization_id`; pass it straight to `POST /auth/switch-to-organization` (above) to land on the new team's dashboard — no lookup in between.
   - **Invited user with no account (first time):** the invite already created a passwordless, unverified **placeholder** for that email, and `accept` requires a **verified** email (else `403 errors:invitationRequiresVerifiedEmail` — a forwarded invite must not be claimable by the wrong person). So the new user first authenticates in a way that proves email control: **email verification-code** (`/auth/email/send-code` → `/auth/email/login`) or **OAuth** both claim the placeholder, verify the email, and provision their personal organization in one step. After that, the same `accept` → (`organization_id`) → `switch-to-organization` tail applies. Don't hard-block the UI when `is_email_verified` is false — route the user through the email-code login, then call `accept`.
 
@@ -186,7 +185,7 @@ sequenceDiagram
   API-->>FE: 200 { access_token, session_id }  + Set-Cookie session_id
   Note over FE: keep access_token in memory
   FE->>API: GET /auth/me/context   [Authorization: Bearer]
-  API-->>FE: 200 { user, active_organization, my_permissions, global_role, organizations[] }
+  API-->>FE: 200 { user, active_organization, my_permissions, global_role }
   Note over FE: dashboard painted
 ```
 
@@ -428,7 +427,8 @@ export interface MeContext {
   active_organization: Organization | null;             // the active organization (may be an auto-provisioned personal organization)
   my_permissions: string[];                              // e.g. ["organization:read", "membership:manage"]
   global_role: GlobalRole | null;                        // null for a standard user
-  organizations: Array<Organization & { is_active: boolean }>;   // organization-switcher list
+  // NOTE: no `organizations` — the switcher list is paginated and lives at
+  // GET /users/me/organizations.
 }
 // Onboarding routing is driven by user.onboarding_completed, NOT by active_organization:
 // every fresh user (any deployment mode) is routed to /onboarding once — even personal

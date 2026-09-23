@@ -453,7 +453,7 @@ export const authRoutesPlugin: FastifyPluginAsync = async (app) => {
       schema: {
         summary: 'Get my session context',
         description:
-          "Returns the authenticated caller's identity, active organization (with type-derived capabilities), the permission codes the caller holds in that organization, their global role, and the organizations they belong to (each flagged is_active). One authoritative call for rendering a permission-aware UI — identical for personal and team organizations.",
+          "Returns the authenticated caller's identity, active organization (with type-derived capabilities), the permission codes the caller holds in that organization, and their global role. One authoritative call for rendering a permission-aware UI — identical for personal and team organizations. The organizations the caller belongs to are NOT here: that list is paginated and lives at GET /users/me/organizations.",
         tags: ['Auth'],
       },
     },
