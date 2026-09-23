@@ -52,9 +52,23 @@ const ALL_UPLOAD_PERMISSION_CODES: readonly string[] = Object.values(UPLOAD_PERM
 
 /**
  * Permission codes granted to the auto-provisioned Owner role.
- * Every owner receives the tenancy, audit and upload codes; TEAM organizations additionally
- * receive billing read/manage so the creator can use `/billing/*`, and notify read/manage so
- * they can use `/notify/webhooks/*`.
+ *
+ * @remarks
+ * Every owner receives the tenancy, audit and upload codes, plus **`subscription:read`**.
+ * TEAM organizations additionally receive `subscription:manage` so the creator can use the
+ * billing write routes, and notify read/manage so they can use `/notify/webhooks/*`.
+ *
+ * A PERSONAL owner gets the billing READ code because Billing is an **account-level**
+ * surface they reach, and the route catalog already says so: every `subscription:read`
+ * route is organization-scope `both`, while every team-only billing route requires
+ * `subscription:manage`. Withholding the read code made those `both` routes unreachable
+ * for the only person who can call them — the frontend's billing panel had nothing to
+ * render and went blank.
+ *
+ * `subscription:manage` stays TEAM-only, and that is enforced twice over: the code is not
+ * granted here, and `subscription.service.ts` calls `assertTeamOrganization(…, 'BILLING')`
+ * on every write path regardless, so a personal organization is refused with 422 even if
+ * the code were somehow held.
  */
 export function ownerPermissionCodesForOrganizationType(
   type: ProvisionOrganizationInput['type'],
@@ -63,6 +77,8 @@ export function ownerPermissionCodesForOrganizationType(
     ...ALL_TENANCY_PERMISSION_CODES,
     ...ALL_AUDIT_PERMISSION_CODES,
     ...ALL_UPLOAD_PERMISSION_CODES,
+    // Billing is account-level, so a personal owner reads it too; the write half stays TEAM.
+    BILLING_PERMISSIONS.SUBSCRIPTION_READ,
   ];
   if (type === 'TEAM') {
     return [...everyOwnerCodes, ...ALL_BILLING_PERMISSION_CODES, ...ALL_NOTIFY_PERMISSION_CODES];
