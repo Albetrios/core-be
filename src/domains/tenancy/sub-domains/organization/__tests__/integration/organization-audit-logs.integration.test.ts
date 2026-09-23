@@ -17,6 +17,7 @@ import {
 import { TENANCY_PERMISSIONS } from '@/domains/tenancy/tenancy.permissions.js';
 import { AUDIT_PERMISSIONS } from '@/domains/audit/audit.permissions.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 
@@ -85,7 +86,7 @@ describe('GET /api/v1/tenancy/organization/audit-logs — Integration', () => {
     actorUserId: number;
     action: string;
   }) {
-    const [row] = await database
+    const [row] = await getElevatedDatabase()
       .insert(logs)
       .values({
         organization_id: options.organizationId,

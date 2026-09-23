@@ -6,6 +6,7 @@ import { injectUnauthenticated, injectRoute } from '@/tests/helpers/test-http-in
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { env } from '@/shared/config/env.config.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestPlan } from '@/tests/factories/plan.factory.js';

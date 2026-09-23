@@ -4,6 +4,7 @@ import { Queue, QueueEvents } from 'bullmq';
 import { desc, eq } from 'drizzle-orm';
 
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { webhook_delivery_attempts } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
 import {
   createWebhookDeliveryWorker,
@@ -72,7 +73,7 @@ describe('webhook-delivery.worker — status transitions', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getElevatedDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),
@@ -121,7 +122,7 @@ describe('webhook-delivery.worker — status transitions', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getElevatedDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),
@@ -165,7 +166,7 @@ describe('webhook-delivery.worker — status transitions', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getElevatedDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),
@@ -217,7 +218,7 @@ describe('webhook-delivery.worker — status transitions', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getElevatedDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),

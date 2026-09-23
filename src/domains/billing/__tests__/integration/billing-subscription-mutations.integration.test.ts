@@ -18,6 +18,7 @@ import {
 } from '@/domains/tenancy/__tests__/factories/permission.factory.js';
 import { createTestSubscription } from '@/domains/billing/__tests__/factories/subscription.factory.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';

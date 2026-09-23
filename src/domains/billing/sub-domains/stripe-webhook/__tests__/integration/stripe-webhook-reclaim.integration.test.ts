@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { stripe_webhook_events } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook.schema.js';
 import { StripeWebhookEventRepository } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook-event.repository.js';
 import { STRIPE_WEBHOOK_STUCK_PROCESSING_LEASE_MINUTES } from '@/shared/constants/index.js';
@@ -10,7 +11,7 @@ describe('Stripe webhook reclaim — integration', () => {
   const stripeEventId = `evt_reclaim_int_${Date.now()}`;
 
   afterEach(async () => {
-    await database
+    await getElevatedDatabase()
       .delete(stripe_webhook_events)
       .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId));
   });
@@ -60,7 +61,7 @@ describe('Stripe webhook reclaim — integration', () => {
     const stuckUpdatedAt = new Date(
       Date.now() - (STRIPE_WEBHOOK_STUCK_PROCESSING_LEASE_MINUTES + 1) * 60_000,
     );
-    await database
+    await getElevatedDatabase()
       .update(stripe_webhook_events)
       .set({ updated_at: stuckUpdatedAt })
       .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId));

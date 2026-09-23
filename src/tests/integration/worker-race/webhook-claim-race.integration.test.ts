@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { webhook_delivery_attempts } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { WebhookDeliveryAttemptRepository } from '@/domains/notify/sub-domains/webhook/webhook-delivery/webhook-delivery-attempt.repository.js';
@@ -27,7 +28,7 @@ describe('Integration: webhook delivery claim race', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getElevatedDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),

@@ -25,6 +25,7 @@ import {
 import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.schema.js';
 import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.schema.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import enErrors from '@/shared/locales/en/errors.json' with { type: 'json' };
 import type { FastifyInstance } from 'fastify';

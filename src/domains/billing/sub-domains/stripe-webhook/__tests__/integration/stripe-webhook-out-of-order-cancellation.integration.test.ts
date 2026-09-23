@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createStripeWebhookServiceForWorker } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook.container.js';
 import type { StripeWebhookService } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook.service.js';
@@ -94,7 +95,7 @@ describe('Stripe Webhook — out-of-order cancellation (audit-#1)', () => {
     const user = await createTestUser();
     const organization = await createTestOrganization({ ownerUserId: user.id });
     organizationPublicId = organization.public_id;
-    const [plan] = await database
+    const [plan] = await getElevatedDatabase()
       .insert(plans)
       .values({
         public_id: generatePublicId('plan'),

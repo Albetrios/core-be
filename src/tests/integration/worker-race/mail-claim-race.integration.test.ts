@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { mail_outbox } from '@/infrastructure/mail/mail-outbox.schema.js';
 import {
   insertMailOutbox,

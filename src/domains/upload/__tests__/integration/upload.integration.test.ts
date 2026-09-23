@@ -12,6 +12,7 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { generateTestToken } from '@/tests/helpers/test-auth.js';
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { uploads } from '@/domains/upload/upload.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { eq } from 'drizzle-orm';
@@ -46,7 +47,7 @@ describe('Upload Domain — Integration', () => {
   ): Promise<{ id: number; publicId: string; fileKey: string }> {
     const publicId = generatePublicId('upload');
     const fileKey = `avatars/${publicId}/verified.png`;
-    const [seeded] = await database
+    const [seeded] = await getElevatedDatabase()
       .insert(uploads)
       .values({
         public_id: publicId,

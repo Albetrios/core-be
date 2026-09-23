@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 
 import { database } from '@/infrastructure/database/connection.js';
+import { getElevatedDatabase } from '@/tests/helpers/elevated-database.js';
 import { webhook_delivery_attempts } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
 import { WebhookDeliveryAttemptRepository } from '@/domains/notify/sub-domains/webhook/webhook-delivery/webhook-delivery-attempt.repository.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
@@ -27,7 +28,7 @@ describe('Integration: webhook delivery sending reclaim', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getElevatedDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),
@@ -41,7 +42,7 @@ describe('Integration: webhook delivery sending reclaim', () => {
 
     expect(await repository.tryMarkSending(pendingAttempt!.id, 1)).toBe('claimed');
 
-    await database
+    await getElevatedDatabase()
       .update(webhook_delivery_attempts)
       .set({ sent_at: new Date(Date.now() - 60 * 60_000) })
       .where(eq(webhook_delivery_attempts.id, pendingAttempt!.id));
