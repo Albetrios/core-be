@@ -55,17 +55,15 @@ export class PermissionRepository {
     // Resolve public_id → internal id via a SECURITY DEFINER function instead of joining
     // auth.users, which is invisible under ORG-only context with FORCE RLS. The function
     // excludes soft-deleted users, so a deleted user yields no internal id → empty set.
-    const resolved = await database.execute<{ id: string | number | null }>(
-      drizzleSql`SELECT auth.resolve_user_id_by_public_id(${userPublicId}) AS id`,
-    );
-    const resolvedRows = Array.isArray(resolved)
-      ? resolved
-      : ((resolved as { rows?: { id: string | number | null }[] }).rows ?? []);
-    const rawUserId = resolvedRows[0]?.id ?? null;
-    if (rawUserId === null) {
-      return [];
-    }
-    const internalUserId = Number(rawUserId);
+    //
+    // Resolved INSIDE the join rather than by a preceding round trip: the function is
+    // STABLE, so Postgres evaluates it once per statement, and an unknown or soft-deleted
+    // user resolves to NULL, which makes the comparison fail and the set come back empty —
+    // the same answer the separate lookup produced with an early return. Same technique and
+    // same reason as `OrganizationRepository.findAllForUser`. It matters here because this
+    // runs on every permission-cache miss, and a role or permission write invalidates the
+    // WHOLE organization at once, so the misses arrive together.
+    const internalUserId = drizzleSql<number>`auth.resolve_user_id_by_public_id(${userPublicId})`;
 
     const rows = await database
       .select({ permission_code: role_permissions.permission_code })

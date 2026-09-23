@@ -163,19 +163,44 @@ export class OrganizationRepository extends BaseRepository {
     };
   }
 
+  /**
+   * The organization, if this user may see it — otherwise `null`.
+   *
+   * @remarks
+   * Returns the ROW rather than a boolean because every caller needed it next and
+   * fetched it again: `getByPublicId` ran `findByPublicId` here and then a second,
+   * identical `findByPublicId` immediately after, so the normal team-member path
+   * cost four queries to read one row. Handing the row back removes that entirely.
+   */
   async userCanAccessOrganization(
     user_public_id: string,
     organization_public_id: string,
-  ): Promise<boolean> {
+  ): Promise<Organization | null> {
     const organization = await this.findByPublicId(organization_public_id);
     if (!organization) {
-      return false;
+      return null;
     }
+    const canAccess = await this.userCanAccessLoadedOrganization(user_public_id, organization);
+    return canAccess ? organization : null;
+  }
+
+  /**
+   * The same access rule against an organization the caller already holds.
+   *
+   * @remarks
+   * For a caller that reached the row another way — `getBySlug` looks it up by slug —
+   * the public-id variant above would re-read the identical row. This is the shared
+   * half of that check, so neither path pays for a lookup it has already done.
+   */
+  async userCanAccessLoadedOrganization(
+    user_public_id: string,
+    organization: Organization,
+  ): Promise<boolean> {
     const userId = await this.resolveUserIdByPublicId(user_public_id);
     if (userId !== null && organization.owner_user_id === userId) {
       return true;
     }
-    return this.userHasActiveMembership(user_public_id, organization_public_id);
+    return this.userHasActiveMembership(user_public_id, organization.public_id);
   }
 
   async userHasActiveMembership(

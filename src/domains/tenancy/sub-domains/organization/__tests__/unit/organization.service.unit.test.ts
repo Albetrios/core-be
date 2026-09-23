@@ -81,7 +81,8 @@ describe('OrganizationService', () => {
     updateOwner: vi.fn().mockResolvedValue(organizationRow),
     updateStripeCustomerId: vi.fn().mockResolvedValue(undefined),
     userHasActiveMembership: vi.fn().mockResolvedValue(true),
-    userCanAccessOrganization: vi.fn().mockResolvedValue(true),
+    userCanAccessOrganization: vi.fn(),
+    userCanAccessLoadedOrganization: vi.fn().mockResolvedValue(true),
     findAllForUser: vi.fn().mockResolvedValue({
       items: [organizationRow],
       total: null,
@@ -118,7 +119,10 @@ describe('OrganizationService', () => {
     vi.mocked(repository.update).mockResolvedValue(organizationRow as never);
     vi.mocked(repository.softDelete).mockResolvedValue(organizationRow as never);
     vi.mocked(repository.markDeletionStarted).mockResolvedValue(organizationRow as never);
-    vi.mocked(repository.userCanAccessOrganization).mockResolvedValue(true);
+    // Returns the ROW now, not a boolean: the access check hands back the organization
+    // it already fetched so the caller stops re-reading it.
+    vi.mocked(repository.userCanAccessOrganization).mockResolvedValue(organizationRow as never);
+    vi.mocked(repository.userCanAccessLoadedOrganization).mockResolvedValue(true);
   });
 
   it('requireOrganizationByPublicId returns billing context', async () => {
@@ -376,10 +380,22 @@ describe('OrganizationService', () => {
   });
 
   it('getByPublicId throws when organization missing', async () => {
-    vi.mocked(repository.findByPublicId).mockResolvedValue(null);
+    // `null` is the single "no such organization, or not yours" answer now — the access
+    // check owns the lookup, so the service no longer calls `findByPublicId` itself.
+    // Mocking the inner step would leave this passing for the wrong reason.
+    vi.mocked(repository.userCanAccessOrganization).mockResolvedValue(null);
     await expect(service.getByPublicId('missing', 'user_public')).rejects.toBeInstanceOf(
       NotFoundError,
     );
+  });
+
+  it("getByPublicId throws when the organization exists but is not the caller's", async () => {
+    // Same NotFoundError, deliberately: a member of another organization must not be able
+    // to tell "does not exist" from "exists, not yours".
+    vi.mocked(repository.userCanAccessOrganization).mockResolvedValue(null);
+    await expect(
+      service.getByPublicId(organizationRow.public_id, 'outsider_public'),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('findOrganizationByPublicId and internal id return billing context', async () => {

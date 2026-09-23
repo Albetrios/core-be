@@ -14,6 +14,7 @@ import {
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from './organization.repository.js';
+import type { Organization } from './organization.types.js';
 import type {
   OrganizationBillingContext,
   OrganizationMembershipContext,
@@ -328,13 +329,27 @@ export class OrganizationService {
    * or as an empty row set one query later. A real cross-tenant admin view needs a SECURITY DEFINER
    * resolver and a role-guarded route, not a branch here.
    */
-  private async assertUserCanAccessOrganization(
+  private async requireAccessibleOrganization(
     user_public_id: string,
     organization_public_id: string,
-  ): Promise<void> {
-    const canAccess = await this.repository.userCanAccessOrganization(
+  ): Promise<Organization> {
+    const organization = await this.repository.userCanAccessOrganization(
       user_public_id,
       organization_public_id,
+    );
+    if (!organization) {
+      throw new NotFoundError('Organization');
+    }
+    return organization;
+  }
+
+  private async assertUserCanAccessLoadedOrganization(
+    user_public_id: string,
+    organization: Organization,
+  ): Promise<void> {
+    const canAccess = await this.repository.userCanAccessLoadedOrganization(
+      user_public_id,
+      organization,
     );
     if (!canAccess) {
       throw new NotFoundError('Organization');
@@ -370,9 +385,8 @@ export class OrganizationService {
     return withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ userPublicId: user_public_id }),
       async () => {
-        await this.assertUserCanAccessOrganization(user_public_id, public_id);
-        const organization = await this.repository.findByPublicId(public_id);
-        if (!organization) throw new NotFoundError('Organization');
+        // One read, not two: the access check hands back the row it fetched.
+        const organization = await this.requireAccessibleOrganization(user_public_id, public_id);
         return this.toOrganizationOutput(organization);
       },
     );
@@ -384,7 +398,9 @@ export class OrganizationService {
       async () => {
         const organization = await this.repository.findBySlug(slug);
         if (!organization) throw new NotFoundError('Organization');
-        await this.assertUserCanAccessOrganization(user_public_id, organization.public_id);
+        // The row is already in hand from the slug lookup, so check against it rather
+        // than re-reading the same organization by public id.
+        await this.assertUserCanAccessLoadedOrganization(user_public_id, organization);
         return this.toOrganizationOutput(organization);
       },
     );
