@@ -39,9 +39,9 @@ export function webhookRoutes(
         onRequest: [app.authenticate],
         preHandler: [requireOrganizationPermission(NOTIFY_PERMISSIONS.WEBHOOK_READ)],
         schema: {
-          summary: 'List webhook events',
+          summary: 'List dispatchable webhook event types',
           description:
-            'Returns a list of recent webhook events for the organization. Requires WEBHOOK_READ permission.',
+            "Returns the catalog of event types this platform can dispatch, so a client can build a webhook subscription list. These are event TYPES, not the organization's delivery history — for that, use GET /notify/webhooks/{webhook_id}/delivery-attempts. Requires WEBHOOK_READ permission.",
           tags: ['Webhook'],
         },
       },
