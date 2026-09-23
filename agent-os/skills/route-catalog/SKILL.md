@@ -139,10 +139,10 @@ Legend:
   Team-only (O)   : <count>
 
 ================================================================================
-  IDEMPOTENCY-REQUIRED WRITES (8) — X-Idempotency-Key required
+  IDEMPOTENCY-REQUIRED WRITES (13) — X-Idempotency-Key required
 ================================================================================
 
-  <the 8 routes whose I column is `req` — listed automatically>
+  <the 13 routes whose I column is `req` — listed automatically>
 
 ================================================================================
   DEPRECATED ROUTES (<count>) — Sunset / Deprecation headers

@@ -69,7 +69,7 @@ flowchart LR
 | `Authorization: Bearer <access_token>` | every authenticated request | **Yes** (authed routes) | The in-memory access token. Carries the active `org` claim. |
 | `Content-Type: application/json` | any request with a JSON body | **Yes** for JSON bodies | — |
 | `X-Idempotency-Key: <uuid>` | `POST`/`PUT`/`PATCH` writes | **Required on 13 routes**, optional elsewhere | `422` if missing on a required route. See [Idempotency keys](#idempotency-keys). |
-| `X-Captcha-Token: <widget token>` | public auth forms | **Required only when Turnstile is configured** (production) | From the Cloudflare Turnstile widget. Routes: `login`, `mfa/login`, `email/send-code`, `password/forgot`, `password/reset`, `email/verify`, OAuth init. |
+| `X-Captcha-Token: <widget token>` | public auth forms | **Required only when Turnstile is configured** (production) | From the Cloudflare Turnstile widget. Routes: `login`, `mfa/login`, `email/send-code`, `password/forgot`, `password/reset`, OAuth init. |
 | `X-CSRF-Token: <csrf_token cookie value>` | `POST /auth/refresh` **only**, **only if you don't send `Origin`** | Browsers: **not needed** | Browsers always send `Origin`, which satisfies the refresh origin check. This is a fallback for non-browser clients. |
 
 **Cookies — never touched by JS.** The browser stores and sends `session_id` (httpOnly) and
