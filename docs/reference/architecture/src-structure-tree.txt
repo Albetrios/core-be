@@ -1830,6 +1830,7 @@ src/
     │   │   └── plans.integration.test.ts
     │   ├── database/
     │   │   ├── database-constraints.integration.test.ts
+    │   │   ├── index-hygiene.integration.test.ts
     │   │   ├── migration-rollback.integration.test.ts
     │   │   ├── migrations-backward.integration.test.ts
     │   │   ├── migrations-forward.integration.test.ts

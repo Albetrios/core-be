@@ -42,9 +42,10 @@ export const webauthn_credentials = authSchema
         .on(table.credential_id)
         .where(sql`${table.revoked_at} IS NULL`),
       uniqueIndex('webauthn_credentials_public_id_unique').on(table.public_id),
-      index('webauthn_credentials_user_id_idx')
-        .on(table.user_id)
-        .where(sql`${table.revoked_at} IS NULL`),
+      // Full, not partial on `revoked_at IS NULL`: the user-delete cascade reaches revoked passkeys
+      // too, and a partial index cannot serve it. Replaced webauthn_credentials_user_id_idx in
+      // migration 20260923152433.
+      index('idx_webauthn_credentials_user_id').on(table.user_id),
       pgPolicy('webauthn_credentials_owner_access', {
         as: 'permissive',
         for: 'all',
