@@ -33,7 +33,7 @@ const meScope = PRINCIPAL_SCOPE.REQUEST({
 }) as UserPrincipalDatabaseScope;
 
 describe('AuthMeContextService.getContext', () => {
-  it('aggregates the user, active organization, resolved permissions, and organization list', async () => {
+  it('aggregates the user, active organization, and resolved permissions', async () => {
     const activeOrganization = { id: 'org_active', type: 'TEAM' };
     const userService = { getMe: vi.fn().mockResolvedValue({ id: 'usr_1', email: 'a@b.com' }) };
     const organizationService = {
@@ -65,15 +65,19 @@ describe('AuthMeContextService.getContext', () => {
       'org_active',
     );
     expect(data.activeOrganization).toBe(activeOrganization);
-    expect(data.activeOrganizationPublicId).toBe('org_active');
     expect(data.myPermissions).toEqual(['organization:read']);
-    expect(data.organizations).toHaveLength(2);
+    // The switcher list moved to `GET /users/me/organizations`, which pages.
+    // Embedded here it was filled by a DEFAULT-paginated read behind a flat
+    // array with no cursor, so a caller in more than 25 organizations was
+    // silently truncated. Not fetching it is the point, not an omission.
+    expect(data).not.toHaveProperty('organizations');
+    expect(organizationService.listForUser).not.toHaveBeenCalled();
   });
 
   /**
    * The route's reads split by DATABASE CONTEXT, not by dependency.
    *
-   * `getMe`, `list` and `getByPublicId` all want `app.current_user_public_id` set to the same value, so
+   * `getMe` and `getByPublicId` both want `app.current_user_public_id` set to the same value, so
    * they share one `withAppDatabaseContext (user scope)` and therefore one pooled checkout — they serialize
    * on it deliberately, and asserting they run concurrently would pin the opposite of the design.
    * `resolveUserOrganizationPermissions` drives `app.current_organization_public_id` instead, so it owns
@@ -152,7 +156,6 @@ describe('AuthMeContextService.getContext', () => {
     });
 
     expect(data.activeOrganization).toBeNull();
-    expect(data.activeOrganizationPublicId).toBeNull();
     expect(data.myPermissions).toEqual([]);
     expect(organizationService.getByPublicId).not.toHaveBeenCalled();
     expect(authorizationService.resolveUserOrganizationPermissions).not.toHaveBeenCalled();

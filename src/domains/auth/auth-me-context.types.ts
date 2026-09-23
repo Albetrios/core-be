@@ -6,15 +6,8 @@ import type { OrganizationOutput } from '@/domains/tenancy/sub-domains/organizat
 export interface AuthMeContextData {
   user: UserOutput;
   activeOrganization: OrganizationOutput | null;
-  activeOrganizationPublicId: string | null;
   myPermissions: string[];
   globalRole: GlobalRole | null;
-  organizations: OrganizationOutput[];
-}
-
-/** An organization in the switcher list: the public organization shape plus whether it is the caller's active organization. */
-export interface AuthMeContextOrganization extends OrganizationOutput {
-  is_active: boolean;
 }
 
 /** Public response body for `GET /api/v1/auth/me/context`. */
@@ -25,8 +18,16 @@ export interface AuthMeContextOutput {
   active_organization: OrganizationOutput | null;
   /** Permission codes the caller holds in the active organization (e.g. `["organization:read", …]`). */
   my_permissions: string[];
-  /** The caller's platform-wide role, or `null` for a standard user. */
+  /**
+   * The caller's platform-wide role, or `null` for a standard user.
+   *
+   * @remarks
+   * The organization LIST is deliberately not here — it lives at
+   * `GET /users/me/organizations`. Embedded, it was a flat array with no cursor,
+   * filled by a default-paginated read: a caller in more than 25 organizations
+   * got a silently truncated switcher and no way to ask for the rest. The
+   * dedicated endpoint pages properly, and the client can fetch it alongside
+   * this call rather than behind it.
+   */
   global_role: GlobalRole | null;
-  /** Organizations the caller belongs to (organization-switcher source); each flagged `is_active`. */
-  organizations: AuthMeContextOrganization[];
 }

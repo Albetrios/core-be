@@ -227,16 +227,10 @@ export const healthAuthUserRouteResponses: Record<string, ResponseDefinition> = 
           active_organization: { ...schemas.organizationSchema, nullable: true },
           my_permissions: { type: 'array', items: { type: 'string' } },
           global_role: { type: 'string', nullable: true },
-          organizations: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                ...schemas.organizationSchema.properties,
-                is_active: { type: 'boolean' },
-              },
-            },
-          },
+          // The organization LIST is not here: it lives at
+          // `GET /users/me/organizations`, which pages. Embedded it was a flat
+          // array with no cursor, so a caller in more than 25 organizations was
+          // silently truncated.
         },
       },
       {
