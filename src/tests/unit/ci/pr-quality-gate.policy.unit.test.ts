@@ -50,6 +50,7 @@ const REQUIRED_LANES = [
   'dependency-review',
   'contract-property',
   'rls-security',
+  'rls-application-role',
   'actionlint',
 ] as const;
 

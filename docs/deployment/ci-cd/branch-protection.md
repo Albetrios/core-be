@@ -72,11 +72,12 @@ Lanes currently rolled up (**authoritative source: `quality-gate.needs` in pr-ci
 | `dependency-review` | Dependency review |
 | `contract-property` | Contract + property |
 | `rls-security` | RLS security (non-superuser) |
+| `rls-application-role` | RLS application role (whole connection) |
 | `actionlint` | Actionlint |
 
 Post-merge Docker (Trivy + GHCR), SBOM, API docs, deploy, and release automation run from [post-merge-ci.yml](../../../.github/workflows/post-merge-ci.yml) when a PR merges (not required PR checks).
 
-> **`RLS security (non-superuser)` is the one DB-backed PR lane.** Every other PR-CI job is DB-less, but the RLS suite must run as the non-superuser `core_be_app` role against a real Postgres — the local/CI superuser is RLS-exempt and hides FORCE-RLS bugs (this is how the organization-mandated-MFA bypass shipped). It is scoped to `src/tests/security/rls` to stay fast; the rest of `--project security` and the full DB integration and chaos suites remain post-merge / local-only (`pnpm test:integration`, `pnpm test:chaos`). It is gated the same as every other lane: `quality-gate` `needs: rls-security`, so a red RLS run fails `Quality gate` and blocks the merge (pinned by [`pr-rls-security-gate.policy.unit.test.ts`](../../../src/tests/unit/ci/pr-rls-security-gate.policy.unit.test.ts)).
+> **The two RLS lanes are the DB-backed PR lanes.** Every other PR-CI job is DB-less, but RLS must be exercised as the non-superuser `core_be_app` role against a real Postgres — the local/CI superuser is RLS-exempt and hides FORCE-RLS bugs (this is how the organization-mandated-MFA bypass shipped). `RLS security (non-superuser)` proves the **policies** — its tests opt into the role per statement — and is scoped to `src/tests/security/rls` to stay fast; the rest of `--project security` and the full DB integration and chaos suites remain post-merge / local-only (`pnpm test:integration`, `pnpm test:chaos`). `RLS application role (whole connection)` proves the **application obeys them** — `pnpm test:rls-role` opens the whole pool as `core_be_app`, so a code path that runs without a database context reads zero rows there, exactly as in production. Both are gated the same as every other lane: `quality-gate` `needs:` `rls-security` and `rls-application-role`, so a red run of either fails `Quality gate` and blocks the merge (pinned by [`pr-rls-security-gate.policy.unit.test.ts`](../../../src/tests/unit/ci/pr-rls-security-gate.policy.unit.test.ts)).
 
 ### Advisory PR jobs (run but not in the aggregate)
 
