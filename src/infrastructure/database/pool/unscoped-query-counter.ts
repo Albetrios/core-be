@@ -71,10 +71,26 @@ function resolveCallSite(): string | undefined {
   for (const line of stack.split('\n').slice(1)) {
     if (line.includes('unscoped-query-counter')) continue;
     if (line.includes('database-context-runtime')) continue;
-    const match = /\(?([^()\s]+:\d+:\d+)\)?\s*$/.exec(line.trim());
-    if (match) return match[1];
+    const location = frameLocation(line);
+    if (location) return location;
   }
   return undefined;
+}
+
+/**
+ * The `file:line:column` a V8 stack frame ends with — `at fn (file:1:2)` or `at file:1:2`.
+ *
+ * @remarks
+ * Parsed from the frame's last token rather than with one anchored pattern: a character class
+ * that also admits the digits and colons after it backtracks super-linearly on a malformed frame
+ * (Sonar S5852). Splitting on whitespace and stripping the parentheses stays linear.
+ */
+function frameLocation(frame: string): string | undefined {
+  const lastToken = frame.trim().split(/\s+/).pop() ?? '';
+  const location =
+    lastToken.startsWith('(') && lastToken.endsWith(')') ? lastToken.slice(1, -1) : lastToken;
+  if (location.includes('(') || location.includes(')')) return undefined;
+  return /:\d+:\d+$/.test(location) ? location : undefined;
 }
 
 /**
