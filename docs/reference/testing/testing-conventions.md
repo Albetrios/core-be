@@ -84,7 +84,7 @@ src/domains/<domain>/sub-domains/<resource>/__tests__/
 | **Integration**        | `pnpm test:integration` | Cross-domain in-process contracts         |
 | **Domain integration** | `pnpm test:e2e`         | `src/domains/**/__tests__/integration/**` |
 | **Security**           | `pnpm test:security`    | Auth, CORS, JWT, RLS                      |
-| **RLS application role** | `pnpm test:rls-role`  | The e2e lane, on an RLS-subject connection |
+| **RLS application role** | `pnpm test:rls-role`  | The e2e + integration lanes, on an RLS-subject connection |
 | **Performance**        | `pnpm test:performance` | N+1, concurrency                          |
 | **Load**               | `pnpm load:*`           | k6 against running API                    |
 | **Smoke**              | `pnpm test:api-smoke`   | Live API after seed                       |
@@ -120,9 +120,10 @@ knowing. When it is the fixture, the symptom is a silent zero-row write, which r
 application bug: a soft-delete that updated nothing made a switch-organization test look like an
 authorization hole until the fixture was moved onto the operator connection.
 
-Only `e2e` is covered today. `integration` and `security` fixtures still write directly to FORCE
-RLS tables without a context; converting them is the same work already done for the e2e
-factories.
+`e2e` and `integration` are covered. `security` is deliberately not: its RLS suites switch roles
+themselves — per statement into `core_be_app`, or into `core_be_owner` to run a migration the way
+the migrator does — and a connection that already *is* `core_be_app` cannot `SET ROLE` to
+anything else. That half belongs to the `RLS security (non-superuser)` job.
 
 ```bash
 pnpm test:rls-role
