@@ -664,6 +664,7 @@ jobs:
       - dependency-review
       - contract-property
       - rls-security
+      - rls-application-role
       - actionlint
     if: always()
     runs-on: ubuntu-latest
