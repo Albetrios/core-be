@@ -10,6 +10,7 @@ import {
   DEFAULT_TEAM_ROLES,
   ownerPermissionCodesForOrganizationType,
   provisionOrganizationWithOwner,
+  provisionPersonalOrganization,
 } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
 import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.schema.js';
 import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.schema.js';
@@ -78,17 +79,30 @@ describe('team organization provisioning (database)', () => {
     expect(granted).toContain(NOTIFY_PERMISSIONS.WEBHOOK_MANAGE);
   });
 
-  it('does not grant notify permissions to PERSONAL organization owners', () => {
-    // Webhooks are a TEAM surface, exactly like billing.
-    const codes = ownerPermissionCodesForOrganizationType('PERSONAL');
-    expect(codes).not.toContain(NOTIFY_PERMISSIONS.WEBHOOK_READ);
-    expect(codes).not.toContain(NOTIFY_PERMISSIONS.WEBHOOK_MANAGE);
-  });
+  it('grants a PERSONAL owner the billing read code but not the write half', async () => {
+    // This reads the table rather than the function on purpose. The pure
+    // contract is pinned without a database in owner-permission-codes.unit.test.ts;
+    // a pure assertion parked in a `.db.` file only runs where Postgres runs,
+    // which is how the previous version of this expectation survived a local
+    // run and failed in CI.
+    //
+    // Billing is account-level, so the read half follows an owner into a
+    // personal workspace. `subscription:manage` stays a TEAM surface, and so do
+    // webhooks.
+    const user = await createTestUser();
 
-  it('does not grant billing permissions to PERSONAL organization owners', async () => {
-    const codes = ownerPermissionCodesForOrganizationType('PERSONAL');
-    expect(codes).not.toContain(BILLING_PERMISSIONS.SUBSCRIPTION_READ);
-    expect(codes).not.toContain(BILLING_PERMISSIONS.SUBSCRIPTION_MANAGE);
+    const result = await provisionPersonalOrganization(user.id);
+
+    const rows = await database
+      .select({ permission_code: role_permissions.permission_code })
+      .from(role_permissions)
+      .where(eq(role_permissions.role_id, result.roleId));
+
+    const granted = rows.map((row) => row.permission_code);
+    expect(granted).toContain(BILLING_PERMISSIONS.SUBSCRIPTION_READ);
+    expect(granted).not.toContain(BILLING_PERMISSIONS.SUBSCRIPTION_MANAGE);
+    expect(granted).not.toContain(NOTIFY_PERMISSIONS.WEBHOOK_READ);
+    expect(granted).not.toContain(NOTIFY_PERMISSIONS.WEBHOOK_MANAGE);
   });
 
   it('provisions the default Admin/Member/Viewer system roles for a TEAM org', async () => {
