@@ -3,17 +3,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockInfo = vi.fn();
 const mockGetJobCounts = vi.fn();
 const mockQueueClose = vi.fn();
+const mockGetOrCreateQueueClient = vi.fn((_queueName: string) => ({
+  getJobCounts: mockGetJobCounts,
+  close: mockQueueClose,
+}));
 const mockCaptureMessage = vi.fn();
 
 vi.mock('@/infrastructure/cache/redis.client.js', () => ({
   redisConnection: { info: (...args: unknown[]) => mockInfo(...args) },
 }));
 
-vi.mock('bullmq', () => ({
-  Queue: class MockQueue {
-    getJobCounts = mockGetJobCounts;
-    close = mockQueueClose;
-  },
+// The sampler reads depths through the SHARED pooled clients rather than constructing its own,
+// so the pool getter is what has to be stubbed here — `bullmq` is never touched directly.
+vi.mock('@/infrastructure/observability/metrics/bullmq-metrics.js', () => ({
+  getOrCreateQueueClient: (queueName: string) => mockGetOrCreateQueueClient(queueName),
 }));
 
 vi.mock('@/infrastructure/observability/sentry/sentry.js', () => ({
@@ -118,7 +121,11 @@ describe('redis-saturation service', () => {
       'queue.waiting.depth.high',
       expect.objectContaining({ level: 'warning' }),
     );
-    expect(mockQueueClose).toHaveBeenCalled();
+    // The client came from the shared pool and MUST be left open: it is the same client the
+    // queue-depth gauges and the readiness probe read through, so closing it here would break
+    // them until the next process start.
+    expect(mockGetOrCreateQueueClient).toHaveBeenCalled();
+    expect(mockQueueClose).not.toHaveBeenCalled();
   });
 
   it('records depth 0 and does not abort when a single queue probe fails', async () => {
@@ -131,6 +138,8 @@ describe('redis-saturation service', () => {
 
     expect(result.depths.every((entry) => entry.total === 0)).toBe(true);
     expect(mockCaptureMessage).not.toHaveBeenCalled();
-    expect(mockQueueClose).toHaveBeenCalled();
+    // Probing the queues together must not change this: every queue still reports its own
+    // failure as depth 0 instead of one rejection sinking the whole pass.
+    expect(mockQueueClose).not.toHaveBeenCalled();
   });
 });

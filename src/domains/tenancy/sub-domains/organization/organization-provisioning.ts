@@ -20,8 +20,6 @@ export const OWNER_ROLE_NAME = 'Owner';
 /** Every tenancy permission code — part of the set the owner role is granted. */
 const ALL_TENANCY_PERMISSION_CODES: readonly string[] = Object.values(TENANCY_PERMISSIONS);
 
-const ALL_BILLING_PERMISSION_CODES: readonly string[] = Object.values(BILLING_PERMISSIONS);
-
 /**
  * Every notify permission code — webhooks are a TEAM organization surface.
  *
@@ -52,9 +50,23 @@ const ALL_UPLOAD_PERMISSION_CODES: readonly string[] = Object.values(UPLOAD_PERM
 
 /**
  * Permission codes granted to the auto-provisioned Owner role.
- * Every owner receives the tenancy, audit and upload codes; TEAM organizations additionally
- * receive billing read/manage so the creator can use `/billing/*`, and notify read/manage so
- * they can use `/notify/webhooks/*`.
+ *
+ * @remarks
+ * Every owner receives the tenancy, audit and upload codes, plus **`subscription:read`**.
+ * TEAM organizations additionally receive `subscription:manage` so the creator can use the
+ * billing write routes, and notify read/manage so they can use `/notify/webhooks/*`.
+ *
+ * A PERSONAL owner gets the billing READ code because Billing is an **account-level**
+ * surface they reach, and the route catalog already says so: every `subscription:read`
+ * route is organization-scope `both`, while every team-only billing route requires
+ * `subscription:manage`. Withholding the read code made those `both` routes unreachable
+ * for the only person who can call them — the frontend's billing panel had nothing to
+ * render and went blank.
+ *
+ * `subscription:manage` stays TEAM-only, and that is enforced twice over: the code is not
+ * granted here, and `subscription.service.ts` calls `assertTeamOrganization(…, 'BILLING')`
+ * on every write path regardless, so a personal organization is refused with 422 even if
+ * the code were somehow held.
  */
 export function ownerPermissionCodesForOrganizationType(
   type: ProvisionOrganizationInput['type'],
@@ -63,9 +75,19 @@ export function ownerPermissionCodesForOrganizationType(
     ...ALL_TENANCY_PERMISSION_CODES,
     ...ALL_AUDIT_PERMISSION_CODES,
     ...ALL_UPLOAD_PERMISSION_CODES,
+    // Billing is account-level, so a personal owner reads it too; the write half stays TEAM.
+    BILLING_PERMISSIONS.SUBSCRIPTION_READ,
   ];
   if (type === 'TEAM') {
-    return [...everyOwnerCodes, ...ALL_BILLING_PERMISSION_CODES, ...ALL_NOTIFY_PERMISSION_CODES];
+    // Only what TEAM adds ON TOP of the base. Spreading the whole billing set here would
+    // repeat `subscription:read`, and `role_permissions` is keyed on
+    // (role_id, permission_code) — so provisioning a TEAM organization died on a duplicate
+    // key rather than granting anything twice.
+    return [
+      ...everyOwnerCodes,
+      BILLING_PERMISSIONS.SUBSCRIPTION_MANAGE,
+      ...ALL_NOTIFY_PERMISSION_CODES,
+    ];
   }
   return everyOwnerCodes;
 }
