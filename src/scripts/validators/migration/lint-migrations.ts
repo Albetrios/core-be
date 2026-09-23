@@ -602,7 +602,13 @@ function findNonTransactionalBreakpointViolations(
  */
 const RLS_SUBJECT_MIGRATOR_SINCE = '20260827050000';
 
-const dataWriteStatementPattern = /\b(insert\s+into|update|delete\s+from)\s/i;
+/**
+ * A statement that moves rows: INSERT INTO, DELETE FROM, MERGE INTO, or an UPDATE whose target is
+ * followed by SET. A bare `update` would also match `CREATE POLICY ... FOR UPDATE` and an FK's
+ * `ON UPDATE CASCADE` — DDL that names a FORCE RLS table but moves no rows.
+ */
+const dataWriteStatementPattern =
+  /\b(?:insert\s+into|delete\s+from|merge\s+into)\s|\bupdate\s+(?:only\s+)?[\w."]+(?:\s+(?:as\s+)?\w+)?\s+set\s/i;
 
 /** SQL with `--` comments stripped, so prose that names a table is not mistaken for a statement. */
 function stripSqlLineComments(fileContent: string): string {

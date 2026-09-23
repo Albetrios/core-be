@@ -97,6 +97,28 @@ CREATE POLICY permissions_deny_all ON tenancy.permissions AS PERMISSIVE FOR ALL 
     expect(flaggedTables(AFTER_TAXONOMY, policyOnly)).toEqual([]);
   });
 
+  it('ignores DDL that says UPDATE but moves no rows — a FOR UPDATE policy, an ON UPDATE FK', () => {
+    const policy = `CREATE POLICY organizations_update ON tenancy.organizations FOR UPDATE TO core_be_app USING (true);`;
+    const foreignKey = `CREATE TABLE IF NOT EXISTS notify.example (
+  id bigint PRIMARY KEY,
+  organization_id bigint REFERENCES tenancy.organizations (id) ON UPDATE CASCADE ON DELETE SET NULL
+);`;
+    expect(flaggedTables(AFTER_TAXONOMY, policy)).toEqual([]);
+    expect(flaggedTables(AFTER_TAXONOMY, foreignKey)).toEqual([]);
+  });
+
+  it('still flags a real UPDATE, with ONLY or an alias', () => {
+    expect(
+      flaggedTables(AFTER_TAXONOMY, 'UPDATE ONLY tenancy.roles SET is_system = true WHERE id = 1;'),
+    ).toEqual(['tenancy.roles']);
+    expect(
+      flaggedTables(
+        AFTER_TAXONOMY,
+        'UPDATE tenancy.organizations AS o SET name = o.name WHERE o.id = 1;',
+      ),
+    ).toEqual(['tenancy.organizations']);
+  });
+
   it('does not count a table named only in a comment', () => {
     const commentOnly = `-- Backfills rows that tenancy.roles used to hold.
 INSERT INTO notify.webhook_event_catalog (event) VALUES ('x.y');`;
