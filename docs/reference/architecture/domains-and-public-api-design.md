@@ -263,7 +263,7 @@ Domain folder = DB schema; each **sub-domain** is a folder with its own controll
 ### 4.1 auth — sub-domain: users
 
 - **Path:** `src/domains/auth/` (controller, service, repos; sub-domains: auth-method, auth-session, auth-mfa, auth-mfa-session, auth-webauthn).
-- **Routes:** Auth flows `POST /api/v1/auth/login`, `logout`, `email verification-code`, `oauth/:provider`; current user `GET|PATCH /api/v1/auth/me`; under me: `GET|PATCH /api/v1/auth/me/settings`, `GET|PUT /api/v1/auth/me/notification-preferences`, `GET|POST|DELETE /api/v1/auth/me/auth-methods`, `GET /api/v1/auth/me/sessions`, `DELETE /api/v1/auth/me/sessions/:session_id`.
+- **Routes:** Auth flows `POST /api/v1/auth/login`, `logout`, `email verification-code`, `oauth/:provider`; under `/auth/me`: `GET|POST|DELETE /api/v1/auth/me/auth-methods`, `GET /api/v1/auth/me/sessions`, `DELETE /api/v1/auth/me/sessions/:session_id`. The current user and their profile sub-resources belong to the **user** domain, not auth: `GET|PATCH|DELETE /api/v1/users/me`, `GET|PATCH /api/v1/users/me/settings`, `GET|PUT /api/v1/users/me/notification-preferences`.
 - **Self-service MFA / WebAuthn (authenticated, under `/auth/me/`):** managing a user's own second factor is a self-service operation and lives under `/auth/me/`: `GET /api/v1/auth/me/mfa`, `DELETE /api/v1/auth/me/mfa/:mfa_method_id`, `POST /api/v1/auth/me/mfa/enroll`, `POST /api/v1/auth/me/mfa/enroll/confirm`, `POST /api/v1/auth/me/mfa/verify`, `POST /api/v1/auth/me/webauthn/register/options`, `POST /api/v1/auth/me/webauthn/register/verify`. MFA-method ids use the `am_` (auth-method) prefix — `mfa_method_id` validates `^am_[a-z0-9]{21}$`.
 - **Public login-flow second factor (unauthenticated):** the routes used **during login**, before a session exists, stay at the top level: `POST /api/v1/auth/mfa/login`, `POST /api/v1/auth/webauthn/authenticate/options`, `POST /api/v1/auth/webauthn/authenticate/verify`. The old `/auth/mfa*` (non-login) paths now return 404 — there are no deprecation aliases (pre-first-release).
 - **Active-organization switch:** `POST /api/v1/auth/switch-to-personal`, `POST /api/v1/auth/switch-to-organization { organization_id }` re-mint the access token with the new `org` claim.
@@ -272,7 +272,7 @@ Domain folder = DB schema; each **sub-domain** is a folder with its own controll
 
 - **Paths:** `src/domains/tenancy/sub-domains/organization/`, `sub-domains/membership/`, etc. (each with controller, service, repository, etc.).
 - **Routes (prefix `/api/v1/tenancy`):** The active organization is the signed `org` token claim, so organization-scoped sub-resources hang off the **singular** `/tenancy/organization` resource — there is no per-organization path segment. Account-level list/create stays **plural**.
-  - Organizations (account-level): `GET|POST /api/v1/tenancy/organizations` (list / create a team organization), `GET /api/v1/tenancy/organizations/by-slug/:slug`.
+  - Organizations (account-level): `POST /api/v1/tenancy/organizations` (create a team organization), `GET /api/v1/tenancy/organizations/by-slug/:slug`. The caller's own organization list is `GET /api/v1/users/me/organizations` (user domain) — there is no `GET /tenancy/organizations`.
   - Active organization: `GET|PATCH|DELETE /api/v1/tenancy/organization`.
   - Settings: `GET|PATCH /api/v1/tenancy/organization/settings`.
   - Notification policies: `GET|POST /api/v1/tenancy/organization/notification-policies`, `PATCH|DELETE .../notification-policies/:notification_policy_id`.

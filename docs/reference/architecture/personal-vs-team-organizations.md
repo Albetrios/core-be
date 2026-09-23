@@ -103,7 +103,7 @@ not listed operates on the active organization regardless of type.
 | `POST /auth/switch-to-personal`                             | 200                                 | 200                         | **404** (no personal organization) |
 | `POST /auth/switch-to-organization`                         | — (no teams)                        | 200                         | 200                       |
 | `POST /tenancy/organizations` (create team)                 | **403** `teamOrganizationsDisabled` | 200                         | 200                       |
-| `GET /tenancy/organizations` (list teams)                   | 200 (empty)                         | 200                         | 200                       |
+| `GET /users/me/organizations` (list all)                    | 200 (personal)                      | 200                         | 200                       |
 | `DELETE /tenancy/organization`                              | **422**                             | 204 team · **422** personal | 204                       |
 | `POST /tenancy/organization/memberships`                    | **422**                             | 200 team · **422** personal | 200                       |
 | `POST /tenancy/organization/roles`                          | **422**                             | 200 team · **422** personal | 200                       |
@@ -179,7 +179,7 @@ leave, transfer-ownership). Other domains hang directly off the claim: `/api/v1/
 `/api/v1/notify/webhooks`.
 
 Account-level routes stay **plural** because they are not scoped to one active organization:
-`GET|POST /api/v1/tenancy/organizations` (list / create a team organization),
+`POST /api/v1/tenancy/organizations` (create a team organization),
 `GET /api/v1/tenancy/organizations/by-slug/{slug}`, and the cross-organization invitation accept action
 `POST /api/v1/tenancy/invitations/{invitation_id}/accept`.
 

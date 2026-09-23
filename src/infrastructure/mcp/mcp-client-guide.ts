@@ -59,9 +59,9 @@ alongside \`${MCP_OPENAPI_RESOURCE_URI}\` (full spec) and \`${MCP_ROUTES_RESOURC
 
 - \`GET /api/v1/users/me\` → profile plus \`personal_organization_id\` (the
   account-level "Personal" workspace). Use it to render the organization switcher.
-- \`GET /api/v1/tenancy/organizations\` → the team organizations the user belongs
-  to (for the switcher). The personal organization is account-level (always
-  present); list + personal together to populate the switcher.
+- \`GET /api/v1/users/me/organizations\` → every organization the caller owns or is
+  an active member of — personal and team alike — for the switcher. Paginated;
+  each row carries the organization \`type\`.
 
 ## 4. Calling organization-scoped APIs (flat routes)
 
@@ -75,7 +75,7 @@ The active organization is implicit (from the token), so routes are flat:
 - **Other domains (top-level under the claim):**
   \`/api/v1/billing/subscriptions\`, \`/api/v1/notify/webhooks\`.
 - **Account-level (NOT organization-scoped, stay plural):**
-  \`GET|POST /api/v1/tenancy/organizations\` (list / create a team organization),
+  \`POST /api/v1/tenancy/organizations\` (create a team organization),
   \`GET /api/v1/tenancy/organizations/by-slug/{slug}\`, and the cross-organization
   invitation actions \`POST /api/v1/tenancy/invitations/{invitation_id}/accept|decline\`.
 - A **personal** organization supports every feature EXCEPT people-sharing
@@ -103,7 +103,7 @@ The active organization is implicit (from the token), so routes are flat:
 ## 7. Recommended client flow
 
 1. Login → store the access token (and refresh via cookie + CSRF).
-2. \`GET /users/me\` + \`GET /tenancy/organizations\` → render the organization switcher.
+2. \`GET /users/me\` + \`GET /users/me/organizations\` → render the organization switcher.
 3. To act in a different organization, call a switch endpoint, replace the stored token
    with the returned one, then call the flat organization-scoped routes.
 4. Discover exact request/response shapes from \`${MCP_OPENAPI_RESOURCE_URI}\`.

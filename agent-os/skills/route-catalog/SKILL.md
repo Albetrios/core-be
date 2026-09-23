@@ -109,7 +109,7 @@ Legend:
   ...
 
   — Membership —
-  POST   /api/v1/tenancy/organization/invitations                200  req  team  PERM: invitation:manage
+  DELETE /api/v1/tenancy/organization/invitations/:invitation_id  204  -    both  PERM: invitation:manage
   POST   /api/v1/tenancy/organization/memberships                200  req  team  PERM: membership:manage
   ...
 

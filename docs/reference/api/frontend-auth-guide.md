@@ -148,12 +148,12 @@ is issued — the same `session_id` keeps working, and a later refresh re-mints 
 
 This works **identically for personal and team organizations** — there is one route surface, and the organization `type` (not different URLs) tells the UI what to show. See [route-consistency-and-organization-model.md](route-consistency-and-organization-model.md).
 
-`GET /users/me` (profile + deployment `capabilities`) and `GET /tenancy/organizations` (paginated organization list) remain available if you need them individually.
+`GET /users/me` (profile + deployment `capabilities`) and `GET /users/me/organizations` (paginated organization list) remain available if you need them individually.
 
 > The organization-scoped resources are **flat**: `/api/v1/tenancy/organization` (singular — settings, logo,
 > audit-logs, api-keys, notification-policies, memberships, roles, invitations live under it),
 > `/api/v1/billing/subscriptions`, `/api/v1/notify/webhooks`. Account-level routes that aren't tied
-> to one active organization stay plural: `GET|POST /api/v1/tenancy/organizations`,
+> to one active organization stay plural: `POST /api/v1/tenancy/organizations`,
 > `GET /api/v1/tenancy/organizations/by-slug/{slug}`, and the cross-organization invitation-accept action
 > `POST /api/v1/tenancy/invitations/{invitation_id}/accept`.
 >

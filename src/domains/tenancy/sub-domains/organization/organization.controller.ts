@@ -13,7 +13,7 @@ import { AuditSerializer } from '@/domains/audit/audit.serializer.js';
 
 /**
  * Builds the Fastify handler map for the organization routes — account-level
- * `/organizations` (list, create, by-slug lookup) and the active-organization
+ * `/organizations` (create, by-slug lookup) and the active-organization
  * `/organization` resource (get/update/delete, logo upload/delete, audit-log
  * listing). Wraps service calls with `requireAuth`, public-id validation, and
  * `successResponse` / `paginatedResponse` shaping. The optional

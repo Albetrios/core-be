@@ -277,13 +277,14 @@ function buildDomainProbes(): RouteProbe[] {
       expectedStatus: 200,
     },
 
-    // ── Tenancy ───────────────────────────────────────────────────────
     {
-      name: 'GET /api/v1/tenancy/organizations',
-      path: `${API_PREFIX}/tenancy/organizations`,
+      name: 'GET /api/v1/users/me/organizations',
+      path: `${API_PREFIX}/users/me/organizations`,
       authenticated: true,
       expectedStatus: 200,
     },
+
+    // ── Tenancy ───────────────────────────────────────────────────────
     {
       name: 'GET /api/v1/tenancy/organization',
       path: () => `${API_PREFIX}/tenancy/organization`,

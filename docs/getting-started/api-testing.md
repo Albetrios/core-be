@@ -30,7 +30,7 @@ TEST_PASSWORD=DemoPassword123!
 
 After seed, note the resource ids from logs or fetch them via the flows below. Every id is prefixed by entity (`org_…`, `usr_…`, `pln_…`):
 
-- Organization id: use `GET /api/v1/tenancy/organizations` (first item) — needed only to **switch** the active organization (see below), not as a path/header on every call
+- Organization id: use `GET /api/v1/users/me/organizations` (first item) — needed only to **switch** the active organization (see below), not as a path/header on every call
 - User id: use `GET /api/v1/users/me`
 
 Permissions, plans, demo organization, admin role, membership, an extra organization/user, and one pending invitation are created. See `src/scripts/seed/full.ts`.
