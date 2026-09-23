@@ -774,6 +774,7 @@ src/
     │   │   │   │   │   ├── organization.serializer.unit.test.ts
     │   │   │   │   │   ├── organization.service.unit.test.ts
     │   │   │   │   │   ├── organization.validator.unit.test.ts
+    │   │   │   │   │   ├── owner-permission-codes.unit.test.ts
     │   │   │   │   │   ├── personal-organization-provisioning.db.unit.test.ts
     │   │   │   │   │   └── team-organization-provisioning.db.unit.test.ts
     │   │   │   ├── organization-api-key/
