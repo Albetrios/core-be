@@ -19,7 +19,21 @@ function getGoogleRedirectUri(): string {
   );
 }
 
-/** Builds the Google authorize URL (`https://accounts.google.com/o/oauth2/v2/auth?...`) with the configured client id, callback URI, OIDC scopes, CSRF `state`, the PKCE S256 `code_challenge`, and offline + consent prompts. Throws `NotImplementedError` when `OAUTH_GOOGLE_CLIENT_ID` is unset. */
+/**
+ * Builds the Google authorize URL (`https://accounts.google.com/o/oauth2/v2/auth?...`) with the
+ * configured client id, callback URI, OIDC scopes, CSRF `state` and the PKCE S256 `code_challenge`.
+ * Throws `NotImplementedError` when `OAUTH_GOOGLE_CLIENT_ID` is unset.
+ *
+ * @remarks
+ * Deliberately sends no `prompt` and no `access_type`. Sign-in needs identity only, and nothing
+ * here reads a Google refresh token — {@link exchangeGoogleOAuthCode} keeps `access_token` for a
+ * single userinfo call and discards the rest. `prompt=consent` (paired with `access_type=offline`
+ * to mint that unused refresh token) forced Google's consent screen on every sign-in; that screen
+ * is a page the user clicks through, so it stayed in the browser history behind the dashboard and
+ * Back from a fresh sign-in landed on Google. Left unset, Google shows UI only when it has to —
+ * first-time consent, or several signed-in accounts to choose between — and otherwise completes
+ * on HTTP redirects, which add no history entry.
+ */
 export function buildGoogleOAuthRedirectUrl(state: string, codeChallenge: string): string {
   const clientId = env.OAUTH_GOOGLE_CLIENT_ID;
   if (!clientId) {
@@ -32,8 +46,6 @@ export function buildGoogleOAuthRedirectUrl(state: string, codeChallenge: string
     response_type: 'code',
     scope: 'openid email profile',
     state,
-    access_type: 'offline',
-    prompt: 'consent',
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
   });
