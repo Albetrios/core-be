@@ -20,8 +20,6 @@ export const OWNER_ROLE_NAME = 'Owner';
 /** Every tenancy permission code — part of the set the owner role is granted. */
 const ALL_TENANCY_PERMISSION_CODES: readonly string[] = Object.values(TENANCY_PERMISSIONS);
 
-const ALL_BILLING_PERMISSION_CODES: readonly string[] = Object.values(BILLING_PERMISSIONS);
-
 /**
  * Every notify permission code — webhooks are a TEAM organization surface.
  *
@@ -81,7 +79,15 @@ export function ownerPermissionCodesForOrganizationType(
     BILLING_PERMISSIONS.SUBSCRIPTION_READ,
   ];
   if (type === 'TEAM') {
-    return [...everyOwnerCodes, ...ALL_BILLING_PERMISSION_CODES, ...ALL_NOTIFY_PERMISSION_CODES];
+    // Only what TEAM adds ON TOP of the base. Spreading the whole billing set here would
+    // repeat `subscription:read`, and `role_permissions` is keyed on
+    // (role_id, permission_code) — so provisioning a TEAM organization died on a duplicate
+    // key rather than granting anything twice.
+    return [
+      ...everyOwnerCodes,
+      BILLING_PERMISSIONS.SUBSCRIPTION_MANAGE,
+      ...ALL_NOTIFY_PERMISSION_CODES,
+    ];
   }
   return everyOwnerCodes;
 }
