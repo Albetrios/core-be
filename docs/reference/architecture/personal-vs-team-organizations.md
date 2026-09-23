@@ -26,11 +26,16 @@ organizations, and how the active organization is carried as a signed token clai
   degrades to the pre-existing value (usually `null`) and returns 200 rather than 500; the user
   simply heals on a later read. The explicit `switch-to-personal` action still surfaces a genuine
   provisioning failure (it cannot silently succeed). Provisioning depends on the seeded
-  `permissions` reference catalog (every owner is granted the tenancy, audit and upload codes; a
-  TEAM owner additionally the billing and notify codes); it is present in every real environment.
-  Audit and upload are not team surfaces — `/tenancy/organization/audit-logs` and `/uploads` are
-  both organization-scope `both`, and a personal workspace needs `upload:manage` to set its own
-  logo — so a PERSONAL owner holds them too.
+  `permissions` reference catalog (every owner is granted the tenancy, audit and upload codes plus
+  `subscription:read`; a TEAM owner additionally `subscription:manage` and the notify codes); it is
+  present in every real environment.
+  Audit, upload and billing READS are not team surfaces — `/tenancy/organization/audit-logs`,
+  `/uploads` and every `subscription:read` route are organization-scope `both`, a personal
+  workspace needs `upload:manage` to set its own logo, and Billing is an **account-level** section
+  a personal workspace reaches — so a PERSONAL owner holds those codes too. Billing WRITES stay
+  team-only, enforced twice: `subscription:manage` is not granted to a personal owner, and
+  `subscription.service.ts` calls `assertTeamOrganization(…, 'BILLING')` on every write path
+  regardless, so a personal organization is refused with 422 even if the code were somehow held.
 - The `PERSONAL` organization has a **null slug** (never user-facing — its app URL is `/`) and is
   **immutable**: it cannot be deleted or have its ownership transferred (`409
 personalOrganizationImmutable`); it is removed only when the account is deleted (cascade).

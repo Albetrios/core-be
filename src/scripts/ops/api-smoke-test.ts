@@ -171,9 +171,11 @@ async function setupOrganization(): Promise<void> {
 
   // Post-flatten, the ACTIVE organization rides the signed `org` JWT claim — the
   // The X-Organization-Id header was removed. Login mints a token scoped to the
-  // demo user's PERSONAL organization, where the organization-permission probes (subscription:read,
-  // webhook:read, audit-log:read) legitimately 403. Switch to the demo TEAM organization and adopt
-  // the re-scoped token, exactly as a real client does.
+  // demo user's PERSONAL organization, where the webhook:read probe legitimately 403s — webhooks
+  // are a TEAM surface, so no personal owner holds that code. (Billing reads and audit-log reads
+  // do NOT need the switch: an owner carries subscription:read and audit-log:read into a personal
+  // workspace.) Switch to the demo TEAM organization and adopt the re-scoped token, exactly as a
+  // real client does.
   const switchResponse = await requestJson(`${API_PREFIX}/auth/switch-to-organization`, {
     method: 'POST',
     headers: { ...authHeaders(false), 'Content-Type': 'application/json' },

@@ -12,6 +12,7 @@ import { closeStripeWebhookQueue } from '@/domains/billing/sub-domains/stripe-we
 import { closeUserDataExportQueue } from '@/domains/user/sub-domains/user-data-export/queues/user-data-export.queue.js';
 import { flushSentry } from '@/infrastructure/observability/sentry/sentry.js';
 import { shutdownPostHog } from '@/infrastructure/observability/posthog/posthog.js';
+import { closeBullMQMetricsQueues } from '@/infrastructure/observability/metrics/bullmq-metrics.js';
 import { shutdownOpenTelemetry } from '@/infrastructure/observability/tracing/otel.js';
 import { THREE_SECONDS_MS } from '@/shared/constants/index.js';
 import { setApplicationDraining } from '@/shared/utils/infrastructure/application-lifecycle.util.js';
@@ -72,6 +73,9 @@ const shutdownMiddleware: FastifyPluginAsync = async (app) => {
       closeStripeWebhookQueue(),
       closeUserDataExportQueue(),
     ]);
+    // The same pooled BullMQ clients the readiness probe uses — released before the shared
+    // connections so the API does not leave Redis sockets open on the way out.
+    await closeBullMQMetricsQueues();
     await Promise.allSettled([closeRedis(), closeBullMqRedis(), closeDatabase()]);
     // audit M5: flush + tear down the OpenTelemetry SDK (no-op when never started)
     // before the Sentry flush so pending OTLP spans are not dropped on shutdown.

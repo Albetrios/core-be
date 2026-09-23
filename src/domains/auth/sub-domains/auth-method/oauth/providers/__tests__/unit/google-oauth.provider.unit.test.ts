@@ -43,6 +43,21 @@ describe('exchangeGoogleOAuthCode', () => {
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
   });
 
+  // Sign-in only needs identity (`openid email profile`), and nothing in this codebase reads a
+  // Google refresh token — the exchange keeps `access_token` for one userinfo call and drops the
+  // rest. `prompt=consent` + `access_type=offline` bought nothing and cost a Google consent screen
+  // on EVERY sign-in. That screen is a real page the user clicks through, so it stayed in the
+  // browser history behind the dashboard, and Back from a fresh sign-in landed on Google. Without
+  // a forced prompt, Google shows UI only when it must (first consent, several signed-in accounts)
+  // and otherwise completes on HTTP redirects, which leave no history entry.
+  it('does not force a consent screen or request offline access', () => {
+    const url = new URL(buildGoogleOAuthRedirectUrl('state-token', 'the-code-challenge'));
+    expect(url.searchParams.has('prompt')).toBe(false);
+    expect(url.searchParams.has('access_type')).toBe(false);
+    // Identity scopes only — the reason offline access was never needed.
+    expect(url.searchParams.get('scope')).toBe('openid email profile');
+  });
+
   it('returns a normalised profile when Google reports a verified email', async () => {
     outboundFetch
       .mockResolvedValueOnce(jsonResponse({ access_token: 'google-access-token' }))

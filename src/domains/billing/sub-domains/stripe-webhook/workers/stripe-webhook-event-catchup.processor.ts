@@ -85,15 +85,23 @@ export async function runStripeWebhookEventCatchupJob(
   );
   const missingEventIds = stripeEventIds.filter((eventId) => !existingEventIds.has(eventId));
 
-  let enqueuedCount = 0;
-  for (const stripeEventId of missingEventIds) {
-    try {
-      await enqueueStripeWebhookByEventIdForReclaim(stripeEventId, CATCHUP_REQUEST_ID);
-      enqueuedCount += 1;
-    } catch (error) {
-      logger.warn({ error, stripeEventId }, 'stripe-webhook-event-catchup.enqueue.failed');
-    }
-  }
+  // Enqueued together rather than one after another: each `add` is its own Lua round trip, and a
+  // full batch paid them strictly in series. Each keeps its OWN try/catch — deliberately not
+  // `addBulk`, which would collapse the batch into a single all-or-nothing call. This is the
+  // recovery path for Stripe events that are already stuck, so one bad event id must not take
+  // the other reclaims down with it; the per-event count and warning stay exactly as they were.
+  const enqueueOutcomes = await Promise.all(
+    missingEventIds.map(async (stripeEventId) => {
+      try {
+        await enqueueStripeWebhookByEventIdForReclaim(stripeEventId, CATCHUP_REQUEST_ID);
+        return true;
+      } catch (error) {
+        logger.warn({ error, stripeEventId }, 'stripe-webhook-event-catchup.enqueue.failed');
+        return false;
+      }
+    }),
+  );
+  const enqueuedCount = enqueueOutcomes.filter(Boolean).length;
 
   logger.info(
     {

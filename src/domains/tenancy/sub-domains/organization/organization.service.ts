@@ -300,6 +300,23 @@ export class OrganizationService {
     return this.repository.resolveUserPublicIdByInternalId(user_internal_id);
   }
 
+  /**
+   * The batch form of {@link resolveUserPublicIdByInternalId}, for a caller holding a whole
+   * set of internal ids.
+   *
+   * @remarks
+   * - **Why:** resolving a set one id at a time costs one round trip per id. The underlying
+   *   `auth.resolve_user_public_ids_by_ids` resolver answers the whole set in one statement.
+   * - **Failure modes:** none raised. An id with no active user is absent from the map, which
+   *   is the same signal the single-id version gives with `null`.
+   * - **Side effects:** one read-only Postgres lookup, or none for empty input.
+   */
+  async resolveUserPublicIdsByInternalIds(
+    user_internal_ids: readonly number[],
+  ): Promise<Map<number, string>> {
+    return this.repository.resolveUserPublicIdsByInternalIds(user_internal_ids);
+  }
+
   async updateStripeCustomerIdForOrganization(
     organization_public_id: string,
     stripe_customer_id: string,
