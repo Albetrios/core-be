@@ -1,6 +1,5 @@
-import { Queue } from 'bullmq';
 import { redisConnection } from '@/infrastructure/cache/redis.client.js';
-import { getBullMQConnectionOptions } from '@/infrastructure/queue/connection.js';
+import { getOrCreateQueueClient } from '@/infrastructure/observability/metrics/bullmq-metrics.js';
 import { captureMessage } from '@/infrastructure/observability/sentry/sentry.js';
 import { MAIL_QUEUE_NAME } from '@/infrastructure/mail/queues/mail.queue.js';
 import { WEBHOOK_DELIVERY_QUEUE_NAME } from '@/domains/notify/sub-domains/webhook/webhook-delivery/queues/webhook-delivery.queue.js';
@@ -169,30 +168,35 @@ export async function sampleBullMqSourceQueueWaitingDepth(): Promise<QueueWaitin
   const warnThreshold = env.QUEUE_WAITING_DEPTH_WARN_THRESHOLD;
   const depths: QueueWaitingDepthSampleResult['depths'][number][] = [];
 
-  for (const queueName of SOURCE_QUEUE_NAMES_FOR_WAITING_DEPTH_MONITORING) {
-    const queue = new Queue(queueName, { connection: getBullMQConnectionOptions() });
-    try {
-      const counts = await queue.getJobCounts('waiting', 'delayed');
-      const waiting = counts.waiting ?? 0;
-      const delayed = counts.delayed ?? 0;
-      const total = waiting + delayed;
-      depths.push({ queueName, waiting, delayed, total });
-
-      if (total >= warnThreshold) {
-        logger.warn(
-          { queueName, waiting, delayed, total, warnThreshold },
-          'queue.waiting.depth.high',
-        );
-        captureMessage('queue.waiting.depth.high', {
-          level: 'warning',
-          extra: { queueName, waiting, delayed, total, warnThreshold },
-        });
+  // Probed together on pooled clients rather than one at a time on throwaway ones. Every queue
+  // here is already in `MONITORED_BULLMQ_QUEUE_NAMES`, so sharing that pool adds no Redis
+  // connection — it removes a connect + script-load + close per queue per pass, which is the
+  // same cost `getDeadLetterQueueClient` pools to avoid (sec-DLQ-scrape). Each probe keeps its
+  // own try/catch, so one failing queue still reports 0 without aborting the others.
+  const sampled = await Promise.all(
+    SOURCE_QUEUE_NAMES_FOR_WAITING_DEPTH_MONITORING.map(async (queueName) => {
+      try {
+        const counts = await getOrCreateQueueClient(queueName).getJobCounts('waiting', 'delayed');
+        const waiting = counts.waiting ?? 0;
+        const delayed = counts.delayed ?? 0;
+        return { queueName, waiting, delayed, total: waiting + delayed };
+      } catch (error) {
+        logger.warn({ error, queueName }, 'queue.waiting.depth.probe.failed');
+        return { queueName, waiting: 0, delayed: 0, total: 0 };
       }
-    } catch (error) {
-      logger.warn({ error, queueName }, 'queue.waiting.depth.probe.failed');
-      depths.push({ queueName, waiting: 0, delayed: 0, total: 0 });
-    } finally {
-      await queue.close();
+    }),
+  );
+
+  // Alerting stays sequential and in list order so the logs and Sentry breadcrumbs read the same
+  // way they did when the probes themselves were sequential.
+  for (const depth of sampled) {
+    depths.push(depth);
+    if (depth.total >= warnThreshold) {
+      logger.warn({ ...depth, warnThreshold }, 'queue.waiting.depth.high');
+      captureMessage('queue.waiting.depth.high', {
+        level: 'warning',
+        extra: { ...depth, warnThreshold },
+      });
     }
   }
 

@@ -9,6 +9,7 @@ import {
   shutdownOpenTelemetry,
 } from '@/infrastructure/observability/tracing/otel.js';
 import { initPostHog, shutdownPostHog } from '@/infrastructure/observability/posthog/posthog.js';
+import { closeBullMQMetricsQueues } from '@/infrastructure/observability/metrics/bullmq-metrics.js';
 import { OTEL_SERVICE_NAME_WORKER } from '@/shared/constants/project-identity.constants.js';
 import { createUnhandledRejectionHandler } from '@/infrastructure/observability/unhandled-rejection.handler.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
@@ -130,6 +131,10 @@ async function main() {
         closeWebhookDeliveryQueue(),
         closeUserDataExportQueue(), // sec-r4-R1: was missing from shutdown sequence
       ]);
+      // Pooled BullMQ clients (queue gauges, readiness depth probes, the Redis-saturation
+      // sampler) hold Redis sockets for the process lifetime — release them before the
+      // shared connections go.
+      await closeBullMQMetricsQueues();
       await Promise.allSettled([closeRedis(), closeBullMqRedis(), closeDatabase()]);
       // audit M5: tear down the OpenTelemetry SDK (no-op when never started)
       // before the Sentry flush so pending OTLP spans flush on shutdown.

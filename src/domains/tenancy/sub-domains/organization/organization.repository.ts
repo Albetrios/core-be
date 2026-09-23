@@ -80,6 +80,36 @@ export class OrganizationRepository extends BaseRepository {
     return extractResolverRows<{ public_id: string | null }>(result)[0]?.public_id ?? null;
   }
 
+  /**
+   * Batch-resolve internal user ids → public ids in ONE statement.
+   *
+   * @remarks
+   * Same FORCE RLS rationale as {@link OrganizationRepository.resolveUserPublicIdByInternalId},
+   * which this replaces wherever a caller holds a whole set of ids. The single-id version is
+   * still correct for a single id; the problem is calling it in a loop, which
+   * `MembershipService` did once per suspended member while fitting an organization to a
+   * downgraded seat ceiling — an unbounded count, one round trip each.
+   *
+   * `auth.resolve_user_public_ids_by_ids` is the batch sibling and carries the identical
+   * `deleted_at IS NULL` predicate, so an id with no active user is simply absent from the
+   * map — the same signal `null` gave. `audit.repository.ts` resolves audit-row actors the
+   * same way. Empty input returns an empty map without a round trip.
+   */
+  async resolveUserPublicIdsByInternalIds(
+    user_ids: readonly number[],
+  ): Promise<Map<number, string>> {
+    if (user_ids.length === 0) return new Map();
+    const userIdValues = sql.join(
+      user_ids.map((user_id) => sql`${user_id}`),
+      sql`, `,
+    );
+    const result = await getRequestDatabase().execute(
+      sql`SELECT id, public_id FROM auth.resolve_user_public_ids_by_ids(ARRAY[${userIdValues}]::bigint[])`,
+    );
+    const rows = extractResolverRows<{ id: number | string; public_id: string }>(result);
+    return new Map(rows.map((row) => [Number(row.id), row.public_id]));
+  }
+
   async findById(identifier: number): Promise<Organization | null> {
     const rows = await getRequestDatabase()
       .select()

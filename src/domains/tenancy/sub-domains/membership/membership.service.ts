@@ -243,6 +243,33 @@ export class MembershipService {
     }
   }
 
+  /**
+   * The same purge for a whole set of members, in one id lookup instead of one per member.
+   *
+   * @remarks
+   * The single-member version above resolves one internal id per call, so running it in a loop
+   * costs a round trip per member — and the seat-ceiling path's loop is as long as the number
+   * of members being suspended, which a large downgrade makes unbounded. One batch resolve,
+   * then the Redis purges together: `invalidatePermissions` swallows its own failures and
+   * fails open by design, so no purge can reject the others.
+   *
+   * An id the resolver does not return has no active user, which is exactly the case the
+   * single-member version skips on `null`.
+   */
+  private async invalidatePermissionsForMemberships(
+    user_internal_ids: readonly number[],
+    organization_public_id: string,
+  ): Promise<void> {
+    if (user_internal_ids.length === 0) return;
+    const publicIdsByInternalId =
+      await this.organizationService.resolveUserPublicIdsByInternalIds(user_internal_ids);
+    await Promise.all(
+      [...publicIdsByInternalId.values()].map((userPublicId) =>
+        invalidatePermissions(userPublicId, organization_public_id),
+      ),
+    );
+  }
+
   private async applyOrganizationLocaleDefaults(
     userPublicId: string,
     organizationPublicId: string,
@@ -789,9 +816,7 @@ export class MembershipService {
     // Post-commit (policy audit R11): purge each suspended member's permission cache OUTSIDE the
     // organization context block, so a concurrent recompute can't re-cache the pre-suspension permission set
     // before the suspend transaction commits.
-    for (const userInternalId of suspendedUserIds) {
-      await this.invalidatePermissionsForMembership(userInternalId, options.organizationPublicId);
-    }
+    await this.invalidatePermissionsForMemberships(suspendedUserIds, options.organizationPublicId);
     return suspendedUserIds.length;
   }
 

@@ -68,15 +68,26 @@ async function runStripeWebhookEventReclaimJobInner(
   const { scannedCount, candidateStripeEventIds } =
     await repository.sweepReclaimableEvents(batchSize);
 
-  let enqueuedCount = 0;
-  for (const stripeEventId of candidateStripeEventIds) {
-    try {
-      await enqueueStripeWebhookByEventIdForReclaim(stripeEventId, 'stripe-webhook-event-reclaim');
-      enqueuedCount += 1;
-    } catch (error) {
-      logger.warn({ error, stripeEventId }, 'stripe-webhook-event-reclaim.enqueue.failed');
-    }
-  }
+  // Enqueued together rather than one after another: each `add` is its own Lua round trip, and a
+  // full batch paid them strictly in series. Each keeps its OWN try/catch — deliberately not
+  // `addBulk`, which would collapse the batch into a single all-or-nothing call. This is the
+  // recovery path for Stripe events that are already stuck, so one bad event id must not take
+  // the other reclaims down with it; the per-event count and warning stay exactly as they were.
+  const enqueueOutcomes = await Promise.all(
+    candidateStripeEventIds.map(async (stripeEventId) => {
+      try {
+        await enqueueStripeWebhookByEventIdForReclaim(
+          stripeEventId,
+          'stripe-webhook-event-reclaim',
+        );
+        return true;
+      } catch (error) {
+        logger.warn({ error, stripeEventId }, 'stripe-webhook-event-reclaim.enqueue.failed');
+        return false;
+      }
+    }),
+  );
+  const enqueuedCount = enqueueOutcomes.filter(Boolean).length;
 
   const failedCount = await repository.countFailedEvents();
   setStripeWebhookEventsFailedCount(failedCount);
