@@ -21,6 +21,12 @@ const ALLOWED_PATH_FRAGMENTS: Record<MaintenanceContextKind, readonly string[]> 
     // Tombstoning soft-delete: sec-new-D3 hides the tombstoned NEW row from the tenant
     // SELECT arm, so the final UPDATE must carry the retention arm (see the service).
     'organization/organization.service.ts',
+    // Offboarding tombstone for a deleted user's / organization's uploads. `upload.uploads` is
+    // FORCE RLS and both its policy arms are GUC-gated, so without this authority the sweep
+    // reads zero rows and erases nothing while reporting success — a GDPR Article 17 failure.
+    // The retention arm is on the policy's USING and WITH CHECK and covers organization-scoped
+    // and user-scoped rows alike. Entered from offboarding only; S3 I/O stays outside it.
+    'upload/upload.service.ts',
   ],
   SESSION_RETENTION_CLEANUP: ['auth-session/workers/'],
   GLOBAL_ADMIN: [

@@ -37,8 +37,10 @@ import type { UploadRepository, UploadRow } from './upload.repository.js';
 import { serializeUploadCreate, serializeUploadDetail } from './upload.serializer.js';
 import { validateUploadPublicIdParam } from './upload.validator.js';
 import {
+  MAINTENANCE_SCOPE,
   PRINCIPAL_SCOPE,
   withAppDatabaseContext,
+  withMaintenanceDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 
 /** Inputs for {@link UploadService}'s private atomic PENDING-slot reservation. */
@@ -417,18 +419,53 @@ export class UploadService {
     }
   }
 
+  /**
+   * Loads an upload for a read/confirm/delete action, under a scope that can actually see it.
+   *
+   * @remarks
+   * `upload.uploads` is FORCE RLS with two disjoint arms: `uploads_owner_access` matches only
+   * `organization_id IS NULL AND user_id = <app.current_user_public_id>`, and
+   * `uploads_tenant_isolation` matches only rows of the organization in
+   * `app.current_organization_public_id`. A single scope therefore cannot see both kinds.
+   *
+   * This previously read under the user scope alone, so **every organization-scoped upload
+   * 404'd** on `GET /uploads/:upload_id`, `POST …/confirm` and `DELETE …` — organization logos
+   * included — and {@link assertUserCanAccessOrgScopedUpload}, written for exactly that case,
+   * was unreachable. `createUpload` had always branched on the target, so creating an
+   * organization upload worked and nothing afterwards did.
+   *
+   * Both arms are tried, cheapest first: the user arm, then — only if that finds nothing and
+   * the caller has an active organization — that organization's arm. A personal upload costs
+   * one query as before; an organization upload costs two rather than failing.
+   */
   private async loadUploadForUserAction(input: {
     public_id: string;
     userPublicId: string;
     userInternalId: number;
+    organizationPublicId?: string | null | undefined;
   }): Promise<UploadRow> {
-    const { public_id, userPublicId, userInternalId } = input;
-    const row = await withAppDatabaseContext(
+    const { public_id, userPublicId, userInternalId, organizationPublicId } = input;
+    const ownRow = await withAppDatabaseContext(
       PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
       () => this.repository.findByPublicId(public_id),
     );
+
+    // Only reached when the owner arm saw nothing AND the caller has an organization to try.
+    const row =
+      ownRow ??
+      (organizationPublicId
+        ? await withAppDatabaseContext(
+            PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId }),
+            () => this.repository.findByPublicId(public_id),
+          )
+        : null);
     if (!row) throw new NotFoundError('Upload');
 
+    // The authorization decision below is made on the ROW, never on which arm produced it.
+    // RLS is a second line here, not the first: dev and CI connect with roles that bypass it
+    // (Compose's superuser, the local operator's `rolbypassrls`), so a check that leaned on
+    // "the owner arm returned it, therefore it is mine" would be skipped in exactly the
+    // environments the tests run in.
     if (row.organization_id === null) {
       if (row.user_id !== userInternalId) {
         throw new NotFoundError('Upload');
@@ -440,13 +477,18 @@ export class UploadService {
     return row;
   }
 
-  async getUpload(public_id: string, userPublicId: string): Promise<UploadDetailOutput> {
+  async getUpload(
+    public_id: string,
+    userPublicId: string,
+    organizationPublicId?: string | null,
+  ): Promise<UploadDetailOutput> {
     const validatedPublicId = validateUploadPublicIdParam(public_id);
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     const row = await this.loadUploadForUserAction({
       public_id: validatedPublicId,
       userPublicId,
       userInternalId: user.id,
+      organizationPublicId,
     });
 
     return this.toUploadDetail(row, userPublicId);
@@ -510,13 +552,18 @@ export class UploadService {
    * served bytes can never execute as stored XSS. Consumers must require UPLOADED before
    * attaching the object. Idempotent for already-UPLOADED rows.
    */
-  async confirmUpload(public_id: string, userPublicId: string): Promise<UploadDetailOutput> {
+  async confirmUpload(
+    public_id: string,
+    userPublicId: string,
+    organizationPublicId?: string | null,
+  ): Promise<UploadDetailOutput> {
     const validatedPublicId = validateUploadPublicIdParam(public_id);
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     const row = await this.loadUploadForUserAction({
       public_id: validatedPublicId,
       userPublicId,
       userInternalId: user.id,
+      organizationPublicId,
     });
 
     if (row.status === UPLOAD_STATUS.UPLOADED) {
@@ -686,13 +733,18 @@ export class UploadService {
     return serializeUploadDetail(row, organizationPublicId);
   }
 
-  async deleteUpload(public_id: string, userPublicId: string): Promise<void> {
+  async deleteUpload(
+    public_id: string,
+    userPublicId: string,
+    organizationPublicId?: string | null,
+  ): Promise<void> {
     const validatedPublicId = validateUploadPublicIdParam(public_id);
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
     const row = await this.loadUploadForUserAction({
       public_id: validatedPublicId,
       userPublicId,
       userInternalId: user.id,
+      organizationPublicId,
     });
 
     // S3 delete runs outside the DB context.
@@ -711,7 +763,27 @@ export class UploadService {
     if (!deleted) throw new NotFoundError('Upload');
   }
 
-  /** Tombstones all active uploads for a user (offboarding) and removes S3 objects when possible. */
+  /**
+   * Tombstones all active uploads for a user (offboarding) and removes S3 objects when possible.
+   *
+   * @remarks
+   * Every database statement here runs under
+   * {@link MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP}. Without it these calls reach
+   * `upload.uploads` — a FORCE RLS table — with no GUC set at all, and neither policy arm can
+   * match: `uploads_tenant_isolation` needs `app.current_organization_id` and
+   * `uploads_owner_access` needs `app.current_user_id`. The keyset read then returns zero rows,
+   * no S3 object is deleted, the soft-delete updates nothing, and offboarding reports success
+   * while every row and object survives. That is a GDPR Article 17 failure, and it is invisible
+   * in dev and CI because those roles bypass RLS (superuser in Compose, `rolbypassrls` on the
+   * local operator role) — it only misbehaves where it matters.
+   *
+   * The retention arm is the right authority: it is on `uploads_tenant_isolation`'s USING and
+   * WITH CHECK, covers organization-scoped and user-scoped (`organization_id IS NULL`) rows
+   * alike, and is what `organization.service.ts` already uses for the sibling soft-delete.
+   *
+   * The S3 deletions stay OUTSIDE the context so the offboarding path never holds a pooled
+   * connection across external I/O.
+   */
   async tombstoneAllByUserId(user_id: number): Promise<number> {
     // Stream the user's active uploads in bounded keyset batches and delete their S3 objects
     // with bounded concurrency. This prevents a user with a large upload footprint from
@@ -720,10 +792,14 @@ export class UploadService {
     // through the full set exactly once; the soft-delete at the end is the durable marker.
     let afterId = 0;
     for (;;) {
-      const rows = await this.repository.findActiveByUserIdAfter(
-        user_id,
-        afterId,
-        UPLOAD_OFFBOARDING_DELETE_BATCH_SIZE,
+      const rows = await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
+        () =>
+          this.repository.findActiveByUserIdAfter(
+            user_id,
+            afterId,
+            UPLOAD_OFFBOARDING_DELETE_BATCH_SIZE,
+          ),
       );
       if (rows.length === 0) {
         break;
@@ -737,7 +813,9 @@ export class UploadService {
         break;
       }
     }
-    return this.repository.softDeleteAllByUserId(user_id);
+    return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, () =>
+      this.repository.softDeleteAllByUserId(user_id),
+    );
   }
 
   /** Deletes S3 objects in fixed-size concurrent chunks; failures are logged, never thrown. */
@@ -781,16 +859,23 @@ export class UploadService {
    * serialise thousands of S3 round-trips inline.
    */
   async tombstoneAllByOrganizationId(organization_id: number): Promise<number> {
+    // Same RLS reasoning as {@link tombstoneAllByUserId}: with no context these statements hit
+    // FORCE RLS `upload.uploads` GUC-less, match no policy arm, and silently tombstone nothing.
     let afterId = 0;
     for (;;) {
-      const rows = await this.repository.findActiveByOrganizationIdAfter(
-        organization_id,
-        afterId,
-        UPLOAD_OFFBOARDING_DELETE_BATCH_SIZE,
+      const rows = await withMaintenanceDatabaseContext(
+        MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
+        () =>
+          this.repository.findActiveByOrganizationIdAfter(
+            organization_id,
+            afterId,
+            UPLOAD_OFFBOARDING_DELETE_BATCH_SIZE,
+          ),
       );
       if (rows.length === 0) {
         break;
       }
+      // Outside the context on purpose — no pooled connection is held across S3 I/O.
       await this.deleteObjectsWithBoundedConcurrency({
         fileKeys: rows.map((row) => row.file_key),
         organizationId: organization_id,
@@ -800,6 +885,8 @@ export class UploadService {
         break;
       }
     }
-    return this.repository.softDeleteAllByOrganizationId(organization_id);
+    return withMaintenanceDatabaseContext(MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP, () =>
+      this.repository.softDeleteAllByOrganizationId(organization_id),
+    );
   }
 }

@@ -298,6 +298,15 @@ sequenceDiagram
 - **Key**: `<domain>:<thing>:<scope public id>`, logical (no deployment prefix), from the verified scope.
 - **TTL**: ≤ 60 s, declared in [ttl.constants.ts](src/shared/constants/ttl.constants.ts) with its own literal — not aliased to an unrelated cache's constant — and documented in [POLICIES.md](src/POLICIES.md). The tombstone TTL is a **separate** number: `CACHE_INVALIDATION_TOMBSTONE_TTL_SECONDS` for freshness, the cache's own TTL only for revocation.
 - **Stored shape**: JSON-safe only. No `Date` objects, no class instances; serialize first.
+- **Where the Redis call goes**: **outside** the Postgres context, deferred with
+  `runEnqueueAfterCommit`. This is the rule, not a preference — the reasoning is two paragraphs
+  up, and it is also what keeps a rolled-back write from invalidating anything. Both shapes
+  currently exist in the tree and a newcomer copies whichever file they open first:
+  `member-invitation.service.ts`, `organization.service.ts` and both notify handlers defer;
+  four session-cache invalidations and `notification-dispatch.service.ts`'s `RPUSH` await
+  inside the caller's context. Awaiting Redis inside a context is allowed **only** with a
+  comment naming the fail-safe reason — `member-invitation-accepted.event-handlers.ts`
+  documents its choice exactly that way, and is the model to copy.
 - **Invalidate after commit**, at *every* write choke point for that key, including worker paths. A writer that cannot name the scope (a retention sweep deleting by `created_at`) cannot invalidate — that is what the TTL bounds, and the direction of the resulting error belongs in the cache module's TSDoc.
 - **Register the key prefix** in `TEST_REDIS_PREFIXES` ([test-redis.ts](src/tests/helpers/test-redis.ts)). Test teardown recycles ids, so an un-cleared entry — or its tombstone, which blocks the next `SET NX` — leaks into the next case.
 - **Tests, five of them**: a hit serving a value Postgres has since changed; invalidation on each write path; scope isolation with two warm callers; the route's own gate (401/403) refusing while the entry is warm; and Redis-down falling back. Worked example: [notification-unread-count-cache.integration.test.ts](src/domains/notify/sub-domains/notification/__tests__/integration/notification-unread-count-cache.integration.test.ts).

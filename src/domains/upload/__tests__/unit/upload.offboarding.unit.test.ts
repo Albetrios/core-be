@@ -15,6 +15,26 @@ vi.mock('@/domains/tenancy/sub-domains/organization/organization.service.js', ()
   OrganizationService: class OrganizationService {},
 }));
 
+// Offboarding now runs its reads and its tombstoning UPDATE under
+// `MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP` — without it `upload.uploads` (FORCE RLS, both
+// arms GUC-gated) matches nothing and the sweep silently erases zero rows. The real wrapper
+// opens a `database.transaction()`, and the unit lane has no Postgres, so pass the callback
+// through here. The context itself is asserted for real in
+// `src/tests/security/rls/uploads-offboarding-rls.security.test.ts`, which runs as
+// `core_be_app` where RLS actually applies.
+vi.mock('@/infrastructure/database/contexts/database-context.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    withMaintenanceDatabaseContext: vi.fn(
+      async (_scope: unknown, callback: () => Promise<unknown>) => callback(),
+    ),
+    withAppDatabaseContext: vi.fn(async (_scope: unknown, callback: () => Promise<unknown>) =>
+      callback(),
+    ),
+  };
+});
+
 import { deleteObject } from '@/infrastructure/storage/storage.service.js';
 import type { UploadRepository } from '@/domains/upload/upload.repository.js';
 import { UploadService } from '@/domains/upload/upload.service.js';
