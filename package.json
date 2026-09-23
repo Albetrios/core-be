@@ -101,6 +101,7 @@
     "test:watch": "vitest",
     "test:performance": "vitest run --project performance",
     "test:security": "vitest run --project security",
+    "test:rls-role": "tsx tooling/vitest/run-as-application-role.ts --project e2e --project integration --project security",
     "test:chaos": "vitest run --config tooling/vitest/chaos.config.ts --no-file-parallelism",
     "test:mutation": "stryker run",
     "test:bench": "tsx src/tests/bench/run-benches.ts",

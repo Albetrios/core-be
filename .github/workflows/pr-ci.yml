@@ -246,12 +246,16 @@ jobs:
       (needs.changes.outputs.src-code == 'true' || needs.changes.outputs.ci-config == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # The RLS suite runs as the non-superuser `core_be_app` role (`SET LOCAL ROLE`), which is the
-    # only way to surface FORCE ROW LEVEL SECURITY bugs — the local/CI superuser is RLS-exempt and
-    # hides them (this is how the org-mandated-MFA bypass reached production). Those tests therefore
-    # need a real Postgres, so unlike the rest of PR CI this job starts a database. It stays scoped
-    # to `src/tests/security/rls` (the rest of `--project security` runs post-merge) to keep the
-    # gate fast. Required-check wiring: docs/deployment/ci-cd/branch-protection.md.
+    # Policy-level RLS coverage. These tests opt INTO the non-superuser `core_be_app` role per
+    # statement (`SET LOCAL ROLE`, via the rls-matrix helpers), which is what lets them assert what
+    # a FORCE ROW LEVEL SECURITY policy does and does not permit — the CI superuser below is
+    # RLS-exempt, so without that opt-in they would assert nothing (this is how the
+    # org-mandated-MFA bypass reached production). Note the scope: only the statements that opt in
+    # are RLS-subject. Application code paths running on this connection are NOT — an app path that
+    # forgets a database context still reads rows here and returns none in production. The
+    # `rls-application-role` job below covers that case by making the whole connection RLS-subject.
+    # Stays scoped to `src/tests/security/rls` (the rest of `--project security` runs post-merge) to
+    # keep the gate fast. Required-check wiring: docs/deployment/ci-cd/branch-protection.md.
     services:
       postgres:
         image: postgres:17.10-alpine
@@ -304,6 +308,76 @@ jobs:
         run: |
           set -euo pipefail
           pnpm exec vitest run --project security src/tests/security/rls
+
+  rls-application-role:
+    name: RLS application role (whole connection)
+    needs: [changes]
+    if: |
+      needs.changes.outputs.docs-only-md != 'true' &&
+      (needs.changes.outputs.src-code == 'true' || needs.changes.outputs.ci-config == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The job above proves the POLICIES are right. This one proves the APPLICATION obeys them.
+    # Every suite here runs on a connection opened as `core_be_app` via libpq's
+    # `options=-c role=…`, so the role applies to every statement — including ones inside the
+    # app's own transactions — rather than only where a test opts in. A path that reaches a
+    # FORCE RLS table without a database context matches no policy arm, reads zero rows and
+    # reports success; that is how organization and account deletion came to erase no uploads
+    # with every check green, and it is invisible on the RLS-exempt superuser the other jobs use.
+    services:
+      postgres:
+        image: postgres:17.10-alpine
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: core
+          POSTGRES_PASSWORD: core
+          POSTGRES_DB: core
+        options: >-
+          --health-cmd="pg_isready -U core -d core"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      redis:
+        image: redis:8.6.3-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      NODE_ENV: development
+      LOG_LEVEL: warn
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: postgresql://core:core@localhost:5432/core
+      REDIS_URL: redis://localhost:6379
+      DATABASE_SSL_ENABLED: 'false'
+      RATE_LIMIT_MAX: 1000
+      RATE_LIMIT_WINDOW_MS: 60000
+      RUN_DB_TESTS: 1
+      RUN_REDIS_TESTS: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Export shared CI test env (JWT keys + retention + secrets-encryption)
+        uses: ./.github/actions/test-env
+
+      # Migrations run on the superuser URL above, BEFORE the role rewrite — the application
+      # role is deliberately not a schema owner.
+      - name: Run migrations
+        run: pnpm db:migrate
+
+      - name: Run e2e + integration + security as the RLS-subject application role
+        run: |
+          set -euo pipefail
+          pnpm test:rls-role
 
   build-verify:
     name: Build verify
