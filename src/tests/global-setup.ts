@@ -177,7 +177,7 @@ export default async function globalSetup(): Promise<() => void> {
         );
       `);
       await sql.unsafe(
-        'CREATE INDEX IF NOT EXISTS idx_user_data_exports_user_id ON auth.user_data_exports (user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_user_data_exports_user_id_status ON auth.user_data_exports (user_id, status);',
       );
     }
 

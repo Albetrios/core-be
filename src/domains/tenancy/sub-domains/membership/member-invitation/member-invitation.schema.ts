@@ -45,7 +45,6 @@ export const member_invitations = tenancySchema
     (table) => [
       uniqueIndex('idx_member_invitations_public_id').on(table.public_id),
       uniqueIndex('idx_member_invitations_token').on(table.token_hash),
-      index('idx_member_invitations_membership').on(table.membership_id),
       index('idx_member_invitations_membership_created_id').on(
         table.membership_id,
         table.created_at,
