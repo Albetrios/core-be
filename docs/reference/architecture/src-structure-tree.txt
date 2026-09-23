@@ -1149,7 +1149,8 @@ src/
     │   │   └── migration-version.ts
     │   ├── pool/
     │   │   ├── organization-rls-checkout-counter.ts
-    │   │   └── pool.constants.ts
+    │   │   ├── pool.constants.ts
+    │   │   └── unscoped-query-counter.ts
     │   ├── safety/
     │   │   ├── assert-connection-budget.ts
     │   │   ├── assert-database-rls-safety.ts
@@ -2123,6 +2124,7 @@ src/
     │   │   │   ├── scope-shape-contract.policy.unit.test.ts
     │   │   │   ├── session-context-confinement.policy.unit.test.ts
     │   │   │   ├── transaction.util.db.unit.test.ts
+    │   │   │   ├── unscoped-query-counter.unit.test.ts
     │   │   │   ├── verified-scope-usage.policy.unit.test.ts
     │   │   │   └── worker-database-guard.unit.test.ts
     │   │   ├── mail/

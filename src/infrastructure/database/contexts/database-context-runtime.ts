@@ -21,6 +21,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
 import type { PostgresDatabaseHandle } from '@/infrastructure/database/utils/database-handle.types.js';
 import { getEnv } from '@/shared/config/env.config.js';
+import { recordUnscopedDatabaseAccess } from '@/infrastructure/database/pool/unscoped-query-counter.js';
 
 /**
  * Thrown when a worker process accesses Postgres without a pinned worker database context
@@ -233,6 +234,11 @@ export function getRequestDatabase(): RequestScopedPostgresDatabase {
     );
   }
 
+  // Outside worker runtime this is permitted but no longer silent. A missing context is exactly
+  // how offboarding came to erase nothing: FORCE RLS tables match no policy arm without a GUC,
+  // the query returns zero rows, and dev and CI cannot see it because those roles bypass RLS.
+  // No static test can answer "is a context active here"; the runtime can, so it counts.
+  recordUnscopedDatabaseAccess();
   return database;
 }
 
