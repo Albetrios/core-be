@@ -14,8 +14,8 @@ import {
   type OrganizationPrincipalDatabaseScope,
 } from '@/infrastructure/database/contexts/database-context.js';
 import type { OrganizationRepository } from './organization.repository.js';
-import type { Organization } from './organization.types.js';
 import type {
+  Organization,
   OrganizationBillingContext,
   OrganizationMembershipContext,
   OrganizationOutput,
