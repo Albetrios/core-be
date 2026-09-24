@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.0.0](https://github.com/albetrios/core-be/compare/v7.0.2...v8.0.0) (2026-09-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** the data-export responses' `export_id` field is now `id`.
+* **auth:** `GET /auth/me/context` no longer returns `organizations`. Clients read the caller's organizations from `GET /users/me/organizations`.
+
+### Added
+
+* **auth:** move the organization list off /auth/me/context ([#1188](https://github.com/albetrios/core-be/issues/1188)) ([31f7026](https://github.com/albetrios/core-be/commit/31f7026a974336f376d9158cf000a76055fd3de4))
+* count unscoped queries, and run e2e where RLS actually applies ([#1193](https://github.com/albetrios/core-be/issues/1193)) ([f1c379d](https://github.com/albetrios/core-be/commit/f1c379df9eca4036d19105a6bba37ae37b2ed725))
+* **database:** a context-free accessor, so the unscoped metric means a bug ([#1211](https://github.com/albetrios/core-be/issues/1211)) ([bf558b7](https://github.com/albetrios/core-be/commit/bf558b715b0b429f6ca430aa6ba6d6c2eb05cbc2))
+* **load:** warn about box headroom before a load run ([#1209](https://github.com/albetrios/core-be/issues/1209)) ([9cbd081](https://github.com/albetrios/core-be/commit/9cbd081c99195c07dd0bbd51778d72c43cd26679))
+
+
+### Fixed
+
+* **api:** return the data export's id as `id`, like every other resource ([#1223](https://github.com/albetrios/core-be/issues/1223)) ([971978a](https://github.com/albetrios/core-be/commit/971978a7ad860d69fee058b58f59e2117d298421))
+* **auth:** stop forcing Google's consent screen on every sign-in ([#1196](https://github.com/albetrios/core-be/issues/1196)) ([bf6cf69](https://github.com/albetrios/core-be/commit/bf6cf69a49c06bf2995ec12cbd44356a8829ec70))
+* **chaos:** create the database role the chaos suite connects as, and seed reference data ([#1217](https://github.com/albetrios/core-be/issues/1217)) ([90da0b1](https://github.com/albetrios/core-be/commit/90da0b1e29c6de7b7a1504d50bec4bea494b2c20))
+* **chaos:** route maintenance-context queries through Toxiproxy too ([#1207](https://github.com/albetrios/core-be/issues/1207)) ([c94f512](https://github.com/albetrios/core-be/commit/c94f51212eae1f13683465e907257a6294a916a9))
+* **ci:** let the scheduled k6 and chaos suites reach their tests, and say when they fail ([#1212](https://github.com/albetrios/core-be/issues/1212)) ([cce5044](https://github.com/albetrios/core-be/commit/cce50442be3b48d64b1a3794b23d74d2390bbd07))
+* correct docs, skills and tests that disagree with the code ([#1189](https://github.com/albetrios/core-be/issues/1189)) ([f0ebbbc](https://github.com/albetrios/core-be/commit/f0ebbbcbdead105f8e53c1cad16c158983b90da1))
+* **database:** a deadline on getting a pooled connection, so an outage fails fast and writes nothing late ([#1214](https://github.com/albetrios/core-be/issues/1214)) ([c7bdb28](https://github.com/albetrios/core-be/commit/c7bdb28368102cd894932c5e575b264aec2758d6))
+* **database:** clear the Sonar findings the acquire deadline introduced ([#1221](https://github.com/albetrios/core-be/issues/1221)) ([05e925d](https://github.com/albetrios/core-be/commit/05e925db1d64d6ba0e98b3dd35fcff8c0a0cf8b1))
+* **load:** make the load rig run again, and measure the right server ([#1205](https://github.com/albetrios/core-be/issues/1205)) ([de8bd61](https://github.com/albetrios/core-be/commit/de8bd61e7e53eb508cc9614559e43ec5c7149bde))
+* **migrations:** let data migrations run under the RLS-subject migrator ([#1197](https://github.com/albetrios/core-be/issues/1197)) ([1ca3508](https://github.com/albetrios/core-be/commit/1ca3508585f820b05adba30524f75aee0a069e9e))
+* **overload:** don't shed a fresh process on the stall of its own boot ([#1202](https://github.com/albetrios/core-be/issues/1202)) ([6f2fe4e](https://github.com/albetrios/core-be/commit/6f2fe4e89d7b15013e5bf1e8b6e6c1903020dac1))
+* **overload:** let a bounded queue form before the pool trigger sheds ([#1218](https://github.com/albetrios/core-be/issues/1218)) ([9a45316](https://github.com/albetrios/core-be/commit/9a45316cb00f529bb89ab95389e0d3813629a033))
+* **schema:** declare every index the database has, and gate the parity ([#1210](https://github.com/albetrios/core-be/issues/1210)) ([ea4b751](https://github.com/albetrios/core-be/commit/ea4b7511395ec90540dd2f70bf42e184156975ec))
+* **sonar:** scan without SCM, and stop printing the analysis token ([#1208](https://github.com/albetrios/core-be/issues/1208)) ([b144f72](https://github.com/albetrios/core-be/commit/b144f72becac5de9f02953b1431f3380218908d1))
+* **tenancy:** grant a personal owner the billing read code its routes expect ([#1194](https://github.com/albetrios/core-be/issues/1194)) ([570c1c5](https://github.com/albetrios/core-be/commit/570c1c589b4e8fcb8d93a83975a30d40d44639fe))
+* **tenancy:** grant the permissions no role could hold, and let Admin run the organization ([#1185](https://github.com/albetrios/core-be/issues/1185)) ([018b5ca](https://github.com/albetrios/core-be/commit/018b5cabd1cab629ad7eec0562e8fb126b9c3cf7))
+* **upload:** erase uploads on offboarding, and reach the ones users own ([#1192](https://github.com/albetrios/core-be/issues/1192)) ([14e31bc](https://github.com/albetrios/core-be/commit/14e31bc68a056cc2149d946a7faa483327e397e5))
+* **upload:** write an organization upload under the scope that read it ([#1199](https://github.com/albetrios/core-be/issues/1199)) ([513443b](https://github.com/albetrios/core-be/commit/513443bfe459b22a2c441152c39ab82094e9fbc8))
+
+
+### Performance
+
+* batch the lookups and enqueues that ran one at a time ([#1191](https://github.com/albetrios/core-be/issues/1191)) ([d112345](https://github.com/albetrios/core-be/commit/d1123452c4c738dc076ba2c13727297158eb9099))
+* **db:** drop 8 redundant indexes, index 3 uncovered foreign keys, gate both ([#1201](https://github.com/albetrios/core-be/issues/1201)) ([751663a](https://github.com/albetrios/core-be/commit/751663aa17313f798b92225d4248415692ee0c5f))
+* **tenancy:** stop re-reading rows the request already fetched ([#1190](https://github.com/albetrios/core-be/issues/1190)) ([5b618c1](https://github.com/albetrios/core-be/commit/5b618c1d17f1e11755a838ee5777f39ef9af8c0c))
+* **tenancy:** stop re-reading rows the request already fetched ([#1195](https://github.com/albetrios/core-be/issues/1195)) ([82d8055](https://github.com/albetrios/core-be/commit/82d8055269aa7b0139cf71985b9dcc9373c84fac))
+
+
+### Changed
+
+* **tenancy:** import organization types once ([#1203](https://github.com/albetrios/core-be/issues/1203)) ([f91a44a](https://github.com/albetrios/core-be/commit/f91a44a30a04bc6bc89dada814bb3345b64e0307))
+
+
+### Documentation
+
+* add the 2026-09-24 production readiness review ([#1225](https://github.com/albetrios/core-be/issues/1225)) ([9e12e67](https://github.com/albetrios/core-be/commit/9e12e67d76b35a7066de3a140b4c9efedbe08b2e))
+* **notify:** document the webhook shapes the API actually returns ([#1187](https://github.com/albetrios/core-be/issues/1187)) ([4ccee32](https://github.com/albetrios/core-be/commit/4ccee3226a31c5c36b4bad6ca939409c98e70b56))
+
 ## [7.0.2](https://github.com/albetrios/core-be/compare/v7.0.1...v7.0.2) (2026-09-22)
 
 
