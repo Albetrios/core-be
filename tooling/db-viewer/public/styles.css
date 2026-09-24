@@ -379,6 +379,7 @@ button {
     color 0.12s,
     background 0.12s;
 }
+/* biome-ignore lint/style/noDescendingSpecificity: no .ghost-btn sits inside .seg, so this never meets `.seg button.on svg`. */
 .ghost-btn svg {
   width: 13px;
   height: 13px;
@@ -390,6 +391,7 @@ button {
   border-color: color-mix(in srgb, var(--trace) 50%, var(--hair));
   background: var(--surface);
 }
+/* biome-ignore lint/style/noDescendingSpecificity: no .ghost-btn sits inside .seg, so this never meets `.seg button.on svg`. */
 .ghost-btn:hover svg {
   opacity: 1;
 }
@@ -692,6 +694,7 @@ button {
   border: 1px solid color-mix(in srgb, var(--trace) 30%, var(--hair));
   box-shadow: 0 1px 0 color-mix(in srgb, #fff 6%, transparent) inset;
 }
+/* biome-ignore lint/style/noDescendingSpecificity: a node type icon is no .seg button, so this never meets `.seg button.on svg`. */
 .node .ticon svg {
   width: 13px;
   height: 13px;
@@ -960,10 +963,12 @@ button {
   text-decoration: line-through;
   text-decoration-color: var(--rem);
 }
+/* biome-ignore lint/style/noDescendingSpecificity: diff states are exclusive: a removed row never matches `.row.d-added.pk .cname`. */
 .row.d-removed .cname,
 .row.d-removed.pk .cname {
   color: var(--rem);
 }
+/* biome-ignore lint/style/noDescendingSpecificity: diff states are exclusive: a removed row never matches `.row.d-added.pk .pin`. */
 .row.d-removed .pin,
 .row.d-removed.pk .pin,
 .row.d-removed.fk .pin {
@@ -975,10 +980,12 @@ button {
   background: var(--mod-bg);
   box-shadow: inset 3px 0 0 var(--mod);
 }
+/* biome-ignore lint/style/noDescendingSpecificity: diff states are exclusive: a modified row never matches `.row.d-added.pk .cname`. */
 .row.d-modified .cname,
 .row.d-modified.pk .cname {
   color: var(--mod);
 }
+/* biome-ignore lint/style/noDescendingSpecificity: diff states are exclusive: a modified row never matches `.row.d-added.pk .pin`. */
 .row.d-modified .pin,
 .row.d-modified.pk .pin,
 .row.d-modified.fk .pin {
@@ -1379,6 +1386,7 @@ body.sidebar-collapsed .sidebar-show {
     border-color 0.12s,
     background 0.12s;
 }
+/* biome-ignore lint/style/noDescendingSpecificity: the versions chevron is no .seg button, so this never meets `.seg button.on svg`. */
 .versions-more .versions-chevron svg {
   width: 11px;
   height: 11px;
@@ -1959,6 +1967,9 @@ body.sidebar-collapsed .sidebar-show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+.toast .dot {
+  background: var(--add);
+}
 .toast.err {
   border-color: var(--rem);
 }
@@ -2087,9 +2098,6 @@ input:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--trace);
   outline-offset: 2px;
-}
-.toast .dot {
-  background: var(--add);
 }
 
 /* inspector panel */
@@ -2371,6 +2379,10 @@ textarea:focus-visible {
 .ins-rel:hover {
   color: var(--ink);
 }
+.ins-rel-target b {
+  color: var(--trace);
+  font-weight: 600;
+}
 .ins-rel:hover .ins-rel-target b {
   color: var(--trace);
 }
@@ -2382,15 +2394,12 @@ textarea:focus-visible {
   min-width: 0;
   line-height: 1.35;
 }
+/* biome-ignore lint/style/noDescendingSpecificity: a relation row is not an .ins-col row, so this never meets `.ins-col.pk .cn`. */
 .ins-rel .cn,
 .ins-rel-target {
   overflow-wrap: anywhere;
   word-break: break-word;
   min-width: 0;
-}
-.ins-rel-target b {
-  color: var(--trace);
-  font-weight: 600;
 }
 .ins-rel-meta {
   color: var(--mod);
@@ -2524,6 +2533,7 @@ textarea:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* biome-ignore lint/style/noDescendingSpecificity: not inside an .ins-rel, so this never meets `.ins-rel:hover .ins-rel-target b`. */
 .pb-chain b {
   color: var(--ink);
   font-weight: 600;
@@ -2700,6 +2710,7 @@ textarea:focus-visible {
 .minimap {
   cursor: crosshair;
 }
+/* biome-ignore lint/style/noDescendingSpecificity: the minimap is not #btn-mig, so this never meets `#btn-mig.on svg`. */
 .minimap svg {
   width: 100%;
   height: 100%;
@@ -2884,6 +2895,7 @@ textarea:focus-visible {
   padding: 14px 16px;
   border-bottom: 1px solid var(--hair);
 }
+/* biome-ignore lint/style/noDescendingSpecificity: the palette input is not #btn-mig, so this never meets `#btn-mig.on svg`. */
 .palette-input svg {
   width: 17px;
   height: 17px;
@@ -2946,6 +2958,7 @@ textarea:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* biome-ignore lint/style/noDescendingSpecificity: not inside an .ins-rel, so this never meets `.ins-rel:hover .ins-rel-target b`. */
 .pl-item .pl-label b {
   color: var(--ink);
   font-weight: 600;
