@@ -23,7 +23,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/be-change-completeness-guard/SKILL.md",
-      "computedHash": "87fb4794cc26e404b5dd30b4798b91935bd11685fcf9a4cfa140986c35e74622"
+      "computedHash": "b136f51b4b0f7e72f52a8aa962bcbc9aebd56a83877aef8c57b60b4227ea4068"
     },
     "be-chaos-test-maintainer": {
       "source": "local",
@@ -59,7 +59,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/be-cursor-global-skills/SKILL.md",
-      "computedHash": "4bf6a9e245f946860f41b841c31719df827fbd1f34104658dcc35e3066f5e389"
+      "computedHash": "49bceb169b2e83cefd8113d82593eabf9b316f2e01732e3f090f981aeeb6cb82"
     },
     "be-db-migration-maintainer": {
       "source": "local",
@@ -107,7 +107,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/be-find-skills/SKILL.md",
-      "computedHash": "df8f3ecd023d659163038206bda3578b0f6c72f3baa2a3eedd3ca757e7a255d9"
+      "computedHash": "a714c3e2f34fae4a47b14a0bf95b3530a998a8e48f7c10f3de2e4b79b1a6039c"
     },
     "be-i18n-message-guard": {
       "source": "local",
@@ -209,7 +209,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/be-skill-index/SKILL.md",
-      "computedHash": "6278ae1946594673d4d182d4aed76d072961d3dc7a6a12bb90e5f58dcb933cb2"
+      "computedHash": "e9653cf2648d8ba1cea335e3ab5e93e79cd2e92fa0fc79fe2fe802dfe9cdcd7b"
     },
     "be-split-to-prs": {
       "source": "local",
@@ -227,7 +227,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/be-structure-maintainer/SKILL.md",
-      "computedHash": "fd2883b86406cd014511c2cc9ce5e780d7e372eca4f95c995f5bc002ba241999"
+      "computedHash": "dc76bff47b6077345a10814cf085c703d46f9bdb12b58e7875d45a99621ca59d"
     },
     "be-supabase-porting": {
       "source": "local",

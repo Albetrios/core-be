@@ -68,7 +68,7 @@ Cursor reads them via `.cursor/agents` → `agent-os/agents/` symlink.
 | **Claude Code** | `"Read agent-os/agents/<name>.md and follow the procedure"` |
 | **Codex** | Reads `AGENTS.md` custom subagents table; invoke by name |
 
-Add new agents with global **create-subagent**. See [be-cursor-global-skills](../../agent-os/skills/be-cursor-global-skills/SKILL.md).
+Add new agents with global **create-subagent**, named `be-<name>` (file `agent-os/agents/be-<name>.md`; see CLAUDE.md → Agent-os naming). See [be-cursor-global-skills](../../agent-os/skills/be-cursor-global-skills/SKILL.md).
 
 ---
 

@@ -364,7 +364,9 @@ Project-defined subagents in [`agent-os/agents/`](../../agents/) run in isolatio
 | **be-sql-design-reviewer** | `agent-os/agents/be-sql-design-reviewer.md` | Review Drizzle schema files for PostgreSQL design conventions |
 | **be-tsdoc-coverage-reviewer** | `agent-os/agents/be-tsdoc-coverage-reviewer.md` | Run `pnpm tsdoc:check`, identify exports missing TSDoc |
 
-To add a subagent, use global **create-subagent** (`~/.cursor/skills-cursor/`).
+To add a subagent, use global **create-subagent** (`~/.cursor/skills-cursor/`) and name it
+`be-<name>`: file `agent-os/agents/be-<name>.md`, frontmatter `name: be-<name>`. Add it to the
+table above, then run `pnpm agent-os:generate`, which regenerates `agent-os/docs/agents-catalog.md`.
 
 ## Related process docs
 
@@ -385,7 +387,8 @@ When a **new skill is created**, name its folder (and frontmatter `name`) with t
 1. The trigger map table above
 2. The trigger detection rules section
 3. The multi-skill scenarios order (if applicable)
-4. The auto-trigger rules section (if it has a `.mdc` auto-invoke rule)
+4. The auto-trigger rules section (if it has a `.mdc` auto-invoke rule, name it `<skill>-sync.mdc`,
+   e.g. `be-env-schema-add-sync.mdc`, so it inherits the `be-` prefix)
 5. `CLAUDE.md` under "Keeping Docs and Skills in Sync"
 6. Assign it a group in `agent-os/skills/groups.json`
 

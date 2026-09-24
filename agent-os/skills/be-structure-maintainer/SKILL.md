@@ -28,7 +28,7 @@ Whenever you change code structure (e.g. add a domain, rename layers, add infras
   - `agent-os/skills/be-tsdoc-export-guard/SKILL.md` (if the TSDoc coverage gate inputs changed)
   - Any other `agent-os/skills/*/SKILL.md` that references paths or layer names
 - **Docs:** `CLAUDE.md` (architecture and domain layout), `README.md` (project structure and diagrams), `AGENTS.md` (agent entry + custom subagents).
-- **Agents:** `agent-os/agents/*.md` — keep in sync with **AGENTS.md** custom subagents table when adding or renaming subagents.
+- **Agents:** `agent-os/agents/be-*.md` (every agent file carries the `be-` prefix) — keep in sync with **AGENTS.md** custom subagents table when adding or renaming subagents.
 - **System narratives**: when a new domain folder appears under `src/domains/`, also invoke **be-system-narrative-maintainer** to add the row to `src/OVERVIEW.md` Domains table.
 
 Then run the **Checklist** below and verify with `pnpm typecheck` (and tests if applicable).

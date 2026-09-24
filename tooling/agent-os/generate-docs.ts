@@ -151,7 +151,7 @@ function buildSkillIndexRegion(): DocResult {
   ].join('\n');
 
   const text = readText(path);
-  const next = rewriteRegion('skill-index/SKILL.md', text, body);
+  const next = rewriteRegion('be-skill-index/SKILL.md', text, body);
   return {
     path,
     displayPath: 'agent-os/skills/be-skill-index/SKILL.md',

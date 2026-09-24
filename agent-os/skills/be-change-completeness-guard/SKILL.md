@@ -55,7 +55,7 @@ does not apply (not by forgetting it).
 4. **Rules.** If the change alters a convention, an enforced count, or a file-pattern policy,
    update the relevant `agent-os/rules/*.mdc` (and the always-applied rules table). Run
    **be-structure-maintainer**.
-5. **Skills.** If you added/renamed a skill, or a skill hardcodes a fact you just changed
+5. **Skills.** If you added/renamed a skill (its folder and `name` keep the `be-` prefix), or a skill hardcodes a fact you just changed
    (a count, a route set, a path list), update it — and the indexes that count skills:
    `agent-os/skills/be-skill-index/SKILL.md` (the `N project skills` count + the skill table),
    `agent-os/skills/groups.json` (every skill in exactly one group), `agent-os/docs/skill-triggers.md`,

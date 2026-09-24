@@ -82,7 +82,8 @@ Project-defined subagents in [`agent-os/agents/`](agent-os/agents/) run in isola
 **Skill trigger map:** [agent-os/docs/skill-triggers.md](agent-os/docs/skill-triggers.md) — file pattern → which skill to invoke.
 
 To add a subagent, use global **create-subagent**
-(see [be-cursor-global-skills](agent-os/skills/be-cursor-global-skills/SKILL.md)).
+(see [be-cursor-global-skills](agent-os/skills/be-cursor-global-skills/SKILL.md)) and name it `be-<name>`:
+file `agent-os/agents/be-<name>.md`, frontmatter `name: be-<name>` (see CLAUDE.md → Agent-os naming).
 
 ## Custom commands
 

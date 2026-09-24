@@ -205,11 +205,11 @@ Full skill triggers live in [be-skill-index](../../../.cursor/skills/be-skill-in
 
 ## Skill file template
 
-Every **domain/architecture** skill under `.cursor/skills/<name>/SKILL.md` follows roughly:
+Every **domain/architecture** skill under `.cursor/skills/be-<name>/SKILL.md` follows roughly:
 
 ```markdown
 ---
-name: ...
+name: be-<name>
 description: ...
 ---
 

@@ -26,6 +26,9 @@ These skills ship with **Cursor** under `~/.cursor/skills-cursor/`. They are **n
 | Migrate `.mdc` rules → skills format               | **migrate-to-skills** (one-time; `disable-model-invocation`)                       |
 | Custom subagent definitions                        | **create-subagent**                                                                |
 
+Whichever tool creates them, project items carry the `be-` prefix: skill folder, agent file,
+command file and rule file (`pnpm agent-os:check`, Check 17). Upstream skills keep their names.
+
 ## Global skill catalog
 
 | Skill                      | Purpose                                                    |

@@ -42,6 +42,7 @@ pnpm agent-os:guards           # Tier 4 gate (CI) — adversarial guard cases + 
 | Referenced paths exist | a backticked `src/…` / `.github/…` path in any skill/rule/doc that doesn't exist |
 | Chains have outcome fixtures | a chain in `chains.json` with no `cases/outcomes/<chain>-*.jsonl` fixture, or a fixture missing its `.expected.json` — the coverage rule is **new chain ⇒ new outcome case** |
 | Sync rules ↔ skills/routing map | a `<skill>-sync.mdc` whose skill was renamed/deleted (error); a rule with no `globs`, or whose globs *and* skill name are all absent from `skill-triggers.md` (warn) |
+| Repo name prefix | a skill, agent, command or rule this repo owns without the `be-` prefix; upstream skills (non-`local` `skills-lock.json` entries) are exempt |
 
 Warnings (non-blocking): thin skill descriptions (< 80 chars, weak auto-trigger) and agents pinning a non-`inherit` model.
 

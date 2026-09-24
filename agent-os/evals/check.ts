@@ -772,7 +772,11 @@ if (existsSync(lockFile)) {
 }
 const requirePrefix = (kind: string, name: string) => {
   if (!name.startsWith(repositoryPrefix))
-    error("name-prefix", `${kind} "${name}" must start with "${repositoryPrefix}"`);
+    error(
+      "name-prefix",
+      `${kind} "${name}" must start with "${repositoryPrefix}" — rename it "${repositoryPrefix}${name}"` +
+        (kind === "skill" ? ", or record an upstream skill's source in skills-lock.json" : ""),
+    );
 };
 for (const skill of skillNames)
   if (!upstreamSkills.has(skill)) requirePrefix("skill", skill);

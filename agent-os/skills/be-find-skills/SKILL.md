@@ -37,6 +37,11 @@ manager for the open agent-skills ecosystem. Key commands:
 - `npx skills check` — check for skill updates
 - `npx skills update` — update installed skills
 
+An installed skill keeps its upstream name, with no `be-` prefix. Record its GitHub source by
+adding it to `KNOWN_EXTERNAL_SOURCES` in `tooling/agent-os/skills-lock.ts`, then run
+`pnpm agent-os:lock`. A skill locked as `local` must carry the `be-` prefix, so
+`agent-os:check` (Check 17) would fail it.
+
 Browse skills at https://skills.sh/. Check the leaderboard there first — it ranks by
 total installs, surfacing the most popular and battle-tested options — then run
 `npx skills find [query]` if the leaderboard does not cover the need. For example:
