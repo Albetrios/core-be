@@ -30,7 +30,7 @@ import { SharedArray } from 'k6/data';
  *
  *   POST /auth/login                      Password sign-in. The journey signs in once, the way
  *                                         core-fe does by default, with an email code;
- *                                         `fe-login-to-org.js` walks password sign-in
+ *                                         `fe-login-to-organization.js` walks password sign-in
  *                                         (`AUTH=password`).
  *   POST /auth/mfa/login                  Needs an enrolled TOTP factor and a live code.
  *   GET  /auth/oauth/:provider/callback   Needs the authorization code the provider hands back.
