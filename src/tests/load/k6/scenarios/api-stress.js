@@ -81,10 +81,12 @@ export function apiStress() {
     });
   }
 
-  // Think time, as every other authenticated scenario has: 100 VUs then model 100 users. With none,
-  // 100 closed-loop VUs hold more than 90% of the 20-connection pool and the overload guard sheds
-  // most requests with 503 — the guard working, not the API failing its SLO.
-  sleep(1);
+  // Think time, as every other authenticated scenario has, so 100 VUs model 100 users. With none,
+  // 100 closed-loop VUs keep more than 90% of the 20-connection pool checked out and the overload
+  // guard sheds most requests with 503 — the guard working, not the API failing its SLO. Jittered
+  // (mean 1 s): a fixed sleep marches every VU in lockstep, and those synchronized bursts trip the
+  // same pool trigger at under 200 req/s, a traffic shape real users never produce.
+  sleep(0.5 + Math.random());
 }
 
 export default apiStress;
