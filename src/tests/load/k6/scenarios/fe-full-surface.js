@@ -9,25 +9,31 @@ import { SharedArray } from 'k6/data';
  * Where `full-journey.js` starts from the backend's route catalogue and asks "what can one user
  * reach", this starts from the OTHER side: every `apiClient` call site in `core-fe`, resolved to a
  * concrete path, walked in the order the app performs it. If the front end does not call it, it is
- * not here — even when the backend exposes it.
+ * not here — even when the backend exposes it. The one exception is teardown: step 52 deletes the
+ * organization the journey created, which core-fe itself never does.
  *
  * ## Where the list came from
  *
- * Extracted from `core-fe/src` by resolving each `apiClient.<verb>(...)` template against the path
- * constants it interpolates (`AUTH_API`, `ORG_API`, `BILLING_API`, `NOTIF_API`, `MFA_API`,
- * `SESSIONS_API`, `WEBAUTHN_API`, `PREFS_API`, `WEBHOOKS_API`, `INVITATIONS_API`) plus the
- * `API_ENDPOINTS.AUTH` map in `core-fe/src/core/config/constants.ts`, plus the list endpoints the
- * app reaches through bare constants (`ORG_API/api-keys`, `/roles`, `/memberships`, `NOTIF_API`,
- * `BILLING_API/invoices`). This scenario walks **48** of those calls — 45 by default and three more
- * behind `STEP_UP=true` — and the block below states why each of the remaining **19** is out of
- * reach for a signed-in pool user.
+ * Extracted from `core-fe/src` (`main` at `aff4be5`, 2026-09-24) by resolving each
+ * `apiClient.<verb>(...)` and `authFetch(...)` call against the path constants it interpolates
+ * (`AUTH_API`, `ORG_API`, `BILLING_API`, `NOTIF_API`, `PREFS_API`, `MFA_API`, `SESSIONS_API`,
+ * `WEBAUTHN_API`, `WEBHOOKS_API`, `WEBHOOK_EVENTS_API`, `PERMISSIONS_API`, `INVITATIONS_API`,
+ * `UPLOADS_API`, `AVATAR_API`) and the `API_ENDPOINTS.AUTH` map in
+ * `core-fe/src/core/config/constants.ts`, plus the lists the app reads through `fetchListPage` /
+ * `fetchAllPages` (API keys, roles, memberships, webhooks and their delivery attempts,
+ * notifications, invoices). That comes to **78** distinct calls (method + path). This scenario
+ * walks **52** of them — 49 by default and three more behind `STEP_UP=true` — in 55 steps: it
+ * reads `me/context` three times, as the app does, and step 52 is the teardown above. The block
+ * below states why each of the other **26** is out of reach for a signed-in pool user.
  *
  * ## What the front end calls that this cannot do
  *
- *   POST /auth/login                      Password sign-in. No seeded user has a password
- *                                         (`password_hash` is null for all 80), so there is nothing
- *                                         to sign in with.
+ *   POST /auth/login                      Password sign-in. The journey signs in once, the way
+ *                                         core-fe does by default, with an email code;
+ *                                         `fe-login-to-org.js` walks password sign-in
+ *                                         (`AUTH=password`).
  *   POST /auth/mfa/login                  Needs an enrolled TOTP factor and a live code.
+ *   GET  /auth/oauth/:provider/callback   Needs the authorization code the provider hands back.
  *   POST /auth/me/mfa/enroll/confirm      Needs a TOTP code computed from the staged secret.
  *   POST /auth/me/mfa/verify              Needs an enrolled factor.
  *   DELETE /auth/me/mfa/:id               Enrolment stages the secret in Redis; no method row
@@ -43,11 +49,15 @@ import { SharedArray } from 'k6/data';
  *   POST /auth/refresh                    Works, but is capped at 30/min PER IP. Every VU shares one
  *                                         IP locally, so including it exhausts the budget and fails
  *                                         the run.
+ *   DELETE /users/me                      Ends the account, and pool users are reused every run.
+ *   POST /notify/webhooks/:id/test        Delivers to the webhook's URL, live.
  *
- * Billing writes (`POST /billing/subscriptions`, `payment-methods/setup`, `:id/cancel`,
- * `change-plan`, `resume`, `payment-setup`) and the webhook routes are also front-end calls that
- * stay out: the first group reaches Stripe, and no role in the system grants `webhook:read` or
- * `webhook:manage`, so every webhook route answers 403 for every caller including an Owner.
+ * Also out: Stripe — `POST /billing/subscriptions`, `payment-methods/setup`, and a subscription's
+ * `change-plan`, `cancel`, `resume` and `payment-setup` — and `GET /billing/subscriptions/:id`,
+ * since a new organization has no subscription until Stripe creates one. And the S3 upload flow —
+ * `POST /uploads`, `POST /uploads/:id/confirm`, `PUT`/`DELETE /users/me/avatar` and
+ * `PUT`/`DELETE /tenancy/organization/logo`: the file goes straight to S3 and `confirm` checks
+ * the object there, so the flow needs a bucket a load run does not have.
  *
  * ## The step-up cluster is opt-in
  *
@@ -62,11 +72,12 @@ import { SharedArray } from 'k6/data';
  * Each VU creates its own TEAM organization, invites a SECOND pool user into it to exercise the
  * membership routes, and deletes the organization at the end — which takes the membership with it.
  * The invitee is an existing pool user rather than a freshly signed-up account, so no user rows
- * accumulate. Step 44 re-reads `me/context` and requires the organization to be gone from the
+ * accumulate. Step 54 re-reads `me/context` and requires the organization to be gone from the
  * owner's own list; the proof runs inside the session rather than against the database.
  *
  * Run:
- *   TEST_MODE=true AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED=true pnpm dev
+ *   TEST_MODE=true AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED=true \
+ *     WEBHOOK_URL_ALLOWLIST=example.com pnpm dev   # the webhook block creates example.com URLs
  *   BASE_URL=http://localhost:3000 VUS=20 k6 run src/tests/load/k6/scenarios/fe-full-surface.js
  *
  *   # include the step-up cluster (adds a 60s wait per VU, in parallel):
@@ -116,51 +127,60 @@ const STEPS = [
   // ── notification bell ──────────────────────────────────────────────────────
   ['16-list-notifications', 'GET', '/notify/notifications'],
   ['17-unread-count', 'GET', '/notify/notifications/unread-count'],
-  ['18-mark-all-read', 'POST', '/notify/notifications/mark-all-read'],
+  ['18-mark-one-read', 'PATCH', '/notify/notifications/:id/read'],
+  ['19-mark-all-read', 'POST', '/notify/notifications/mark-all-read'],
 
   // ── organization switcher + create, then scope the session ─────────────────
-  ['19-list-orgs', 'GET', '/users/me/organizations'],
-  ['20-create-org', 'POST', '/tenancy/organizations'],
-  ['21-switch-org', 'POST', '/auth/switch-to-organization'],
-  ['22-me-context-2', 'GET', '/auth/me/context'],
-  ['23-patch-org', 'PATCH', '/tenancy/organization'],
+  ['20-list-orgs', 'GET', '/users/me/organizations'],
+  ['21-create-org', 'POST', '/tenancy/organizations'],
+  ['22-switch-org', 'POST', '/auth/switch-to-organization'],
+  ['23-me-context-2', 'GET', '/auth/me/context'],
+  ['24-patch-org', 'PATCH', '/tenancy/organization'],
 
-  // ── settings › API keys ────────────────────────────────────────────────────
-  ['24-list-keys', 'GET', '/tenancy/organization/api-keys'],
-  ['25-create-key', 'POST', '/tenancy/organization/api-keys'],
-  ['26-get-key', 'GET', '/tenancy/organization/api-keys/:id'],
+  // ── settings › integrations: API keys ──────────────────────────────────────
+  ['25-list-keys', 'GET', '/tenancy/organization/api-keys'],
+  ['26-create-key', 'POST', '/tenancy/organization/api-keys'],
   ['27-patch-key', 'PATCH', '/tenancy/organization/api-keys/:id'],
   ['28-delete-key', 'DELETE', '/tenancy/organization/api-keys/:id'],
 
+  // ── settings › integrations: webhooks ──────────────────────────────────────
+  ['29-webhook-events', 'GET', '/notify/webhook-events'],
+  ['30-create-webhook', 'POST', '/notify/webhooks'],
+  ['31-list-webhooks', 'GET', '/notify/webhooks'],
+  ['32-webhook-deliveries', 'GET', '/notify/webhooks/:id/delivery-attempts'],
+  ['33-patch-webhook', 'PATCH', '/notify/webhooks/:id'],
+  ['34-delete-webhook', 'DELETE', '/notify/webhooks/:id'],
+
   // ── settings › roles ───────────────────────────────────────────────────────
-  ['29-list-roles', 'GET', '/tenancy/organization/roles'],
-  ['30-create-role', 'POST', '/tenancy/organization/roles'],
-  ['31-patch-role', 'PATCH', '/tenancy/organization/roles/:id'],
-  ['32-get-role-perms', 'GET', '/tenancy/organization/roles/:id/permissions'],
-  ['33-put-role-perms', 'PUT', '/tenancy/organization/roles/:id/permissions'],
-  ['34-delete-role', 'DELETE', '/tenancy/organization/roles/:id'],
+  ['35-list-roles', 'GET', '/tenancy/organization/roles'],
+  ['36-permission-catalog', 'GET', '/tenancy/permissions'],
+  ['37-create-role', 'POST', '/tenancy/organization/roles'],
+  ['38-patch-role', 'PATCH', '/tenancy/organization/roles/:id'],
+  ['39-get-role-perms', 'GET', '/tenancy/organization/roles/:id/permissions'],
+  ['40-put-role-perms', 'PUT', '/tenancy/organization/roles/:id/permissions'],
+  ['41-delete-role', 'DELETE', '/tenancy/organization/roles/:id'],
 
   // ── settings › members (needs a second identity) ───────────────────────────
-  ['35-list-memberships', 'GET', '/tenancy/organization/memberships'],
-  ['36-invite-member', 'POST', '/tenancy/organization/memberships'],
-  ['37-patch-membership', 'PATCH', '/tenancy/organization/memberships/:id'],
-  ['38-delete-membership', 'DELETE', '/tenancy/organization/memberships/:id'],
+  ['42-list-memberships', 'GET', '/tenancy/organization/memberships'],
+  ['43-invite-member', 'POST', '/tenancy/organization/memberships'],
+  ['44-patch-membership', 'PATCH', '/tenancy/organization/memberships/:id'],
+  ['45-delete-membership', 'DELETE', '/tenancy/organization/memberships/:id'],
 
   // ── billing screen (reads only; every write goes to Stripe) ────────────────
-  ['39-list-subscriptions', 'GET', '/billing/subscriptions'],
-  ['40-list-invoices', 'GET', '/billing/invoices'],
-  ['41-payment-methods', 'GET', '/billing/payment-methods'],
+  ['46-list-subscriptions', 'GET', '/billing/subscriptions'],
+  ['47-list-invoices', 'GET', '/billing/invoices'],
+  ['48-payment-methods', 'GET', '/billing/payment-methods'],
 
   // ── step-up cluster, only when STEP_UP=true ────────────────────────────────
-  ['42-step-up', 'POST', '/auth/step-up'],
-  ['43-mfa-enroll', 'POST', '/auth/me/mfa/enroll'],
-  ['44-webauthn-options', 'POST', '/auth/me/webauthn/register/options'],
+  ['49-step-up', 'POST', '/auth/step-up'],
+  ['50-mfa-enroll', 'POST', '/auth/me/mfa/enroll'],
+  ['51-webauthn-options', 'POST', '/auth/me/webauthn/register/options'],
 
-  // ── teardown, then sign out ────────────────────────────────────────────────
-  ['45-delete-org', 'DELETE', '/tenancy/organization'],
-  ['46-switch-personal', 'POST', '/auth/switch-to-personal'],
-  ['47-me-context-3', 'GET', '/auth/me/context'],
-  ['48-logout', 'POST', '/auth/logout'],
+  // ── teardown (core-fe never deletes an organization), then sign out ────────
+  ['52-delete-org', 'DELETE', '/tenancy/organization'],
+  ['53-switch-personal', 'POST', '/auth/switch-to-personal'],
+  ['54-me-context-3', 'GET', '/auth/me/context'],
+  ['55-logout', 'POST', '/auth/logout'],
 ];
 
 const metricKey = (name) => name.replace(/-/g, '_');
@@ -217,6 +237,11 @@ function record(name, res, expected) {
 /** A step that could not run because a prerequisite failed — never counted as a pass. */
 function skip(name) {
   M[name].skipped.add(1);
+}
+
+/** Every step from `first` on, in STEPS order — the rest of a journey, named rather than counted. */
+function stepsFrom(first) {
+  return STEPS.slice(STEPS.findIndex(([name]) => name === first));
 }
 
 function body(res) {
@@ -385,12 +410,12 @@ function accountBlock(auth) {
   return state.ok;
 }
 
-/** 16-18 the notification bell. */
+/** 16-19 the notification bell. */
 function notifyBlock(auth) {
   const state = { ok: true };
   const step = stepper(state);
 
-  step(
+  const listed = step(
     '16-list-notifications',
     http.get(`${API}/notify/notifications`, {
       headers: auth,
@@ -406,11 +431,26 @@ function notifyBlock(auth) {
     }),
     [200],
   );
+  // Opening a notification marks it read. A pool user's notifications come from the bulk seed;
+  // on a database without any there is nothing to open, and the step is skipped, not failed.
+  const opened = rows(body(listed))[0];
+  if (opened?.id) {
+    step(
+      '18-mark-one-read',
+      http.patch(`${API}/notify/notifications/${opened.id}/read`, null, {
+        headers: auth,
+        tags: { name: '18-mark-one-read' },
+      }),
+      [200],
+    );
+  } else {
+    skip('18-mark-one-read');
+  }
   step(
-    '18-mark-all-read',
+    '19-mark-all-read',
     http.post(`${API}/notify/notifications/mark-all-read`, null, {
       headers: auth,
-      tags: { name: '18-mark-all-read' },
+      tags: { name: '19-mark-all-read' },
     }),
     [200],
   );
@@ -418,7 +458,7 @@ function notifyBlock(auth) {
   return state.ok;
 }
 
-/** 24-28 settings › API keys. */
+/** 25-28 settings › integrations: API keys. */
 function apiKeyBlock(auth, unique) {
   const state = { ok: true };
   const step = stepper(state);
@@ -430,9 +470,9 @@ function apiKeyBlock(auth, unique) {
   const created = http.post(
     `${API}/tenancy/organization/api-keys`,
     JSON.stringify({ name: `k6-fe-key-${unique}`, scopes: ['organization:read'] }),
-    { headers: { ...auth, 'X-Idempotency-Key': idemKey('key') }, tags: { name: '25-create-key' } },
+    { headers: { ...auth, 'X-Idempotency-Key': idemKey('key') }, tags: { name: '26-create-key' } },
   );
-  const keyOk = record('25-create-key', created, [200, 201]);
+  const keyOk = record('26-create-key', created, [200, 201]);
   if (!keyOk) state.ok = false;
   // The id is nested under `api_key`; the sibling `raw_key` is the only time the secret is shown.
   const keyId = keyOk ? (body(created).api_key?.id ?? null) : null;
@@ -442,25 +482,17 @@ function apiKeyBlock(auth, unique) {
     // ever exercising the row shape it is meant to return. Listing after it means the response
     // carries real data, and the check below proves the key is actually in it.
     const listed = step(
-      '24-list-keys',
+      '25-list-keys',
       http.get(`${API}/tenancy/organization/api-keys`, {
         headers: auth,
-        tags: { name: '24-list-keys' },
+        tags: { name: '25-list-keys' },
       }),
       [200],
     );
     check(listed, {
-      '24 the key just created is listed': () => rows(body(listed)).some((k) => k.id === keyId),
+      '25 the key just created is listed': () => rows(body(listed)).some((k) => k.id === keyId),
     });
 
-    step(
-      '26-get-key',
-      http.get(`${API}/tenancy/organization/api-keys/${keyId}`, {
-        headers: auth,
-        tags: { name: '26-get-key' },
-      }),
-      [200],
-    );
     step(
       '27-patch-key',
       http.patch(
@@ -482,22 +514,111 @@ function apiKeyBlock(auth, unique) {
       [200, 204],
     );
   } else {
-    for (const n of ['24-list-keys', '26-get-key', '27-patch-key', '28-delete-key']) skip(n);
+    for (const n of ['25-list-keys', '27-patch-key', '28-delete-key']) skip(n);
   }
 
   return state.ok;
 }
 
-/** 29-34 settings › roles. */
+/** 29-34 settings › integrations: webhooks. */
+function webhookBlock(auth, unique) {
+  const state = { ok: true };
+  const step = stepper(state);
+
+  // The create form's checklist comes from the catalog, so the webhook subscribes to an event
+  // that exists.
+  const catalog = step(
+    '29-webhook-events',
+    http.get(`${API}/notify/webhook-events`, {
+      headers: auth,
+      tags: { name: '29-webhook-events' },
+    }),
+    [200],
+  );
+  const event = rows(body(catalog))[0]?.event ?? 'subscription.updated';
+
+  // The SSRF guard accepts only allowlisted hosts: the nightly and the local load rig allowlist
+  // example.com (WEBHOOK_URL_ALLOWLIST). Nothing is delivered — the subscribed event never fires.
+  const created = http.post(
+    `${API}/notify/webhooks`,
+    JSON.stringify({ url: `https://example.com/k6-fe-${unique}`, events: [event] }),
+    {
+      headers: { ...auth, 'X-Idempotency-Key': idemKey('webhook') },
+      tags: { name: '30-create-webhook' },
+    },
+  );
+  const webhookOk = record('30-create-webhook', created, [200, 201]);
+  if (!webhookOk) state.ok = false;
+  const webhookId = webhookOk ? (body(created).id ?? null) : null;
+
+  if (webhookId) {
+    const listed = step(
+      '31-list-webhooks',
+      http.get(`${API}/notify/webhooks`, { headers: auth, tags: { name: '31-list-webhooks' } }),
+      [200],
+    );
+    check(listed, {
+      '31 the webhook just created is listed': () =>
+        rows(body(listed)).some((webhook) => webhook.id === webhookId),
+    });
+    step(
+      '32-webhook-deliveries',
+      http.get(`${API}/notify/webhooks/${webhookId}/delivery-attempts`, {
+        headers: auth,
+        tags: { name: '32-webhook-deliveries' },
+      }),
+      [200],
+    );
+    // core-fe edits the URL and the events together.
+    step(
+      '33-patch-webhook',
+      http.patch(
+        `${API}/notify/webhooks/${webhookId}`,
+        JSON.stringify({ url: `https://example.com/k6-fe-${unique}-edited`, events: [event] }),
+        { headers: auth, tags: { name: '33-patch-webhook' } },
+      ),
+      [200],
+    );
+    step(
+      '34-delete-webhook',
+      http.del(`${API}/notify/webhooks/${webhookId}`, null, {
+        headers: auth,
+        tags: { name: '34-delete-webhook' },
+      }),
+      [200, 204],
+    );
+  } else {
+    for (const n of [
+      '31-list-webhooks',
+      '32-webhook-deliveries',
+      '33-patch-webhook',
+      '34-delete-webhook',
+    ])
+      skip(n);
+  }
+
+  return state.ok;
+}
+
+/** 35-41 settings › roles. */
 function roleBlock(auth, unique) {
   const state = { ok: true };
   const step = stepper(state);
 
   step(
-    '29-list-roles',
+    '35-list-roles',
     http.get(`${API}/tenancy/organization/roles`, {
       headers: auth,
-      tags: { name: '29-list-roles' },
+      tags: { name: '35-list-roles' },
+    }),
+    [200],
+  );
+  // The role builder renders its checklist from the live permission catalog.
+  step(
+    '36-permission-catalog',
+    http.get(`${API}/tenancy/permissions`, {
+      headers: auth,
+      tags: { name: '36-permission-catalog' },
     }),
     [200],
   );
@@ -507,56 +628,56 @@ function roleBlock(auth, unique) {
     JSON.stringify({ name: `k6-fe-role-${unique}`.slice(0, 100), description: 'k6 fe journey' }),
     {
       headers: { ...auth, 'X-Idempotency-Key': idemKey('role') },
-      tags: { name: '30-create-role' },
+      tags: { name: '37-create-role' },
     },
   );
-  const roleOk = record('30-create-role', created, [200, 201]);
+  const roleOk = record('37-create-role', created, [200, 201]);
   if (!roleOk) state.ok = false;
   const roleId = roleOk ? (body(created).id ?? null) : null;
 
   if (roleId) {
     step(
-      '31-patch-role',
+      '38-patch-role',
       http.patch(
         `${API}/tenancy/organization/roles/${roleId}`,
         JSON.stringify({ description: 'k6 renamed' }),
         {
           headers: auth,
-          tags: { name: '31-patch-role' },
+          tags: { name: '38-patch-role' },
         },
       ),
       [200],
     );
     step(
-      '32-get-role-perms',
+      '39-get-role-perms',
       http.get(`${API}/tenancy/organization/roles/${roleId}/permissions`, {
         headers: auth,
-        tags: { name: '32-get-role-perms' },
+        tags: { name: '39-get-role-perms' },
       }),
       [200],
     );
     step(
-      '33-put-role-perms',
+      '40-put-role-perms',
       http.put(
         `${API}/tenancy/organization/roles/${roleId}/permissions`,
         JSON.stringify({ permission_codes: ['organization:read'] }),
         {
           headers: auth,
-          tags: { name: '33-put-role-perms' },
+          tags: { name: '40-put-role-perms' },
         },
       ),
       [200],
     );
     step(
-      '34-delete-role',
+      '41-delete-role',
       http.del(`${API}/tenancy/organization/roles/${roleId}`, null, {
         headers: auth,
-        tags: { name: '34-delete-role' },
+        tags: { name: '41-delete-role' },
       }),
       [200, 204],
     );
   } else {
-    for (const n of ['31-patch-role', '32-get-role-perms', '33-put-role-perms', '34-delete-role'])
+    for (const n of ['38-patch-role', '39-get-role-perms', '40-put-role-perms', '41-delete-role'])
       skip(n);
   }
 
@@ -564,7 +685,7 @@ function roleBlock(auth, unique) {
 }
 
 /**
- * 35-38 settings › members.
+ * 42-45 settings › members.
  *
  * The invitee is ANOTHER pool user rather than a freshly signed-up account, so the run creates no
  * user rows. Inviting writes the mail to the transactional outbox and enqueues a job — the Resend
@@ -576,10 +697,10 @@ function membershipBlock(auth, inviteeEmail, seatCeiling) {
   const step = stepper(state);
 
   const listed = step(
-    '35-list-memberships',
+    '42-list-memberships',
     http.get(`${API}/tenancy/organization/memberships`, {
       headers: auth,
-      tags: { name: '35-list-memberships' },
+      tags: { name: '42-list-memberships' },
     }),
     [200],
   );
@@ -604,7 +725,7 @@ function membershipBlock(auth, inviteeEmail, seatCeiling) {
     ) ?? member;
 
   if (!member || listed.status !== 200) {
-    for (const n of ['36-invite-member', '37-patch-membership', '38-delete-membership']) skip(n);
+    for (const n of ['43-invite-member', '44-patch-membership', '45-delete-membership']) skip(n);
     return false;
   }
 
@@ -617,7 +738,7 @@ function membershipBlock(auth, inviteeEmail, seatCeiling) {
   const seatsUsed = rows(body(listed)).length;
   if (seatCeiling !== null && seatsUsed >= seatCeiling) {
     seatLimitHit.add(1);
-    for (const n of ['36-invite-member', '37-patch-membership', '38-delete-membership']) skip(n);
+    for (const n of ['43-invite-member', '44-patch-membership', '45-delete-membership']) skip(n);
     return true;
   }
 
@@ -626,7 +747,7 @@ function membershipBlock(auth, inviteeEmail, seatCeiling) {
     JSON.stringify({ email: inviteeEmail, role_id: member.id }),
     {
       headers: { ...auth, 'X-Idempotency-Key': idemKey('invite') },
-      tags: { name: '36-invite-member' },
+      tags: { name: '43-invite-member' },
     },
   );
   // A 409 `seat_limit_reached` is a PLAN constraint, not a failure: a new organization lands on the
@@ -638,62 +759,62 @@ function membershipBlock(auth, inviteeEmail, seatCeiling) {
   const seatLimited =
     invited.status === 409 && String(invited.body || '').includes('seat_limit_reached');
   if (seatLimited) seatLimitHit.add(1);
-  const inviteOk = record('36-invite-member', invited, seatLimited ? [409] : [200, 201]);
+  const inviteOk = record('43-invite-member', invited, seatLimited ? [409] : [200, 201]);
   if (!inviteOk) state.ok = false;
   const membershipId = !seatLimited && inviteOk ? (body(invited).id ?? null) : null;
 
   if (membershipId) {
     step(
-      '37-patch-membership',
+      '44-patch-membership',
       http.patch(
         `${API}/tenancy/organization/memberships/${membershipId}`,
         JSON.stringify({ role_id: viewer.id }),
         {
           headers: auth,
-          tags: { name: '37-patch-membership' },
+          tags: { name: '44-patch-membership' },
         },
       ),
       [200],
     );
     step(
-      '38-delete-membership',
+      '45-delete-membership',
       http.del(`${API}/tenancy/organization/memberships/${membershipId}`, null, {
         headers: auth,
-        tags: { name: '38-delete-membership' },
+        tags: { name: '45-delete-membership' },
       }),
       [200, 204],
     );
   } else {
-    skip('37-patch-membership');
-    skip('38-delete-membership');
+    skip('44-patch-membership');
+    skip('45-delete-membership');
   }
 
   return state.ok;
 }
 
-/** 39-41 the billing screen. Reads only — every write on it goes to Stripe. */
+/** 46-48 the billing screen. Reads only — every write on it goes to Stripe. */
 function billingBlock(auth) {
   const state = { ok: true };
   const step = stepper(state);
 
   step(
-    '39-list-subscriptions',
+    '46-list-subscriptions',
     http.get(`${API}/billing/subscriptions`, {
       headers: auth,
-      tags: { name: '39-list-subscriptions' },
+      tags: { name: '46-list-subscriptions' },
     }),
     [200],
   );
   step(
-    '40-list-invoices',
-    http.get(`${API}/billing/invoices`, { headers: auth, tags: { name: '40-list-invoices' } }),
+    '47-list-invoices',
+    http.get(`${API}/billing/invoices`, { headers: auth, tags: { name: '47-list-invoices' } }),
     [200],
   );
   step(
-    '41-payment-methods',
+    '48-payment-methods',
     http.get(`${API}/billing/payment-methods`, {
       headers: auth,
-      tags: { name: '41-payment-methods' },
+      tags: { name: '48-payment-methods' },
     }),
     [200],
   );
@@ -702,7 +823,7 @@ function billingBlock(auth) {
 }
 
 /**
- * 42-44 the step-up cluster, only when STEP_UP=true.
+ * 49-51 the step-up cluster, only when STEP_UP=true.
  *
  * A verification code is issued at most once per 60 seconds per email and sign-in consumed the
  * first one, so this waits out that cooldown before asking for a second. The wait is per VU and
@@ -720,31 +841,31 @@ function stepUpBlock(auth, json, email) {
   const code = reissued.status === 200 ? body(reissued).debug_verification_code : null;
   if (!code) {
     // Without TEST_MODE the real code never reaches the client, so step-up cannot be reached.
-    for (const n of ['42-step-up', '43-mfa-enroll', '44-webauthn-options']) skip(n);
+    for (const n of ['49-step-up', '50-mfa-enroll', '51-webauthn-options']) skip(n);
     return false;
   }
 
   step(
-    '42-step-up',
+    '49-step-up',
     http.post(`${API}/auth/step-up`, JSON.stringify({ code }), {
       headers: auth,
-      tags: { name: '42-step-up' },
+      tags: { name: '49-step-up' },
     }),
     [200],
   );
   step(
-    '43-mfa-enroll',
+    '50-mfa-enroll',
     http.post(`${API}/auth/me/mfa/enroll`, JSON.stringify({ method_type: 'MFA_TOTP' }), {
       headers: auth,
-      tags: { name: '43-mfa-enroll' },
+      tags: { name: '50-mfa-enroll' },
     }),
     [200],
   );
   step(
-    '44-webauthn-options',
+    '51-webauthn-options',
     http.post(`${API}/auth/me/webauthn/register/options`, JSON.stringify({}), {
       headers: auth,
-      tags: { name: '44-webauthn-options' },
+      tags: { name: '51-webauthn-options' },
     }),
     [200],
   );
@@ -752,7 +873,7 @@ function stepUpBlock(auth, json, email) {
   return state.ok;
 }
 
-/** 45-48 teardown: delete what this VU made, return home, prove it is gone, sign out. */
+/** 52-55 teardown: delete what this VU made, return home, prove it is gone, sign out. */
 function teardownBlock(auth, json, slug) {
   const state = { ok: true };
   const step = stepper(state);
@@ -760,9 +881,9 @@ function teardownBlock(auth, json, slug) {
 
   const removed = http.del(`${API}/tenancy/organization`, null, {
     headers: session,
-    tags: { name: '45-delete-org' },
+    tags: { name: '52-delete-org' },
   });
-  const removedOk = record('45-delete-org', removed, [200, 204]);
+  const removedOk = record('52-delete-org', removed, [200, 204]);
   if (!removedOk) {
     state.ok = false;
     orgsLeaked.add(1);
@@ -772,10 +893,10 @@ function teardownBlock(auth, json, slug) {
   // Deleting the active organization leaves this token scoped to a row that no longer resolves —
   // `me/context` answers 404 "Organization not found" until the session moves somewhere real.
   const home = step(
-    '46-switch-personal',
+    '53-switch-personal',
     http.post(`${API}/auth/switch-to-personal`, null, {
       headers: session,
-      tags: { name: '46-switch-personal' },
+      tags: { name: '53-switch-personal' },
     }),
     [200],
   );
@@ -785,14 +906,14 @@ function teardownBlock(auth, json, slug) {
   }
 
   const after = step(
-    '47-me-context-3',
-    http.get(`${API}/auth/me/context`, { headers: session, tags: { name: '47-me-context-3' } }),
+    '54-me-context-3',
+    http.get(`${API}/auth/me/context`, { headers: session, tags: { name: '54-me-context-3' } }),
     [200],
   );
   if (removedOk) {
     if (after.status === 200) {
       const stillListed = (body(after).organizations ?? []).some((o) => o?.slug === slug);
-      check(after, { '47 organization no longer listed': () => !stillListed });
+      check(after, { '54 organization no longer listed': () => !stillListed });
       if (stillListed) {
         state.ok = false;
         orgsLeaked.add(1);
@@ -806,8 +927,8 @@ function teardownBlock(auth, json, slug) {
   }
 
   step(
-    '48-logout',
-    http.post(`${API}/auth/logout`, null, { headers: session, tags: { name: '48-logout' } }),
+    '55-logout',
+    http.post(`${API}/auth/logout`, null, { headers: session, tags: { name: '55-logout' } }),
     [200, 204],
   );
 
@@ -822,7 +943,7 @@ export function setup() {
     JSON.stringify({
       command: `BASE_URL=${BASE} VUS=${VUS}${USER_OFFSET ? ` USER_OFFSET=${USER_OFFSET}` : ''}${STEP_UP ? ' STEP_UP=true' : ''} \\\n    k6 run src/tests/load/k6/scenarios/fe-full-surface.js`,
       vus: VUS,
-      mode: `${VUS} users x 1 pass x ${STEP_UP ? STEPS.length : STEPS.length - 3} core-fe calls`,
+      mode: `${VUS} users x 1 pass x ${STEP_UP ? STEPS.length : STEPS.length - 3} steps`,
       stepsPerJourney: STEP_UP ? STEPS.length : STEPS.length - 3,
       poolMax: POOL,
     }),
@@ -874,7 +995,7 @@ export function feFullJourney() {
     },
   );
   if (!record('05-login', login, [200])) {
-    for (const [name] of STEPS.slice(5)) skip(name);
+    for (const [name] of stepsFrom('06-me-context')) skip(name);
     journeyDuration.add(Date.now() - t0);
     return void journeyComplete.add(false);
   }
@@ -890,8 +1011,8 @@ export function feFullJourney() {
   if (!notifyBlock(auth)) state.ok = false;
 
   step(
-    '19-list-orgs',
-    http.get(`${API}/users/me/organizations`, { headers: auth, tags: { name: '19-list-orgs' } }),
+    '20-list-orgs',
+    http.get(`${API}/users/me/organizations`, { headers: auth, tags: { name: '20-list-orgs' } }),
     [200],
   );
 
@@ -901,28 +1022,28 @@ export function feFullJourney() {
     JSON.stringify({ name: `K6 FE ${unique}`, slug }),
     {
       headers: { ...auth, 'X-Idempotency-Key': idemKey('org') },
-      tags: { name: '20-create-org' },
+      tags: { name: '21-create-org' },
     },
   );
-  const organizationOk = record('20-create-org', createdOrg, [200, 201]);
+  const organizationOk = record('21-create-org', createdOrg, [200, 201]);
   const organizationId = organizationOk ? (body(createdOrg).id ?? null) : null;
   if (!organizationId) {
     // Without an organization nothing below can run. Everything after is SKIPPED rather than
     // failed: those steps were never attempted, and a fail count would misattribute one 409.
     state.ok = false;
-    for (const [name] of STEPS.slice(20)) skip(name);
+    for (const [name] of stepsFrom('22-switch-org')) skip(name);
     journeyDuration.add(Date.now() - t0);
     return void journeyComplete.add(false);
   }
 
   const sw = step(
-    '21-switch-org',
+    '22-switch-org',
     http.post(
       `${API}/auth/switch-to-organization`,
       JSON.stringify({ organization_id: organizationId }),
       {
         headers: auth,
-        tags: { name: '21-switch-org' },
+        tags: { name: '22-switch-org' },
       },
     ),
     [200],
@@ -933,20 +1054,21 @@ export function feFullJourney() {
   // The app re-bootstraps after a scope change: the permission set it renders the sidebar from
   // belongs to the NEW organization, so the one cached at sign-in is already stale.
   step(
-    '22-me-context-2',
-    http.get(`${API}/auth/me/context`, { headers: auth, tags: { name: '22-me-context-2' } }),
+    '23-me-context-2',
+    http.get(`${API}/auth/me/context`, { headers: auth, tags: { name: '23-me-context-2' } }),
     [200],
   );
   step(
-    '23-patch-org',
+    '24-patch-org',
     http.patch(`${API}/tenancy/organization`, JSON.stringify({ name: `K6 FE Renamed ${unique}` }), {
       headers: auth,
-      tags: { name: '23-patch-org' },
+      tags: { name: '24-patch-org' },
     }),
     [200],
   );
 
   if (!apiKeyBlock(auth, unique)) state.ok = false;
+  if (!webhookBlock(auth, unique)) state.ok = false;
   if (!roleBlock(auth, unique)) state.ok = false;
   if (!membershipBlock(auth, invitee.email, opening.seatCeiling)) state.ok = false;
   if (!billingBlock(auth)) state.ok = false;
@@ -954,7 +1076,7 @@ export function feFullJourney() {
   if (STEP_UP) {
     if (!stepUpBlock(auth, json, cred.email)) state.ok = false;
   } else {
-    for (const n of ['42-step-up', '43-mfa-enroll', '44-webauthn-options']) skip(n);
+    for (const n of ['49-step-up', '50-mfa-enroll', '51-webauthn-options']) skip(n);
   }
 
   if (!teardownBlock(auth, json, slug)) state.ok = false;
@@ -999,7 +1121,7 @@ export function handleSummary(data) {
   const planned = STEP_UP ? STEPS.length : STEPS.length - 3;
 
   out.push(rule);
-  out.push(`  CORE-FE FULL JOURNEY   ${VUS} user(s)  x  1 pass  x  ${planned} front-end calls`);
+  out.push(`  CORE-FE FULL JOURNEY   ${VUS} user(s)  x  1 pass  x  ${planned} steps`);
   out.push(
     `  DATABASE_POOL_MAX = ${POOL}   ·   step-up cluster ${STEP_UP ? 'INCLUDED' : 'skipped (set STEP_UP=true)'}`,
   );
@@ -1037,7 +1159,7 @@ export function handleSummary(data) {
   const seats = m.seat_limit_hit ? m.seat_limit_hit.values.count : 0;
   const summary = [
     ['users (VUs)', VUS],
-    ['front-end calls per user', planned],
+    ['steps per user', planned],
     ['calls expected', VUS * planned],
     ['calls actually sent', sent],
     ['steps skipped', skipped],
@@ -1050,7 +1172,7 @@ export function handleSummary(data) {
     [
       'member invite',
       seats > 0
-        ? `refused for ${seats} VU(s) — Free plan allows 1 seat; steps 37-38 need Starter/Pro, a Stripe call`
+        ? `refused for ${seats} VU(s) — Free plan allows 1 seat; steps 44-45 need Starter/Pro, a Stripe call`
         : 'accepted — member routes exercised end to end',
     ],
     [
