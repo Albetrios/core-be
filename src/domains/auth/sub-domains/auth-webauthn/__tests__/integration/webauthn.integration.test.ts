@@ -1,4 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
+import {
+  type RequestScopedPostgresDatabase,
+  runWithPinnedDatabaseHandle,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
 import { createTestApp } from '@/tests/helpers/test-app.js';
 import {
@@ -200,24 +205,33 @@ describe('Auth WebAuthn — Integration', () => {
       await seedRecentStepUpForTestUser(user.public_id, sessionPublicId);
 
       const repository = new WebauthnCredentialRepository();
-      const doomed = await repository.createCredential({
-        user_id: user.id,
-        credential_id: 'cred-to-revoke',
-        public_key: 'pk-to-revoke',
-        counter: 0,
-        device_type: 'multiDevice',
-        backed_up: true,
-        transports: ['internal'],
-      });
-      const survivor = await repository.createCredential({
-        user_id: user.id,
-        credential_id: 'cred-to-keep',
-        public_key: 'pk-to-keep',
-        counter: 0,
-        device_type: 'singleDevice',
-        backed_up: false,
-        transports: ['usb'],
-      });
+      const doomed = await runWithPinnedDatabaseHandle(
+        // Seeded on the operator connection: a fixture, not the behaviour under test.
+        getOperatorDatabase() as unknown as RequestScopedPostgresDatabase,
+        () =>
+          repository.createCredential({
+            user_id: user.id,
+            credential_id: 'cred-to-revoke',
+            public_key: 'pk-to-revoke',
+            counter: 0,
+            device_type: 'multiDevice',
+            backed_up: true,
+            transports: ['internal'],
+          }),
+      );
+      const survivor = await runWithPinnedDatabaseHandle(
+        getOperatorDatabase() as unknown as RequestScopedPostgresDatabase,
+        () =>
+          repository.createCredential({
+            user_id: user.id,
+            credential_id: 'cred-to-keep',
+            public_key: 'pk-to-keep',
+            counter: 0,
+            device_type: 'singleDevice',
+            backed_up: false,
+            transports: ['usb'],
+          }),
+      );
 
       const response = await injectAuthenticated(app, {
         method: 'DELETE',

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq, sql as drizzleSql } from 'drizzle-orm';
 import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import {
   organizationRequestDatabaseStorage,
   type RequestScopedPostgresDatabase,
@@ -68,7 +69,7 @@ describe('Integration: transactional mail outbox', () => {
       }),
     ).rejects.toThrow('simulated_handler_failure');
 
-    const rows = await database
+    const rows = await getOperatorDatabase()
       .select({ id: mail_outbox.id })
       .from(mail_outbox)
       .where(drizzleSql`${mail_outbox.to_addresses} @> ${JSON.stringify([email])}::jsonb`);
@@ -95,7 +96,10 @@ describe('Integration: transactional mail outbox', () => {
       );
     });
 
-    const rows = await database.select().from(mail_outbox).where(eq(mail_outbox.id, mailOutboxId));
+    const rows = await getOperatorDatabase()
+      .select()
+      .from(mail_outbox)
+      .where(eq(mail_outbox.id, mailOutboxId));
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.status).toBe('pending');

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { mail_outbox } from '@/infrastructure/mail/mail-outbox.schema.js';
 import {
   insertMailOutbox,
@@ -28,7 +28,7 @@ describe('Integration: mail outbox claim race', () => {
     expect(claimResults.filter((result) => result === 'claimed')).toHaveLength(1);
     expect(claimResults.filter((result) => result === 'in_flight')).toHaveLength(9);
 
-    const rows = await database
+    const rows = await getOperatorDatabase()
       .select({ status: mail_outbox.status })
       .from(mail_outbox)
       .where(eq(mail_outbox.id, mailOutboxId));

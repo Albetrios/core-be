@@ -5,7 +5,7 @@ import { injectUnauthenticated, injectRoute } from '@/tests/helpers/test-http-in
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { eq } from 'drizzle-orm';
 import { createTestUserWithPassword } from '@/tests/factories/user.factory.js';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { users } from '@/domains/user/user.schema.js';
 import type { FastifyInstance } from 'fastify';
 
@@ -48,7 +48,7 @@ describe('Auth Domain — Response contract (integration)', () => {
   describe('POST /api/v1/auth/login — MFA challenge envelope', () => {
     it('should return mfa_required without access_token when MFA is enabled', async () => {
       const { user, password } = await createTestUserWithPassword();
-      await database
+      await getOperatorDatabase()
         .update(users)
         .set({ is_mfa_enabled: true })
         .where(eq(users.public_id, user.public_id));
@@ -73,7 +73,7 @@ describe('Auth Domain — Response contract (integration)', () => {
 
     it('should return 401 on refresh when login stopped at MFA and no session cookie was set', async () => {
       const { user, password } = await createTestUserWithPassword();
-      await database
+      await getOperatorDatabase()
         .update(users)
         .set({ is_mfa_enabled: true })
         .where(eq(users.public_id, user.public_id));

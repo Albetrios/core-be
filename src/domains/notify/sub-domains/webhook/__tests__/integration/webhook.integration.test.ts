@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import {
+  type RequestScopedPostgresDatabase,
+  runWithPinnedDatabaseHandle,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { redisConnection } from '@/infrastructure/cache/redis.client.js';
 import { buildIdempotencyCacheKey } from '@/shared/utils/idempotency/idempotency-key.util.js';
 import { createTestApp } from '@/tests/helpers/test-app.js';
@@ -127,7 +131,7 @@ describe('Webhook Sub-Domain — Integration', () => {
           createdByUserId: owner.id,
         });
         const orderedCreatedAt = new Date(baseCreatedAt + index * 1_000);
-        await database
+        await getOperatorDatabase()
           .update(webhooks)
           .set({ created_at: orderedCreatedAt, updated_at: orderedCreatedAt })
           .where(eq(webhooks.id, webhook.id));
@@ -197,17 +201,22 @@ describe('Webhook Sub-Domain — Integration', () => {
       const attemptRepository = new WebhookDeliveryAttemptRepository();
       const baseCreatedAt = Date.now();
       for (let index = 0; index < 3; index += 1) {
-        const attempt = await attemptRepository.create({
-          webhook_id: webhook.id,
-          event_type: 'subscription.updated',
-          payload: { id: `evt_${index}` },
-          status: 'SENT',
-          http_status_code: 200,
-          response_body: 'ok',
-          sent_at: new Date(),
-          attempt_count: 1,
-        });
-        await database
+        const attempt = await runWithPinnedDatabaseHandle(
+          // Seeded on the operator connection: a fixture, not the behaviour under test.
+          getOperatorDatabase() as unknown as RequestScopedPostgresDatabase,
+          () =>
+            attemptRepository.create({
+              webhook_id: webhook.id,
+              event_type: 'subscription.updated',
+              payload: { id: `evt_${index}` },
+              status: 'SENT',
+              http_status_code: 200,
+              response_body: 'ok',
+              sent_at: new Date(),
+              attempt_count: 1,
+            }),
+        );
+        await getOperatorDatabase()
           .update(webhook_delivery_attempts)
           .set({ created_at: new Date(baseCreatedAt + index * 1_000) })
           .where(eq(webhook_delivery_attempts.id, attempt.id));

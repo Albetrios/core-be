@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { webhook_delivery_attempts } from '@/domains/notify/sub-domains/webhook/webhook.schema.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { WebhookDeliveryAttemptRepository } from '@/domains/notify/sub-domains/webhook/webhook-delivery/webhook-delivery-attempt.repository.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
@@ -27,7 +31,7 @@ describe('Integration: webhook delivery sending reclaim', () => {
       createdByUserId: user.id,
     });
 
-    const [pendingAttempt] = await database
+    const [pendingAttempt] = await getOperatorDatabase()
       .insert(webhook_delivery_attempts)
       .values({
         public_id: generatePublicId('webhook'),
@@ -39,16 +43,26 @@ describe('Integration: webhook delivery sending reclaim', () => {
       })
       .returning({ id: webhook_delivery_attempts.id });
 
-    expect(await repository.tryMarkSending(pendingAttempt!.id, 1)).toBe('claimed');
+    expect(
+      await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.JOB({ organizationPublicId: organization.public_id }),
+        () => repository.tryMarkSending(pendingAttempt!.id, 1),
+      ),
+    ).toBe('claimed');
 
-    await database
+    await getOperatorDatabase()
       .update(webhook_delivery_attempts)
       .set({ sent_at: new Date(Date.now() - 60 * 60_000) })
       .where(eq(webhook_delivery_attempts.id, pendingAttempt!.id));
 
-    expect(await repository.tryMarkSending(pendingAttempt!.id, 2)).toBe('claimed');
+    expect(
+      await withAppDatabaseContext(
+        PRINCIPAL_SCOPE.JOB({ organizationPublicId: organization.public_id }),
+        () => repository.tryMarkSending(pendingAttempt!.id, 2),
+      ),
+    ).toBe('claimed');
 
-    const rows = await database
+    const rows = await getOperatorDatabase()
       .select({
         status: webhook_delivery_attempts.status,
         attempt_count: webhook_delivery_attempts.attempt_count,

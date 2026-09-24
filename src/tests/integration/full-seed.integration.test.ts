@@ -36,7 +36,11 @@ async function resolveDemoSeed(): Promise<{
   return { user, organization };
 }
 
-describe('Full seed — integration', () => {
+// Skipped under `pnpm test:rls-role`: this suite runs the seeders, which are an operator activity by design (`seed-runtime-url.ts` points them at `DATABASE_OPERATOR_URL`), so running it as the RLS-subject
+// `core_be_app` would assert nothing about whether the application obeys RLS.
+const runAsApplicationBehaviour = !process.env.TEST_DATABASE_ROLE;
+
+describe.runIf(runAsApplicationBehaviour)('Full seed — integration', () => {
   beforeEach(async () => {
     await cleanupDatabase();
     process.env.DEMO_PASSWORD = 'DemoPassword123!';

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { mail_outbox } from '@/infrastructure/mail/mail-outbox.schema.js';
 import { insertMailOutbox } from '@/infrastructure/mail/mail-outbox.repository.js';
 import { processMailOutboxJob } from '@/infrastructure/mail/workers/mail.processor.js';
@@ -51,7 +51,10 @@ describe('Integration: mail worker concurrency race', () => {
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
     expect(sentOnce).toBe(true);
 
-    const rows = await database.select().from(mail_outbox).where(eq(mail_outbox.id, mailOutboxId));
+    const rows = await getOperatorDatabase()
+      .select()
+      .from(mail_outbox)
+      .where(eq(mail_outbox.id, mailOutboxId));
 
     expect(rows[0]?.status).toBe('sent');
     expect(rows[0]?.resend_message_id).toBe('msg_race_single');
