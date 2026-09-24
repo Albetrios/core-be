@@ -100,3 +100,17 @@ process.env.REDIS_URL = 'redis://127.0.0.1:26379';
  * the app pool, as before the harness gained a separate one.
  */
 process.env.DATABASE_OPERATOR_URL = process.env.DATABASE_URL;
+
+/**
+ * Maintenance contexts (`withMaintenanceDatabaseContext` — retention, audit drain, global admin)
+ * open their own pool on `DATABASE_MAINTENANCE_URL` when it is set, which a developer's env file
+ * does. That pool would reach Postgres directly, so no toxin could touch a maintenance path. Keep
+ * its role and credentials — the scope's grants are what these paths are tested under — and
+ * reroute only the host and port through the Toxiproxy listener.
+ */
+if (process.env.DATABASE_MAINTENANCE_URL) {
+  const proxiedMaintenanceUrl = new URL(process.env.DATABASE_MAINTENANCE_URL);
+  proxiedMaintenanceUrl.hostname = '127.0.0.1';
+  proxiedMaintenanceUrl.port = '25432';
+  process.env.DATABASE_MAINTENANCE_URL = proxiedMaintenanceUrl.toString();
+}
