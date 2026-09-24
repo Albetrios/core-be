@@ -43,6 +43,13 @@ export const member_invitations = tenancySchema
       ),
     },
     (table) => [
+      // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+      // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+      index('idx_member_invitations_created_by_user_id')
+        .on(table.created_by_user_id)
+        .where(sql`${table.created_by_user_id} IS NOT NULL`),
+      // invited_by_user_id is NOT NULL, so its FK index is full, not partial.
+      index('idx_member_invitations_invited_by_user_id').on(table.invited_by_user_id),
       uniqueIndex('idx_member_invitations_public_id').on(table.public_id),
       uniqueIndex('idx_member_invitations_token').on(table.token_hash),
       index('idx_member_invitations_membership_created_id').on(

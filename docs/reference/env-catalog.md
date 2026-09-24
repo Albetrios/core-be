@@ -5,7 +5,7 @@
 
 Allowed values + description come from the explicit registry; the **default** and **required/optional**
 status are read from each Zod field, so this can never disagree with what boots. Registry coverage:
-**12 / 236** variables migrated to an explicit `{ allowed, description }` entry.
+**13 / 237** variables migrated to an explicit `{ allowed, description }` entry.
 
 | Variable | Allowed values | Default | In registry | Description |
 | --- | --- | --- | :---: | --- |
@@ -43,6 +43,7 @@ status are read from each Zod field, so this can never disagree with what boots.
 | `DATABASE_MAINTENANCE_URL` | — | — *(optional)* |  | — |
 | `DATABASE_MIGRATION_URL` | — | — *(optional)* |  | — |
 | `DATABASE_OPERATOR_URL` | — | — *(optional)* |  | — |
+| `DATABASE_POOL_ACQUIRE_TIMEOUT_MS` | integer 0–60000 (ms; 0 disables) | `10000` | ✓ | Deadline for a unit of work to get a pooled connection. Past it the caller gets 503 + Retry-After, and a connection that arrives later rolls the transaction back unrun. |
 | `DATABASE_POOL_ACTIVE_CRITICAL_RATIO` | — | `0.95` |  | — |
 | `DATABASE_POOL_ACTIVE_WARN_RATIO` | — | `0.8` |  | — |
 | `DATABASE_POOL_ALERT_CONSECUTIVE_POLLS` | — | `2` |  | — |

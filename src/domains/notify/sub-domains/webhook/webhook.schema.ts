@@ -55,6 +55,14 @@ export const webhooks = notifySchema
       ),
     },
     (table) => [
+      // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+      // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+      index('idx_webhooks_created_by_user_id')
+        .on(table.created_by_user_id)
+        .where(sql`${table.created_by_user_id} IS NOT NULL`),
+      index('idx_webhooks_updated_by_user_id')
+        .on(table.updated_by_user_id)
+        .where(sql`${table.updated_by_user_id} IS NOT NULL`),
       uniqueIndex('idx_webhooks_public_id').on(table.public_id),
       index('idx_webhooks_org_enabled').on(table.organization_id, table.is_enabled),
       index('idx_webhooks_org_created_id_active')

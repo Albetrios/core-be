@@ -49,6 +49,15 @@ export const auth_methods = authSchema
       ),
     },
     (table) => [
+      // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+      // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+      index('idx_auth_methods_created_by_user_id')
+        .on(table.created_by_user_id)
+        .where(sql`${table.created_by_user_id} IS NOT NULL`),
+      // One active TOTP method per user — migration 20260607080000.
+      uniqueIndex('uniq_auth_methods_user_active_totp')
+        .on(table.user_id)
+        .where(sql`${table.method_type} = 'MFA_TOTP' AND ${table.revoked_at} IS NULL`),
       uniqueIndex('idx_auth_methods_public_id').on(table.public_id),
       index('idx_auth_methods_user_type').on(table.user_id, table.method_type),
       index('idx_auth_methods_provider').on(table.provider, table.provider_user_id),

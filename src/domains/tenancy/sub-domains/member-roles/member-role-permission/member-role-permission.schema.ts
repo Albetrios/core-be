@@ -27,6 +27,11 @@ export const role_permissions = tenancySchema
       ),
     },
     (table) => [
+      // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+      // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+      index('idx_role_permissions_created_by_user_id')
+        .on(table.created_by_user_id)
+        .where(sql`${table.created_by_user_id} IS NOT NULL`),
       primaryKey({
         columns: [table.role_id, table.permission_code],
         name: 'pk_role_permissions',

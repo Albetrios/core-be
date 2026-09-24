@@ -1,4 +1,4 @@
 {
   "_comment": "Ratchet: number of env vars migrated to the explicit ENV_VAR_REGISTRY manifest (allowed values + description, Zod derived). The gate in env-var-registry.policy.unit.test.ts requires Object.keys(ENV_VAR_REGISTRY).length >= migrated, so coverage can only grow. Bump this as you migrate each section; target is the full schema key count.",
-  "migrated": 12
+  "migrated": 13
 }

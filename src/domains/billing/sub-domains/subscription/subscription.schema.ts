@@ -61,6 +61,14 @@ export const subscriptions = billingSchema
       ),
     },
     (table) => [
+      // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+      // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+      index('idx_subscriptions_created_by_user_id')
+        .on(table.created_by_user_id)
+        .where(sql`${table.created_by_user_id} IS NOT NULL`),
+      index('idx_subscriptions_updated_by_user_id')
+        .on(table.updated_by_user_id)
+        .where(sql`${table.updated_by_user_id} IS NOT NULL`),
       uniqueIndex('idx_subscriptions_public_id').on(table.public_id),
       // Partial unique index: an organization may hold at most one non-terminal
       // subscription. CANCELED and INCOMPLETE_EXPIRED rows are excluded so

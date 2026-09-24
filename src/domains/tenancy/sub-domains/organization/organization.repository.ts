@@ -1,6 +1,9 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import {
+  getContextFreeDatabase,
+  getRequestDatabase,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { users as authUsers } from '@/domains/user/user.schema.js';
@@ -55,7 +58,7 @@ export class OrganizationRepository extends BaseRepository {
    */
   async resolveUserIdByPublicId(public_id: string | undefined): Promise<number | null> {
     if (!public_id) return null;
-    const result = await getRequestDatabase().execute<{ id: string | number | null }>(
+    const result = await getContextFreeDatabase().execute<{ id: string | number | null }>(
       sql`SELECT auth.resolve_user_id_by_public_id(${public_id}) AS id`,
     );
     const rawId = extractResolverRows<{ id: string | number | null }>(result)[0]?.id ?? null;
@@ -74,7 +77,7 @@ export class OrganizationRepository extends BaseRepository {
    * cache TTL. The resolver carries the identical `deleted_at IS NULL` predicate.
    */
   async resolveUserPublicIdByInternalId(user_id: number): Promise<string | null> {
-    const result = await getRequestDatabase().execute<{ public_id: string | null }>(
+    const result = await getContextFreeDatabase().execute<{ public_id: string | null }>(
       sql`SELECT public_id FROM auth.resolve_user_by_internal_id(${user_id})`,
     );
     return extractResolverRows<{ public_id: string | null }>(result)[0]?.public_id ?? null;
@@ -103,7 +106,7 @@ export class OrganizationRepository extends BaseRepository {
       user_ids.map((user_id) => sql`${user_id}`),
       sql`, `,
     );
-    const result = await getRequestDatabase().execute(
+    const result = await getContextFreeDatabase().execute(
       sql`SELECT id, public_id FROM auth.resolve_user_public_ids_by_ids(ARRAY[${userIdValues}]::bigint[])`,
     );
     const rows = extractResolverRows<{ id: number | string; public_id: string }>(result);

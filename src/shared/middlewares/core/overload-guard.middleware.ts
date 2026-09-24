@@ -99,7 +99,7 @@ const overloadGuardMiddleware: FastifyPluginAsync = async (application) => {
     clearInterval(sampleTimer);
   });
 
-  application.addHook('onRequest', async (request, reply) => {
+  application.addHook('onRequest', async (request) => {
     const path = request.url.split('?', 1)[0] ?? '';
     if (
       shouldShedRequest({
@@ -110,8 +110,7 @@ const overloadGuardMiddleware: FastifyPluginAsync = async (application) => {
         dbCheckoutShedThreshold,
       })
     ) {
-      reply.header('Retry-After', String(OVERLOAD_RETRY_AFTER_SECONDS));
-      throw new ServiceUnavailableError();
+      throw new ServiceUnavailableError().withRetryAfter(OVERLOAD_RETRY_AFTER_SECONDS);
     }
   });
 };

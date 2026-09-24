@@ -46,6 +46,7 @@ The same context is reused if a worker is already running inside one (no nested 
 - New tenant-scoped repository: extend `BaseRepository`, scope every query by `organization_id`. Any RLS-eligible table also needs an RLS policy in its migration.
 - New tenant-scoped service method: wrap database I/O in `withAppDatabaseContext(scope, fn)` — the scope is attached by the auth middleware, narrowed at the controller (`requireOrganizationScope(request)`), and relayed through the service. **Network I/O (Stripe, S3, Resend) MUST stay outside** the wrapper to avoid holding a pool checkout across remote round trips — enforced by `pnpm test:global` (`rls-context-network-isolation.global.test.ts`).
 - New worker job: use `runOrganizationScopedWorkerJob`; never call `getRequestDatabase()` from a `*.worker.ts` / `*.processor.ts` (enforced by global tests).
+- Outside a context, `getRequestDatabase()` counts the access (`database_unscoped_query_total`) — a FORCE RLS query with no GUC silently returns zero rows. A query that **cannot** depend on a context — a `SECURITY DEFINER` resolver (`<schema>.resolve_*`) or the `tenancy.permissions` catalog read — uses `getContextFreeDatabase()` instead, so a non-zero counter always means a real missing context. Confined per call site by `context-free-database-usage.policy.unit.test.ts`.
 - New tenant-scoped endpoint: the active organization comes from the `org` JWT claim (no `{organization_id}` path segment); narrow `request.principalScope` with `requireOrganizationScope(request)` at the controller and pass it into `withAppDatabaseContext`.
 
 ## audit-emission
@@ -180,6 +181,8 @@ These four properties hold today and are what keep lock contention from becoming
 | **Bounded post-commit fan-out** — `flushOnCommit` runs at most `MAX_CONCURRENT_ON_COMMIT_TASKS` tasks at once | A post-commit task that touches the database opens its own scoped context, so unbounded dispatch made one request's connection demand equal its queue length | enforced in code |
 
 **Three timeouts, three different failures, no substitutes** (all connection parameters, see [database.overview.md](src/infrastructure/database/database.overview.md)): `statement_timeout` bounds a running query, `idle_in_transaction_session_timeout` bounds an open-and-idle transaction, `lock_timeout` bounds a statement **blocked behind someone else's lock**. A lock waiter is neither running nor idle, so only `lock_timeout` bounds it — while it holds its pooled checkout for the entire wait.
+
+**Getting the connection is bounded separately** (`DATABASE_POOL_ACQUIRE_TIMEOUT_MS`): postgres.js has no acquire timeout, so a unit of work waiting on a cold pool during an outage would otherwise commit after its request had already failed. Every pooled unit of work runs through `runPooledUnitOfWork`, which answers `503` + `Retry-After` at the deadline and rolls a late connection's transaction back unrun (see [database.overview.md](src/infrastructure/database/database.overview.md)).
 
 ### How to apply
 

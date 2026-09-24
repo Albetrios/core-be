@@ -6,6 +6,10 @@ import {
   resetUnscopedDatabaseAccessTrackingForTests,
   type UnscopedDatabaseAccessSample,
 } from '@/infrastructure/database/pool/unscoped-query-counter.js';
+import {
+  getContextFreeDatabase,
+  getRequestDatabase,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 
 /**
  * A missing database context is silent: on a FORCE RLS table whose policy arms are GUC-gated,
@@ -22,6 +26,16 @@ describe('unscoped database access counter', () => {
   beforeEach(() => {
     registerUnscopedDatabaseAccessObserver(null);
     resetUnscopedDatabaseAccessTrackingForTests();
+  });
+
+  it('counts a fall-through from getRequestDatabase, but not from getContextFreeDatabase', () => {
+    // SECURITY DEFINER resolvers and the permission catalog cannot read zero rows for want of a
+    // context, so they go through the context-free accessor — which keeps the counter meaning
+    // "a query that needed a context ran without one".
+    getContextFreeDatabase();
+    expect(getUnscopedDatabaseAccessCount()).toBe(0);
+    getRequestDatabase();
+    expect(getUnscopedDatabaseAccessCount()).toBe(1);
   });
 
   it('counts every access even with no observer registered', () => {

@@ -45,6 +45,14 @@ export const roles = tenancySchema
       ),
     },
     (table) => [
+      // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+      // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+      index('idx_roles_created_by_user_id')
+        .on(table.created_by_user_id)
+        .where(sql`${table.created_by_user_id} IS NOT NULL`),
+      index('idx_roles_updated_by_user_id')
+        .on(table.updated_by_user_id)
+        .where(sql`${table.updated_by_user_id} IS NOT NULL`),
       uniqueIndex('idx_roles_public_id').on(table.public_id),
       index('idx_roles_org_name').on(table.organization_id, table.name),
       index('idx_roles_org_name_id_active')

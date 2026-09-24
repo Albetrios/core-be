@@ -1647,6 +1647,7 @@ src/
     │   ├── database-pool-exhaustion.chaos.test.ts
     │   ├── global-setup.ts
     │   ├── mail-outbox-sweeper-recovery.chaos.test.ts
+    │   ├── postgres-cold-pool-acquire-deadline.chaos.test.ts
     │   ├── postgres-health.chaos.test.ts
     │   ├── postgres-pool-concurrency.chaos.test.ts
     │   ├── postgres-reset-peer.chaos.test.ts
@@ -2118,6 +2119,7 @@ src/
     │   │   │   ├── redis-prefix.util.unit.test.ts
     │   │   │   └── redis-tombstone-cache.util.unit.test.ts
     │   │   ├── database/
+    │   │   │   ├── acquire-deadline.unit.test.ts
     │   │   │   ├── base-repository.pagination.unit.test.ts
     │   │   │   ├── batch-delete.util.db.unit.test.ts
     │   │   │   ├── batch-delete.util.unit.test.ts
@@ -2125,6 +2127,7 @@ src/
     │   │   │   ├── connection-url.util.unit.test.ts
     │   │   │   ├── connection.options.unit.test.ts
     │   │   │   ├── context-directory-standard.policy.unit.test.ts
+    │   │   │   ├── context-free-database-usage.policy.unit.test.ts
     │   │   │   ├── maintenance-context-confinement.policy.unit.test.ts
     │   │   │   ├── maintenance-database-context.unit.test.ts
     │   │   │   ├── maintenance-role.db.unit.test.ts

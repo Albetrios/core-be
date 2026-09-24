@@ -223,6 +223,35 @@ export const organizationRequestDatabaseStorage =
  * in worker runtime if no context has been pinned to prevent silent RLS bypass.
  */
 export function getRequestDatabase(): RequestScopedPostgresDatabase {
+  return resolveRequestDatabase({ countUnscopedAccess: true });
+}
+
+/**
+ * {@link getRequestDatabase} for a query whose correctness does not depend on a database context:
+ * a `SECURITY DEFINER` resolver (`auth.resolve_*`, `tenancy.resolve_*`), or a table whose policy
+ * reads no GUC (the `tenancy.permissions` reference catalog).
+ *
+ * @remarks
+ * - **Why:** outside a context, `getRequestDatabase()` counts the access
+ *   (`database_unscoped_query_total`), because a query against a FORCE RLS table with no GUC set
+ *   silently returns zero rows. These queries cannot fail that way — the resolver runs as its
+ *   owner and the catalog policy is unconditional — so counting them only buried the signal: a
+ *   healthy load run reported three call sites, all by design. With them routed here, a non-zero
+ *   rate means a query that genuinely needs a context ran without one.
+ * - **Algorithm:** identical to {@link getRequestDatabase} — the pinned handle when a context is
+ *   active, a throw in worker runtime, the shared pool otherwise — except that nothing is counted.
+ * - **Failure modes:** throws {@link WorkerDatabaseContextError} in worker runtime without a
+ *   pinned context, exactly like {@link getRequestDatabase}.
+ * - **Notes:** confined by `context-free-database-usage.policy.unit.test.ts` to an allowlist of
+ *   repositories and methods; it is not a general way to silence the counter.
+ */
+export function getContextFreeDatabase(): RequestScopedPostgresDatabase {
+  return resolveRequestDatabase({ countUnscopedAccess: false });
+}
+
+function resolveRequestDatabase(options: {
+  countUnscopedAccess: boolean;
+}): RequestScopedPostgresDatabase {
   const session = organizationRequestDatabaseStorage.getStore();
   if (session !== undefined) {
     return session.databaseHandle;
@@ -238,7 +267,7 @@ export function getRequestDatabase(): RequestScopedPostgresDatabase {
   // how offboarding came to erase nothing: FORCE RLS tables match no policy arm without a GUC,
   // the query returns zero rows, and dev and CI cannot see it because those roles bypass RLS.
   // No static test can answer "is a context active here"; the runtime can, so it counts.
-  recordUnscopedDatabaseAccess();
+  if (options.countUnscopedAccess) recordUnscopedDatabaseAccess();
   return database;
 }
 

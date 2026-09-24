@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { bigint, boolean, timestamp, jsonb, varchar, check, pgPolicy } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  timestamp,
+  jsonb,
+  varchar,
+  check,
+  pgPolicy,
+  index,
+} from 'drizzle-orm/pg-core';
 import { tenancySchema } from '@/infrastructure/database/pg-schemas.js';
 import { users } from '@/domains/user/user.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
@@ -34,6 +43,14 @@ export const organization_settings = tenancySchema
       ),
     },
     (table) => [
+      // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+      // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+      index('idx_organization_settings_created_by_user_id')
+        .on(table.created_by_user_id)
+        .where(sql`${table.created_by_user_id} IS NOT NULL`),
+      index('idx_organization_settings_updated_by_user_id')
+        .on(table.updated_by_user_id)
+        .where(sql`${table.updated_by_user_id} IS NOT NULL`),
       check('chk_org_settings_updated', sql`${table.updated_at} >= ${table.created_at}`),
       check(
         'chk_organization_settings_default_locale',

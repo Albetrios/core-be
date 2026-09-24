@@ -52,6 +52,11 @@ export const uploads = uploadSchema
       ),
     },
     (table) => [
+      // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+      // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+      index('idx_uploads_created_by_user_id')
+        .on(table.created_by_user_id)
+        .where(sql`${table.created_by_user_id} IS NOT NULL`),
       uniqueIndex('idx_uploads_public_id').on(table.public_id),
       index('idx_uploads_user_id').on(table.user_id),
       index('idx_uploads_organization_id')
