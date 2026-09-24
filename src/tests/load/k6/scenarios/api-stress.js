@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check } from 'k6';
+import { check, sleep } from 'k6';
 import { API_PREFIX, SCENARIOS } from '../helpers/config.js';
 import { authHeaders } from '../helpers/auth.js';
 
@@ -80,6 +80,11 @@ export function apiStress() {
       'tenancy/memberships 2xx or 403': (r) => r.status === 200 || r.status === 403,
     });
   }
+
+  // Think time, as every other authenticated scenario has: 100 VUs then model 100 users. With none,
+  // 100 closed-loop VUs hold more than 90% of the 20-connection pool and the overload guard sheds
+  // most requests with 503 — the guard working, not the API failing its SLO.
+  sleep(1);
 }
 
 export default apiStress;
