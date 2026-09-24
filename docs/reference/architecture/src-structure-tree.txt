@@ -1919,6 +1919,7 @@ src/
     │   │   ├── COMPREHENSIVE-JOURNEY.md
     │   │   ├── README.md
     │   │   ├── check-prereqs.mjs
+    │   │   ├── export-load-test-credentials.sh
     │   │   ├── run-journey.sh
     │   │   └── setup-loadtest.sh
     │   └── load.overview.md
