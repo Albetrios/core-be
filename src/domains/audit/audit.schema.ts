@@ -64,12 +64,9 @@ export const logs = auditSchema
       created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     },
     (table) => [
-      index('idx_audit_logs_org_created').on(table.organization_id, table.created_at),
       index('idx_audit_logs_org_created_id').on(table.organization_id, table.created_at, table.id),
-      index('idx_audit_logs_actor_created').on(table.actor_user_id, table.created_at),
       index('idx_audit_logs_actor_created_id').on(table.actor_user_id, table.created_at, table.id),
       index('idx_audit_logs_resource').on(table.resource_type, table.resource_id, table.created_at),
-      index('idx_audit_logs_created_at').on(table.created_at),
       index('idx_audit_logs_created_id').on(table.created_at, table.id),
       index('idx_audit_logs_severity_created').on(table.severity, table.created_at),
       // sec-D3: partial index covers the FK from auth.users hard-delete; the
@@ -85,7 +82,6 @@ export const logs = auditSchema
       index('idx_audit_logs_actor_api_key_id_created')
         .on(table.actor_api_key_id, table.created_at)
         .where(sql`${table.actor_api_key_id} IS NOT NULL`),
-      index('idx_audit_logs_action_created').on(table.action, table.created_at),
       index('idx_audit_logs_action_created_id').on(table.action, table.created_at, table.id),
       check(
         'chk_audit_severity',

@@ -5,6 +5,7 @@ import {
   varchar,
   boolean,
   timestamp,
+  index,
   uniqueIndex,
   check,
   pgPolicy,
@@ -64,6 +65,11 @@ export const user_notification_preferences = authSchema
         table.notification_type,
         table.channel,
       ),
+      // Backs the organization_id FK for the organization tombstone purge. chk_user_notif_prefs_no_org
+      // keeps new rows NULL, so this stays near-empty. Added by migration 20260923152433.
+      index('idx_user_notification_preferences_organization_id')
+        .on(table.organization_id)
+        .where(sql`${table.organization_id} IS NOT NULL`),
       check(
         'chk_user_notif_prefs_channel',
         sql`${table.channel} IN ('EMAIL', 'SMS', 'WEB_PUSH', 'IN_APP')`,

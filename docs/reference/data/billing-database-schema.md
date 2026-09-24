@@ -27,7 +27,7 @@ For tables **without** tenant RLS, see [system-tables-without-tenant-rls.md](../
 | **Foreign keys** | `created_by_user_id` → `auth.users(id)`; `updated_by_user_id` → `auth.users(id)` (nullable) |
 | **RLS** | **None** — a shared, non-tenant catalog. Both read routes (`GET /billing/plans`, `GET /billing/plans/:plan_id`) are **PUBLIC**; there are no write routes. |
 | **Soft delete** | No `deleted_at` — use `is_active` |
-| **Notable indexes** | `idx_plans_public_id`, `idx_plans_name`, `idx_plans_active` |
+| **Notable indexes** | `idx_plans_public_id`, `idx_plans_name`, `idx_plans_active_price` |
 | **Drizzle** | [`plan.schema.ts`](../../../src/domains/billing/sub-domains/plan/plan.schema.ts) |
 
 ---

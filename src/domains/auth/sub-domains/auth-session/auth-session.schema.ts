@@ -59,6 +59,12 @@ export const sessions = authSchema
       index('idx_sessions_refresh_token_hash')
         .on(table.refresh_token_hash)
         .where(sql`${table.refresh_token_hash} IS NOT NULL`),
+      // Backs the organization_id FK: purging an organization runs `SET NULL ... WHERE
+      // organization_id = $1` here, a full scan per purged organization without it. Added by
+      // migration 20260923152433.
+      index('idx_sessions_organization_id')
+        .on(table.organization_id)
+        .where(sql`${table.organization_id} IS NOT NULL`),
       check('chk_sessions_expires', sql`${table.expires_at} > ${table.created_at}`),
       check('chk_sessions_last_active', sql`${table.last_active_at} >= ${table.created_at}`),
       pgPolicy('sessions_user_access', {

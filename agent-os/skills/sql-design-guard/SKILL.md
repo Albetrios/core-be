@@ -133,7 +133,11 @@ When reviewing a schema, apply these rules and **output the suggested indexes as
 
 #### D.1 Foreign key indexes (mandatory)
 
-Every FK column **must** have an index. Name: `idx_<table>_<column>`.
+Every FK column **must** have an index its ON DELETE / ON UPDATE action can use. Name: `idx_<table>_<column>`. The action runs `... WHERE <fk column> = $1` on the child once per deleted parent row, so without a usable index every tombstone purge scans the whole child table per purged row.
+
+- The FK column(s) must **lead** the index — a composite `(organization_id, created_at, id)` covers `organization_id`.
+- A **partial** index counts only when its predicate is `<column> IS NOT NULL` (the right shape for nullable FKs such as `*_by_user_id`). Any other predicate — e.g. `WHERE revoked_at IS NULL` — cannot serve the action, which must reach every row.
+- Gated against the migrated catalog by `src/tests/integration/database/index-hygiene.integration.test.ts`.
 
 ```sql
 CREATE INDEX idx_webhook_delivery_attempts_webhook_id ON notify.webhook_delivery_attempts(webhook_id);
@@ -169,6 +173,8 @@ Name: `idx_<table>_<col1>_<col2>`.
 ```sql
 CREATE INDEX idx_subscriptions_organization_status ON billing.subscriptions(organization_id, status);
 ```
+
+When a new composite index extends an existing one — e.g. adding `id` as a keyset tie-breaker to `(organization_id, created_at)` — **drop the shorter index in the same migration**. A B-tree whose columns (with matching sort order and collation) lead another index is redundant: the longer one serves every lookup, range and ordering it can, so the shorter one only costs writes. The same index-hygiene gate fails on any plain, non-unique index that is a leading prefix or duplicate of another.
 
 #### D.4 Partial indexes
 

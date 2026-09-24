@@ -38,7 +38,6 @@ export const user_data_exports = authSchema
       updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     },
     (table) => [
-      index('idx_user_data_exports_user_id').on(table.user_id),
       index('idx_user_data_exports_user_id_status').on(table.user_id, table.status),
       uniqueIndex('idx_user_data_exports_user_pending')
         .on(table.user_id)
