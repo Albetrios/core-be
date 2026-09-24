@@ -19,6 +19,15 @@ the background and the gate waits for readiness only when needed. First boot is 
 provisions an analysis token into `.env.local` (gitignored); after that a scan is ~60–90s.
 `pnpm sonar:up` starts only SonarQube, and the pre-commit gate auto-starts it if it is down.
 
+The scanner runs with **`sonar.scm.disabled=true`** (set in `docker-compose.sonar.yml`). The gate
+fails on any open issue, so blame and new-code data never change its verdict — and the scanner's git
+reader (JGit) crashes with `Bare Repository has neither a working tree, nor an index` on a checkout
+whose shared `.git/config` sets `core.bare = true` with per-worktree overrides
+(`extensions.worktreeConfig`), a layout git itself handles. The analysis token reaches the scanner
+**only** through the `SONAR_TOKEN` environment variable: passing it again as `-Dsonar.token` made the
+scanner log both values in plain text ("Property 'sonar.token' … is overridden with value …") on
+every pre-commit run.
+
 ### Sharing port 9000 with core-fe
 
 Both repos use `localhost:9000` — **one server, two projects** (`core-be` and `core-fe` appear
