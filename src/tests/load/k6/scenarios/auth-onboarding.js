@@ -64,12 +64,20 @@ export function authOnboarding() {
   sleep(0.5);
 
   // Step 3: List organizations
-  const orgsResponse = http.get(`${API_PREFIX}/users/me/organizations`, {
+  const organizationsResponse = http.get(`${API_PREFIX}/users/me/organizations`, {
     headers: authHeaders,
-    tags: { name: 'auth-list-orgs' },
+    tags: { name: 'auth-list-organizations' },
   });
-  checkStatus(orgsResponse, 200, 'list-orgs');
-  checkResponseTime(orgsResponse, 500, 'list-orgs');
+  checkStatus(organizationsResponse, 200, 'list-organizations');
+  checkResponseTime(organizationsResponse, 500, 'list-organizations');
+
+  // Log out, so repeated logins leave no sessions behind: past MAX_ACTIVE_SESSIONS_PER_USER (30),
+  // every login revokes the user's oldest session — the shared TEST_TOKEN's included.
+  const logoutResponse = http.post(`${API_PREFIX}/auth/logout`, null, {
+    headers: { Authorization: `Bearer ${token}` },
+    tags: { name: 'auth-logout' },
+  });
+  checkStatus(logoutResponse, 200, 'logout');
 
   sleep(1);
 }

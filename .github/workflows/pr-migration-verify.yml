@@ -70,7 +70,6 @@ jobs:
       DATABASE_URL: postgresql://core:core@localhost:5432/core
       REDIS_URL: redis://localhost:6379
       ALLOWED_ORIGINS: http://localhost:3000
-      DATABASE_SSL_ENABLED: 'false'
 
     steps:
       - name: Checkout

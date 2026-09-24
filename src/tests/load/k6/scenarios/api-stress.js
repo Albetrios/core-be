@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check } from 'k6';
+import { check, sleep } from 'k6';
 import { API_PREFIX, SCENARIOS } from '../helpers/config.js';
 import { authHeaders } from '../helpers/auth.js';
 
@@ -31,7 +31,7 @@ export const options = {
     http_reqs: ['rate>5'],
     http_req_duration: ['p(95)<500', 'p(99)<1000'],
     'http_req_duration{name:users-me}': ['p(95)<500'],
-    'http_req_duration{name:tenancy-organizations}': ['p(95)<500'],
+    'http_req_duration{name:my-organizations}': ['p(95)<500'],
     'http_req_duration{name:notify-notifications}': ['p(95)<500'],
     'http_req_duration{name:notify-unread-count}': ['p(95)<500'],
     'http_req_duration{name:tenancy-memberships}': ['p(95)<500'],
@@ -80,6 +80,13 @@ export function apiStress() {
       'tenancy/memberships 2xx or 403': (r) => r.status === 200 || r.status === 403,
     });
   }
+
+  // Think time, as every other authenticated scenario has, so 100 VUs model 100 users. With none,
+  // 100 closed-loop VUs keep more than 90% of the 20-connection pool checked out and the overload
+  // guard sheds most requests with 503 — the guard working, not the API failing its SLO. Jittered
+  // (mean 1 s): a fixed sleep marches every VU in lockstep, and those synchronized bursts trip the
+  // same pool trigger at under 200 req/s, a traffic shape real users never produce.
+  sleep(0.5 + Math.random());
 }
 
 export default apiStress;

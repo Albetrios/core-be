@@ -1,5 +1,5 @@
 # Nightly k6 load tests against an ephemeral API (Postgres + Redis).
-# Gate: health-stress + api-stress (SLO thresholds). Informational: auth, daily-ops, billing, webhooks, admin, org-scoped routes (incl. rls-concurrency-beyond-pool).
+# Gate: health-stress, api-stress, login-smoke, permission-cached, stripe-webhook-ingest, idempotency-storm (SLO thresholds). Informational: auth, daily-ops, billing, webhooks, admin, org-scoped routes (incl. rls-concurrency-beyond-pool).
 # Secrets (optional email): RESEND_API_KEY, TEST_RESULT_EMAIL_TO
 name: Scheduled k6 API load & SLO
 
@@ -65,6 +65,18 @@ jobs:
       # Test-run gate: lets /auth/email/send-code echo debug_verification_code so the
       # passwordless-signup scenario can complete. A refine forbids TEST_MODE=true in production.
       TEST_MODE: 'true'
+      # Every k6 request comes from one source IP, so the tight per-route caps (login, webhook)
+      # would answer 429 instead of measuring the route; the Vitest harness relaxes them the same
+      # way. A refine forbids RATE_LIMIT_RELAXED_CAPS=true in production.
+      RATE_LIMIT_RELAXED_CAPS: 'true'
+      # CI-only fixture, the one the Vitest harness uses. The webhook route answers 503 until a
+      # secret is configured, and stripe-webhook-ingest asserts the 400 for a missing signature.
+      STRIPE_WEBHOOK_SECRET: whsec_test_contract_fixture_secret_minimum_length_32_chars_xx
+      # CI-only fixtures, the Vitest harness's. /auth/email/send-code answers 503 until email is
+      # configured, which failed every passwordless-signup request. Mail only lands in the outbox —
+      # this job runs no worker — so nothing is sent. The results-email step keeps its own secret.
+      RESEND_API_KEY: re_test_contract_fixture_key
+      EMAIL_FROM_ADDRESS: noreply@example.com
 
     steps:
       - name: Checkout
@@ -75,9 +87,13 @@ jobs:
 
       - name: Export shared CI test env (JWT keys + retention + secrets-encryption)
         uses: ./.github/actions/test-env
+        # The global limiter keeps running, so its cost is measured, but never rejects the one k6
+        # source IP: the schema caps RATE_LIMIT_MAX at 100000, and a 1 s window makes that 100k req/s
+        # (the local load rig's setting). At 10000 per minute, api-stress had 97% of its requests
+        # answered 429 and starved the scenarios after it.
         with:
-          rate-limit-max: '10000'
-          rate-limit-window-ms: '60000'
+          rate-limit-max: '100000'
+          rate-limit-window-ms: '1000'
 
       - name: Setup k6
         uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
@@ -91,40 +107,11 @@ jobs:
       - name: Start API server
         uses: ./.github/actions/start-api-server
         with:
-          rate-limit-max: '10000'
+          rate-limit-max: '100000'
           ready-timeout-seconds: '80'
 
       - name: Export load-test credentials and admin token
-        run: |
-          set -euo pipefail
-          CREDS_OUT="$(pnpm tool:load-test-credentials 2>&1)"
-          echo "$CREDS_OUT"
-          TOKEN="$(echo "$CREDS_OUT" | sed -n 's/^export TEST_TOKEN="\([^"]*\)"/\1/p')"
-          ORGANIZATION_PUBLIC_ID="$(echo "$CREDS_OUT" | sed -n 's/^export TEST_ORG_ID="\([^"]*\)"/\1/p')"
-          if [ -z "$TOKEN" ] || [ -z "$ORGANIZATION_PUBLIC_ID" ]; then
-            echo "::error::Could not parse TEST_TOKEN or TEST_ORG_ID from tool:load-test-credentials"
-            exit 1
-          fi
-          {
-            echo "TEST_TOKEN<<EOF_TEST_TOKEN"
-            echo "$TOKEN"
-            echo "EOF_TEST_TOKEN"
-            echo "TEST_ORG_ID<<EOF_TEST_ORG_ID"
-            echo "$ORGANIZATION_PUBLIC_ID"
-            echo "EOF_TEST_ORG_ID"
-          } >> "$GITHUB_ENV"
-          ADMIN_OUT="$(pnpm tool:admin-token 2>&1)"
-          echo "$ADMIN_OUT"
-          ADMIN_TOKEN_VALUE="$(echo "$ADMIN_OUT" | sed -n 's/^export ADMIN_TOKEN="\([^"]*\)"/\1/p')"
-          if [ -z "$ADMIN_TOKEN_VALUE" ]; then
-            echo "::error::Could not parse ADMIN_TOKEN from tool:admin-token"
-            exit 1
-          fi
-          {
-            echo "ADMIN_TOKEN<<EOF_ADMIN_TOKEN"
-            echo "$ADMIN_TOKEN_VALUE"
-            echo "EOF_ADMIN_TOKEN"
-          } >> "$GITHUB_ENV"
+        run: bash src/tests/load/k6/export-load-test-credentials.sh
 
       - name: Gate — health stress + API stress (k6 SLO)
         id: gate
@@ -138,8 +125,14 @@ jobs:
           k6 run --summary-export=k6-stripe-webhook-ingest.json src/tests/load/k6/scenarios/stripe-webhook-ingest.js
           k6 run --summary-export=k6-idempotency-storm.json src/tests/load/k6/scenarios/idempotency-storm.js
 
+      - name: Refresh load-test credentials (before the informational scenarios)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        # Access tokens live 15 minutes; the block below would outlast one minted earlier.
+        run: bash src/tests/load/k6/export-load-test-credentials.sh
+
       - name: k6 auth-onboarding (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: >
           k6 run --summary-export=k6-auth-onboarding.json src/tests/load/k6/scenarios/auth-onboarding.js
@@ -148,42 +141,52 @@ jobs:
           DEMO_PASSWORD: DemoPassword123!
 
       - name: k6 passwordless-signup (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         # Relies on TEST_MODE=true (job env) so /auth/email/send-code echoes debug_verification_code.
         run: >
           k6 run --summary-export=k6-passwordless-signup.json src/tests/load/k6/scenarios/passwordless-signup.js
 
       - name: k6 daily-ops (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: k6 run --summary-export=k6-daily-ops.json src/tests/load/k6/scenarios/daily-ops.js
 
       - name: k6 billing (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: k6 run --summary-export=k6-billing.json src/tests/load/k6/scenarios/billing.js
 
       - name: k6 webhooks (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: k6 run --summary-export=k6-webhooks.json src/tests/load/k6/scenarios/webhooks.js
 
       - name: k6 admin (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: k6 run --summary-export=k6-admin.json src/tests/load/k6/scenarios/admin.js
 
-      - name: k6 org-scoped routes (informational)
-        if: always()
+      - name: Refresh load-test credentials (before the organization-scoped scenarios)
+        if: ${{ !cancelled() }}
         continue-on-error: true
+        # Access tokens live 15 minutes; the block below would outlast one minted earlier.
+        run: bash src/tests/load/k6/export-load-test-credentials.sh
+
+      - name: k6 org-scoped routes (informational)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        # Every scenario runs even when an earlier one fails (bash -e stopped the block at the first
+        # failure, so the rest never ran); the step still fails when any of them did.
         run: |
-          k6 run --summary-export=k6-audit-list.json src/tests/load/k6/scenarios/audit-list.js
-          k6 run --summary-export=k6-org-membership-list.json src/tests/load/k6/scenarios/org-membership-list.js
-          k6 run --summary-export=k6-notification-policy.json src/tests/load/k6/scenarios/notification-policy-crud.js
-          k6 run --summary-export=k6-billing-subscriptions-rls.json src/tests/load/k6/scenarios/billing-subscriptions-rls.js
-          k6 run --summary-export=k6-user-data-export.json src/tests/load/k6/scenarios/user-data-export.js
-          k6 run --summary-export=k6-rls-concurrency.json src/tests/load/k6/scenarios/rls-concurrency-beyond-pool.js
+          failed=0
+          k6 run --summary-export=k6-audit-list.json src/tests/load/k6/scenarios/audit-list.js || failed=1
+          k6 run --summary-export=k6-org-membership-list.json src/tests/load/k6/scenarios/org-membership-list.js || failed=1
+          k6 run --summary-export=k6-notification-policy.json src/tests/load/k6/scenarios/notification-policy-crud.js || failed=1
+          k6 run --summary-export=k6-billing-subscriptions-rls.json src/tests/load/k6/scenarios/billing-subscriptions-rls.js || failed=1
+          k6 run --summary-export=k6-user-data-export.json src/tests/load/k6/scenarios/user-data-export.js || failed=1
+          k6 run --summary-export=k6-rls-concurrency.json src/tests/load/k6/scenarios/rls-concurrency-beyond-pool.js || failed=1
+          exit "$failed"
         env:
           ADMIN_TOKEN: ${{ env.ADMIN_TOKEN }}
           TEST_TOKEN: ${{ env.TEST_TOKEN }}
@@ -200,14 +203,23 @@ jobs:
           retention-days: 14
 
       - name: Send load-test results email (from k6 summaries)
-        if: always() && env.RESEND_API_KEY != '' && env.TEST_RESULT_EMAIL_TO != ''
+        # A step's own `env:` is not visible to its `if:` (evaluated first), so the former
+        # `env.RESEND_API_KEY != ''` read the job env — where the secret never is — and the
+        # email never went out. The check lives in the script instead; the secrets must not move
+        # to the job env, or the API server under load would send real email.
+        if: always()
         continue-on-error: true
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           TEST_RESULT_EMAIL_TO: ${{ secrets.TEST_RESULT_EMAIL_TO }}
           BASE_URL: http://localhost:3000
           K6_USE_SUMMARIES: '1'
-        run: pnpm tool:send-load-test-results-email
+        run: |
+          if [ -z "$RESEND_API_KEY" ] || [ -z "$TEST_RESULT_EMAIL_TO" ]; then
+            echo "RESEND_API_KEY or TEST_RESULT_EMAIL_TO is not set — skipping the results email."
+            exit 0
+          fi
+          pnpm tool:send-load-test-results-email
 
       - name: Stop API server
         if: always()
@@ -216,5 +228,75 @@ jobs:
       - name: Enforce gate success (SLO)
         if: always() && (steps.gate.outcome == 'failure' || steps.gate.outcome == 'cancelled')
         run: |
-          echo "::error::k6 gate failed — health-stress or api-stress breached SLO thresholds."
+          echo "::error::k6 gate failed — a gate scenario breached its SLO thresholds (read the Gate step for which)."
           exit 1
+
+  resolve-success:
+    name: Close ci-failure issue
+    needs: [k6]
+    # Only the nightly run speaks for main — a manual dispatch tests whatever ref it was started
+    # on, feature branches included.
+    if: always() && github.event_name == 'schedule' && needs.k6.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Close the open ci-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Nightly k6 load SLO failing"
+          existing="$(gh issue list --repo "$GH_REPOSITORY" --state open --label ci-failure \
+            --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            echo "No open ci-failure issue to close."
+            exit 0
+          fi
+          gh issue close "$existing" --repo "$GH_REPOSITORY" \
+            --comment "The nightly k6 run is green again on main — closing automatically. Run: ${WORKFLOW_URL}"
+          echo "Closed ci-failure issue #${existing}."
+
+  notify-failure:
+    name: Notify failure
+    needs: [k6]
+    if: always() && github.event_name == 'schedule' && needs.k6.result == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update ci-failure issue
+        # This run was red every night from its first one — it never got past the seed step — and
+        # nothing said so. An issue produces a real notification; repeats collect as comments.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh label create ci-failure --repo "$GH_REPOSITORY" \
+            --color D93F0B --description "Automated post-merge/guard failure notification" \
+            2>/dev/null || true
+          title="Nightly k6 load SLO failing"
+          body="$(printf '%s\n' \
+            "Run: ${WORKFLOW_URL}" \
+            "" \
+            "The nightly k6 run on main is red: a gate scenario breached its SLO thresholds, or the" \
+            "run never reached k6 (migrate, seed or API boot failed — read the step list first)." \
+            "" \
+            "The k6-load-test-artifacts upload holds every k6-*.json summary and server.log." \
+            "Reproduce: docs/reference/testing/load-testing.md. The next green nightly closes this issue.")"
+          existing="$(gh issue list --repo "$GH_REPOSITORY" --state open --label ci-failure \
+            --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GH_REPOSITORY" --body "$body"
+            echo "Commented on existing ci-failure issue #${existing}."
+          else
+            gh issue create --repo "$GH_REPOSITORY" --title "$title" --label ci-failure --body "$body"
+          fi

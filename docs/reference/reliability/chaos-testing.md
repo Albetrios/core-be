@@ -38,10 +38,11 @@ via a GitHub Actions service container (see below), so this local build affects 
 
 ## Continuous integration
 
-The **Post-merge CI / Chaos** job in [`.github/workflows/post-merge-ci.yml`](../../../.github/workflows/post-merge-ci.yml) (push to `main` or `dev` when source code changed):
+The weekly [`scheduled-chaos.yml`](../../../.github/workflows/scheduled-chaos.yml) run (Sundays 03:00 UTC, and on demand) calls [`reusable-chaos-toxiproxy.yml`](../../../.github/workflows/reusable-chaos-toxiproxy.yml) against the current `main` — whichever ref dispatches it:
 
-- Runs after merge alongside the integration, Docker, SBOM, and API docs jobs.
 - Executes `pnpm chaos:provision`, `pnpm db:migrate` against proxied `DATABASE_URL`, then `pnpm test:chaos`.
+- The CI Postgres is plaintext while the schema default is TLS on, so the shared `test-env` action exports `DATABASE_SSL_ENABLED=false`. Without it every test dies in setup within milliseconds (`Client network socket disconnected before secure TLS connection was established`), which kept this suite red on every run from its first one.
+- A red run opens (or comments on) a `ci-failure` issue titled *Weekly chaos suite failing*; the next green run closes it.
 
 Upstream addresses inside the proxy container default to `postgres:5432` and `redis:6379`; override
 through `CHAOS_TOXIPROXY_POSTGRES_UPSTREAM` / `CHAOS_TOXIPROXY_REDIS_UPSTREAM` only when your Docker

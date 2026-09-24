@@ -318,7 +318,6 @@ jobs:
         env:
           DATABASE_URL: postgresql://core:core@localhost:5432/core
           REDIS_URL: redis://localhost:6379
-          DATABASE_SSL_ENABLED: 'false'
         run: |
           set -euo pipefail
           docker run --rm --network host \

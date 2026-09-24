@@ -53,6 +53,15 @@ export function loginSmoke() {
   checkStatus(meResponse, 200, 'users-me');
   checkResponseTime(meResponse, 500, 'users-me');
 
+  // Log out, so repeated logins leave no sessions behind: past MAX_ACTIVE_SESSIONS_PER_USER (30),
+  // every login revokes the user's oldest session — the shared TEST_TOKEN's included, which
+  // failed every scenario that ran after this one.
+  const logoutResponse = http.post(`${API_PREFIX}/auth/logout`, null, {
+    headers: { Authorization: `Bearer ${token}` },
+    tags: { name: 'login-smoke-logout' },
+  });
+  checkStatus(logoutResponse, 200, 'logout');
+
   sleep(0.5);
 }
 

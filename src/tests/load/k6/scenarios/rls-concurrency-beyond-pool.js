@@ -2,7 +2,7 @@ import http from 'k6/http';
 import { sleep } from 'k6';
 import { API_PREFIX } from '../helpers/config.js';
 import { checkOk, checkResponseTime } from '../helpers/checks.js';
-import { authHeaders, switchToOrganization } from '../helpers/auth.js';
+import { authHeaders } from '../helpers/auth.js';
 
 /**
  * RLS concurrency-beyond-pool scenario.
@@ -49,13 +49,13 @@ export const options = {
 };
 
 export function rlsConcurrencyBeyondPool() {
-  let token = __ENV.TEST_TOKEN;
+  const token = __ENV.TEST_TOKEN;
   const organizationPublicId = __ENV.TEST_ORG_ID;
   if (!(token && organizationPublicId)) return;
 
-  // The active organization rides the token's `org` claim — scope the token to TEST_ORG_ID
-  // so the flat RLS route resolves the right organization.
-  token = switchToOrganization(token, organizationPublicId) || token;
+  // TEST_TOKEN arrives already scoped to TEST_ORG_ID (tool:load-test-credentials). Never switch it
+  // here: a switch re-binds the shared session to the new token, which revokes TEST_TOKEN for every
+  // other VU and every later scenario.
 
   const response = http.get(`${API_PREFIX}/tenancy/organization/memberships`, {
     ...authHeaders(token),

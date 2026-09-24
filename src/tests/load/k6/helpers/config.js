@@ -7,7 +7,10 @@ export const API_PREFIX = `${BASE_URL}/api/v1`;
 export const THRESHOLDS = {
   http_req_duration: ['p(95)<500', 'p(99)<1000'],
   http_req_failed: ['rate<0.01'], // Less than 1% failure rate
-  http_reqs: ['rate>10'], // At least 10 requests/second
+  // No shared throughput floor: in a closed-loop scenario with think time, the request rate just
+  // restates the pacing (webhooks and billing-subscriptions-rls failed a rate>10 floor at 9–10/s on
+  // healthy runs). Latency and failure rate catch a slow server; a scenario that measures
+  // throughput (api-stress) sets its own http_reqs threshold.
 };
 
 export const SMOKE_THRESHOLDS = {

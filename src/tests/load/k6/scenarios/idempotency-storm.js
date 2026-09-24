@@ -1,8 +1,7 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
-import { API_PREFIX, SCENARIOS, SMOKE_THRESHOLDS } from '../helpers/config.js';
+import { API_PREFIX, SMOKE_THRESHOLDS } from '../helpers/config.js';
 import { checkStatus } from '../helpers/checks.js';
-import { switchToOrganization } from '../helpers/auth.js';
 
 /**
  * Hammer an idempotency-protected route with the same key (expect 409 or 422 on duplicates).
@@ -10,10 +9,13 @@ import { switchToOrganization } from '../helpers/auth.js';
 export const options = {
   scenarios: {
     idempotencyStorm: {
-      ...SCENARIOS.smoke,
+      // 20 requests shared by 5 VUs. `constant-vus` (the smoke profile) takes no `iterations`,
+      // and k6 2 refuses to load a scenario with an unknown field.
+      executor: 'shared-iterations',
       exec: 'idempotencyStorm',
       vus: 5,
       iterations: 20,
+      maxDuration: '30s',
     },
   },
   thresholds: {
@@ -22,22 +24,35 @@ export const options = {
   },
 };
 
-export function idempotencyStorm() {
-  let token = __ENV.TEST_TOKEN;
+/**
+ * The subscribe body needs a real plan id — seeded ids are generated, and the body schema is strict
+ * (`plan_id`, `billing_cycle`). Plans are public, so read the Free plan once for every VU.
+ */
+export function setup() {
+  const response = http.get(`${API_PREFIX}/billing/plans`, {
+    tags: { name: 'idempotency-storm-plans' },
+  });
+  const plans = response.status === 200 ? (JSON.parse(response.body).data ?? []) : [];
+  const plan = plans.find((candidate) => candidate.name === 'Free') ?? plans[0];
+  return { planId: plan?.id ?? null };
+}
+
+export function idempotencyStorm(data) {
+  const token = __ENV.TEST_TOKEN;
   const organizationPublicId = __ENV.TEST_ORG_ID;
-  if (!(token && organizationPublicId)) {
+  if (!(token && organizationPublicId && data?.planId)) {
     sleep(1);
     return;
   }
 
-  // The active organization rides the token's `org` claim — scope the token to TEST_ORG_ID
-  // so the flat route resolves the right organization.
-  token = switchToOrganization(token, organizationPublicId) || token;
+  // TEST_TOKEN arrives already scoped to TEST_ORG_ID (tool:load-test-credentials). Never switch it
+  // here: a switch re-binds the shared session to the new token, which revokes TEST_TOKEN for every
+  // other VU and every later scenario.
 
   const idempotencyKey = `k6-storm-${organizationPublicId}`;
   const response = http.post(
     `${API_PREFIX}/billing/subscriptions`,
-    JSON.stringify({ plan_public_id: 'plan_free', billing_cycle: 'monthly' }),
+    JSON.stringify({ plan_id: data.planId, billing_cycle: 'monthly' }),
     {
       headers: {
         Authorization: `Bearer ${token}`,
