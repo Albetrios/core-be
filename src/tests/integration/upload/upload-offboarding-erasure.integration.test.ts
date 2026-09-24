@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sql } from '@/infrastructure/database/connection.js';
+import { getOperatorSql } from '@/tests/helpers/operator-database.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { UploadRepository } from '@/domains/upload/upload.repository.js';
 import { UploadService } from '@/domains/upload/upload.service.js';
@@ -33,13 +33,13 @@ type Seeded = { userId: number; organizationId: number };
 
 async function seed(): Promise<Seeded> {
   const email = 'offboarding-erasure@example.test';
-  const [user] = await sql<{ id: number }[]>`
+  const [user] = await getOperatorSql()<{ id: number }[]>`
     INSERT INTO auth.users (public_id, email, email_hash, is_email_verified)
     VALUES ('usr_offboarderasureuser1', ${email},
             ${createHash('sha256').update(email).digest('hex')}, true)
     RETURNING id
   `;
-  const [organization] = await sql<{ id: number }[]>`
+  const [organization] = await getOperatorSql()<{ id: number }[]>`
     INSERT INTO tenancy.organizations (public_id, name, slug, owner_user_id, type)
     VALUES ('org_offboarderasureorg01', 'Offboard Erasure', 'offboard-erasure', ${user!.id}, 'TEAM')
     RETURNING id
@@ -50,7 +50,7 @@ async function seed(): Promise<Seeded> {
   // Two organization-scoped uploads and two personal ones — the two policy arms are disjoint,
   // so a sweep that can only see one of them is still a failure.
   for (const [index, orgId] of [organizationId, organizationId, null, null].entries()) {
-    await sql`
+    await getOperatorSql()`
       INSERT INTO upload.uploads
         (public_id, user_id, organization_id, file_name, file_key, mime_type, file_size, bucket, status)
       VALUES (${`upl_offboarderasure${String(index).padStart(5, '0')}`}, ${userId}, ${orgId},
@@ -61,7 +61,7 @@ async function seed(): Promise<Seeded> {
 }
 
 async function countLiveUploads(): Promise<number> {
-  const [row] = await sql<{ count: number }[]>`
+  const [row] = await getOperatorSql()<{ count: number }[]>`
     SELECT count(*)::int AS count FROM upload.uploads WHERE deleted_at IS NULL
   `;
   return Number(row!.count);

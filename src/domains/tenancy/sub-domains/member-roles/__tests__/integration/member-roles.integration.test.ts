@@ -24,7 +24,7 @@ import {
 } from '@/domains/tenancy/sub-domains/organization/organization-provisioning.js';
 import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.schema.js';
 import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.schema.js';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import enErrors from '@/shared/locales/en/errors.json' with { type: 'json' };
 import type { FastifyInstance } from 'fastify';
@@ -114,7 +114,7 @@ describe('Member Roles Sub-Domain — Integration', () => {
 
       // Provisioning seeds: Owner (with the owner's ACTIVE membership) + Admin/Member/Viewer
       // (no members). Assign a second ACTIVE member to Admin so it also counts 1.
-      const [adminRole] = await database
+      const [adminRole] = await getOperatorDatabase()
         .select({ id: roles.id })
         .from(roles)
         .where(and(eq(roles.organization_id, team.organization.id), eq(roles.name, 'Admin')));
@@ -231,13 +231,13 @@ describe('Member Roles Sub-Domain — Integration', () => {
 
       expect(response.statusCode).toBe(200);
 
-      const [roleRow] = await database
+      const [roleRow] = await getOperatorDatabase()
         .select({ id: roles.id })
         .from(roles)
         .where(and(eq(roles.organization_id, organization.id), eq(roles.name, roleName)));
       expect(roleRow).toBeDefined();
 
-      const grants = await database
+      const grants = await getOperatorDatabase()
         .select({ code: role_permissions.permission_code })
         .from(role_permissions)
         .where(eq(role_permissions.role_id, roleRow!.id));
@@ -261,7 +261,7 @@ describe('Member Roles Sub-Domain — Integration', () => {
       expect(response.statusCode).toBe(403);
 
       // Atomic: the whole create rolled back — no role by that name exists.
-      const rows = await database
+      const rows = await getOperatorDatabase()
         .select({ name: roles.name })
         .from(roles)
         .where(and(eq(roles.organization_id, organization.id), eq(roles.name, roleName)));
@@ -285,7 +285,7 @@ describe('Member Roles Sub-Domain — Integration', () => {
     }
 
     async function countRoles(organizationId: number): Promise<number> {
-      const [row] = await database
+      const [row] = await getOperatorDatabase()
         .select({ value: count() })
         .from(roles)
         .where(and(eq(roles.organization_id, organizationId), isNull(roles.deleted_at)));

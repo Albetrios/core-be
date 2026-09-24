@@ -4,7 +4,8 @@ import { eq } from 'drizzle-orm';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { withTransaction } from '@/infrastructure/database/transaction.js';
-import { database } from '@/infrastructure/database/connection.js';
+import type { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { users } from '@/domains/user/user.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -17,7 +18,11 @@ function buildUserInsert(email: string) {
   };
 }
 
-describe('Integration: transaction rollback on error', () => {
+// Skipped under `pnpm test:rls-role`: this suite uses `auth.users` as a scratch table to test `withTransaction` semantics, which do not depend on RLS, so running it as the RLS-subject
+// `core_be_app` would assert nothing about whether the application obeys RLS.
+const runAsApplicationBehaviour = !process.env.TEST_DATABASE_ROLE;
+
+describe.runIf(runAsApplicationBehaviour)('Integration: transaction rollback on error', () => {
   beforeEach(async () => {
     await cleanupDatabase();
   });
@@ -35,13 +40,16 @@ describe('Integration: transaction rollback on error', () => {
       }),
     ).rejects.toThrow('Simulated failure');
 
-    const rolledBackRows = await database
+    const rolledBackRows = await getOperatorDatabase()
       .select()
       .from(users)
       .where(eq(users.email, rolledBackEmail));
     expect(rolledBackRows).toHaveLength(0);
 
-    const seedRows = await database.select().from(users).where(eq(users.email, seedEmail));
+    const seedRows = await getOperatorDatabase()
+      .select()
+      .from(users)
+      .where(eq(users.email, seedEmail));
     expect(seedRows).toHaveLength(1);
   });
 
@@ -53,7 +61,7 @@ describe('Integration: transaction rollback on error', () => {
       await databaseHandle.insert(users).values(buildUserInsert(committedEmail));
     });
 
-    const committedRows = await database
+    const committedRows = await getOperatorDatabase()
       .select()
       .from(users)
       .where(eq(users.email, committedEmail));

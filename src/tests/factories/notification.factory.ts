@@ -1,4 +1,4 @@
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { notifications } from '@/domains/notify/sub-domains/notification/notification.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -15,7 +15,7 @@ export interface CreateNotificationOptions {
  */
 export async function createTestNotification(options: CreateNotificationOptions) {
   const publicId = generatePublicId('notification');
-  const [notification] = await database
+  const [notification] = await getOperatorDatabase()
     .insert(notifications)
     .values({
       public_id: publicId,

@@ -11,7 +11,7 @@ import {
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { generateTestToken } from '@/tests/helpers/test-auth.js';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { uploads } from '@/domains/upload/upload.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import { eq } from 'drizzle-orm';
@@ -46,7 +46,7 @@ describe('Upload Domain — Integration', () => {
   ): Promise<{ id: number; publicId: string; fileKey: string }> {
     const publicId = generatePublicId('upload');
     const fileKey = `avatars/${publicId}/verified.png`;
-    const [seeded] = await database
+    const [seeded] = await getOperatorDatabase()
       .insert(uploads)
       .values({
         public_id: publicId,
@@ -239,7 +239,10 @@ describe('Upload Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(200);
 
-      const [postCall] = await database.select().from(uploads).where(eq(uploads.id, id));
+      const [postCall] = await getOperatorDatabase()
+        .select()
+        .from(uploads)
+        .where(eq(uploads.id, id));
       expect(postCall!.status).toBe('UPLOADED');
     });
   });
@@ -319,7 +322,10 @@ describe('Upload Domain — Integration', () => {
       const idOf = (raw: string): string => (JSON.parse(raw) as { data: { id: string } }).data.id;
       // A replay would return the first id byte-for-byte; a fresh execution mints a new row.
       expect(idOf(second.body)).not.toBe(idOf(first.body));
-      const rows = await database.select().from(uploads).where(eq(uploads.user_id, user.id));
+      const rows = await getOperatorDatabase()
+        .select()
+        .from(uploads)
+        .where(eq(uploads.user_id, user.id));
       expect(rows).toHaveLength(2);
     });
 
