@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { redisConnection } from '@/infrastructure/cache/redis.client.js';
 import { notifications } from '@/domains/notify/sub-domains/notification/notification.schema.js';
 import { createTestApp } from '@/tests/helpers/test-app.js';
@@ -202,7 +202,7 @@ describe('Notification unread count — read cache', () => {
     await createTestNotification({ userId: user.id, organizationId: organization.id });
     expect(await readUnreadCount(token, organization.public_id)).toBe(1);
 
-    await database.delete(notifications);
+    await getOperatorDatabase().delete(notifications);
 
     expect(await readUnreadCount(token, organization.public_id)).toBe(1);
   });

@@ -9,7 +9,11 @@ import {
   injectUnauthenticated,
 } from '@/tests/helpers/test-http-inject.helper.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestPlan } from '@/tests/factories/plan.factory.js';
@@ -217,7 +221,7 @@ describe('Membership Sub-Domain — Integration', () => {
       const created = (response.json() as { data: { id: string; status: string } }).data;
       expect(created.status).toBe('INVITED');
 
-      const [row] = await database
+      const [row] = await getOperatorDatabase()
         .select()
         .from(memberships)
         .where(eq(memberships.public_id, created.id));
@@ -398,7 +402,7 @@ describe('Membership Sub-Domain — Integration', () => {
         organizationId: organization.id,
         permissionCodes: [TENANCY_PERMISSIONS.MEMBERSHIP_READ],
       });
-      const [inviteeMembership] = await database
+      const [inviteeMembership] = await getOperatorDatabase()
         .insert(memberships)
         .values({
           public_id: generatePublicId('membership'),
@@ -410,14 +414,22 @@ describe('Membership Sub-Domain — Integration', () => {
         .returning();
       const rawToken = `accept-token-${randomUUID()}`;
       const invitationRepository = new MemberInvitationRepository();
-      const invitation = await invitationRepository.create({
-        membership_id: inviteeMembership!.id,
-        email: invitee.email,
-        token_hash: hashInvitationToken(rawToken),
-        invited_by_user_id: admin.id,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1_000),
-        created_by_user_id: admin.id,
-      });
+      const invitation = await withAppDatabaseContext(
+        // Mirrors `MemberInvitationService`, which always calls this repository inside the
+        // organization context: `tenancy.member_invitations` is FORCE RLS with WITH CHECK
+        // pinned to the active organization, so a context-free create is rejected the moment
+        // the pool under test is RLS-subject.
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization.public_id }),
+        () =>
+          invitationRepository.create({
+            membership_id: inviteeMembership!.id,
+            email: invitee.email,
+            token_hash: hashInvitationToken(rawToken),
+            invited_by_user_id: admin.id,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1_000),
+            created_by_user_id: admin.id,
+          }),
+      );
       return {
         organization,
         token,
@@ -446,7 +458,7 @@ describe('Membership Sub-Domain — Integration', () => {
         (acceptResponse.json() as { data: { organization_id: string } }).data.organization_id,
       ).toBe(organization.public_id);
 
-      const [updated] = await database
+      const [updated] = await getOperatorDatabase()
         .select()
         .from(memberships)
         .where(eq(memberships.id, inviteeMembership.id));
@@ -501,7 +513,7 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(patchResponse.statusCode).toBe(403);
 
-      const [stillInvited] = await database
+      const [stillInvited] = await getOperatorDatabase()
         .select()
         .from(memberships)
         .where(eq(memberships.id, inviteeMembership.id));
@@ -524,7 +536,7 @@ describe('Membership Sub-Domain — Integration', () => {
         organizationId: organization.id,
         permissionCodes: [],
       });
-      const [membership] = await database
+      const [membership] = await getOperatorDatabase()
         .insert(memberships)
         .values({
           public_id: generatePublicId('membership'),
@@ -551,7 +563,7 @@ describe('Membership Sub-Domain — Integration', () => {
       expect(body.data.role_id).toBe(toRole.public_id);
       expect(body.data.role.id).toBe(toRole.public_id);
 
-      const [row] = await database
+      const [row] = await getOperatorDatabase()
         .select()
         .from(memberships)
         .where(eq(memberships.id, membership!.id));
@@ -567,7 +579,7 @@ describe('Membership Sub-Domain — Integration', () => {
         organizationId: organization.id,
         permissionCodes: [TENANCY_PERMISSIONS.MEMBERSHIP_READ],
       });
-      const [inviteeMembership] = await database
+      const [inviteeMembership] = await getOperatorDatabase()
         .insert(memberships)
         .values({
           public_id: generatePublicId('membership'),
@@ -578,14 +590,22 @@ describe('Membership Sub-Domain — Integration', () => {
         })
         .returning();
       const invitationRepository = new MemberInvitationRepository();
-      const invitation = await invitationRepository.create({
-        membership_id: inviteeMembership!.id,
-        email: invitee.email,
-        token_hash: hashInvitationToken(`admin-revoke-token-${randomUUID()}`),
-        invited_by_user_id: admin.id,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1_000),
-        created_by_user_id: admin.id,
-      });
+      const invitation = await withAppDatabaseContext(
+        // Mirrors `MemberInvitationService`, which always calls this repository inside the
+        // organization context: `tenancy.member_invitations` is FORCE RLS with WITH CHECK
+        // pinned to the active organization, so a context-free create is rejected the moment
+        // the pool under test is RLS-subject.
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization.public_id }),
+        () =>
+          invitationRepository.create({
+            membership_id: inviteeMembership!.id,
+            email: invitee.email,
+            token_hash: hashInvitationToken(`admin-revoke-token-${randomUUID()}`),
+            invited_by_user_id: admin.id,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1_000),
+            created_by_user_id: admin.id,
+          }),
+      );
       return { organization, adminToken, invitation, inviteeMembership: inviteeMembership! };
     }
 
@@ -600,7 +620,7 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(204);
 
-      const [revoked] = await database
+      const [revoked] = await getOperatorDatabase()
         .select()
         .from(member_invitations)
         .where(eq(member_invitations.id, invitation.id));
@@ -609,7 +629,7 @@ describe('Membership Sub-Domain — Integration', () => {
 
       // REQ-1/REQ-3: the membership was auto-created by the invite, so revoking removes the invitee
       // entirely (no ghost INVITED row left in the members table).
-      const [softDeleted] = await database
+      const [softDeleted] = await getOperatorDatabase()
         .select()
         .from(memberships)
         .where(eq(memberships.id, inviteeMembership.id));
@@ -631,7 +651,7 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(404);
 
-      const [untouched] = await database
+      const [untouched] = await getOperatorDatabase()
         .select()
         .from(member_invitations)
         .where(eq(member_invitations.id, invitation.id));
@@ -663,7 +683,7 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(403);
 
-      const [stillPending] = await database
+      const [stillPending] = await getOperatorDatabase()
         .select()
         .from(member_invitations)
         .where(eq(member_invitations.id, invitation.id));
@@ -679,7 +699,7 @@ describe('Membership Sub-Domain — Integration', () => {
         organizationId: organization.id,
         permissionCodes: [TENANCY_PERMISSIONS.MEMBERSHIP_READ],
       });
-      const [inviteeMembership] = await database
+      const [inviteeMembership] = await getOperatorDatabase()
         .insert(memberships)
         .values({
           public_id: generatePublicId('membership'),
@@ -691,14 +711,22 @@ describe('Membership Sub-Domain — Integration', () => {
         .returning();
       const invitationRepository = new MemberInvitationRepository();
       const originalTokenHash = hashInvitationToken(`original-token-${randomUUID()}`);
-      const invitation = await invitationRepository.create({
-        membership_id: inviteeMembership!.id,
-        email: invitee.email,
-        token_hash: originalTokenHash,
-        invited_by_user_id: admin.id,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1_000),
-        created_by_user_id: admin.id,
-      });
+      const invitation = await withAppDatabaseContext(
+        // Mirrors `MemberInvitationService`, which always calls this repository inside the
+        // organization context: `tenancy.member_invitations` is FORCE RLS with WITH CHECK
+        // pinned to the active organization, so a context-free create is rejected the moment
+        // the pool under test is RLS-subject.
+        PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organization.public_id }),
+        () =>
+          invitationRepository.create({
+            membership_id: inviteeMembership!.id,
+            email: invitee.email,
+            token_hash: originalTokenHash,
+            invited_by_user_id: admin.id,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1_000),
+            created_by_user_id: admin.id,
+          }),
+      );
       return { organization, adminToken, invitation, originalTokenHash };
     }
 
@@ -717,7 +745,7 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(200);
 
-      const [rotated] = await database
+      const [rotated] = await getOperatorDatabase()
         .select()
         .from(member_invitations)
         .where(eq(member_invitations.id, invitation.id));
@@ -729,7 +757,7 @@ describe('Membership Sub-Domain — Integration', () => {
 
     it('rejects resend on a revoked invitation (400)', async () => {
       const { organization, adminToken, invitation } = await createPendingInvitationForResend();
-      await database
+      await getOperatorDatabase()
         .update(member_invitations)
         .set({ revoked_at: new Date() })
         .where(eq(member_invitations.id, invitation.id));
@@ -789,7 +817,7 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(200);
 
-      const [softDeleted] = await database
+      const [softDeleted] = await getOperatorDatabase()
         .select()
         .from(memberships)
         .where(eq(memberships.id, memberMembership.id));
@@ -821,7 +849,7 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(403);
 
-      const [stillActive] = await database
+      const [stillActive] = await getOperatorDatabase()
         .select()
         .from(memberships)
         .where(eq(memberships.id, ownerMembership.id));
@@ -1060,7 +1088,7 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(200);
 
-      const [updatedOrg] = await database
+      const [updatedOrg] = await getOperatorDatabase()
         .select()
         .from(organizations)
         .where(eq(organizations.id, organization.id));
@@ -1101,7 +1129,7 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(403);
 
-      const [organizationUnchanged] = await database
+      const [organizationUnchanged] = await getOperatorDatabase()
         .select()
         .from(organizations)
         .where(eq(organizations.id, organization.id));
@@ -1151,7 +1179,7 @@ describe('Membership Sub-Domain — Integration', () => {
       });
       expect(response.statusCode).toBe(403);
 
-      const [stillActive] = await database
+      const [stillActive] = await getOperatorDatabase()
         .select()
         .from(memberships)
         .where(eq(memberships.id, ownerMembership.id));
@@ -1194,7 +1222,7 @@ describe('Membership Sub-Domain — Integration', () => {
     }
 
     async function rolePublicId(roleInternalId: number): Promise<string> {
-      const [role] = await database
+      const [role] = await getOperatorDatabase()
         .select()
         .from(roles)
         .where(eq(roles.id, roleInternalId))
@@ -1220,7 +1248,7 @@ describe('Membership Sub-Domain — Integration', () => {
     }
 
     async function countMemberships(organizationId: number): Promise<number> {
-      const [row] = await database
+      const [row] = await getOperatorDatabase()
         .select({ value: count() })
         .from(memberships)
         .where(

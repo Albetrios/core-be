@@ -8,16 +8,20 @@ import { spawnSync } from 'node:child_process';
 export const APPLICATION_DATABASE_ROLE = 'core_be_app';
 
 /**
- * The projects this lane covers today.
+ * The projects this lane covers.
  *
  * @remarks
- * `e2e` is the whole HTTP route surface, which is the part worth proving: it exercises
- * application code paths end to end, and those are what silently read zero rows when a database
- * context is missing. `integration` and `security` are **not** included yet — their fixtures
- * still write directly to FORCE RLS tables without a context and fail on the seed rather than
- * on anything meaningful. Converting them is the same work already done for the e2e factories.
+ * `e2e` exercises the HTTP route surface end to end; `integration` exercises services, workers
+ * and repositories directly — where the upload offboarding sweep read zero rows for months and
+ * where organization-scoped upload writes 404'd. Both are where a missing database context goes
+ * silent. `security` is left out on purpose: its RLS suites already opt into `core_be_app` per
+ * statement, which is the stronger assertion for policies themselves.
+ *
+ * Three integration suites skip themselves under this lane (`describe.runIf`, keyed on
+ * `TEST_DATABASE_ROLE`) because they test infrastructure owned by a role other than the
+ * application: `transaction-rollback`, `migrations-forward` and `full-seed`. Each states why.
  */
-const DEFAULT_PROJECTS = ['--project', 'e2e'];
+const DEFAULT_PROJECTS = ['--project', 'e2e', '--project', 'integration'];
 
 /**
  * Runs Vitest with the pool under test opened as {@link APPLICATION_DATABASE_ROLE}.

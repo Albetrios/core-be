@@ -11,7 +11,7 @@ import {
   runAuditOutboxDrainJob,
 } from '@/domains/audit/workers/audit-outbox-drain.processor.js';
 import { users } from '@/domains/user/user.schema.js';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { setLocalDatabaseConfig } from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 
@@ -30,20 +30,22 @@ describe('Integration: audit transactional outbox drain', () => {
   });
 
   it('drains a PENDING tenantless row into audit.logs and empties the outbox', async () => {
-    await database.insert(users).values({
+    await getOperatorDatabase().insert(users).values({
       public_id: ACTOR_PUBLIC_ID,
       email: 'audit-drain@example.com',
       email_hash: 'audit-drain-hash',
     });
-    await database.insert(audit_outbox).values({
-      status: 'PENDING',
-      actor_user_public_id: ACTOR_PUBLIC_ID,
-      organization_public_id: null,
-      action: 'user.login',
-      resource_type: 'user',
-      severity: 'INFO',
-      metadata: { source: 'audit-outbox-drain.integration' },
-    });
+    await getOperatorDatabase()
+      .insert(audit_outbox)
+      .values({
+        status: 'PENDING',
+        actor_user_public_id: ACTOR_PUBLIC_ID,
+        organization_public_id: null,
+        action: 'user.login',
+        resource_type: 'user',
+        severity: 'INFO',
+        metadata: { source: 'audit-outbox-drain.integration' },
+      });
 
     expect(await pendingOutboxCount()).toBe(1);
 
@@ -58,20 +60,23 @@ describe('Integration: audit transactional outbox drain', () => {
     expect(await pendingOutboxCount()).toBe(0);
 
     // The canonical ledger row landed with the outbox payload copied verbatim.
-    const auditRows = await database.select().from(logs).where(eq(logs.action, 'user.login'));
+    const auditRows = await getOperatorDatabase()
+      .select()
+      .from(logs)
+      .where(eq(logs.action, 'user.login'));
     expect(auditRows).toHaveLength(1);
     expect(auditRows[0]?.resource_type).toBe('user');
     expect(auditRows[0]?.metadata).toEqual({ source: 'audit-outbox-drain.integration' });
 
     // The outbox row is marked PROCESSED (not deleted) so retention can prune it.
-    const outboxRows = await database.select().from(audit_outbox);
+    const outboxRows = await getOperatorDatabase().select().from(audit_outbox);
     expect(outboxRows).toHaveLength(1);
     expect(outboxRows[0]?.status).toBe('PROCESSED');
     expect(outboxRows[0]?.processed_at).not.toBeNull();
   });
 
   it('marks an unresolvable-actor row FAILED and writes no audit.logs row', async () => {
-    await database.insert(audit_outbox).values({
+    await getOperatorDatabase().insert(audit_outbox).values({
       status: 'PENDING',
       actor_user_public_id: 'usr_doesnotexist00000001',
       organization_public_id: null,
@@ -86,9 +91,9 @@ describe('Integration: audit transactional outbox drain', () => {
 
     expect(result).toEqual({ drained: 0, transientFailed: 0, permanentlyFailed: 1 });
     expect(await pendingOutboxCount()).toBe(0);
-    expect(await database.select().from(logs)).toHaveLength(0);
+    expect(await getOperatorDatabase().select().from(logs)).toHaveLength(0);
 
-    const outboxRows = await database.select().from(audit_outbox);
+    const outboxRows = await getOperatorDatabase().select().from(audit_outbox);
     expect(outboxRows).toHaveLength(1);
     expect(outboxRows[0]?.status).toBe('FAILED');
     expect(outboxRows[0]?.last_error).toMatch(/actor public_id did not resolve/);
@@ -98,24 +103,26 @@ describe('Integration: audit transactional outbox drain', () => {
     // The scheduler can run on >1 replica. `claimPendingBatch` uses FOR UPDATE SKIP LOCKED so
     // two drainers racing the same backlog partition the rows instead of both copying a row into
     // audit.logs (a duplicate ledger entry). The single-drainer test above cannot prove this.
-    await database.insert(users).values({
+    await getOperatorDatabase().insert(users).values({
       public_id: ACTOR_PUBLIC_ID,
       email: 'audit-drain-concurrent@example.com',
       email_hash: 'audit-drain-concurrent-hash',
     });
 
     const ROW_COUNT = 24;
-    await database.insert(audit_outbox).values(
-      Array.from({ length: ROW_COUNT }, (_, index) => ({
-        status: 'PENDING' as const,
-        actor_user_public_id: ACTOR_PUBLIC_ID,
-        organization_public_id: null,
-        action: 'user.login',
-        resource_type: 'user',
-        severity: 'INFO',
-        metadata: { source: 'audit-outbox-drain.concurrent', index },
-      })),
-    );
+    await getOperatorDatabase()
+      .insert(audit_outbox)
+      .values(
+        Array.from({ length: ROW_COUNT }, (_, index) => ({
+          status: 'PENDING' as const,
+          actor_user_public_id: ACTOR_PUBLIC_ID,
+          organization_public_id: null,
+          action: 'user.login',
+          resource_type: 'user',
+          severity: 'INFO',
+          metadata: { source: 'audit-outbox-drain.concurrent', index },
+        })),
+      );
     expect(await pendingOutboxCount()).toBe(ROW_COUNT);
 
     // Two independent drain contexts (two worker replicas) racing the same backlog.
@@ -134,11 +141,14 @@ describe('Integration: audit transactional outbox drain', () => {
     expect(await pendingOutboxCount()).toBe(0);
 
     // The canonical ledger has exactly ROW_COUNT rows — a broken SKIP LOCKED would double-insert.
-    const auditRows = await database.select().from(logs).where(eq(logs.action, 'user.login'));
+    const auditRows = await getOperatorDatabase()
+      .select()
+      .from(logs)
+      .where(eq(logs.action, 'user.login'));
     expect(auditRows).toHaveLength(ROW_COUNT);
 
     // Every outbox row is PROCESSED exactly once.
-    const outboxRows = await database.select().from(audit_outbox);
+    const outboxRows = await getOperatorDatabase().select().from(audit_outbox);
     expect(outboxRows).toHaveLength(ROW_COUNT);
     expect(outboxRows.every((row) => row.status === 'PROCESSED')).toBe(true);
   });
@@ -151,12 +161,12 @@ describe('Integration: audit transactional outbox drain', () => {
     // still commits. This proves the failed row does NOT wedge the batch on the real driver — raw
     // `SAVEPOINT` via execute() does not survive postgres-js's transaction-error state, so the
     // nested transaction is the supported mechanism.
-    await database.insert(users).values({
+    await getOperatorDatabase().insert(users).values({
       public_id: ACTOR_PUBLIC_ID,
       email: 'audit-drain-savepoint@example.com',
       email_hash: 'audit-drain-savepoint-hash',
     });
-    const [actor] = await database
+    const [actor] = await getOperatorDatabase()
       .select({ id: users.id })
       .from(users)
       .where(eq(users.public_id, ACTOR_PUBLIC_ID));
@@ -198,13 +208,16 @@ describe('Integration: audit transactional outbox drain', () => {
 
     expect(failedThenRecovered).toBe(true);
     // The valid row committed despite the earlier failed statement → savepoint isolation works.
-    const recovered = await database
+    const recovered = await getOperatorDatabase()
       .select()
       .from(logs)
       .where(eq(logs.action, 'recovered.savepoint'));
     expect(recovered).toHaveLength(1);
     // The poison row was rolled back with the nested transaction — never persisted.
-    const poison = await database.select().from(logs).where(eq(logs.action, 'poison.savepoint'));
+    const poison = await getOperatorDatabase()
+      .select()
+      .from(logs)
+      .where(eq(logs.action, 'poison.savepoint'));
     expect(poison).toHaveLength(0);
   });
 });

@@ -376,7 +376,7 @@ jobs:
       - name: Run migrations
         run: pnpm db:migrate
 
-      - name: Run e2e as the RLS-subject application role
+      - name: Run e2e + integration as the RLS-subject application role
         run: |
           set -euo pipefail
           pnpm test:rls-role

@@ -6,14 +6,14 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestOrganization } from '@/tests/factories/organization.factory.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { generateTestToken } from '@/tests/helpers/test-auth.js';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { notifications } from '@/domains/notify/sub-domains/notification/notification.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 import type { FastifyInstance } from 'fastify';
 
 async function insertNotificationFor(userId: number): Promise<string> {
   const publicId = generatePublicId('notification');
-  await database.insert(notifications).values({
+  await getOperatorDatabase().insert(notifications).values({
     public_id: publicId,
     user_id: userId,
     type: 'system',

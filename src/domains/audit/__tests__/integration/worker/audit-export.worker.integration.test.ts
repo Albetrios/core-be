@@ -5,7 +5,7 @@ import {
 } from '@/infrastructure/database/contexts/database-context.js';
 import { gunzipSync } from 'node:zlib';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
@@ -84,7 +84,7 @@ describe('audit-export.worker — S3 NDJSON export', () => {
     const { start, dateLabel } = getPreviousUtcDayRange();
     const createdAt = new Date(start.getTime() + 3_600_000);
 
-    await database.insert(logs).values({
+    await getOperatorDatabase().insert(logs).values({
       organization_id: organization.id,
       actor_user_id: user.id,
       action: 'organization.updated',
@@ -153,22 +153,24 @@ describe('audit-export.worker — S3 NDJSON export', () => {
     const { start, dateLabel } = getPreviousUtcDayRange();
     const createdAt = new Date(start.getTime() + 3_600_000);
 
-    await database.insert(logs).values([
-      {
-        organization_id: organizationA.id,
-        actor_user_id: user.id,
-        action: 'organization.updated',
-        resource_type: 'organization',
-        created_at: createdAt,
-      },
-      {
-        organization_id: organizationB.id,
-        actor_user_id: user.id,
-        action: 'membership.created',
-        resource_type: 'membership',
-        created_at: createdAt,
-      },
-    ]);
+    await getOperatorDatabase()
+      .insert(logs)
+      .values([
+        {
+          organization_id: organizationA.id,
+          actor_user_id: user.id,
+          action: 'organization.updated',
+          resource_type: 'organization',
+          created_at: createdAt,
+        },
+        {
+          organization_id: organizationB.id,
+          actor_user_id: user.id,
+          action: 'membership.created',
+          resource_type: 'membership',
+          created_at: createdAt,
+        },
+      ]);
 
     const result = await withMaintenanceDatabaseContext(
       MAINTENANCE_SCOPE.GLOBAL_RETENTION_CLEANUP,
@@ -215,7 +217,7 @@ describe('audit-export.worker — S3 NDJSON export', () => {
     const { start, dateLabel } = getPreviousUtcDayRange();
     const createdAt = new Date(start.getTime() + 3_600_000);
 
-    await database.insert(logs).values({
+    await getOperatorDatabase().insert(logs).values({
       organization_id: organization.id,
       actor_user_id: user.id,
       action: 'membership.created',
@@ -249,7 +251,7 @@ describe('audit-export.worker — S3 NDJSON export', () => {
     const { end } = getPreviousUtcDayRange();
     const todayLogTime = new Date(end.getTime() + 3_600_000);
 
-    await database.insert(logs).values({
+    await getOperatorDatabase().insert(logs).values({
       organization_id: organization.id,
       actor_user_id: user.id,
       action: 'user.login',

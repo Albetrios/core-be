@@ -11,7 +11,7 @@ import { createTestPlan } from '@/tests/factories/plan.factory.js';
 import { createTestSubscription } from '@/domains/billing/__tests__/factories/subscription.factory.js';
 import { buildStripeWebhookTestSignatureHeader } from '@/tests/contract/helpers/stripe-signature.js';
 import { stripe_webhook_events } from '@/domains/billing/sub-domains/stripe-webhook/stripe-webhook.schema.js';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { env } from '@/shared/config/env.config.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -130,7 +130,7 @@ describe('Stripe webhook — replay defence', () => {
 
     await postWebhook(rawPayload, signature);
 
-    const rows = await database
+    const rows = await getOperatorDatabase()
       .select()
       .from(stripe_webhook_events)
       .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId));
@@ -149,7 +149,7 @@ describe('Stripe webhook — replay defence', () => {
 
     expect(first.statusCode, first.body).toBe(200);
     expect(replay.statusCode, replay.body).toBe(200);
-    const rows = await database
+    const rows = await getOperatorDatabase()
       .select()
       .from(stripe_webhook_events)
       .where(eq(stripe_webhook_events.stripe_event_id, stripeEventId));
