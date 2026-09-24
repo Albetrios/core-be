@@ -33,7 +33,12 @@ describe.runIf(runRedisTests)('Integration: BullMQ Prometheus metrics', () => {
   afterAll(async () => {
     if (worker) await worker.close();
     if (queueEvents) await queueEvents.close();
-    if (queue) await queue.close();
+    if (queue) {
+      // `removeOnComplete` drops the job, not the queue's meta/id/events keys — obliterate them so
+      // every run does not leave another uniquely named queue behind in Redis.
+      await queue.obliterate({ force: true });
+      await queue.close();
+    }
     await closeBullMQMetricsQueues();
 
     if (originalMetricsEnabled === undefined) {

@@ -48,7 +48,6 @@ export const plans = billingSchema.table(
   (table) => [
     uniqueIndex('idx_plans_public_id').on(table.public_id),
     uniqueIndex('idx_plans_name').on(table.name),
-    index('idx_plans_active').on(table.is_active),
     index('idx_plans_active_price').on(table.is_active, table.price_monthly),
     check('chk_plans_price_m', sql`${table.price_monthly} >= 0`),
     check('chk_plans_price_y', sql`${table.price_yearly} >= 0`),

@@ -177,7 +177,7 @@ export default async function globalSetup(): Promise<() => void> {
         );
       `);
       await sql.unsafe(
-        'CREATE INDEX IF NOT EXISTS idx_user_data_exports_user_id ON auth.user_data_exports (user_id);',
+        'CREATE INDEX IF NOT EXISTS idx_user_data_exports_user_id_status ON auth.user_data_exports (user_id, status);',
       );
     }
 
@@ -244,9 +244,48 @@ export default async function globalSetup(): Promise<() => void> {
         .unsafe('ALTER TABLE auth.verification_tokens ENABLE ROW LEVEL SECURITY')
         .catch(() => {});
     }
+
+    try {
+      await seedPermissionCatalog();
+    } catch (seedError) {
+      if (process.env.CI === 'true') {
+        throw seedError;
+      }
+      console.warn(
+        'Seeding the permission catalog failed during test global setup — suites that provision an organization will depend on test order',
+        seedError,
+      );
+    }
   } finally {
     await sql.end({ timeout: 5_000 });
   }
 
   return releaseDatabaseSuiteLock;
+}
+
+/**
+ * Seeds the permission catalog the way a deploy does: migrate, then the reference seed.
+ *
+ * `tenancy.permissions` is reference data from `pnpm db:seed`, not a migration, and
+ * `cleanupDatabase()` preserves it between suites — so without this the catalog existed only once
+ * some suite happened to call `seedAllPermissions()`. Suites that ran first saw a near-empty
+ * catalog: personal-organization provisioning failed the `role_permissions` → `permissions` FK,
+ * the read-safe path swallowed it, and the user silently had no personal organization.
+ *
+ * Runs the reference seeder itself (no second code list), imported only now so the app pool it
+ * opens reads the `DATABASE_URL` chosen above — the operator role locally, the superuser in CI.
+ * FORCE ROW LEVEL SECURITY on `tenancy.permissions` would refuse the RLS-subject application role.
+ */
+async function seedPermissionCatalog(): Promise<void> {
+  const { resetEnvCacheForTests } = await import('@/shared/config/env.config.js');
+  resetEnvCacheForTests();
+  const { seedPermissions } = await import(
+    '@/domains/tenancy/sub-domains/permission/seed/permission.reference.seed.js'
+  );
+  const { closeDatabase } = await import('@/infrastructure/database/connection.js');
+  try {
+    await seedPermissions();
+  } finally {
+    await closeDatabase();
+  }
 }

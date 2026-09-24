@@ -43,6 +43,20 @@ import {
   withMaintenanceDatabaseContext,
 } from '@/infrastructure/database/contexts/database-context.js';
 
+/**
+ * An upload together with the principal scope under which row-level security showed it.
+ *
+ * @remarks
+ * `upload.uploads` splits across two disjoint RLS arms — a user-owned arm (`organization_id IS
+ * NULL`) and a tenant arm (one organization) — so whichever scope FOUND a row is the only one
+ * that can also UPDATE it. Every write that follows a read must reuse this scope; a write under
+ * the other arm matches zero rows and surfaces as a 404 on a row that plainly exists.
+ */
+type LoadedUpload = {
+  row: UploadRow;
+  scope: ReturnType<typeof PRINCIPAL_SCOPE.VERIFIED>;
+};
+
 /** Inputs for {@link UploadService}'s private atomic PENDING-slot reservation. */
 interface ReservePendingUploadSlotParams {
   userInternalId: number;
@@ -443,23 +457,28 @@ export class UploadService {
     userPublicId: string;
     userInternalId: number;
     organizationPublicId?: string | null | undefined;
-  }): Promise<UploadRow> {
+  }): Promise<LoadedUpload> {
     const { public_id, userPublicId, userInternalId, organizationPublicId } = input;
-    const ownRow = await withAppDatabaseContext(
-      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
-      () => this.repository.findByPublicId(public_id),
+    const userScope = PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId });
+    const ownRow = await withAppDatabaseContext(userScope, () =>
+      this.repository.findByPublicId(public_id),
     );
 
     // Only reached when the owner arm saw nothing AND the caller has an organization to try.
+    const organizationScope =
+      ownRow || !organizationPublicId
+        ? null
+        : PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId });
     const row =
       ownRow ??
-      (organizationPublicId
-        ? await withAppDatabaseContext(
-            PRINCIPAL_SCOPE.VERIFIED({ organizationPublicId: organizationPublicId }),
-            () => this.repository.findByPublicId(public_id),
+      (organizationScope
+        ? await withAppDatabaseContext(organizationScope, () =>
+            this.repository.findByPublicId(public_id),
           )
         : null);
     if (!row) throw new NotFoundError('Upload');
+    // The scope that FOUND the row is the one every follow-up write must use — see LoadedUpload.
+    const scope = ownRow ? userScope : (organizationScope ?? userScope);
 
     // The authorization decision below is made on the ROW, never on which arm produced it.
     // RLS is a second line here, not the first: dev and CI connect with roles that bypass it
@@ -470,11 +489,11 @@ export class UploadService {
       if (row.user_id !== userInternalId) {
         throw new NotFoundError('Upload');
       }
-      return row;
+      return { row, scope };
     }
 
     await this.assertUserCanAccessOrgScopedUpload(row, userPublicId);
-    return row;
+    return { row, scope };
   }
 
   async getUpload(
@@ -484,7 +503,7 @@ export class UploadService {
   ): Promise<UploadDetailOutput> {
     const validatedPublicId = validateUploadPublicIdParam(public_id);
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
-    const row = await this.loadUploadForUserAction({
+    const { row } = await this.loadUploadForUserAction({
       public_id: validatedPublicId,
       userPublicId,
       userInternalId: user.id,
@@ -559,7 +578,7 @@ export class UploadService {
   ): Promise<UploadDetailOutput> {
     const validatedPublicId = validateUploadPublicIdParam(public_id);
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
-    const row = await this.loadUploadForUserAction({
+    const { row, scope } = await this.loadUploadForUserAction({
       public_id: validatedPublicId,
       userPublicId,
       userInternalId: user.id,
@@ -589,9 +608,8 @@ export class UploadService {
     // legacy rows are at end-of-life; refuse and require re-upload via
     // a fresh pending key.
     if (!pendingKeyed) {
-      const failedRow = await withAppDatabaseContext(
-        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
-        () => this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
+      const failedRow = await withAppDatabaseContext(scope, () =>
+        this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
       );
       if (!failedRow) throw new NotFoundError('Upload');
       logger.warn(
@@ -612,9 +630,8 @@ export class UploadService {
     });
 
     if (!verified) {
-      const failedRow = await withAppDatabaseContext(
-        PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
-        () => this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
+      const failedRow = await withAppDatabaseContext(scope, () =>
+        this.repository.markStatusByPublicId(validatedPublicId, UPLOAD_STATUS.FAILED),
       );
       if (!failedRow) throw new NotFoundError('Upload');
       throw new ValidationError('errors:uploadVerificationFailed', undefined, {
@@ -624,9 +641,8 @@ export class UploadService {
 
     // Repoint the row at the immutable final key in the same update that marks it UPLOADED, so a
     // servable row never references the overwritable pending key.
-    const updated = await withAppDatabaseContext(
-      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
-      () => this.repository.markConfirmedByPublicId(validatedPublicId, finalKey),
+    const updated = await withAppDatabaseContext(scope, () =>
+      this.repository.markConfirmedByPublicId(validatedPublicId, finalKey),
     );
     if (!updated) throw new NotFoundError('Upload');
 
@@ -740,7 +756,7 @@ export class UploadService {
   ): Promise<void> {
     const validatedPublicId = validateUploadPublicIdParam(public_id);
     const user = await this.userService.requireUserRecordByPublicId(userPublicId);
-    const row = await this.loadUploadForUserAction({
+    const { row, scope } = await this.loadUploadForUserAction({
       public_id: validatedPublicId,
       userPublicId,
       userInternalId: user.id,
@@ -756,9 +772,8 @@ export class UploadService {
       );
     }
 
-    const deleted = await withAppDatabaseContext(
-      PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
-      () => this.repository.softDeleteByPublicId(validatedPublicId),
+    const deleted = await withAppDatabaseContext(scope, () =>
+      this.repository.softDeleteByPublicId(validatedPublicId),
     );
     if (!deleted) throw new NotFoundError('Upload');
   }

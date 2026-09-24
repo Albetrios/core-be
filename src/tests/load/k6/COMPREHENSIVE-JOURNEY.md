@@ -67,13 +67,14 @@ worker cluster exceed 12 cores. The cluster has spare capacity; it just can't ge
 ## 1. Server config — load-test env overrides (`.env.local`)
 
 Run a **dedicated** loadtest server (leave any normal `:3000` dev server alone). Set these in
-`.env.local`; the loader makes `.env.local` authoritative, so the runtime `NODE_ENV` resolves to `test`.
+`.env.local`; the loader makes `.env.local` authoritative, so these values win.
 
 | Env var | Load-test value | Default | Why |
 | --- | --- | --- | --- |
-| `NODE_ENV` | `test` | `local` | (a) captcha **fails open** (login works without a Turnstile token); (b) per-route rate caps bump to 5000. The full server still runs real auth/DB/RLS. |
-| `CAPTCHA_PROVIDER` | `disabled` | `disabled` | belt-and-suspenders with the `test` fail-open. |
-| `RATE_LIMIT_MAX` | `100000000` | `100` | all k6 traffic is one IP; the global limiter must never reject (it still runs — its cost is measured). |
+| `NODE_ENV` | `development` | `local` | non-production runtime, so captcha **fails open** (login works without a Turnstile token). The enum rejects `test`. The full server still runs real auth/DB/RLS. |
+| `RATE_LIMIT_RELAXED_CAPS` | `true` | `false` | per-route rate caps bump to 5000 (what the old `test` runtime implied). |
+| `CAPTCHA_PROVIDER` | `disabled` | `disabled` | belt-and-suspenders with the fail-open. |
+| `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` | `100000` / `1000` | `100` / `60000` | all k6 traffic is one IP; the global limiter must never reject (it still runs — its cost is measured). The schema caps the max at `100000`, so the 1 s window makes it 100k req/s. |
 | `WEBHOOK_URL_ALLOWLIST` | `example.com` | `hooks.example.com,*.partner.example.com` | `POST /notify/webhooks` validates host vs allowlist **and** resolves it (SSRF/DNS-pin); `example.com` resolves to a public IP and passes both. |
 | `MEMBER_ROLE_MAX_PER_ORG` | `500` (max) | `50` | the journey create/deletes roles under concurrency; the default 50 is hit when many VUs share an organization. |
 | `POSTGRES_MAX_CONNECTIONS` | `500` | `100` | the connection-budget check reads this from **env**, not the live DB — must match the actual Postgres `max_connections` (§4). |
@@ -203,7 +204,13 @@ it churns other users' permission caches under load), `DIAG` (`true` logs each f
 
 ## 8. Teardown / revert
 
-The load-test overrides are local-only. To restore normal dev:
+The load-test overrides are local-only. To restore normal dev after `setup-loadtest.sh`, run
+`pnpm load:journey:down` (`setup-loadtest.sh --teardown`): it stops the cluster and restores
+`.env.local` from the owner-only backup setup took in `/tmp`, then **deletes that backup** — setup
+snapshots only when no backup exists, so one left behind would be restored by a later teardown and
+clobber everything added to `.env.local` in between. Postgres stays at `max_connections=500`.
+
+For a rig assembled by hand (no setup script), revert manually:
 
 ```bash
 cp /tmp/docker-compose.yml.bak docker-compose.yml   # if you scaled Postgres bigger

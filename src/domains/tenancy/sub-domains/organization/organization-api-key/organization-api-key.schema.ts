@@ -50,7 +50,6 @@ export const api_keys = tenancySchema
     },
     (table) => [
       uniqueIndex('idx_api_keys_public_id').on(table.public_id),
-      index('idx_api_keys_organization').on(table.organization_id),
       index('idx_api_keys_organization_status').on(table.organization_id, table.status),
       index('idx_api_keys_org_created_id_active')
         .on(table.organization_id, table.created_at, table.id)
