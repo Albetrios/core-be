@@ -69,7 +69,8 @@ export function shouldShedRequest(options: {
  * - **Failure modes:** none surfaced to healthy traffic — at sane thresholds the guard is dormant
  *   under normal load. Allowlisted health/metrics paths are never shed.
  * - **Side effects:** one shared `monitorEventLoopDelay` histogram + one unref'd interval timer
- *   (both cleared on `onClose`); reads an in-process counter; throws on shed.
+ *   (both cleared on `onClose`); the histogram is reset on `onReady` so the boot's own stall is
+ *   never sampled as load; reads an in-process counter; throws on shed.
  */
 const overloadGuardMiddleware: FastifyPluginAsync = async (application) => {
   const shedThresholdMs = env.OVERLOAD_MAX_EVENT_LOOP_DELAY_MS;
@@ -86,6 +87,14 @@ const overloadGuardMiddleware: FastifyPluginAsync = async (application) => {
     histogram.reset();
   }, OVERLOAD_SAMPLE_INTERVAL_MS);
   sampleTimer.unref();
+  // The histogram starts recording at registration, so the boot itself — importing modules,
+  // compiling route schemas, between the I/O awaits that keep the loop turning — would land in the
+  // first sample as one long stall and shed the first requests a fresh process serves. That stall
+  // is the boot, not load: open the first sample window when the application is ready.
+  application.addHook('onReady', async () => {
+    histogram.reset();
+    recentEventLoopDelayMs = 0;
+  });
   application.addHook('onClose', async () => {
     clearInterval(sampleTimer);
   });

@@ -230,6 +230,17 @@ run's lock is taken over automatically (dead pid), and two runs against two diff
 not block each other. If a suite refuses to start and the named process is genuinely gone, delete
 the lock file the message points at.
 
+### What global setup prepares
+
+Before any database-backed suite, `src/tests/global-setup.ts` mirrors the deploy sequence
+(`pnpm db:migrate` → `pnpm db:seed`, see `reusable-railway-deploy.yml`): it takes the lock above,
+runs `pnpm db:migrate`, and then seeds the **permission catalog** (`tenancy.permissions`) with the
+reference seeder. The catalog is reference data, not a migration, so without that step it existed
+only after some suite happened to call `seedAllPermissions()` — and every login that provisions a
+personal organization depended on test order. `cleanupDatabase()` truncates everything **except**
+`permissions` and `schema_migrations`, so the catalog seeded once stays in place for the whole run.
+A suite that empties the catalog on purpose must restore it (`seedAllPermissions()` in `afterEach`).
+
 ---
 
 ## Coverage reports

@@ -20,7 +20,10 @@ BAK=/tmp/.env.local.loadtest.bak
 if [ "${1:-}" = "--teardown" ]; then
   echo "Teardown: stop cluster + restore .env.local (tracked files are left as-is)"
   pkill -f cluster-run.mjs 2>/dev/null || true
-  [ -f "$BAK" ] && cp "$BAK" .env.local && echo "  .env.local restored from backup"
+  # Remove the backup once restored. Setup snapshots only when no backup exists (so a second
+  # setup never overwrites the pristine copy with load-test values), which means a backup left
+  # behind here would be restored by the NEXT teardown — clobbering everything added since.
+  [ -f "$BAK" ] && cp "$BAK" .env.local && rm -f "$BAK" && echo "  .env.local restored from backup (backup removed)"
   echo "Done. Postgres stays at max_connections=500 (harmless for dev); DB seed/pool are reusable."
   exit 0
 fi
@@ -42,7 +45,8 @@ setkv() {
 echo "==> Load-test setup: VUS=$VUS, WORKERS=$WORKERS, DB pool=$POOL"
 
 echo "[1/7] back up .env.local + apply load-test env overrides"
-[ -f "$BAK" ] || cp .env.local "$BAK"
+# The backup holds secrets and lives in /tmp: owner-only.
+[ -f "$BAK" ] || { cp .env.local "$BAK" && chmod 600 "$BAK"; }
 setkv NODE_ENV development                       # non-production runtime (CAPTCHA_FAIL_OPEN defaults true)
 setkv RATE_LIMIT_RELAXED_CAPS true                # per-route rate caps -> 5000 (previously implied by the old test runtime)
 setkv CAPTCHA_PROVIDER disabled
@@ -53,7 +57,10 @@ setkv DATABASE_RLS_SAFETY_ENFORCED false
 setkv REDIS_TLS_ENFORCED false
 setkv TRUST_PROXY_REQUIRED false
 setkv PORT 3001
-setkv RATE_LIMIT_MAX 100000000            # global limiter never rejects (one source IP)
+# Global limiter never rejects the one k6 source IP — while still running, so its cost is measured.
+# The schema caps RATE_LIMIT_MAX at 100000; a 1 s window makes that 100k req/s, far above this box.
+setkv RATE_LIMIT_MAX 100000
+setkv RATE_LIMIT_WINDOW_MS 1000
 setkv WEBHOOK_URL_ALLOWLIST example.com   # create-webhook host passes SSRF/allowlist
 setkv SENTRY_DSN ""                        # optional; ~0ms impact
 setkv MEMBER_ROLE_MAX_PER_ORG 500          # role create/delete under concurrency
@@ -116,9 +123,24 @@ docker exec core-be-redis sh -c "redis-cli --scan --pattern '*rate*limit*' | xar
 
 echo "[6/7] start cluster ($WORKERS workers on :3001)"
 pkill -f cluster-run.mjs 2>/dev/null || true; sleep 1
+# Anything else on :3001 answers /livez too — a stale `pnpm dev` whose watcher picked up PORT=3001
+# from the env file written above did exactly that — and every later check, and the k6 run, would
+# then measure the wrong server while reporting green.
+if lsof -nP -iTCP:3001 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "      ✗ :3001 is already in use (pid $(lsof -nP -t -iTCP:3001 -sTCP:LISTEN | head -1)) — stop it and re-run" >&2
+  exit 1
+fi
 CLUSTER_WORKERS="$WORKERS" nohup node cluster-run.mjs > /tmp/loadtest-server.log 2>&1 &
-for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:3001/livez 2>/dev/null && break; sleep 0.5; done
-echo "      livez -> $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/livez) ($(grep -ciE 'Server listening at http://127' /tmp/loadtest-server.log) workers)"
+for i in $(seq 1 60); do
+  [ "$(grep -ciE 'Server listening at http://127' /tmp/loadtest-server.log)" -ge "$WORKERS" ] && break
+  sleep 0.5
+done
+LISTENING=$(grep -ciE 'Server listening at http://127' /tmp/loadtest-server.log)
+echo "      livez -> $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/livez) ($LISTENING/$WORKERS workers)"
+if [ "$LISTENING" -lt "$WORKERS" ]; then
+  echo "      ✗ only $LISTENING of $WORKERS workers are listening — see /tmp/loadtest-server.log" >&2
+  exit 1
+fi
 
 echo "[7/7] verify prerequisites"
 VUS="$VUS" node src/tests/load/k6/check-prereqs.mjs
