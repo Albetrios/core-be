@@ -108,5 +108,11 @@ jobs:
       - name: Run migrations through chaos listeners
         run: pnpm db:migrate
 
+      - name: Seed reference data through chaos listeners
+        # Migrations create the schema but not the reference rows the app depends on, chiefly
+        # tenancy.permissions: creating an organization FK-references it, so on a fresh database
+        # every test that creates one got a 500. Deploys run the same step after migrating.
+        run: pnpm db:seed
+
       - name: Run chaos failure-injection suite
         run: pnpm test:chaos

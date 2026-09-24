@@ -40,7 +40,7 @@ via a GitHub Actions service container (see below), so this local build affects 
 
 The weekly [`scheduled-chaos.yml`](../../../.github/workflows/scheduled-chaos.yml) run (Sundays 03:00 UTC, and on demand) calls [`reusable-chaos-toxiproxy.yml`](../../../.github/workflows/reusable-chaos-toxiproxy.yml) against the current `main` — whichever ref dispatches it:
 
-- Executes `pnpm chaos:provision`, `pnpm db:migrate` against proxied `DATABASE_URL`, then `pnpm test:chaos`.
+- Executes `pnpm chaos:provision`, then `pnpm db:migrate` and `pnpm db:seed` (the reference rows, as a deploy does) against the proxied `DATABASE_URL`, then `pnpm test:chaos`. Without the seed, a fresh database has no permission catalog, and every test that creates an organization gets a 500 on the `role_permissions` foreign key.
 - The CI Postgres is plaintext while the schema default is TLS on, so the shared `test-env` action exports `DATABASE_SSL_ENABLED=false`. Without it every test dies in setup within milliseconds (`Client network socket disconnected before secure TLS connection was established`), which kept this suite red on every run from its first one.
 - The harness always connects as `core:core`, the Compose credentials (`src/tests/chaos/bootstrap-env.ts` overrides `DATABASE_URL`), so the job's Postgres service creates that role as well. With the image's usual `postgres:postgres` instead, every test failed in setup on `password authentication failed for user "core"`: the next failure after TLS, which showed up on the first run that got past TLS.
 - A red run opens (or comments on) a `ci-failure` issue titled *Weekly chaos suite failing*; the next green run closes it.
