@@ -19,5 +19,12 @@ export const DEFAULT_DATABASE_POOL_IDLE_TIMEOUT_SECONDS = 300;
 /** Default seconds to wait for a new connection before failing (`connect_timeout`). */
 export const DEFAULT_DATABASE_POOL_CONNECT_TIMEOUT_SECONDS = 10;
 
+/**
+ * `Retry-After` (seconds) on the 503 a unit of work gets when no pooled connection arrives before
+ * `DATABASE_POOL_ACQUIRE_TIMEOUT_MS`: long enough for a failover or a cold start to finish, short
+ * enough that a client retries soon after the database is back.
+ */
+export const DATABASE_ACQUIRE_RETRY_AFTER_SECONDS = 5;
+
 /** Default max lifetime (seconds) of a pooled connection before recycling (`max_lifetime`, 30 min). */
 export const DEFAULT_DATABASE_POOL_MAX_LIFETIME_SECONDS = 1_800;

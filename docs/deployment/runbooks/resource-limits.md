@@ -144,8 +144,10 @@ Organization-scoped HTTP routes hold **one pool checkout per unit of work** via 
 > **Throughput SLA (RLS ceiling).** Because each organization-scoped request holds its connection for the
 > whole request, a single process sustains at most `DATABASE_POOL_MAX` concurrent organization-scoped
 > requests. Steady-state RPS ≈ `DATABASE_POOL_MAX / avg_request_seconds` per process (e.g. 20 / 0.05s
-> ≈ 400 RPS). Beyond that, requests queue against `connect_timeout` and the 5s HTTP statement timeout
-> and surface as 504s. Scale by raising `DATABASE_POOL_MAX` (within the connection budget above) or
+> ≈ 400 RPS). Beyond that, the overload guard sheds new requests with 503 + `Retry-After` once 90% of
+> the pool is in flight (`OVERLOAD_DB_POOL_SHED_RATIO`); a unit of work that still cannot get a
+> connection within `DATABASE_POOL_ACQUIRE_TIMEOUT_MS` gets the same 503, and a running statement past
+> the 5s HTTP statement timeout surfaces as a 504. Scale by raising `DATABASE_POOL_MAX` (within the connection budget above) or
 > adding API replicas; watch the `database.pool.exhaustion.*` Sentry alerts (warn 80% / crit 95%).
 
 | Concern                | Guidance                                                                                               |
@@ -162,6 +164,7 @@ Organization-scoped HTTP routes hold **one pool checkout per unit of work** via 
 | `FASTIFY_REQUEST_TIMEOUT_MS`         | `30000` | Entire HTTP request (Fastify)                                                                                                                                                                     |
 | `FASTIFY_CONNECTION_TIMEOUT_MS`      | `10000` | TCP connection accept                                                                                                                                                                             |
 | `DATABASE_HTTP_STATEMENT_TIMEOUT_MS` | `5000`  | Connection-level `statement_timeout` for HTTP handlers (scoped RLS contexts only)                                                                                                                   |
+| `DATABASE_POOL_ACQUIRE_TIMEOUT_MS`   | `10000` | Getting a pooled connection for a unit of work — 503 + `Retry-After` past it, and a late connection rolls back unrun; `0` disables |
 | `DATABASE_STATEMENT_TIMEOUT_MS`      | `30000` | Connection-level default for workers and long-running queries                                                                                                                                     |
 
 Org-scoped HTTP handlers wrap database work in `withAppDatabaseContext` — there is no per-request transaction pin. Keep Stripe / S3 / Resend calls **outside** those callbacks (enforced by ESLint).

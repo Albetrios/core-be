@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import errorHandlerMiddleware from '@/shared/middlewares/core/error-handler.middleware.js';
 import { captureException } from '@/infrastructure/observability/sentry/sentry.js';
-import { AppError, ConflictError } from '@/shared/errors/index.js';
+import { AppError, ConflictError, ServiceUnavailableError } from '@/shared/errors/index.js';
 
 vi.mock('@/infrastructure/observability/sentry/sentry.js', () => ({
   captureException: vi.fn(),
@@ -113,6 +113,10 @@ async function createApp(): Promise<FastifyInstance> {
     async () => ({ ok: true }),
   );
 
+  app.get('/app-error-503-retry-after', async () => {
+    throw new ServiceUnavailableError().withRetryAfter(5);
+  });
+
   await app.ready();
   return app;
 }
@@ -161,6 +165,14 @@ describe('error-handler.middleware status + body mapping', () => {
       expect(body.error.reason).toBe('membership_already_exists');
       // A non-validation error carries no `errors` array.
       expect(body.error).not.toHaveProperty('errors');
+      expect(response.headers['retry-after']).toBeUndefined();
+    });
+
+    it('sends Retry-After when the AppError carries retryAfterSeconds', async () => {
+      const response = await app.inject({ method: 'GET', url: '/app-error-503-retry-after' });
+
+      expect(response.statusCode).toBe(503);
+      expect(response.headers['retry-after']).toBe('5');
     });
 
     it('does NOT capture a 401 AppError to Sentry', async () => {

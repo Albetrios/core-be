@@ -197,6 +197,14 @@ const SERVER_VARS = {
     description:
       'Fraction of DATABASE_POOL_MAX in-flight RLS checkouts at which the overload guard sheds requests.',
   }),
+  DATABASE_POOL_ACQUIRE_TIMEOUT_MS: envVar(
+    z.coerce.number().int().min(0).max(60_000).default(10_000),
+    {
+      allowed: 'integer 0–60000 (ms; 0 disables)',
+      description:
+        'Deadline for a unit of work to get a pooled connection. Past it the caller gets 503 + Retry-After, and a connection that arrives later rolls the transaction back unrun.',
+    },
+  ),
 } satisfies Record<string, EnvVarSpec>;
 
 const envSchemaBase = z.object({
