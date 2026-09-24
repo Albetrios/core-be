@@ -42,6 +42,7 @@ The weekly [`scheduled-chaos.yml`](../../../.github/workflows/scheduled-chaos.ym
 
 - Executes `pnpm chaos:provision`, `pnpm db:migrate` against proxied `DATABASE_URL`, then `pnpm test:chaos`.
 - The CI Postgres is plaintext while the schema default is TLS on, so the shared `test-env` action exports `DATABASE_SSL_ENABLED=false`. Without it every test dies in setup within milliseconds (`Client network socket disconnected before secure TLS connection was established`), which kept this suite red on every run from its first one.
+- The harness always connects as `core:core`, the Compose credentials (`src/tests/chaos/bootstrap-env.ts` overrides `DATABASE_URL`), so the job's Postgres service creates that role as well. With the image's usual `postgres:postgres` instead, every test failed in setup on `password authentication failed for user "core"`: the next failure after TLS, which showed up on the first run that got past TLS.
 - A red run opens (or comments on) a `ci-failure` issue titled *Weekly chaos suite failing*; the next green run closes it.
 
 Upstream addresses inside the proxy container default to `postgres:5432` and `redis:6379`; override

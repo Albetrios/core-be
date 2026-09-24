@@ -78,16 +78,14 @@ process.env.S3_REGION ??= 'us-east-1';
 process.env.S3_ACCESS_KEY_ID ??= 'AKIAIOSFODNN7EXAMPLE';
 process.env.S3_SECRET_ACCESS_KEY ??= 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
 
-const chaosHostedOnGithubActionsContinuousIntegration = process.env.CI === 'true';
-
 /**
  * Always point at Toxiproxy listener ports for this Vitest profile. A developer `.env` often
  * sets direct `localhost:5432` / `6379` URLs; `||=` would skip the override and chaos traffic
  * would bypass proxies, so toxins and administrative proxy disables would not affect the app.
+ * The credentials are Compose's (`core:core`); the CI chaos job's Postgres service creates the
+ * same role, so this one URL serves both.
  */
-process.env.DATABASE_URL = chaosHostedOnGithubActionsContinuousIntegration
-  ? 'postgresql://core:core@127.0.0.1:25432/core'
-  : 'postgresql://core:core@127.0.0.1:25432/core';
+process.env.DATABASE_URL = 'postgresql://core:core@127.0.0.1:25432/core';
 
 process.env.REDIS_URL = 'redis://127.0.0.1:26379';
 
