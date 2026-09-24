@@ -1,5 +1,5 @@
 # Nightly k6 load tests against an ephemeral API (Postgres + Redis).
-# Gate: health-stress + api-stress (SLO thresholds). Informational: auth, daily-ops, billing, webhooks, admin, org-scoped routes (incl. rls-concurrency-beyond-pool).
+# Gate: health-stress, api-stress, login-smoke, permission-cached, stripe-webhook-ingest, idempotency-storm (SLO thresholds). Informational: auth, daily-ops, billing, webhooks, admin, org-scoped routes (incl. rls-concurrency-beyond-pool).
 # Secrets (optional email): RESEND_API_KEY, TEST_RESULT_EMAIL_TO
 name: Scheduled k6 API load & SLO
 
@@ -150,7 +150,7 @@ jobs:
           k6 run --summary-export=k6-idempotency-storm.json src/tests/load/k6/scenarios/idempotency-storm.js
 
       - name: k6 auth-onboarding (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: >
           k6 run --summary-export=k6-auth-onboarding.json src/tests/load/k6/scenarios/auth-onboarding.js
@@ -159,34 +159,34 @@ jobs:
           DEMO_PASSWORD: DemoPassword123!
 
       - name: k6 passwordless-signup (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         # Relies on TEST_MODE=true (job env) so /auth/email/send-code echoes debug_verification_code.
         run: >
           k6 run --summary-export=k6-passwordless-signup.json src/tests/load/k6/scenarios/passwordless-signup.js
 
       - name: k6 daily-ops (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: k6 run --summary-export=k6-daily-ops.json src/tests/load/k6/scenarios/daily-ops.js
 
       - name: k6 billing (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: k6 run --summary-export=k6-billing.json src/tests/load/k6/scenarios/billing.js
 
       - name: k6 webhooks (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: k6 run --summary-export=k6-webhooks.json src/tests/load/k6/scenarios/webhooks.js
 
       - name: k6 admin (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: k6 run --summary-export=k6-admin.json src/tests/load/k6/scenarios/admin.js
 
       - name: k6 org-scoped routes (informational)
-        if: always()
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: |
           k6 run --summary-export=k6-audit-list.json src/tests/load/k6/scenarios/audit-list.js
@@ -236,7 +236,7 @@ jobs:
       - name: Enforce gate success (SLO)
         if: always() && (steps.gate.outcome == 'failure' || steps.gate.outcome == 'cancelled')
         run: |
-          echo "::error::k6 gate failed — health-stress or api-stress breached SLO thresholds."
+          echo "::error::k6 gate failed — a gate scenario breached its SLO thresholds (read the Gate step for which)."
           exit 1
 
   resolve-success:
