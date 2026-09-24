@@ -11,7 +11,7 @@ import { authHeaders } from '../helpers/auth.js';
  */
 export const options = {
   scenarios: {
-    load: { ...SCENARIOS.load, exec: 'organizationSettingsWriteOps' },
+    load: { ...SCENARIOS.pacedWrites, exec: 'organizationSettingsWriteOps' },
   },
   thresholds: {
     ...THRESHOLDS,

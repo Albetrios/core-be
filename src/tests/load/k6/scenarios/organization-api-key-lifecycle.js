@@ -3,6 +3,7 @@ import { sleep } from 'k6';
 import { API_PREFIX, THRESHOLDS, SCENARIOS } from '../helpers/config.js';
 import { checkOk, checkStatus } from '../helpers/checks.js';
 import { authHeaders } from '../helpers/auth.js';
+import { idempotencyKey } from '../helpers/idempotency.js';
 
 /**
  * k6 Scenario: organization API keys, the whole lifecycle — list, create, read, rename, rotate,
@@ -13,7 +14,7 @@ import { authHeaders } from '../helpers/auth.js';
  */
 export const options = {
   scenarios: {
-    load: { ...SCENARIOS.load, exec: 'apiKeyLifecycleOps' },
+    load: { ...SCENARIOS.pacedWrites, exec: 'apiKeyLifecycleOps' },
   },
   thresholds: {
     ...THRESHOLDS,
@@ -44,7 +45,7 @@ export function apiKeyLifecycleOps() {
     `${API_PREFIX}/tenancy/organization/api-keys`,
     JSON.stringify({ name: `k6 key ${__VU}-${__ITER}`, scopes: ['organization:read'] }),
     {
-      headers: { ...headers, 'X-Idempotency-Key': `k6-api-key-${__VU}-${__ITER}` },
+      headers: { ...headers, 'X-Idempotency-Key': idempotencyKey('api-key') },
       tags: { name: 'create-api-key' },
     },
   );
@@ -53,7 +54,8 @@ export function apiKeyLifecycleOps() {
     sleep(1);
     return;
   }
-  const apiKeyId = JSON.parse(createResponse.body).data.id;
+  // Create and rotate answer { api_key, raw_key } — the secret is shown once, beside the key.
+  const apiKeyId = JSON.parse(createResponse.body).data.api_key.id;
 
   const getResponse = http.get(`${API_PREFIX}/tenancy/organization/api-keys/${apiKeyId}`, {
     headers,
@@ -77,7 +79,7 @@ export function apiKeyLifecycleOps() {
   // Rotation may issue the replacement under a new id; delete whichever key is live now.
   const liveKeyId =
     rotateResponse.status === 200
-      ? (JSON.parse(rotateResponse.body).data?.id ?? apiKeyId)
+      ? (JSON.parse(rotateResponse.body).data?.api_key?.id ?? apiKeyId)
       : apiKeyId;
 
   const deleteResponse = http.del(

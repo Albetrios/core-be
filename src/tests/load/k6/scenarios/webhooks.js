@@ -3,6 +3,7 @@ import { sleep } from 'k6';
 import { API_PREFIX, THRESHOLDS, SCENARIOS } from '../helpers/config.js';
 import { checkResponseTime, checkStatus } from '../helpers/checks.js';
 import { authHeaders } from '../helpers/auth.js';
+import { idempotencyKey } from '../helpers/idempotency.js';
 
 /**
  * k6 Scenario: Webhook Operations
@@ -13,7 +14,7 @@ import { authHeaders } from '../helpers/auth.js';
  */
 export const options = {
   scenarios: {
-    load: { ...SCENARIOS.load, exec: 'webhookOps' },
+    load: { ...SCENARIOS.pacedWrites, exec: 'webhookOps' },
   },
   thresholds: {
     ...THRESHOLDS,
@@ -62,7 +63,7 @@ export function webhookOps() {
     `${API_PREFIX}/notify/webhooks`,
     JSON.stringify({ url: 'https://example.com/k6-load-test', events: ['subscription.updated'] }),
     {
-      headers: { ...headers, 'X-Idempotency-Key': `k6-webhook-${__VU}-${__ITER}` },
+      headers: { ...headers, 'X-Idempotency-Key': idempotencyKey('webhook') },
       tags: { name: 'create-webhook' },
     },
   );

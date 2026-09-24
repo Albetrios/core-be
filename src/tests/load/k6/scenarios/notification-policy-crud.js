@@ -3,6 +3,7 @@ import { sleep } from 'k6';
 import { API_PREFIX, THRESHOLDS, SCENARIOS } from '../helpers/config.js';
 import { checkOk, checkResponseTime, checkStatus } from '../helpers/checks.js';
 import { authHeaders } from '../helpers/auth.js';
+import { idempotencyKey } from '../helpers/idempotency.js';
 
 /**
  * Organization notification policies, the whole lifecycle: list, create, read, update, delete.
@@ -26,7 +27,7 @@ const CHANNELS = ['EMAIL', 'SMS', 'WEB_PUSH', 'IN_APP'];
 
 export const options = {
   scenarios: {
-    load: { ...SCENARIOS.load, exec: 'notificationPolicyCrudOps' },
+    load: { ...SCENARIOS.pacedWrites, exec: 'notificationPolicyCrudOps' },
   },
   thresholds: {
     ...THRESHOLDS,
@@ -64,7 +65,7 @@ export function notificationPolicyCrudOps() {
       default_enabled: true,
     }),
     {
-      headers: { ...headers, 'X-Idempotency-Key': `k6-policy-${__VU}-${__ITER}` },
+      headers: { ...headers, 'X-Idempotency-Key': idempotencyKey('policy') },
       tags: { name: 'create-notification-policy' },
       responseCallback: http.expectedStatuses(200, 409),
     },
