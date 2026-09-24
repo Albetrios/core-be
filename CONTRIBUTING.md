@@ -58,7 +58,7 @@ Read **[CLAUDE.md](CLAUDE.md)** for domains, layers (controller → service → 
 
 ## New features or API work
 
-Use **[docs/getting-started/requirement-intake.md](docs/getting-started/requirement-intake.md)** so scope, routes, and docs stay coherent. Consult **[`.cursor/skills/skill-index/SKILL.md`](.cursor/skills/skill-index/SKILL.md)** to see which automation skills apply to your change.
+Use **[docs/getting-started/requirement-intake.md](docs/getting-started/requirement-intake.md)** so scope, routes, and docs stay coherent. Consult **[`.cursor/skills/be-skill-index/SKILL.md`](.cursor/skills/be-skill-index/SKILL.md)** to see which automation skills apply to your change.
 
 ## Branches
 
@@ -118,7 +118,7 @@ Details: **[CLAUDE.md](CLAUDE.md)** (Testing section).
 
 ## User-facing strings
 
-Errors and API messages must use i18n keys—see **[`.cursor/skills/i18n-message-guard/SKILL.md`](.cursor/skills/i18n-message-guard/SKILL.md)**.
+Errors and API messages must use i18n keys—see **[`.cursor/skills/be-i18n-message-guard/SKILL.md`](.cursor/skills/be-i18n-message-guard/SKILL.md)**.
 
 ## Code of conduct and security
 

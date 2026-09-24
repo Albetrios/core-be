@@ -151,7 +151,7 @@ large tool output, logs, files, and RAG chunks before they reach the model (`hea
 / `headroom_retrieve` / `headroom_stats`). Local install: `pip install "headroom-ai[mcp]"` then
 `headroom mcp install` (the declarative entry is `{ "command": "headroom", "args": ["mcp",
 "serve"] }`). All agents should use it — see
-[`agent-os/rules/headroom-context-compression.mdc`](../../agent-os/rules/headroom-context-compression.mdc).
+[`agent-os/rules/be-headroom-context-compression.mdc`](../../agent-os/rules/be-headroom-context-compression.mdc).
 
 > Endpoints and package names move fast — verify against each vendor's current docs before
 > relying on a config. Sources: [Semgrep](https://github.com/semgrep/mcp),

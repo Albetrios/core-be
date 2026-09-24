@@ -1,0 +1,9 @@
+---
+description: When creating or editing SQL migrations or Drizzle schemas, run be-db-migration-maintainer (and be-sql-design-guard for schemas).
+globs: migrations/*.sql, src/domains/**/*.schema.ts
+alwaysApply: false
+---
+
+# Migration + schema sync
+
+Editing `migrations/*.sql` or a `*.schema.ts`? Run **[be-db-migration-maintainer](../skills/be-db-migration-maintainer/SKILL.md)** (and **[be-sql-design-guard](../skills/be-sql-design-guard/SKILL.md)** for schemas). Gate: `pnpm db:migrate:lint`. Applied migrations are immutable — add a new one. Full chain: `schema-change` in `agent-os/skills/chains.json`.

@@ -265,4 +265,4 @@ webhook-delivery.event-handlers.ts  →  enqueueWebhookDeliveryByAttemptId()
 
 - [documentation-system.md](../architecture/documentation-system.md) — ownership map
 - [CLAUDE.md](../../../CLAUDE.md) §6 — short pointer
-- `.cursor/skills/workers-events/SKILL.md` — orchestration checklist
+- `.cursor/skills/be-workers-events/SKILL.md` — orchestration checklist

@@ -91,7 +91,7 @@ These patterns are implemented identically across the codebase. See [src/PATTERN
 - **`rls-context`** — workers and request handlers wrap DB I/O in context helpers that `SET LOCAL app.current_organization_public_id`. Workers must not import request-scoped DB context.
 - **`transactional-outbox`** — outbound side effects (mail, webhook delivery) are written to an outbox table inside the originating transaction and dispatched by a separate worker with at-least-once semantics.
 - **`read-caching`** — a polled read may be served from Redis, keyed on the verified scope, invalidated after commit by writing a short-lived tombstone rather than deleting. Most reads do not qualify; the bar and the reasoning are in the pattern.
-- **`import-paths`** — `@/` alias for all cross-folder imports inside `src/` (`@tooling/` in tooling); same-folder `./` only, never `../` traversal.
+- **`be-import-paths`** — `@/` alias for all cross-folder imports inside `src/` (`@tooling/` in tooling); same-folder `./` only, never `../` traversal.
 
 ## End-to-end flows
 

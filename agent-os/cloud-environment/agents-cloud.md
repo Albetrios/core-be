@@ -73,5 +73,5 @@ docker compose -f docker-compose.yml -f tooling/setup/agent/docker-compose.cloud
 `install.sh` installs `codegraph` and `headroom` to `~/.local/bin` and runs
 `pnpm mcp:setup:default` (same as local `pnpm setup:local`). If MCP tools are missing in a
 session, confirm platform MCP settings match [`.mcp.default.json`](../../.mcp.default.json)
-and start a fresh session. For **stack-monitor**, add `dashboards` via
+and start a fresh session. For **be-stack-monitor**, add `dashboards` via
 `pnpm mcp:setup dashboards` after `pnpm dashboards:up` — see [`skills-and-mcps.md`](skills-and-mcps.md).

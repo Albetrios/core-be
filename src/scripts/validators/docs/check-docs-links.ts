@@ -7,7 +7,7 @@
  * pass — directory-tree blocks cite names relative to their tree root, which
  * cannot be resolved reliably. Tree drift is covered by the generated
  * `docs/reference/architecture/src-structure-tree.txt` gate and the periodic
- * structure audit (`/structure-audit`) instead.
+ * structure audit (`/be-structure-audit`) instead.
  *
  * Usage: pnpm docs:links:check
  */
@@ -89,7 +89,7 @@ const INTENTIONALLY_ABSENT = new Set<string>([
   'migrations/meta', // Drizzle bookkeeping — docs instruct never to commit it
   'tooling/feature-docs', // retired DOCS.md aggregator, cited historically
   '.github/sync.config.json', // dead reference the evals README quotes as a past finding
-  'docs/reference/load-testing.md', // docs-audit skill cites it as the example of a stale flat path
+  'docs/reference/load-testing.md', // be-docs-audit skill cites it as the example of a stale flat path
   // `init:project --reset-history` deletes the BASE project's audit history, so these are
   // legitimately empty in a freshly adopted repo. Restoring them would import another
   // product's history; leaving the links unguarded made this gate permanently red after
@@ -105,7 +105,7 @@ const INTENTIONALLY_ABSENT = new Set<string>([
  * `docs/american-spelling-organization` reads as a repo path to the pass below.
  * These are branch names, not files: nothing on disk should ever match them.
  * Add new branch examples here when the naming docs gain one.
- * Owner: agent-os/rules/git-branch-naming.mdc.
+ * Owner: agent-os/rules/be-git-branch-naming.mdc.
  */
 const BRANCH_NAME_EXAMPLES = new Set<string>(['docs/american-spelling-organization']);
 

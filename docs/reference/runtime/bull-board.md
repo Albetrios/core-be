@@ -117,7 +117,7 @@ Source queues (Bull Board adapters) registered in [`src/infrastructure/queue/que
 
 For each source queue, a **dead-letter** mirror named `<source-queue-name>-dlq` is also registered when the dashboard is enabled (except observability-only schedulers without DLQ consumers).
 
-When adding a new BullMQ queue, append its constant to `SOURCE_QUEUE_NAMES` in `queue-dashboard.ts` (and update this list). See **[workers-events skill](../../../.cursor/skills/workers-events/SKILL.md)** for the full registration checklist.
+When adding a new BullMQ queue, append its constant to `SOURCE_QUEUE_NAMES` in `queue-dashboard.ts` (and update this list). See **[be-workers-events skill](../../../.cursor/skills/be-workers-events/SKILL.md)** for the full registration checklist.
 
 ## Production
 

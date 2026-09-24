@@ -1,0 +1,88 @@
+---
+description: Canonical project slug, image names, and branch/environment mapping — use setup.config.json and generated constants; never hardcode core-be (or sibling literals) in application code, workflows, or tooling that should follow the manifest.
+alwaysApply: true
+---
+
+> **Source:** [`agent-os/docs/principles.md`](../../agent-os/docs/principles.md) — edit there for Claude Code / Codex; mirror changes here for Cursor auto-inject.
+
+# Project identity (names and branches)
+
+**Manifest (edit this):** `tooling/setup/setup.config.json` — `project.name`, `project.displayName`, `project.artifacts`, `environments[]`, optional `git`.
+
+**Generated (do not hand-edit):**
+
+- `src/shared/constants/project-identity.constants.ts` — runtime TypeScript
+- `.github/actions/setup-project-identity/action.yml`, `.github/project-identity.env`, `docker-bake.hcl`
+- Workflow `# BEGIN GENERATED project-identity` job `env:` blocks and branch/deploy patches
+
+**After manifest changes:** `pnpm tool:generate-project-identity` (pre-commit runs this when `setup.config.json` is staged). **Drift gate:** `pnpm tool:generate-project-identity:check` (in `pnpm ci:quality`).
+
+## Use these imports in `src/` and `tooling/` (not string literals)
+
+Import from `@/shared/constants/project-identity.constants.js`:
+
+| Need | Constant | Avoid |
+| ---- | -------- | ----- |
+| Product slug (issuer, Neon name, MCP scheme) | `PROJECT_SLUG` | `'core-be'` |
+| Human-facing product name (emails, copy) | `PROJECT_DISPLAY_NAME` | `'core-be'` |
+| OpenAPI default `info.title` (emitter fallback) | `PROJECT_OPENAPI_TITLE` | `'core-be API'` |
+| JWT `iss` | `JWT_ISSUER` | slug literal |
+| TOTP authenticator issuer | `TOTP_ISSUER` | slug literal |
+| WebAuthn RP name when env unset | `WEBAUTHN_RP_NAME_DEFAULT` | slug literal |
+| MCP URI scheme | `MCP_URI_SCHEME` | `'core-be'` |
+| MCP resource URIs | `MCP_OPENAPI_RESOURCE_URI`, `MCP_ROUTES_RESOURCE_URI` | `core-be://…` |
+| OTEL service names | `OTEL_SERVICE_NAME_API`, `OTEL_SERVICE_NAME_WORKER` | `core-be-api`, `core-be-worker` |
+| OTEL tracer scope | `OTEL_TRACER_NAME` | slug literal |
+| Local Docker tags (scripts/docs only) | `DOCKER_LOCAL_API_TAG`, `DOCKER_LOCAL_WORKER_TAG` | `core-be`, `core-be-worker` |
+| GHCR image repo names (reference) | `GHCR_API_IMAGE_NAME`, `GHCR_WORKER_IMAGE_NAME` | `core-be-api`, … |
+| Protected git branches | `PROTECTED_GIT_BRANCHES` | `['dev','main']` in app logic |
+| Default / prod / non-prod branch | `GIT_DEFAULT_BRANCH`, `GIT_PRODUCTION_BRANCH`, `GIT_NON_PRODUCTION_BRANCH` | `'dev'`, `'main'` |
+| Branch → hosted environment | `BRANCH_TO_ENVIRONMENT_MAP` | ad-hoc `main` → `production` maps |
+
+**Tests:** assert against the same constants (e.g. `JWT_ISSUER`), not copied literals.
+
+## GitHub Actions and Docker
+
+- **Never** hardcode image names (`core-be-api`, `core-be-worker`, `core-be:ci`) or protected branch lists in workflow YAML.
+- Use generated job `env`: `API_IMAGE`, `WORKER_IMAGE`, `DOCKER_LOCAL_API_TAG`, `GHCR_CACHE_SCOPE_*`, `PROTECTED_BRANCHES_JSON`.
+- To change branches or environments, edit the manifest and run `pnpm tool:generate-project-identity` — do not edit deploy `case` blocks by hand.
+
+## Shell scripts and OpenAPI locales
+
+- Scripts: source `.github/project-identity.env` when the slug is needed (see `tooling/ci/restore-drill-neon.sh`).
+- `src/shared/locales/{en,es}/openapi.json` — `info.title` is updated by codegen; keep in sync via generate, do not set a one-off product name by hand.
+
+## Also generated (do not hand-edit)
+
+`package.json` (`name`, `repository`, `bugs`, `homepage`), `.github/CODEOWNERS`,
+`.github/environments/production.json` reviewer handles, `sonar-project.properties`, and the
+`container_name:` values in `docker-compose*.yml` are all written by
+`pnpm tool:generate-project-identity`. Change `providers.github.owners` / `project.packageName` in
+the manifest and regenerate. CODEOWNERS remains the roster that
+`pnpm github:tool:governance-mode` reads; the generator owns only the handles, never the
+mode-coupled fields.
+
+Additional runtime constants: `API_SERVER_NAME`, `WEBHOOK_USER_AGENT_PREFIX`,
+`SCALAR_SLUG_DEFAULT`, `POSTMAN_COLLECTION_PREFIX`, `DBML_OUTPUT_PATH`, `PROJECT_REPOSITORY`,
+`PROJECT_REPOSITORY_OWNER`.
+
+## OK to keep literal (exceptions)
+
+- Repository folder name, historical CHANGELOG / review docs, Markdown prose naming the base project
+- External URLs or IDs already provisioned under a fixed slug in a third-party console
+- Generic prose that is not the product name (e.g. “backend API” in a description)
+- Anything listed in `IDENTITY_LITERAL_ALLOWLIST`
+  (`tooling/setup/codegen/validate-project-identity-literals.ts`) — entries are self-validating: a
+  stale one fails the gate
+
+## Enforcement
+
+`pnpm tool:generate-project-identity:check` (in `pnpm ci:quality` and the pre-commit guard) fails on
+drift, on any hardcoded slug/owner outside the generated targets and the allowlist, and on a stale
+allowlist entry. Adoption flow: `docs/getting-started/adopting-as-template.md` (`pnpm init:project`).
+
+## Related
+
+- Deployment: `docs/deployment/runbooks/add-new-environment.md`, `docs/deployment/ci-cd/cicd-and-deployment.md`
+- Skill: `agent-os/skills/be-env-schema-add/SKILL.md` (hosted envs + manifest)
+- Scoped sync rule: **be-project-identity-sync.mdc** when editing manifest, workflows, or codegen

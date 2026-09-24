@@ -1,0 +1,13 @@
+---
+description: When changing workspace extensions or settings, run the be-ide-productivity-guard skill so recommendations stay backend-relevant and consistent (no frontend-only extensions/settings; merge cSpell.words; keep envSwitcher).
+globs: .vscode/extensions.json, .vscode/settings.json
+alwaysApply: false
+---
+
+## IDE Productivity Guard
+
+When you change any of the matched files:
+
+1. **Read** `agent-os/skills/be-ide-productivity-guard/SKILL.md`.
+2. **Apply** the checklist: extensions backend-only, settings aligned with curated list, cSpell.words merged, envSwitcher globs present.
+3. Remove any frontend-only extensions or settings if they were introduced.

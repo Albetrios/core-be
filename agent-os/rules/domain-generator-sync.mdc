@@ -1,9 +1,0 @@
----
-description: Domain layout + route catalog when domain structure or routes change (single rule for containers, routes, src/routes.ts).
-globs: src/domains/**/*.container.ts, src/domains/**/*.routes.ts, src/routes.ts
-alwaysApply: false
----
-
-# Domain + routes sync
-
-New domain/sub-domain, `*.container.ts`, `*.routes.ts`, or `src/routes.ts` wiring? Run **[domain-generator](../skills/domain-generator/SKILL.md)**; for routes also **[route-schema-doc-guard](../skills/route-schema-doc-guard/SKILL.md)** + **[route-catalog](../skills/route-catalog/SKILL.md)**. Full chains: `new-domain` / `route-change` in `agent-os/skills/chains.json`.

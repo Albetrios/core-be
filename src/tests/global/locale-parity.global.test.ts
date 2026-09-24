@@ -25,7 +25,7 @@ const REFERENCE_LOCALE = 'en';
  * Namespaces excluded from parity.
  *
  * `openapi` is documentation copy generated per locale by `docs:generate:multilang`; it is allowed
- * to diverge in structure and is gated by the openapi-multilingual workflow instead.
+ * to diverge in structure and is gated by the be-openapi-multilingual workflow instead.
  */
 const EXCLUDED_NAMESPACES = new Set(['openapi']);
 

@@ -1,0 +1,18 @@
+---
+description: Change-completeness definition-of-done for core-be — every code change must propagate to the artifacts that mirror it (its own tests, cross-cutting suites, docs, rules, skills). Always active.
+alwaysApply: true
+---
+
+# Change completeness (core-be)
+
+Owner: **[be-change-completeness-guard](../skills/be-change-completeness-guard/SKILL.md)** — the full five-layer trace-the-change checklist lives there.
+
+A change is done only when **every artifact that mirrors it has moved with it**, not when the code compiles and one test passes. Before calling it done, walk the five layers:
+
+1. **Its own tests** at the right layer (be-test-generator).
+2. **Cross-cutting suites** — security / integration / global / contract / chaos / load — asserted once at the owning layer.
+3. **Docs** — `*.overview.md`, `docs/reference`, TSDoc (`pnpm tsdoc:check`), route `schema`, `.env.example`.
+4. **Rules** — the relevant `agent-os/rules` file (be-structure-maintainer).
+5. **Skills** — be-skill-index count + table, `groups.json`, `skill-triggers.md`, the `N project skills` count in `CLAUDE.md` / `AGENTS.md` (`pnpm agent-os:check`).
+
+When a single fact moves, **grep the literal across `src/`, `docs/`, `agent-os/`** and fix every stale mirror. Treat a gate failure as a mirror you missed.

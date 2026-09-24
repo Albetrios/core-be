@@ -1,0 +1,24 @@
+---
+description: When changing project identity (manifest, generated constants, workflows, OpenAPI locales, identity codegen), regenerate artifacts and use constants from project-identity.constants.ts — never duplicate slug or image names.
+globs: tooling/setup/setup.config.json, tooling/setup/codegen/**, tooling/setup/init-project.ts, src/shared/constants/project-identity.constants.ts, .github/workflows/**/*.yml, .github/CODEOWNERS, .github/environments/*.json, sonar-project.properties, docker-bake.hcl, docker-compose*.yml, src/shared/locales/*/openapi.json
+alwaysApply: false
+---
+
+## Project identity sync
+
+When you change any matched file:
+
+1. **Read** `agent-os/rules/be-project-identity.mdc` (constant mapping table).
+2. **Edit** `tooling/setup/setup.config.json` for slug, artifacts, branches, or environments — not scattered literals.
+3. **Run** `pnpm tool:generate-project-identity` and stage all generated outputs (lint-staged does this when only the manifest is staged).
+4. **Verify** `pnpm tool:generate-project-identity:check` — this runs three scans: generated-artifact drift, the workflow literal scan, and the **repo-wide identity literal scan** (any hardcoded slug/owner outside the generated targets and `IDENTITY_LITERAL_ALLOWLIST`, plus stale allowlist entries).
+5. If `environments[]` changed: `pnpm github:sync --check`, then `pnpm github:sync` when ready.
+6. If `providers.github.owners` changed: `pnpm github:tool:governance-mode:check` — CODEOWNERS is the roster that tool reads.
+
+**In TypeScript** added or touched by your change: import from `@/shared/constants/project-identity.constants.js` per the table in `be-project-identity.mdc`. Do not introduce a new project-slug, image-name, or `'main'/'dev'` branch literal unless the constant already exists for that purpose.
+
+**Do not** hand-edit any generator output: `project-identity.constants.ts`, `.github/project-identity.env`, `.github/CODEOWNERS`, `docker-bake.hcl`, `sonar-project.properties`, `package.json` identity fields, `container_name:` values, or the production environment's reviewer handles.
+
+**Rename-safety rule for codegen:** a rewrite must never anchor its search on the CURRENT slug — match the surrounding shape or the service suffix instead. Anchoring on the literal is self-disabling: after the first rename it stops matching and the rewrite silently goes stale. Pinned by `src/tests/unit/ci/project-identity.policy.unit.test.ts`.
+
+**Adoption:** `docs/getting-started/adopting-as-template.md` and `pnpm init:project` are the entry point for starting a new project from this one; keep them aligned when the manifest schema changes.

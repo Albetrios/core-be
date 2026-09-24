@@ -9,7 +9,7 @@
 ```mermaid
 flowchart LR
   A[Copy template] --> B[Fill details]
-  B --> C[AI consults skill-index]
+  B --> C[AI consults be-skill-index]
   C --> D[Run skills in order]
   D --> E[Apply rules]
   E --> F[Lint]
@@ -17,7 +17,7 @@ flowchart LR
 
 1. **You (the user)** describe the requirement using the **Details to provide** for the matching type below (omit fields covered by **Default assumptions**).
 2. **The AI** applies defaults, proposes a **Plan** once (see [Plan confirmation](#plan-confirmation-ai-workflow)), then runs skills after you reply **go**.
-3. **The AI** consults **`.cursor/skills/skill-index/SKILL.md`** first, invokes the **Skills to run** in order, applies the **Rules** that match the changed files, and fixes lint issues in touched files (**code-smells-and-best-practices**) before finishing.
+3. **The AI** consults **`.cursor/skills/be-skill-index/SKILL.md`** first, invokes the **Skills to run** in order, applies the **Rules** that match the changed files, and fixes lint issues in touched files (**be-code-smells-and-best-practices**) before finishing.
 
 ---
 
@@ -44,19 +44,19 @@ The AI fills these unless your message says otherwise. List overrides in your fi
 
 ## Full-slice template — one requirement → production-ready slice
 
-Fill this once and run **`/build-requirement`** (or paste it as your prompt). The AI validates it for completeness (missing fields are surfaced, never guessed), then drives the full build chain to a gate-passing vertical slice and emits a **reports bundle**. This is the autonomous path; the type-by-type sections below remain the detailed reference.
+Fill this once and run **`/be-build-requirement`** (or paste it as your prompt). The AI validates it for completeness (missing fields are surfaced, never guessed), then drives the full build chain to a gate-passing vertical slice and emits a **reports bundle**. This is the autonomous path; the type-by-type sections below remain the detailed reference.
 
 ### Template
 
-The canonical form is **[`requirement.template.md`](requirement.template.md)** (filled example: **[`requirement.example.md`](requirement.example.md)**). You don't have to fill it — give **`/build-requirement`** a direct task and it drafts the full 9-section document (data model, API, logic, i18n, seed, tests [unit/integration/e2e/smoke/contract/chaos], non-functionals, and a **section-9 file tree**) for your review, asks about anything it shouldn't guess, and iterates before building. Or fill the form yourself; keep the `## N.` headings as-is and mark anything N/A as `none`.
+The canonical form is **[`requirement.template.md`](requirement.template.md)** (filled example: **[`requirement.example.md`](requirement.example.md)**). You don't have to fill it — give **`/be-build-requirement`** a direct task and it drafts the full 9-section document (data model, API, logic, i18n, seed, tests [unit/integration/e2e/smoke/contract/chaos], non-functionals, and a **section-9 file tree**) for your review, asks about anything it shouldn't guess, and iterates before building. Or fill the form yourself; keep the `## N.` headings as-is and mark anything N/A as `none`.
 
-### What `/build-requirement` does
+### What `/be-build-requirement` does
 
 It runs the pipeline (each step is an existing skill), self-healing failed gates and escalating only on genuine ambiguity:
 
-`schema-complete` → **domain-generator** (repository → service → controller → dto/validator/serializer/types → container + route registration) → `route-complete` → **workers-events** (if events) → **seed-maintainer** → **test-generator** → i18n + **tsdoc-export-guard** + **overview-doc-maintainer** + OpenAPI → **/pre-merge-review**.
+`schema-complete` → **be-domain-generator** (repository → service → controller → dto/validator/serializer/types → container + route registration) → `route-complete` → **be-workers-events** (if events) → **be-seed-maintainer** → **be-test-generator** → i18n + **be-tsdoc-export-guard** + **be-overview-doc-maintainer** + OpenAPI → **/be-pre-merge-review**.
 
-**Definition of done:** `pnpm validate` + the route/domain gates + a live `pnpm verify:base` smoke + `/pre-merge-review` clean. It emits a **reports bundle** under `docs/builds/<date>-<feature>/`: build report (files, decisions, assumptions, deviations), a requirement→code→test traceability matrix, the review report, and a quality/security summary.
+**Definition of done:** `pnpm validate` + the route/domain gates + a live `pnpm verify:base` smoke + `/be-pre-merge-review` clean. It emits a **reports bundle** under `docs/builds/<date>-<feature>/`: build report (files, decisions, assumptions, deviations), a requirement→code→test traceability matrix, the review report, and a quality/security summary.
 
 ---
 
@@ -78,23 +78,23 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 
 **Skills to run (in order):**
 
-1. **domain-generator** — `.cursor/skills/domain-generator/SKILL.md`
-2. **schema-generator** (if new tables) — `.cursor/skills/schema-generator/SKILL.md`
-3. **sql-design-guard** — `.cursor/skills/sql-design-guard/SKILL.md`
-4. **db-migration-maintainer** (if new tables) — `.cursor/skills/db-migration-maintainer/SKILL.md`
-5. **workers-events** (if events/queues/workers) — `.cursor/skills/workers-events/SKILL.md`
-6. **route-catalog** — `.cursor/skills/route-catalog/SKILL.md`
-7. **route-schema-doc-guard** — `.cursor/skills/route-schema-doc-guard/SKILL.md`
-8. **test-generator** — `.cursor/skills/test-generator/SKILL.md`
-9. **seed-maintainer** (if seed data needed) — `.cursor/skills/seed-maintainer/SKILL.md`
-10. **tsdoc-export-guard** — TSDoc on every public export added — `.cursor/skills/tsdoc-export-guard/SKILL.md`
-11. **overview-doc-maintainer** — `<folder>.overview.md` for the new domain (Template A.1) and the new sub-domain (Template A.2) — `.cursor/skills/overview-doc-maintainer/SKILL.md`
-12. **system-narrative-maintainer** (only when adding a new domain) — update Domains table in `src/OVERVIEW.md`; add patterns/flows entries if introduced — `.cursor/skills/system-narrative-maintainer/SKILL.md`
-13. **structure-maintainer** — `.cursor/skills/structure-maintainer/SKILL.md`
-14. **code-smells-and-best-practices** — zero new lint issues in touched files; run `pnpm tsdoc:check` to confirm coverage budget is not exceeded
+1. **be-domain-generator** — `.cursor/skills/be-domain-generator/SKILL.md`
+2. **be-schema-generator** (if new tables) — `.cursor/skills/be-schema-generator/SKILL.md`
+3. **be-sql-design-guard** — `.cursor/skills/be-sql-design-guard/SKILL.md`
+4. **be-db-migration-maintainer** (if new tables) — `.cursor/skills/be-db-migration-maintainer/SKILL.md`
+5. **be-workers-events** (if events/queues/workers) — `.cursor/skills/be-workers-events/SKILL.md`
+6. **be-route-catalog** — `.cursor/skills/be-route-catalog/SKILL.md`
+7. **be-route-schema-doc-guard** — `.cursor/skills/be-route-schema-doc-guard/SKILL.md`
+8. **be-test-generator** — `.cursor/skills/be-test-generator/SKILL.md`
+9. **be-seed-maintainer** (if seed data needed) — `.cursor/skills/be-seed-maintainer/SKILL.md`
+10. **be-tsdoc-export-guard** — TSDoc on every public export added — `.cursor/skills/be-tsdoc-export-guard/SKILL.md`
+11. **be-overview-doc-maintainer** — `<folder>.overview.md` for the new domain (Template A.1) and the new sub-domain (Template A.2) — `.cursor/skills/be-overview-doc-maintainer/SKILL.md`
+12. **be-system-narrative-maintainer** (only when adding a new domain) — update Domains table in `src/OVERVIEW.md`; add patterns/flows entries if introduced — `.cursor/skills/be-system-narrative-maintainer/SKILL.md`
+13. **be-structure-maintainer** — `.cursor/skills/be-structure-maintainer/SKILL.md`
+14. **be-code-smells-and-best-practices** — zero new lint issues in touched files; run `pnpm tsdoc:check` to confirm coverage budget is not exceeded
 
 **Rules that will apply:**  
-`core-be-src-architecture.mdc`, `domain-generator-sync.mdc`, `sql-design-guard-sync.mdc`, `no-placeholder-files.mdc`, `code-smells-and-best-practices-sync.mdc`, `testing-conventions.mdc`
+`be-src-architecture.mdc`, `be-domain-generator-sync.mdc`, `be-sql-design-guard-sync.mdc`, `be-no-placeholder-files.mdc`, `be-code-smells-and-best-practices-sync.mdc`, `be-testing-conventions.mdc`
 
 ---
 
@@ -109,16 +109,16 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 
 **Skills to run (in order):**
 
-1. **domain-generator** (for layout reference) or implement in existing controller/service/validator/serializer
-2. **route-catalog** — `.cursor/skills/route-catalog/SKILL.md`
-3. **route-schema-doc-guard** — `.cursor/skills/route-schema-doc-guard/SKILL.md`
-4. **test-generator** (add tests for new routes)
-5. **seed-maintainer** (if new routes need seed data)
-6. **tsdoc-export-guard** — TSDoc on any new public exports introduced by the route work; run `pnpm tsdoc:check`
-7. **code-smells-and-best-practices**
+1. **be-domain-generator** (for layout reference) or implement in existing controller/service/validator/serializer
+2. **be-route-catalog** — `.cursor/skills/be-route-catalog/SKILL.md`
+3. **be-route-schema-doc-guard** — `.cursor/skills/be-route-schema-doc-guard/SKILL.md`
+4. **be-test-generator** (add tests for new routes)
+5. **be-seed-maintainer** (if new routes need seed data)
+6. **be-tsdoc-export-guard** — TSDoc on any new public exports introduced by the route work; run `pnpm tsdoc:check`
+7. **be-code-smells-and-best-practices**
 
 **Rules that will apply:**  
-`core-be-src-architecture.mdc`, `domain-generator-sync.mdc`, `code-smells-and-best-practices-sync.mdc`, `testing-conventions.mdc`
+`be-src-architecture.mdc`, `be-domain-generator-sync.mdc`, `be-code-smells-and-best-practices-sync.mdc`, `be-testing-conventions.mdc`
 
 ---
 
@@ -137,17 +137,17 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 
 **Skills to run (in order):**
 
-1. **workers-events** — `.cursor/skills/workers-events/SKILL.md`
-2. **route-catalog** + **route-schema-doc-guard** (if any new HTTP route triggers the job)
-3. **test-generator** (if new routes or worker tests)
-4. **tsdoc-export-guard** — TSDoc summary + `@remarks` on every new export in `*.worker.ts` / `*.processor.ts` / queue / event files
-5. **overview-doc-maintainer** (if a new domain/sub-domain folder is introduced)
-6. **system-narrative-maintainer** (if the worker introduces a new pattern or end-to-end flow)
-7. **structure-maintainer** (if new dirs)
-8. **code-smells-and-best-practices** — run `pnpm tsdoc:check` to confirm coverage budget
+1. **be-workers-events** — `.cursor/skills/be-workers-events/SKILL.md`
+2. **be-route-catalog** + **be-route-schema-doc-guard** (if any new HTTP route triggers the job)
+3. **be-test-generator** (if new routes or worker tests)
+4. **be-tsdoc-export-guard** — TSDoc summary + `@remarks` on every new export in `*.worker.ts` / `*.processor.ts` / queue / event files
+5. **be-overview-doc-maintainer** (if a new domain/sub-domain folder is introduced)
+6. **be-system-narrative-maintainer** (if the worker introduces a new pattern or end-to-end flow)
+7. **be-structure-maintainer** (if new dirs)
+8. **be-code-smells-and-best-practices** — run `pnpm tsdoc:check` to confirm coverage budget
 
 **Rules that will apply:**  
-`core-be-src-architecture.mdc`, `workers-events-sync.mdc`, `code-smells-and-best-practices-sync.mdc`
+`be-src-architecture.mdc`, `be-workers-events-sync.mdc`, `be-code-smells-and-best-practices-sync.mdc`
 
 ---
 
@@ -158,23 +158,23 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 - **Domain** (DB schema name): **\*\***\_**\*\***
 - **Sub-domain** (if any): **\*\***\_**\*\***
 - **Table name** (snake_case, plural): **\*\***\_**\*\***
-- **Columns**: name, type (e.g. `text`, `bigint`, `timestamp with time zone`, `jsonb`), `notNull()`, `default()`, unique, FK to table.column. Use `text` everywhere — never `varchar(n)`; enforce real length/format limits with a `CHECK` constraint (see `sql-design-guard` section C).
+- **Columns**: name, type (e.g. `text`, `bigint`, `timestamp with time zone`, `jsonb`), `notNull()`, `default()`, unique, FK to table.column. Use `text` everywhere — never `varchar(n)`; enforce real length/format limits with a `CHECK` constraint (see `be-sql-design-guard` section C).
 - **Indexes**: which columns, unique or not
 - **Migration**: "add new migration file" or "change existing table X"
 
-**Defaults:** New migration file (forward-only in PR); `text` columns not `varchar(n)`; indexes for FKs and common filters; `IF NOT EXISTS` / safe DDL per **db-migration-maintainer**.
+**Defaults:** New migration file (forward-only in PR); `text` columns not `varchar(n)`; indexes for FKs and common filters; `IF NOT EXISTS` / safe DDL per **be-db-migration-maintainer**.
 
 **Skills to run (in order):**
 
-1. **schema-generator** — `.cursor/skills/schema-generator/SKILL.md`
-2. **sql-design-guard** — `.cursor/skills/sql-design-guard/SKILL.md`
-3. **db-migration-maintainer** — `.cursor/skills/db-migration-maintainer/SKILL.md`
-4. **seed-maintainer** (if seed data for new tables)
-5. **structure-maintainer** (if new schema file)
-6. **code-smells-and-best-practices**
+1. **be-schema-generator** — `.cursor/skills/be-schema-generator/SKILL.md`
+2. **be-sql-design-guard** — `.cursor/skills/be-sql-design-guard/SKILL.md`
+3. **be-db-migration-maintainer** — `.cursor/skills/be-db-migration-maintainer/SKILL.md`
+4. **be-seed-maintainer** (if seed data for new tables)
+5. **be-structure-maintainer** (if new schema file)
+6. **be-code-smells-and-best-practices**
 
 **Rules that will apply:**  
-`core-be-src-architecture.mdc`, `sql-design-guard-sync.mdc`, `code-smells-and-best-practices-sync.mdc`
+`be-src-architecture.mdc`, `be-sql-design-guard-sync.mdc`, `be-code-smells-and-best-practices-sync.mdc`
 
 ---
 
@@ -190,11 +190,11 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 
 **Skills to run (in order):**
 
-1. **seed-maintainer** — `.cursor/skills/seed-maintainer/SKILL.md`
-2. **code-smells-and-best-practices**
+1. **be-seed-maintainer** — `.cursor/skills/be-seed-maintainer/SKILL.md`
+2. **be-code-smells-and-best-practices**
 
 **Rules that will apply:**  
-`code-smells-and-best-practices-sync.mdc`
+`be-code-smells-and-best-practices-sync.mdc`
 
 ---
 
@@ -207,19 +207,19 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 - **Routes to expose** (method, path, body, response)
 - **Env/secrets**: list any Supabase-specific env vars and their core-be equivalent (e.g. `SUPABASE_URL` → `DATABASE_URL`)
 
-**Defaults:** Target domain follows canonical layout; map Deno handlers to Fastify routes + services; use **env-schema-add** for any new env vars.
+**Defaults:** Target domain follows canonical layout; map Deno handlers to Fastify routes + services; use **be-env-schema-add** for any new env vars.
 
 **Skills to run (in order):**
 
-1. **supabase-porting** — `.cursor/skills/supabase-porting/SKILL.md`
-2. **domain-generator** or extend existing domain
-3. **route-catalog** + **openapi-route-sync**
-4. **test-generator**
-5. **structure-maintainer**
-6. **code-smells-and-best-practices**
+1. **be-supabase-porting** — `.cursor/skills/be-supabase-porting/SKILL.md`
+2. **be-domain-generator** or extend existing domain
+3. **be-route-catalog** + **be-openapi-route-sync**
+4. **be-test-generator**
+5. **be-structure-maintainer**
+6. **be-code-smells-and-best-practices**
 
 **Rules that will apply:**  
-`core-be-src-architecture.mdc`, `domain-generator-sync.mdc`, `code-smells-and-best-practices-sync.mdc`, `testing-conventions.mdc`
+`be-src-architecture.mdc`, `be-domain-generator-sync.mdc`, `be-code-smells-and-best-practices-sync.mdc`, `be-testing-conventions.mdc`
 
 ---
 
@@ -234,11 +234,11 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 
 **Skills to run (in order):**
 
-1. **code-quality-guard** — `.cursor/skills/code-quality-guard/SKILL.md`
-2. **code-smells-and-best-practices** (if code under `src/` is touched)
+1. **be-code-quality-guard** — `.cursor/skills/be-code-quality-guard/SKILL.md`
+2. **be-code-smells-and-best-practices** (if code under `src/` is touched)
 
 **Rules that will apply:**  
-`code-quality-guard-sync.mdc`, `code-smells-and-best-practices-sync.mdc`
+`be-code-quality-guard-sync.mdc`, `be-code-smells-and-best-practices-sync.mdc`
 
 ---
 
@@ -253,12 +253,12 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 
 **Skills to run (in order):**
 
-1. **production-hardening-guard** — `.cursor/skills/production-hardening-guard/SKILL.md`
-2. **structure-maintainer** (if new files or layout)
-3. **code-smells-and-best-practices**
+1. **be-production-hardening-guard** — `.cursor/skills/be-production-hardening-guard/SKILL.md`
+2. **be-structure-maintainer** (if new files or layout)
+3. **be-code-smells-and-best-practices**
 
 **Rules that will apply:**  
-`production-hardening.mdc`, `core-be-src-architecture.mdc`, `code-smells-and-best-practices-sync.mdc`
+`be-production-hardening.mdc`, `be-src-architecture.mdc`, `be-code-smells-and-best-practices-sync.mdc`
 
 ---
 
@@ -270,17 +270,17 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 - **New path(s)**: **\*\***\_**\*\***
 - **Reason**: e.g. "align with domain naming", "split sub-domain"
 
-**Defaults:** Mechanical rename with import path updates; sync **structure-maintainer** artifacts (CLAUDE.md, skills, rules) when layout docs change.
+**Defaults:** Mechanical rename with import path updates; sync **be-structure-maintainer** artifacts (CLAUDE.md, skills, rules) when layout docs change.
 
 **Skills to run (in order):**
 
-1. **structure-maintainer** — `.cursor/skills/structure-maintainer/SKILL.md`
-2. **domain-generator** (if domain layout changes)
-3. **route-catalog** (if route files move)
-4. **code-smells-and-best-practices**
+1. **be-structure-maintainer** — `.cursor/skills/be-structure-maintainer/SKILL.md`
+2. **be-domain-generator** (if domain layout changes)
+3. **be-route-catalog** (if route files move)
+4. **be-code-smells-and-best-practices**
 
 **Rules that will apply:**  
-`structure-maintainer-sync.mdc`, `core-be-src-architecture.mdc`, `domain-generator-sync.mdc` (if routes), `code-smells-and-best-practices-sync.mdc`
+`be-structure-maintainer-sync.mdc`, `be-src-architecture.mdc`, `be-domain-generator-sync.mdc` (if routes), `be-code-smells-and-best-practices-sync.mdc`
 
 ---
 
@@ -296,10 +296,10 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 
 **Skills to run (in order):**
 
-1. **ci-investigator** (if diagnosing one check) — `.cursor/skills/ci-investigator/SKILL.md`
-2. **pr-babysit** — `.cursor/skills/pr-babysit/SKILL.md`
-3. **before-commit-guard** (if pre-commit fails locally)
-4. Skills from **skill-index** matching the code you change (routes, migrations, contract/chaos tests, etc.)
+1. **be-ci-investigation** (if diagnosing one check) — `.cursor/skills/be-ci-investigation/SKILL.md`
+2. **be-pr-babysit** — `.cursor/skills/be-pr-babysit/SKILL.md`
+3. **be-before-commit-guard** (if pre-commit fails locally)
+4. Skills from **be-skill-index** matching the code you change (routes, migrations, contract/chaos tests, etc.)
 
 ---
 
@@ -315,8 +315,8 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 
 **Skills to run:**
 
-1. **split-to-prs** — `.cursor/skills/split-to-prs/SKILL.md`
-2. Per-slice skills from **skill-index** after each PR is carved out
+1. **be-split-to-prs** — `.cursor/skills/be-split-to-prs/SKILL.md`
+2. Per-slice skills from **be-skill-index** after each PR is carved out
 
 ---
 
@@ -328,14 +328,14 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 - **Scope**: which domains/files (e.g. "billing and tenancy", "only auth controller").
 - **Acceptance**: how to verify (e.g. "GET /api/v1/billing/plans returns 200", "lint and tests pass").
 
-**Defaults:** Infer requirement type from scope; apply global defaults above; run **skill-index** triggers for every file category touched.
+**Defaults:** Infer requirement type from scope; apply global defaults above; run **be-skill-index** triggers for every file category touched.
 
 **Skills to run:**
 
-- **Always:** Consult **skill-index** first, then run any skill whose trigger matches your changes.
-- **Always:** **code-smells-and-best-practices** after editing `src/**/*.ts` (fix touched files; pre-commit/CI run full validate).
-- **If routes change:** **route-schema-doc-guard**, **route-catalog**, **openapi-multilingual** (new tags), **seed-maintainer**.
-- **If domain/structure changes:** **structure-maintainer**, **domain-generator** (if new scaffold).
+- **Always:** Consult **be-skill-index** first, then run any skill whose trigger matches your changes.
+- **Always:** **be-code-smells-and-best-practices** after editing `src/**/*.ts` (fix touched files; pre-commit/CI run full validate).
+- **If routes change:** **be-route-schema-doc-guard**, **be-route-catalog**, **be-openapi-multilingual** (new tags), **be-seed-maintainer**.
+- **If domain/structure changes:** **be-structure-maintainer**, **be-domain-generator** (if new scaffold).
 
 **Rules that will apply:**  
 All `.cursor/rules/*.mdc` whose globs match the files you change (see skill index "Auto-trigger rules" table).
@@ -384,52 +384,51 @@ flowchart LR
 
 | Skill                          | Path                                                     | When to invoke                                            |
 | ------------------------------ | -------------------------------------------------------- | --------------------------------------------------------- |
-| **skill-index**                | `.cursor/skills/skill-index/SKILL.md`                    | **First** — full catalog and triggers (45 project skills) |
-| domain-generator               | `.cursor/skills/domain-generator/SKILL.md`               | New domain/sub-domain scaffold                            |
-| route-catalog                  | `.cursor/skills/route-catalog/SKILL.md`                  | Any change to `*.routes.ts`                               |
-| route-schema-doc-guard         | `.cursor/skills/route-schema-doc-guard/SKILL.md`         | Route `schema: { summary, description, tags }`          |
-| workers-events                 | `.cursor/skills/workers-events/SKILL.md`                 | Events, queues, workers                                   |
-| schema-generator               | `.cursor/skills/schema-generator/SKILL.md`               | New/changed Drizzle schema                                |
-| sql-design-guard               | `.cursor/skills/sql-design-guard/SKILL.md`               | Schema design review                                      |
-| db-migration-maintainer        | `.cursor/skills/db-migration-maintainer/SKILL.md`        | SQL in `migrations/`                                      |
-| test-generator                 | `.cursor/skills/test-generator/SKILL.md`                 | Tests, validators, serializers                            |
-| seed-maintainer                | `.cursor/skills/seed-maintainer/SKILL.md`                | Seed scripts or seed data                                 |
-| structure-maintainer           | `.cursor/skills/structure-maintainer/SKILL.md`           | Renames, moves, layout sync                               |
-| supabase-porting               | `.cursor/skills/supabase-porting/SKILL.md`               | Supabase Edge Functions → core-be (manual)                |
-| code-quality-guard             | `.cursor/skills/code-quality-guard/SKILL.md`             | ESLint, Husky, CI security                                |
-| production-hardening-guard     | `.cursor/skills/production-hardening-guard/SKILL.md`     | Middleware, infra, security                               |
-| path-to-production-gate        | `.cursor/skills/path-to-production-gate/SKILL.md`        | Pre-release / deploy review                               |
-| code-smells-and-best-practices | `.cursor/skills/code-smells-and-best-practices/SKILL.md` | Any edit under `src/`                                     |
-| lint-warnings-handler          | `.cursor/skills/lint-warnings-handler/SKILL.md`          | Detail guide (via code-smells)                            |
-| i18n-message-guard             | `.cursor/skills/i18n-message-guard/SKILL.md`             | User-facing messages / locales                            |
-| openapi-multilingual           | `.cursor/skills/openapi-multilingual/SKILL.md`           | OpenAPI locale files                                      |
-| env-schema-add                 | `.cursor/skills/env-schema-add/SKILL.md`                 | Env schema / `.env.example` (Secret vs Variable, sub-section choice) |
-| docs-maintainer                | `.cursor/skills/docs-maintainer/SKILL.md`                | Hand-written `docs/` changes                              |
-| docs-audit                     | `.cursor/skills/docs-audit/SKILL.md`                     | Full docs review (on request)                             |
-| setup-infra-maintainer         | `.cursor/skills/setup-infra-maintainer/SKILL.md`         | `tooling/setup/` providers                                |
-| ide-productivity-guard         | `.cursor/skills/ide-productivity-guard/SKILL.md`         | `.vscode/` project IDE config                             |
-| dependency-security            | `.cursor/skills/dependency-security/SKILL.md`            | `package.json` / lockfile                                 |
-| before-commit-guard            | `.cursor/skills/before-commit-guard/SKILL.md`            | Failed pre-commit / commit-ready                          |
-| change-completeness-guard      | `.cursor/skills/change-completeness-guard/SKILL.md`      | Finishing any change — DoD: tests + cross-cutting + docs + rules + skills |
-| pr-babysit                     | `.cursor/skills/pr-babysit/SKILL.md`                     | PR merge-ready loop (CI + comments)                       |
-| split-to-prs                   | `.cursor/skills/split-to-prs/SKILL.md`                   | Split branch into reviewable PRs                          |
-| ci-investigator                | `.cursor/skills/ci-investigator/SKILL.md`                | Diagnose one failing CI check                             |
-| contract-test-maintainer       | `.cursor/skills/contract-test-maintainer/SKILL.md`       | Stripe/Resend/S3 nock contracts                           |
-| chaos-test-maintainer          | `.cursor/skills/chaos-test-maintainer/SKILL.md`          | Toxiproxy chaos tests                                     |
-| cursor-global-skills           | `.cursor/skills/cursor-global-skills/SKILL.md`           | Reference: Cursor built-in skills                         |
-| **system-narrative-maintainer**| `.cursor/skills/system-narrative-maintainer/SKILL.md`    | Hand-authored `src/OVERVIEW.md` / `src/PATTERNS.md` / `src/FLOWS.md` / `src/POLICIES.md` |
-| **overview-doc-maintainer**    | `.cursor/skills/overview-doc-maintainer/SKILL.md`        | Per-folder `<folder>.overview.md` (hand-written) |
-| **route-schema-doc-guard**     | `.cursor/skills/route-schema-doc-guard/SKILL.md`         | Fastify route `schema: { summary, description, tags }`    |
-| **tsdoc-export-guard**         | `.cursor/skills/tsdoc-export-guard/SKILL.md`             | TSDoc on every public export + `@remarks` on services / workers / processors / policy files; gated by `pnpm tsdoc:check` |
+| **be-skill-index**                | `.cursor/skills/be-skill-index/SKILL.md`                    | **First** — full catalog and triggers (45 project skills) |
+| be-domain-generator               | `.cursor/skills/be-domain-generator/SKILL.md`               | New domain/sub-domain scaffold                            |
+| be-route-catalog                  | `.cursor/skills/be-route-catalog/SKILL.md`                  | Any change to `*.routes.ts`                               |
+| be-route-schema-doc-guard         | `.cursor/skills/be-route-schema-doc-guard/SKILL.md`         | Route `schema: { summary, description, tags }`          |
+| be-workers-events                 | `.cursor/skills/be-workers-events/SKILL.md`                 | Events, queues, workers                                   |
+| be-schema-generator               | `.cursor/skills/be-schema-generator/SKILL.md`               | New/changed Drizzle schema                                |
+| be-sql-design-guard               | `.cursor/skills/be-sql-design-guard/SKILL.md`               | Schema design review                                      |
+| be-db-migration-maintainer        | `.cursor/skills/be-db-migration-maintainer/SKILL.md`        | SQL in `migrations/`                                      |
+| be-test-generator                 | `.cursor/skills/be-test-generator/SKILL.md`                 | Tests, validators, serializers                            |
+| be-seed-maintainer                | `.cursor/skills/be-seed-maintainer/SKILL.md`                | Seed scripts or seed data                                 |
+| be-structure-maintainer           | `.cursor/skills/be-structure-maintainer/SKILL.md`           | Renames, moves, layout sync                               |
+| be-supabase-porting               | `.cursor/skills/be-supabase-porting/SKILL.md`               | Supabase Edge Functions → core-be (manual)                |
+| be-code-quality-guard             | `.cursor/skills/be-code-quality-guard/SKILL.md`             | ESLint, Husky, CI security                                |
+| be-production-hardening-guard     | `.cursor/skills/be-production-hardening-guard/SKILL.md`     | Middleware, infra, security                               |
+| be-path-to-production-gate        | `.cursor/skills/be-path-to-production-gate/SKILL.md`        | Pre-release / deploy review                               |
+| be-code-smells-and-best-practices | `.cursor/skills/be-code-smells-and-best-practices/SKILL.md` | Any edit under `src/`                                     |
+| be-lint-warnings-handler          | `.cursor/skills/be-lint-warnings-handler/SKILL.md`          | Detail guide (via code-smells)                            |
+| be-i18n-message-guard             | `.cursor/skills/be-i18n-message-guard/SKILL.md`             | User-facing messages / locales                            |
+| be-openapi-multilingual           | `.cursor/skills/be-openapi-multilingual/SKILL.md`           | OpenAPI locale files                                      |
+| be-env-schema-add                 | `.cursor/skills/be-env-schema-add/SKILL.md`                 | Env schema / `.env.example` (Secret vs Variable, sub-section choice) |
+| be-docs-maintainer                | `.cursor/skills/be-docs-maintainer/SKILL.md`                | Hand-written `docs/` changes                              |
+| be-docs-audit                     | `.cursor/skills/be-docs-audit/SKILL.md`                     | Full docs review (on request)                             |
+| be-ide-productivity-guard         | `.cursor/skills/be-ide-productivity-guard/SKILL.md`         | `.vscode/` project IDE config                             |
+| be-dependency-security            | `.cursor/skills/be-dependency-security/SKILL.md`            | `package.json` / lockfile                                 |
+| be-before-commit-guard            | `.cursor/skills/be-before-commit-guard/SKILL.md`            | Failed pre-commit / commit-ready                          |
+| be-change-completeness-guard      | `.cursor/skills/be-change-completeness-guard/SKILL.md`      | Finishing any change — DoD: tests + cross-cutting + docs + rules + skills |
+| be-pr-babysit                     | `.cursor/skills/be-pr-babysit/SKILL.md`                     | PR merge-ready loop (CI + comments)                       |
+| be-split-to-prs                   | `.cursor/skills/be-split-to-prs/SKILL.md`                   | Split branch into reviewable PRs                          |
+| be-ci-investigation                | `.cursor/skills/be-ci-investigation/SKILL.md`                | Diagnose one failing CI check                             |
+| be-contract-test-maintainer       | `.cursor/skills/be-contract-test-maintainer/SKILL.md`       | Stripe/Resend/S3 nock contracts                           |
+| be-chaos-test-maintainer          | `.cursor/skills/be-chaos-test-maintainer/SKILL.md`          | Toxiproxy chaos tests                                     |
+| be-cursor-global-skills           | `.cursor/skills/be-cursor-global-skills/SKILL.md`           | Reference: Cursor built-in skills                         |
+| **be-system-narrative-maintainer**| `.cursor/skills/be-system-narrative-maintainer/SKILL.md`    | Hand-authored `src/OVERVIEW.md` / `src/PATTERNS.md` / `src/FLOWS.md` / `src/POLICIES.md` |
+| **be-overview-doc-maintainer**    | `.cursor/skills/be-overview-doc-maintainer/SKILL.md`        | Per-folder `<folder>.overview.md` (hand-written) |
+| **be-route-schema-doc-guard**     | `.cursor/skills/be-route-schema-doc-guard/SKILL.md`         | Fastify route `schema: { summary, description, tags }`    |
+| **be-tsdoc-export-guard**         | `.cursor/skills/be-tsdoc-export-guard/SKILL.md`             | TSDoc on every public export + `@remarks` on services / workers / processors / policy files; gated by `pnpm tsdoc:check` |
 
 ---
 
 ## Quick reference: rules
 
-**Canonical inventory:** [skill-index → Always-applied rules, Policy rules, and Auto-trigger rules](../../.cursor/skills/skill-index/SKILL.md#auto-trigger-rules).
+**Canonical inventory:** [be-skill-index → Always-applied rules, Policy rules, and Auto-trigger rules](../../.cursor/skills/be-skill-index/SKILL.md#auto-trigger-rules).
 
-Rules auto-attach by file glob when you edit matching paths. Always-on: **engineering-principles.mdc**, **project-identity.mdc**. All others are scoped — see skill-index for the full table (44 rules).
+Rules auto-attach by file glob when you edit matching paths. Always-on: **be-engineering-principles.mdc**, **be-project-identity.mdc**. All others are scoped — see be-skill-index for the full table (44 rules).
 
 ---
 
-**Summary:** For any new requirement, give the **details** from the matching section above (defaults fill the rest). The AI posts a **Plan** once; after **go**, it consults **skill-index**, runs **skills** in order, and **rules** auto-invoke on changed files. Before opening a PR, use [pr-review.md](../process/pr-review.md) and [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md).
+**Summary:** For any new requirement, give the **details** from the matching section above (defaults fill the rest). The AI posts a **Plan** once; after **go**, it consults **be-skill-index**, runs **skills** in order, and **rules** auto-invoke on changed files. Before opening a PR, use [pr-review.md](../process/pr-review.md) and [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md).

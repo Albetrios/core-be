@@ -275,7 +275,7 @@ Reuses existing helpers: `createTestUser`, `createTestOrganization`, `createMemb
 | Residual | Why | Mitigation |
 | -------- | --- | ---------- |
 | Gateway / proxy / WAF authz | `fastify.inject` bypasses the deployed edge | deferred: deployed-edge / DAST review (out of scope for this matrix) |
-| Env-specific JWT/CORS config | tests run with test config | staging smoke + `production-hardening` review |
+| Env-specific JWT/CORS config | tests run with test config | staging smoke + `be-production-hardening` review |
 | Shadow / undocumented endpoints | matrix only tests catalog routes | `routes:catalog:check` + periodic discovery scan (deferred) |
 
 ---
@@ -302,7 +302,7 @@ Phases 0–4 are the **day‑0 enterprise baseline**.
 - [ ] `permission-route-matrix` (BFLA) and `bola-cross-tenant` (cross-organization) remain green and now extend to **all** `PERM:` by-id routes.
 - [ ] Uncovered-route budget = `0`; static `findByPublicId` ban green.
 - [ ] Adding a new route without a model + assertion **fails CI** (verified with a deliberate red test).
-- [ ] Plan wired into `docs/README.md` index; `src/tests/security/security.overview.md` updated (via `docs-maintainer` / `overview-doc-maintainer`).
+- [ ] Plan wired into `docs/README.md` index; `src/tests/security/security.overview.md` updated (via `be-docs-maintainer` / `be-overview-doc-maintainer`).
 
 ---
 

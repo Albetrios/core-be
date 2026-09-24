@@ -1,0 +1,32 @@
+---
+description: Token-efficient code navigation — prefer the code index (codegraph) and compression (headroom) over whole-file reads and broad greps. Keeps agent context small and cheap. Always active.
+alwaysApply: true
+---
+
+# Token-efficient navigation (core-be)
+
+Goal: **keep the index doing the work and keep context small.** The codebase is indexed
+(`codegraph` MCP) and large output can be compressed (`headroom` MCP) — use them instead of
+paying tokens to read whole files.
+
+Preferred order for "where / who / what" questions (cheapest first):
+
+1. **`codegraph`** — `codegraph_search` / `callers` / `callees` / `impact` / `node` for symbols,
+   call graphs, and impact. Ask the index, don't read the tree.
+2. **`serena` / `LSP`** — LSP-backed go-to-definition / find-references / hover / symbol body;
+   returns the symbol, not the whole file. (`serena` MCP is the semantic-retrieval superset.)
+3. **`ast-grep`** — structural (AST) pattern search when you want *matches*, not text hits or files.
+4. **Targeted `Grep`** — a specific pattern with a path/glob scope; never an unscoped repo-wide grep.
+5. **`Read` last, and ranged** — read a file only when you need its exact bytes, with `offset`/`limit`,
+   not the whole file.
+
+For **library/framework API** questions, use **`context7`** (version-specific docs) instead of reading
+`node_modules` or guessing (see [`be-context7-backend.mdc`](be-context7-backend.mdc)).
+
+Two more rules:
+
+- **Compress before loading.** Route large, low-signal output (long command/CI/test logs, whole-file
+  dumps, search chunks) through `headroom_compress` before it enters context (see [`be-headroom-context-compression.mdc`](be-headroom-context-compression.mdc)). Never compress diffs, code to edit, or secrets.
+- **Delegate broad sweeps.** For a wide search across many files, spawn a read-only **`Explore`** subagent
+  (skill [`be-delegate-search`](../skills/be-delegate-search/SKILL.md)) — the file reads happen in its context
+  and only the conclusion returns to yours.

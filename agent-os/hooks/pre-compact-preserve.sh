@@ -25,8 +25,8 @@ card="$(
   echo "RESUME CARD (preserve across compaction)"
   echo "- Branch: ${branch} · uncommitted files: ${changed_count}"
   [ -n "$build_dir" ] && echo "- In-progress build: ${build_dir} — reload its build-manifest to resume the requirement."
-  echo "- agent-os: consult agent-os/docs/skill-triggers.md + skill-index FIRST for any file you change."
-  echo "- Definition of done: pnpm validate + pnpm agent-os:check green, then pnpm verify:base + /pre-merge-review clean."
+  echo "- agent-os: consult agent-os/docs/skill-triggers.md + be-skill-index FIRST for any file you change."
+  echo "- Definition of done: pnpm validate + pnpm agent-os:check green, then pnpm verify:base + /be-pre-merge-review clean."
 )"
 
 if command -v jq >/dev/null 2>&1; then

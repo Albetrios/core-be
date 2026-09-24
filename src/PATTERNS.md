@@ -328,7 +328,7 @@ Keep imports stable when files move. Path aliases (`@/`, `@tooling/`) make cross
 
 ### Where it lives
 
-- Rule: [`.cursor/rules/import-paths.mdc`](../.cursor/rules/import-paths.mdc)
+- Rule: [`.cursor/rules/be-import-paths.mdc`](../.cursor/rules/be-import-paths.mdc)
 - Aliases: [`tsconfig.json`](../tsconfig.json) — `@/*` → `src/*`, `@tooling/*` → `tooling/*`
 - CI gate: [`src/tests/global/import-paths.global.test.ts`](tests/global/import-paths.global.test.ts)
 

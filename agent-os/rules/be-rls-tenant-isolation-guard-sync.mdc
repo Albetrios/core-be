@@ -1,0 +1,22 @@
+---
+description: When changing a tenant table, an RLS migration, a database context wrapper, tenant middleware, or a worker that reads tenant data, verify RLS / tenant-isolation correctness so no cross-organization leak or GUC-less query slips in.
+globs: src/domains/**/*.schema.ts, migrations/*.sql, src/infrastructure/database/contexts/**, src/infrastructure/database/utils/force-rls-tables.constants.ts, src/shared/middlewares/tenant/**, src/infrastructure/queue/worker-runtime/worker-processor.util.ts, src/domains/**/*.worker.ts, src/domains/**/*.processor.ts
+alwaysApply: false
+---
+
+## RLS / tenant-isolation guard
+
+When you change any matched file, read `agent-os/skills/be-rls-tenant-isolation-guard/SKILL.md` and verify:
+
+- **New tenant-owned table** → `ENABLE` **and** `FORCE ROW LEVEL SECURITY`, plus a `FOR ALL` policy whose predicate is organization-scoped on the `public_id` (`organization_id = (SELECT id FROM tenancy.organizations WHERE public_id = current_setting('app.current_organization_public_id', true)) OR current_setting('app.global_retention_cleanup', true) = 'true'`). Writable tables carry **both `USING` and `WITH CHECK`**. Add the table to `EXPECTED_FORCE_RLS_TABLES`.
+- The `app.current_organization_public_id` GUC is set on every query path via `withAppDatabaseContext` with a minted organization scope — never a raw pool query.
+- Workers/processors never call `getRequestDatabase()` (the GUC-less pool); importing DB-handle types / `setLocalDatabaseConfig` from `database-context-runtime` is allowed. Tenant-scoped jobs carry `organizationPublicId`, user-scoped jobs `userPublicId`; worker repos take an explicit `databaseHandle`.
+- No external I/O (fetch / Stripe / S3 / Resend) inside a `with*DatabaseContext` callback.
+- New `SECURITY DEFINER` functions pin `SET search_path`, `GRANT EXECUTE` to `core_be_app`, AND `REVOKE EXECUTE ... FROM PUBLIC` (Postgres grants EXECUTE to PUBLIC by default, so a GRANT alone is not "only"); the function body is the sole tenant boundary — scope every query by the passed id.
+- Reading/searching a column on a FORCE-RLS table the current context can't satisfy (e.g. `auth.users` email/name under organization-only context) MUST go through a SECURITY DEFINER resolver, never a plain join (a plain join silently returns 0 rows under `core_be_app`). Prefer returning ids and letting the caller's typed RLS-scoped query apply the keyset (ref: `tenancy.search_organization_membership_ids`, migration 20260702000000). Pin with a `src/tests/security/rls/*.security.test.ts` run as `core_be_app` (raw join → 0 rows; resolver → match; no cross-organization leak) — a superuser db-unit test proves nothing about RLS.
+
+Verify: `pnpm test:global` (no-direct-db, rls-context-network-isolation, FORCE-RLS registry) + `pnpm test:security` + `pnpm db:migrate:lint`.
+- Inside a nested transaction (drizzle savepoint), write EVERY RLS-identity GUC on EVERY iteration. `RELEASE SAVEPOINT` keeps settings (only `ROLLBACK TO` restores), so a branch that sets just its own GUC inherits the other branch's value from the previous row and widens the policy for the rest of the batch. Ref: `audit-outbox-drain.processor.ts`.
+- Transactions stay callback-scoped: no `.commit()` / `.rollback()` in `src/domains`, `src/shared`, `src/core` (an early return between BEGIN and COMMIT leaks a transaction holding its row locks). Use `withTransaction` / `with*DatabaseContext`.
+- Never slice an id list into batches and dispatch them via `Promise.all` — Postgres serialises them on one connection, so the concurrency buys nothing while every statement's row locks are held until COMMIT. One statement for the whole list, or chunk SEQUENTIALLY.
+- Connection parameters set all THREE timeouts (`statement_timeout`, `idle_in_transaction_session_timeout`, `lock_timeout`); they catch different failures and none substitutes. A lock waiter is neither running nor idle, so only `lock_timeout` bounds it.

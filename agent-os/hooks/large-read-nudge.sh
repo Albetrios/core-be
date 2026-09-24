@@ -4,7 +4,7 @@
 # Token-efficiency nudge: when the agent reads a LARGE file whole, or runs a
 # repo-wide content Grep, inject a one-line reminder to prefer the code index
 # (codegraph), a ranged Read, or a delegated Explore subagent — and to compress
-# large output with headroom. Operationalizes agent-os/rules/token-efficient-navigation.mdc.
+# large output with headroom. Operationalizes agent-os/rules/be-token-efficient-navigation.mdc.
 #
 # Non-blocking (PostToolUse can only add context — the tool already ran). Fires
 # only on the wasteful shapes, so an ordinary scoped read/grep is silent. Adds
@@ -31,7 +31,7 @@ case "$TOOL" in
     if [[ -n "$file" && "$has_limit" == "false" && -f "$file" ]]; then
       size=$(wc -c <"$file" 2>/dev/null | tr -d ' ' || echo 0)
       if [[ "$size" -gt "$LARGE_FILE_BYTES" ]]; then
-        hint="Read a large file whole (${size} bytes). For \"where/who/what\" prefer codegraph (codegraph_search / callers / impact) or a ranged Read (offset/limit); if you must load it all, compress with headroom_compress. (token-efficient-navigation)"
+        hint="Read a large file whole (${size} bytes). For \"where/who/what\" prefer codegraph (codegraph_search / callers / impact) or a ranged Read (offset/limit); if you must load it all, compress with headroom_compress. (be-token-efficient-navigation)"
       fi
     fi
     ;;
@@ -40,7 +40,7 @@ case "$TOOL" in
     scoped=$(printf '%s' "$INPUT" | jq -r '.tool_input | (has("path") or has("glob"))' 2>/dev/null || echo "true")
     # Repo-wide CONTENT grep (no path/glob scope) → nudge.
     if [[ "$mode" == "content" && "$scoped" == "false" ]]; then
-      hint="Repo-wide content grep with no path/glob scope. Prefer codegraph_search for symbols/usages, or scope the grep; for a broad sweep delegate to a read-only Explore subagent (skill: delegate-search) so the reads stay out of your context."
+      hint="Repo-wide content grep with no path/glob scope. Prefer codegraph_search for symbols/usages, or scope the grep; for a broad sweep delegate to a read-only Explore subagent (skill: be-delegate-search) so the reads stay out of your context."
     fi
     ;;
 esac

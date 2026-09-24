@@ -4,7 +4,7 @@
  * identifier is `id`. Internal TypeScript identifiers (local variables, private helpers) may stay
  * camelCase; this guard scans the wire-contract surfaces where a camelCase key would leak onto
  * the HTTP request/response. A serializer also emits its own row's public id under exactly that
- * key, `id` (`export_id` was the one exception). See `agent-os/rules/api-contract.mdc`.
+ * key, `id` (`export_id` was the one exception). See `agent-os/rules/be-api-contract.mdc`.
  *
  * Documented exceptions (third-party / browser-native payloads passed through verbatim, plus
  * internal-only structures that are never serialized to a response):

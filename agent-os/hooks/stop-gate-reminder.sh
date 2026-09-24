@@ -26,25 +26,25 @@ REMINDERS=()
 match() { printf '%s\n' "$changed" | grep -Eq "$1"; }
 
 match '\.routes\.ts$' && \
-  REMINDERS+=("routes changed → pnpm routes:catalog:check + route-schema-doc-guard (api-contract-guard)")
+  REMINDERS+=("routes changed → pnpm routes:catalog:check + be-route-schema-doc-guard (be-api-contract-guard)")
 match '\.schema\.ts$' && \
-  REMINDERS+=("schema changed → db-migration-maintainer + pnpm db:migrate:lint + rls-tenant-isolation-guard")
+  REMINDERS+=("schema changed → be-db-migration-maintainer + pnpm db:migrate:lint + be-rls-tenant-isolation-guard")
 match 'migrations/.*\.sql$' && \
-  REMINDERS+=("migration SQL → pnpm db:migrate:lint (db-migration-maintainer)")
+  REMINDERS+=("migration SQL → pnpm db:migrate:lint (be-db-migration-maintainer)")
 match 'env-schema\.ts$|\.env\.example$' && \
-  REMINDERS+=("env changed → pnpm tool:sync-env-example (env-schema-add)")
+  REMINDERS+=("env changed → pnpm tool:sync-env-example (be-env-schema-add)")
 match '/locales/.*\.json$' && \
-  REMINDERS+=("i18n changed → i18n-message-guard")
+  REMINDERS+=("i18n changed → be-i18n-message-guard")
 match '\.(validator|serializer)\.ts$' && \
-  REMINDERS+=("validator/serializer → test-generator (add/refresh tests)")
+  REMINDERS+=("validator/serializer → be-test-generator (add/refresh tests)")
 match '/(events|workers|queues)/.*\.ts$' && \
-  REMINDERS+=("events/workers/queues → workers-events")
+  REMINDERS+=("events/workers/queues → be-workers-events")
 match '\.worker\.ts$|/database/contexts/' && \
-  REMINDERS+=("tenant data path → rls-tenant-isolation-guard (RLS + GUC + context wrappers)")
+  REMINDERS+=("tenant data path → be-rls-tenant-isolation-guard (RLS + GUC + context wrappers)")
 match 'idempotency|stripe\.client\.ts$' && \
-  REMINDERS+=("idempotency/stripe writes → idempotency-guard")
+  REMINDERS+=("idempotency/stripe writes → be-idempotency-guard")
 match '\.mdc$|^agent-os/|agent-os/|CLAUDE\.md$' && \
-  REMINDERS+=("agent-os/rules/docs changed → pnpm agent-os:check (structure-maintainer)")
+  REMINDERS+=("agent-os, rules or docs changed → pnpm agent-os:check (be-structure-maintainer)")
 
 echo ""
 if [[ "${#REMINDERS[@]}" -gt 0 ]]; then

@@ -12,7 +12,7 @@ How schema changes ship, how CI guards them, and how to validate **rollback** wi
 | `src/domains/**/<resource>.schema.ts` | Drizzle definitions — must stay aligned with migrations |
 | `src/scripts/validators/migration/lint-migrations.ts` | CI gate (`pnpm db:migrate:lint`) — destructive DDL, RLS, naming |
 
-See **db-migration-maintainer** skill and [data-lifecycle-deletion.md](../data/data-lifecycle-deletion.md) when retention or `deleted_at` changes.
+See **be-db-migration-maintainer** skill and [data-lifecycle-deletion.md](../data/data-lifecycle-deletion.md) when retention or `deleted_at` changes.
 
 ### Source of truth — no Drizzle Kit snapshot in `migrations/`
 

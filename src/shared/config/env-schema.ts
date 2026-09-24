@@ -1928,6 +1928,6 @@ export const envSchemaConditionallyRequiredKeys: ReadonlyArray<{
  * reads the same structure when pushing.
  *
  * When you add a new env var: add it to this schema AND to the correct half
- * of `.env.example`. The `env-schema-add` skill walks through which half +
+ * of `.env.example`. The `be-env-schema-add` skill walks through which half +
  * sub-section to pick.
  * --------------------------------------------------------------------------- */

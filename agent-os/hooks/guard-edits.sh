@@ -78,7 +78,7 @@ esac
 case "$FILE" in
   */src/*.ts | */src/*.tsx | src/*.ts | src/*.tsx)
     if printf '%s' "$CONTENT" | grep -Eq "(from|require|import)[[:space:]]*\(?[[:space:]]*['\"]\.\./"; then
-      deny "Relative parent import ('../') is banned under src/ — use the '@/' alias (import-paths.mdc; enforced by import-paths.global.test.ts)."
+      deny "Relative parent import ('../') is banned under src/ — use the '@/' alias (be-import-paths.mdc; enforced by import-paths.global.test.ts)."
     fi ;;
 esac
 
@@ -92,7 +92,7 @@ case "$FILE" in
   *.md | *.mdc | *.txt) : ;;
   *)
     if printf '%s' "$CONTENT" | grep -Eiq "NODE_ENV[[:space:]]*[:=]+[[:space:]]*['\"\`]?(test|staging)\b"; then
-      deny "NODE_ENV must never be 'test' or 'staging' (the enum is 'local' | 'development' | 'production'; the Vitest suite runs as 'development'). Drive environment-varying behaviour via an explicit env flag with a static default + production .refine() (agent-os/skills/env-schema-add/SKILL.md; enforced by no-nodeenv-branching.global.test.ts)."
+      deny "NODE_ENV must never be 'test' or 'staging' (the enum is 'local' | 'development' | 'production'; the Vitest suite runs as 'development'). Drive environment-varying behaviour via an explicit env flag with a static default + production .refine() (agent-os/skills/be-env-schema-add/SKILL.md; enforced by no-nodeenv-branching.global.test.ts)."
     fi ;;
 esac
 

@@ -17,8 +17,8 @@ The full `src/` file tree is **not** duplicated here (it drifts from code quickl
 | [`src/PATTERNS.md`](../../../src/PATTERNS.md) | Cross-cutting patterns (RLS context, idempotency, transactional outbox, audit emission, …) |
 | [`src/FLOWS.md`](../../../src/FLOWS.md) | End-to-end flows (signup, webhook ingest, billing reconciliation, …) |
 | [`src/POLICIES.md`](../../../src/POLICIES.md) | Policy constants and the rationale behind each tunable |
-| `.cursor/skills/domain-generator/SKILL.md` | Scaffolding checklist for new domains/resources |
-| `.cursor/skills/test-generator/SKILL.md` | Where to put unit, e2e, and event-handler tests |
+| `.cursor/skills/be-domain-generator/SKILL.md` | Scaffolding checklist for new domains/resources |
+| `.cursor/skills/be-test-generator/SKILL.md` | Where to put unit, e2e, and event-handler tests |
 | [docs/routes.txt](../../routes.txt) | Generated route catalog (`pnpm routes:catalog`) |
 | `pnpm tool:project-structure-tree` | Print current `src/` tree to stdout (skips `__tests__/`, caches) |
 
@@ -58,11 +58,11 @@ The full `src/` file tree is **not** duplicated here (it drifts from code quickl
 
 | File             | Where it lives                                        | Owner skill |
 | ---------------- | ----------------------------------------------------- | --------------------------------------- |
-| `<folder>.overview.md`    | At meaningful boundaries (domains, sub-domains, infra subsystems, test suites). Hand-written: Purpose, design decisions, failure modes, tuning | overview-doc-maintainer |
-| TSDoc            | Inline on every public export in `*.ts` (canonical, gated by `pnpm tsdoc:check`) | tsdoc-export-guard |
-| Route schema     | Inline `schema.summary` / `schema.description` / `schema.tags` on every Fastify route (drives OpenAPI) | route-schema-doc-guard |
+| `<folder>.overview.md`    | At meaningful boundaries (domains, sub-domains, infra subsystems, test suites). Hand-written: Purpose, design decisions, failure modes, tuning | be-overview-doc-maintainer |
+| TSDoc            | Inline on every public export in `*.ts` (canonical, gated by `pnpm tsdoc:check`) | be-tsdoc-export-guard |
+| Route schema     | Inline `schema.summary` / `schema.description` / `schema.tags` on every Fastify route (drives OpenAPI) | be-route-schema-doc-guard |
 
-System-level narratives sit at the `src/` root only: `src/OVERVIEW.md`, `src/PATTERNS.md`, `src/FLOWS.md`, `src/POLICIES.md` (owner: system-narrative-maintainer). There is no auto-generated `DOCS.md` aggregator.
+System-level narratives sit at the `src/` root only: `src/OVERVIEW.md`, `src/PATTERNS.md`, `src/FLOWS.md`, `src/POLICIES.md` (owner: be-system-narrative-maintainer). There is no auto-generated `DOCS.md` aggregator.
 
 ---
 

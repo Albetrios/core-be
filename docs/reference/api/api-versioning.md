@@ -25,7 +25,7 @@ There is **no** separate `/api/v2` tree until a breaking release actually needs 
    });
    ```
 
-3. Regenerate route and OpenAPI artifacts per project skills (`route-catalog`, `openapi-route-sync`) when routes change.
+3. Regenerate route and OpenAPI artifacts per project skills (`be-route-catalog`, `be-openapi-route-sync`) when routes change.
 
 Constants and helpers live in **`src/shared/utils/http/api-versioning.util.ts`** (`PUBLIC_API_VERSION_SEGMENT_V1`, `buildPublicApiPrefix`, `applyPublicApiVersionHeader`).
 

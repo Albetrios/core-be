@@ -1,7 +1,7 @@
 # Requirement intake form (core-be)
 
-This is the **format** `/build-requirement` produces and builds from. You don't have to
-fill it all — give `/build-requirement` a direct task and it **drafts the whole form,
+This is the **format** `/be-build-requirement` produces and builds from. You don't have to
+fill it all — give `/be-build-requirement` a direct task and it **drafts the whole form,
 including the section-9 file tree, for your review**, asks about anything it shouldn't
 guess, and iterates on your changes before building. Or fill the form yourself and pass
 it. Either way the final, approved document looks like the form below.
@@ -17,7 +17,7 @@ it. Either way the final, approved document looks like the form below.
   `<...>` placeholder with your value**; leave the `# e.g.` line as a guide or delete it.
 - If a section truly doesn't apply, write `none`. Anything you mark `default` uses the
   **Default assumptions** in [`requirement-intake.md`](requirement-intake.md).
-- `/build-requirement` is best-effort: for any field left as a `<...>` placeholder or
+- `/be-build-requirement` is best-effort: for any field left as a `<...>` placeholder or
   ambiguous, it asks you once to fill it — it never guesses the data model, auth, or tenancy.
 
 ## The form (copy this)

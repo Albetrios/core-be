@@ -31,8 +31,8 @@ flowchart TB
 
 | System | What it covers | Lives in | Owner skills | Hard gate |
 | --- | --- | --- | --- | --- |
-| **In-source docs** | Code-anchored: every public export's TSDoc, every Fastify route schema, every folder's hand-written `<folder>.overview.md`, system narrative files | TSDoc inside `*.ts`; `**/<folder>.overview.md`; `src/{OVERVIEW,PATTERNS,FLOWS,POLICIES}.md` | tsdoc-export-guard, route-schema-doc-guard, overview-doc-maintainer, system-narrative-maintainer | `pnpm tsdoc:check`, `pnpm docs:check` (OpenAPI drift) |
-| **Hand-written docs** | Narrative guides — setup, runbooks, deployment, integrations, architecture overviews | `docs/**/*.md` | docs-maintainer | `pnpm docs:lint`, `pnpm docs:links:check` |
+| **In-source docs** | Code-anchored: every public export's TSDoc, every Fastify route schema, every folder's hand-written `<folder>.overview.md`, system narrative files | TSDoc inside `*.ts`; `**/<folder>.overview.md`; `src/{OVERVIEW,PATTERNS,FLOWS,POLICIES}.md` | be-tsdoc-export-guard, be-route-schema-doc-guard, be-overview-doc-maintainer, be-system-narrative-maintainer | `pnpm tsdoc:check`, `pnpm docs:check` (OpenAPI drift) |
+| **Hand-written docs** | Narrative guides — setup, runbooks, deployment, integrations, architecture overviews | `docs/**/*.md` | be-docs-maintainer | `pnpm docs:lint`, `pnpm docs:links:check` |
 
 The two systems are independent and never overwrite each other.
 
@@ -44,10 +44,10 @@ There is intentionally **no auto-generated `DOCS.md`** layer. The previous `tool
 
 | Layer | File(s) | Source of truth | Skill |
 | --- | --- | --- | --- |
-| **System narratives** (cross-cutting) | `src/OVERVIEW.md`, `src/PATTERNS.md`, `src/FLOWS.md`, `src/POLICIES.md` | Hand-written | system-narrative-maintainer |
-| **Per-folder overviews** (hand-written narrative) | `src/<folder>/<folder>.overview.md` (~58 files at meaningful boundaries — domains, sub-domains, nested sub-domains, infra subsystems, test suites) | Hand-written | overview-doc-maintainer |
-| **Symbol-level TSDoc** (per-export documentation) | every `export <kind> <name>` declaration in `*.ts`; IDE hover, TypeDoc, and `tsdoc:check` all read this | Hand-written, in-source | tsdoc-export-guard |
-| **Fastify route schema** (route documentation) | `schema: { summary, description, tags }` on every route registration → drives `docs/openapi/openapi.json` → Postman + API hub | Inline Zod schema | route-schema-doc-guard |
+| **System narratives** (cross-cutting) | `src/OVERVIEW.md`, `src/PATTERNS.md`, `src/FLOWS.md`, `src/POLICIES.md` | Hand-written | be-system-narrative-maintainer |
+| **Per-folder overviews** (hand-written narrative) | `src/<folder>/<folder>.overview.md` (~58 files at meaningful boundaries — domains, sub-domains, nested sub-domains, infra subsystems, test suites) | Hand-written | be-overview-doc-maintainer |
+| **Symbol-level TSDoc** (per-export documentation) | every `export <kind> <name>` declaration in `*.ts`; IDE hover, TypeDoc, and `tsdoc:check` all read this | Hand-written, in-source | be-tsdoc-export-guard |
+| **Fastify route schema** (route documentation) | `schema: { summary, description, tags }` on every route registration → drives `docs/openapi/openapi.json` → Postman + API hub | Inline Zod schema | be-route-schema-doc-guard |
 
 ### File-header rule (per-folder <folder>.overview.md)
 
@@ -62,7 +62,7 @@ Line 1 must be the bare backticked relative path:
 ...
 ```
 
-Required sections vary by template (domain, sub-domain, infra/shared/scripts, test suite); see the **overview-doc-maintainer** skill for the full template details.
+Required sections vary by template (domain, sub-domain, infra/shared/scripts, test suite); see the **be-overview-doc-maintainer** skill for the full template details.
 
 ### TSDoc rule (every public export)
 
@@ -114,8 +114,8 @@ The `schema` block is the **single source of truth** for OpenAPI generation. The
 
 | Token | What it flags | Fix by |
 | --- | --- | --- |
-| `MISSING_DESCRIPTION` | A public export has no TSDoc summary | tsdoc-export-guard |
-| `MISSING_REMARKS` | A service-like / policy-like export has no `@remarks` block | tsdoc-export-guard |
+| `MISSING_DESCRIPTION` | A public export has no TSDoc summary | be-tsdoc-export-guard |
+| `MISSING_REMARKS` | A service-like / policy-like export has no `@remarks` block | be-tsdoc-export-guard |
 
 The gate is **budget-driven**, not absolute. Counts are compared to [`tooling/tsdoc-coverage/budget.json`](../../../tooling/tsdoc-coverage/budget.json) and may **decrease** but never **increase**. PRs that lower counts run `pnpm tsdoc:check --refresh-budget` and commit the new lower budget. The eventual target is `MISSING_DESCRIPTION = 0` and `MISSING_REMARKS = 0`; the budget exists only because we are starting from a partially-documented codebase.
 
@@ -131,26 +131,26 @@ pnpm tsdoc:check --refresh-budget   # lock in current (lower) counts
 
 ## Hand-written docs (the long-standing system)
 
-Hand-written guides live in `docs/` topic subfolders; the index is `docs/README.md`. The owner is **docs-maintainer**.
+Hand-written guides live in `docs/` topic subfolders; the index is `docs/README.md`. The owner is **be-docs-maintainer**.
 
 ### Agent workflow for hand-written docs
 
 ```mermaid
 flowchart LR
   intake[Requirement intake] --> readDocs[Read canonical docs]
-  readDocs --> index[Consult skill-index]
+  readDocs --> index[Consult be-skill-index]
   index --> skills[Run skills in order]
   skills --> code[Implement in src/]
   code --> contentSync[Content-sync owned docs]
-  contentSync --> structural[Structural docs-maintainer if paths moved]
+  contentSync --> structural[Structural be-docs-maintainer if paths moved]
 ```
 
 1. **Intake** — [`docs/getting-started/requirement-intake.md`](../../getting-started/requirement-intake.md): pick requirement type and fill details.
 2. **Read canonical docs** — use the **Reference docs (read first)** list for that type (below and in intake).
-3. **Consult** — [`.cursor/skills/skill-index/SKILL.md`](../../../.cursor/skills/skill-index/SKILL.md): triggers and command order.
+3. **Consult** — [`.cursor/skills/be-skill-index/SKILL.md`](../../../.cursor/skills/be-skill-index/SKILL.md): triggers and command order.
 4. **Implement** — follow skills (checklists, `pnpm` commands); do not duplicate long prose from docs inside skills.
 5. **Content-sync** — if behavior or conventions changed, update the **canonical doc** for that topic (this page's ownership table). Skip duplicating the same text in CLAUDE or skills unless a **non-negotiable** changed.
-6. **Structural** — if a doc file was renamed/moved, run **docs-maintainer**. If only `src/` paths moved, run **structure-maintainer** + docs content-sync.
+6. **Structural** — if a doc file was renamed/moved, run **be-docs-maintainer**. If only `src/` paths moved, run **be-structure-maintainer** + docs content-sync.
 
 **Generated artifacts** (`docs/routes.txt`, `docs/openapi/`, `docs/postman-collection.json`) are never hand-edited; regenerate via `pnpm routes:catalog` / `pnpm docs:generate`.
 
@@ -160,25 +160,25 @@ flowchart LR
 
 | Topic | Canonical doc | Primary skill(s) | Update content when |
 | ----- | ------------- | ---------------- | ------------------- |
-| Sub-domains / layout | [sub-domains-layout.md](./sub-domains-layout.md) | domain-generator, structure-maintainer | New domain resource kind, import rules, test placement |
-| Layers / request flow | [project-structure-guide.md](./project-structure-guide.md) | structure-maintainer | Layer matrix, file suffixes, infra/shared layout |
-| Scripts (`src/scripts/`) | [scripts-layout.md](./scripts-layout.md) | structure-maintainer | Category folders, new script placement, `validate:scripts-layout` |
-| Public API / routes | [domains-and-public-api-design.md](./domains-and-public-api-design.md) | route-catalog, route-schema-doc-guard, domain-generator | Route registration pattern, response shape, access control |
-| API docs hub (OpenAPI, Scalar, Postman) | [api-documentation.md](../api/api-documentation.md) | route-schema-doc-guard, openapi-multilingual | Reference UI, validate/upload commands, hosted registry |
-| Events / BullMQ | [workers-and-events.md](../runtime/workers-and-events.md) | workers-events | Event names, queues, registration paths, DLQ |
-| HTTP / Vitest testing | [testing-conventions.md](../testing/testing-conventions.md) | test-generator | Pyramid, layout, naming suffixes, inject patterns |
-| Manual API smoke | [api-testing.md](../../getting-started/api-testing.md) | test-generator | Post-seed manual checklist |
-| i18n | [internationalization.md](../runtime/internationalization.md) | i18n-message-guard | Key format, locale files |
-| CSRF / sessions | [csrf-and-session-cookies.md](../security/csrf-and-session-cookies.md) | production-hardening-guard | Cookie model, Origin checks |
-| Data lifecycle | [data-lifecycle-deletion.md](../data/data-lifecycle-deletion.md) | sql-design-guard, db-migration-maintainer | Soft-delete, retention, immutable ledgers |
-| API versioning | [api-versioning.md](../api/api-versioning.md) | route-schema-doc-guard | Version prefix, API-Version header |
-| Chaos testing | [chaos-testing.md](../reliability/chaos-testing.md) | chaos-test-maintainer | Toxiproxy setup, scenarios |
-| Contract tests | [contract-tests.md](../testing/contract-tests.md) | contract-test-maintainer | Stripe/Resend/S3 fixtures |
-| Load testing | [load-testing.md](../testing/load-testing.md) | structure-maintainer | k6 scenarios, npm scripts |
-| Env / credentials | [integrations/credentials-and-env.md](../../integrations/credentials-and-env.md) | env-schema-add | User-facing env documentation |
-| Doc index / links | [docs/README.md](../../README.md) | docs-maintainer | New/renamed/moved hand-written doc |
-| New requirements | [requirement-intake.md](../../getting-started/requirement-intake.md) | skill-index | New requirement types or skill order |
-| **Documentation system (this page)** | [documentation-system.md](./documentation-system.md) | docs-maintainer, system-narrative-maintainer | Ownership map, in-source layers, gates |
+| Sub-domains / layout | [sub-domains-layout.md](./sub-domains-layout.md) | be-domain-generator, be-structure-maintainer | New domain resource kind, import rules, test placement |
+| Layers / request flow | [project-structure-guide.md](./project-structure-guide.md) | be-structure-maintainer | Layer matrix, file suffixes, infra/shared layout |
+| Scripts (`src/scripts/`) | [scripts-layout.md](./scripts-layout.md) | be-structure-maintainer | Category folders, new script placement, `validate:scripts-layout` |
+| Public API / routes | [domains-and-public-api-design.md](./domains-and-public-api-design.md) | be-route-catalog, be-route-schema-doc-guard, be-domain-generator | Route registration pattern, response shape, access control |
+| API docs hub (OpenAPI, Scalar, Postman) | [api-documentation.md](../api/api-documentation.md) | be-route-schema-doc-guard, be-openapi-multilingual | Reference UI, validate/upload commands, hosted registry |
+| Events / BullMQ | [workers-and-events.md](../runtime/workers-and-events.md) | be-workers-events | Event names, queues, registration paths, DLQ |
+| HTTP / Vitest testing | [testing-conventions.md](../testing/testing-conventions.md) | be-test-generator | Pyramid, layout, naming suffixes, inject patterns |
+| Manual API smoke | [api-testing.md](../../getting-started/api-testing.md) | be-test-generator | Post-seed manual checklist |
+| i18n | [internationalization.md](../runtime/internationalization.md) | be-i18n-message-guard | Key format, locale files |
+| CSRF / sessions | [csrf-and-session-cookies.md](../security/csrf-and-session-cookies.md) | be-production-hardening-guard | Cookie model, Origin checks |
+| Data lifecycle | [data-lifecycle-deletion.md](../data/data-lifecycle-deletion.md) | be-sql-design-guard, be-db-migration-maintainer | Soft-delete, retention, immutable ledgers |
+| API versioning | [api-versioning.md](../api/api-versioning.md) | be-route-schema-doc-guard | Version prefix, API-Version header |
+| Chaos testing | [chaos-testing.md](../reliability/chaos-testing.md) | be-chaos-test-maintainer | Toxiproxy setup, scenarios |
+| Contract tests | [contract-tests.md](../testing/contract-tests.md) | be-contract-test-maintainer | Stripe/Resend/S3 fixtures |
+| Load testing | [load-testing.md](../testing/load-testing.md) | be-structure-maintainer | k6 scenarios, npm scripts |
+| Env / credentials | [integrations/credentials-and-env.md](../../integrations/credentials-and-env.md) | be-env-schema-add | User-facing env documentation |
+| Doc index / links | [docs/README.md](../../README.md) | be-docs-maintainer | New/renamed/moved hand-written doc |
+| New requirements | [requirement-intake.md](../../getting-started/requirement-intake.md) | be-skill-index | New requirement types or skill order |
+| **Documentation system (this page)** | [documentation-system.md](./documentation-system.md) | be-docs-maintainer, be-system-narrative-maintainer | Ownership map, in-source layers, gates |
 
 **CLAUDE.md** holds non-negotiables and command cheat sheets only; link to the rows above for detail.
 
@@ -186,30 +186,30 @@ flowchart LR
 
 ## Code change → documentation (quick reference)
 
-Full skill triggers live in [skill-index](../../../.cursor/skills/skill-index/SKILL.md).
+Full skill triggers live in [be-skill-index](../../../.cursor/skills/be-skill-index/SKILL.md).
 
 | Code change | In-source skill | Hand-written doc to update (if convention/behaviour changed) |
 | ----------- | --------------- | --------------------------------------------------------------- |
-| New / changed `*.routes.ts` | route-schema-doc-guard | domains-and-public-api-design.md, api-versioning.md |
-| New `events/`, `queues/`, `workers/` | tsdoc-export-guard, overview-doc-maintainer | workers-and-events.md |
-| New / changed `*.schema.ts`, migrations (retention/soft-delete) | tsdoc-export-guard | data-lifecycle-deletion.md |
-| Test layout, `*.unit.test.ts` tiers | overview-doc-maintainer (`src/tests/<suite>/<suite>.overview.md`) | testing-conventions.md |
-| `env.config.ts` (user-facing) | tsdoc-export-guard | integrations/credentials-and-env.md |
-| Auth/session middleware | tsdoc-export-guard | csrf-and-session-cookies.md |
-| New domain or sub-domain folder | overview-doc-maintainer + system-narrative-maintainer (Domains table) | sub-domains-layout.md, project-structure-guide.md |
-| New cross-cutting pattern (idempotency, transactional outbox, etc.) | system-narrative-maintainer (`src/PATTERNS.md`) | (link from relevant reference doc) |
-| New end-to-end flow (request lifecycle, webhook ingest, etc.) | system-narrative-maintainer (`src/FLOWS.md`) | (link from relevant reference doc) |
-| New policy constant under `src/shared/constants/` | tsdoc-export-guard + system-narrative-maintainer (`src/POLICIES.md`) | (link from relevant reference doc) |
+| New / changed `*.routes.ts` | be-route-schema-doc-guard | domains-and-public-api-design.md, api-versioning.md |
+| New `events/`, `queues/`, `workers/` | be-tsdoc-export-guard, be-overview-doc-maintainer | workers-and-events.md |
+| New / changed `*.schema.ts`, migrations (retention/soft-delete) | be-tsdoc-export-guard | data-lifecycle-deletion.md |
+| Test layout, `*.unit.test.ts` tiers | be-overview-doc-maintainer (`src/tests/<suite>/<suite>.overview.md`) | testing-conventions.md |
+| `env.config.ts` (user-facing) | be-tsdoc-export-guard | integrations/credentials-and-env.md |
+| Auth/session middleware | be-tsdoc-export-guard | csrf-and-session-cookies.md |
+| New domain or sub-domain folder | be-overview-doc-maintainer + be-system-narrative-maintainer (Domains table) | sub-domains-layout.md, project-structure-guide.md |
+| New cross-cutting pattern (idempotency, transactional outbox, etc.) | be-system-narrative-maintainer (`src/PATTERNS.md`) | (link from relevant reference doc) |
+| New end-to-end flow (request lifecycle, webhook ingest, etc.) | be-system-narrative-maintainer (`src/FLOWS.md`) | (link from relevant reference doc) |
+| New policy constant under `src/shared/constants/` | be-tsdoc-export-guard + be-system-narrative-maintainer (`src/POLICIES.md`) | (link from relevant reference doc) |
 
 ---
 
 ## Skill file template
 
-Every **domain/architecture** skill under `.cursor/skills/<name>/SKILL.md` follows roughly:
+Every **domain/architecture** skill under `.cursor/skills/be-<name>/SKILL.md` follows roughly:
 
 ```markdown
 ---
-name: ...
+name: be-<name>
 description: ...
 ---
 
@@ -231,13 +231,13 @@ description: ...
 - Cross-links to skills that should run before/after.
 ```
 
-The four **in-source documentation skills** (system-narrative-maintainer, overview-doc-maintainer, route-schema-doc-guard, tsdoc-export-guard) follow this same shape.
+The four **in-source documentation skills** (be-system-narrative-maintainer, be-overview-doc-maintainer, be-route-schema-doc-guard, be-tsdoc-export-guard) follow this same shape.
 
-**Gate skills** (before-commit-guard, ci-investigator, pr-babysit, lint-warnings-handler) stay command-centric; they do not need a full ownership block.
+**Gate skills** (be-before-commit-guard, be-ci-investigation, be-pr-babysit, be-lint-warnings-handler) stay command-centric; they do not need a full ownership block.
 
 ---
 
-## docs-maintainer modes
+## be-docs-maintainer modes
 
 | Mode | Trigger | Actions |
 | ---- | ------- | ------- |
@@ -246,7 +246,7 @@ The four **in-source documentation skills** (system-narrative-maintainer, overvi
 
 If only behavior changed, prefer **content-sync** only. Update CLAUDE only when a non-negotiable invariant changed.
 
-**Scope boundary:** docs-maintainer covers only `docs/**/*.md`. In-source docs under `src/` (TSDoc + `<folder>.overview.md` + system narrative files) are owned by the in-source skills above.
+**Scope boundary:** be-docs-maintainer covers only `docs/**/*.md`. In-source docs under `src/` (TSDoc + `<folder>.overview.md` + system narrative files) are owned by the in-source skills above.
 
 ---
 

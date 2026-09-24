@@ -71,4 +71,4 @@ CI runs `validate:locale-keys` in `ci:quality`. When adding a key, update **ever
 
 ## Skill
 
-When adding or changing user-facing messages, run the **i18n-message-guard** skill so keys stay in sync with `src/shared/locales/en/` (and other locales). See `.cursor/skills/skill-index/SKILL.md`.
+When adding or changing user-facing messages, run the **be-i18n-message-guard** skill so keys stay in sync with `src/shared/locales/en/` (and other locales). See `.cursor/skills/be-skill-index/SKILL.md`.

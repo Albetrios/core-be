@@ -1,7 +1,7 @@
 # Pull request review (core-be)
 
 **Authors:** use [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md) and run `pnpm ci:local` (or wait for CI).  
-**Reviewers (human and agent):** use this doc as the shared rubric. Severity labels match [`.cursor/rules/engineering-principles.mdc`](../../.cursor/rules/engineering-principles.mdc) PR review mode.
+**Reviewers (human and agent):** use this doc as the shared rubric. Severity labels match [`.cursor/rules/be-engineering-principles.mdc`](../../.cursor/rules/be-engineering-principles.mdc) PR review mode.
 
 ---
 
@@ -103,7 +103,7 @@ Check only what the PR touches. Skip categories marked **none** in the PR **Revi
 | Check | What to look for | Typical severity |
 | ----- | ---------------- | ---------------- |
 | Coverage | New routes/behavior have unit and/or domain e2e tests | Major |
-| Layout | Tests under domain `__tests__/` per [testing-conventions](../../.cursor/rules/testing-conventions.mdc) | Major |
+| Layout | Tests under domain `__tests__/` per [be-testing-conventions](../../.cursor/rules/be-testing-conventions.mdc) | Major |
 | Determinism | No flaky timers/network without mocks | Major |
 | Factories | Reuse domain factories; no duplicate seed helpers | Nit |
 
@@ -142,12 +142,12 @@ Check only what the PR touches. Skip categories marked **none** in the PR **Revi
 
 ## Section B — Agent reviewer checklist
 
-Use when reviewing as Cursor agent, Bugbot, or **pr-babysit**. Read [skill-index](../../.cursor/skills/skill-index/SKILL.md) first.
+Use when reviewing as Cursor agent, Bugbot, or **be-pr-babysit**. Read [be-skill-index](../../.cursor/skills/be-skill-index/SKILL.md) first.
 
 ### Workflow
 
 1. Read PR **Summary**, **Reviewer notes**, and diff file list.
-2. Map each changed path to skill-index triggers; flag if a glob-matched skill was likely skipped (e.g. routes changed but no catalog/OpenAPI touch).
+2. Map each changed path to be-skill-index triggers; flag if a glob-matched skill was likely skipped (e.g. routes changed but no catalog/OpenAPI touch).
 3. Run targeted greps below on changed files only.
 4. Post findings in the output format below; do not weaken CI to go green.
 
@@ -180,15 +180,15 @@ Post a short review comment body:
 - [ ] <optional>
 
 ### Skills / CI
-- Expected skills: <list from skill-index>
+- Expected skills: <list from be-skill-index>
 - Author test plan: <confirm or gap>
 ```
 
 ### Related skills
 
-- **pr-babysit** — loop until merge-ready; apply this rubric when addressing comments.
-- **ci-investigator** — one failing check diagnosis.
-- **code-smells-and-best-practices** — fix Biome issues in touched `src/` files.
+- **be-pr-babysit** — loop until merge-ready; apply this rubric when addressing comments.
+- **be-ci-investigation** — one failing check diagnosis.
+- **be-code-smells-and-best-practices** — fix Biome issues in touched `src/` files.
 
 ---
 
@@ -221,10 +221,10 @@ flowchart LR
 
 | Item | How it stays in sync |
 | ---- | -------------------- |
-| `docs/README.md` index completeness | **docs-maintainer** when docs change |
-| Cross-links in hand-written docs | Author + **docs-maintainer**; advisory link check in **pr-docs-lane** |
-| i18n keys across locales | **i18n-message-guard**; partial `validate:locale-keys` in `ci:quality` |
-| Seed vs routes | **seed-maintainer** + tests |
+| `docs/README.md` index completeness | **be-docs-maintainer** when docs change |
+| Cross-links in hand-written docs | Author + **be-docs-maintainer**; advisory link check in **pr-docs-lane** |
+| i18n keys across locales | **be-i18n-message-guard**; partial `validate:locale-keys` in `ci:quality` |
+| Seed vs routes | **be-seed-maintainer** + tests |
 | Review snapshots under `docs/reviews/` | Dated files; do not rewrite history |
 
 ### One-time doc hygiene (follow-up PRs)
@@ -239,7 +239,7 @@ flowchart LR
 | ------- | ------ |
 | After workflow renames | Grep `docs/` and skills for old job/workflow names |
 | Quarterly | `pnpm tool:generate-dbdiagram`; spot-check `docs/reviews/` snapshots vs current code |
-| Per route change | Already handled by **route-catalog** + **openapi-route-sync** |
+| Per route change | Already handled by **be-route-catalog** + **be-openapi-route-sync** |
 
 ---
 

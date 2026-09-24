@@ -11,12 +11,12 @@ Map of skills, rules, subagents, and MCP tooling for coding agents and contribut
 | [AGENTS.md](../../AGENTS.md) | Onboarding checklist, CI gates, custom subagents |
 | [CLAUDE.md](../../CLAUDE.md) | Architecture, domains, commands |
 | [requirement-intake.md](../getting-started/requirement-intake.md) | New feature/API intake + Plan workflow |
-| [skill-index](../../agent-os/skills/skill-index/SKILL.md) | **Canonical** skill catalog, triggers, and auto-invoke rules |
+| [be-skill-index](../../agent-os/skills/be-skill-index/SKILL.md) | **Canonical** skill catalog, triggers, and auto-invoke rules |
 
 ```mermaid
 flowchart LR
   User[Requirement or edit] --> Intake[requirement-intake]
-  Intake --> Index[skill-index]
+  Intake --> Index[be-skill-index]
   Index --> Skills[Project skills]
   Index --> Rules[.cursor/rules]
   Rules --> Skills
@@ -27,26 +27,26 @@ flowchart LR
 
 ## Project skills (36)
 
-**36 total** — consult [skill-index](../../agent-os/skills/skill-index/SKILL.md) first. Includes **skill-index** (meta) and **cursor-global-skills** (reference to Cursor built-ins).
+**36 total** — consult [be-skill-index](../../agent-os/skills/be-skill-index/SKILL.md) first. Includes **be-skill-index** (meta) and **be-cursor-global-skills** (reference to Cursor built-ins).
 
 Common chains:
 
 | Change | Skills (order) |
 | --- | --- |
-| New route | route-schema-doc-guard → openapi-multilingual (tags) → route-catalog → seed-maintainer → test-generator |
-| New domain | domain-generator → schema-generator → sql-design-guard → db-migration-maintainer → … |
-| Env var | env-schema-add |
-| Hand-written doc under `docs/` | docs-maintainer |
+| New route | be-route-schema-doc-guard → be-openapi-multilingual (tags) → be-route-catalog → be-seed-maintainer → be-test-generator |
+| New domain | be-domain-generator → be-schema-generator → be-sql-design-guard → be-db-migration-maintainer → … |
+| Env var | be-env-schema-add |
+| Hand-written doc under `docs/` | be-docs-maintainer |
 
-**openapi-route-sync** is legacy (tag locales only). Use **route-schema-doc-guard** for route `schema` blocks.
+**be-openapi-route-sync** is legacy (tag locales only). Use **be-route-schema-doc-guard** for route `schema` blocks.
 
 ---
 
 ## Cursor rules (37)
 
-Two **always-on** rules: [engineering-principles.mdc](../../agent-os/rules/engineering-principles.mdc), [project-identity.mdc](../../agent-os/rules/project-identity.mdc).
+Two **always-on** rules: [be-engineering-principles.mdc](../../agent-os/rules/be-engineering-principles.mdc), [be-project-identity.mdc](../../agent-os/rules/be-project-identity.mdc).
 
-All others are **glob-scoped** — they auto-attach when matching files are edited. Full table: [skill-index → Auto-trigger rules](../../agent-os/skills/skill-index/SKILL.md#auto-trigger-rules).
+All others are **glob-scoped** — they auto-attach when matching files are edited. Full table: [be-skill-index → Auto-trigger rules](../../agent-os/skills/be-skill-index/SKILL.md#auto-trigger-rules).
 
 Policy rules (architecture, import paths, naming, object params) attach on `src/**/*.ts` without invoking a skill — they hold non-negotiable detail.
 
@@ -68,7 +68,7 @@ Cursor reads them via `.cursor/agents` → `agent-os/agents/` symlink.
 | **Claude Code** | `"Read agent-os/agents/<name>.md and follow the procedure"` |
 | **Codex** | Reads `AGENTS.md` custom subagents table; invoke by name |
 
-Add new agents with global **create-subagent**. See [cursor-global-skills](../../agent-os/skills/cursor-global-skills/SKILL.md).
+Add new agents with global **create-subagent**, named `be-<name>` (file `agent-os/agents/be-<name>.md`; see CLAUDE.md → Agent-os naming). See [be-cursor-global-skills](../../agent-os/skills/be-cursor-global-skills/SKILL.md).
 
 ---
 
@@ -76,7 +76,7 @@ Add new agents with global **create-subagent**. See [cursor-global-skills](../..
 
 Ship with Cursor under `~/.cursor/skills-cursor/`. **Not required** for normal backend work. Use when editing `agent-os/skills`, `agent-os/rules`, `agent-os/agents`, hooks, or IDE automation.
 
-See [cursor-global-skills](../../agent-os/skills/cursor-global-skills/SKILL.md).
+See [be-cursor-global-skills](../../agent-os/skills/be-cursor-global-skills/SKILL.md).
 
 ---
 

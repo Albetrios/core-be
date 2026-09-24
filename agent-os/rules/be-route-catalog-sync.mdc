@@ -1,0 +1,17 @@
+---
+description: Regenerate route catalog and OpenAPI metadata when only routes change.
+globs: src/domains/**/*.routes.ts
+alwaysApply: false
+---
+
+## Route catalog sync
+
+When any `*.routes.ts` file is created or modified:
+
+1. Read `agent-os/skills/be-route-schema-doc-guard/SKILL.md` — add or update `schema: { summary, description, tags }` on each route registration.
+2. For new tags, run **be-openapi-multilingual** (`src/shared/locales/*/openapi.json`).
+3. Read `agent-os/skills/be-route-catalog/SKILL.md` and run `pnpm routes:catalog` once.
+4. Run `pnpm docs:generate:multilang` when operation text changed.
+5. If routes affect seeds, run **be-seed-maintainer** per be-skill-index.
+
+CI enforces drift via `pnpm routes:catalog:check`.

@@ -2,10 +2,10 @@
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "core-be",
   "owner": { "name": "core-be" },
-  "metadata": { "description": "core-be single-source agent tooling (agentforge): skills, agents, workflow commands, and the requirement to production-ready build pipeline." },
+  "metadata": { "description": "core-be single-source agent tooling (be-agentforge): skills, agents, workflow commands, and the requirement to production-ready build pipeline." },
   "plugins": [
     {
-      "name": "agentforge",
+      "name": "be-agentforge",
       "source": "./",
       "description": "Single-source, multi-runtime agent tooling for core-be, driven from agent-os/."
     }

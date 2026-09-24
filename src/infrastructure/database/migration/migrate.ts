@@ -120,7 +120,7 @@ async function assertPostgresMajorVersionAtLeast17(): Promise<void> {
     serverVersionNum < MINIMUM_POSTGRES_SERVER_VERSION_NUM
   ) {
     throw new Error(
-      `Refusing to run migrations against Postgres ${row?.server_version ?? 'unknown'} (server_version_num=${row?.server_version_num ?? 'unknown'}). Postgres 17+ is required project-wide. See .cursor/skills/db-migration-maintainer/SKILL.md and docker-compose.yml.`,
+      `Refusing to run migrations against Postgres ${row?.server_version ?? 'unknown'} (server_version_num=${row?.server_version_num ?? 'unknown'}). Postgres 17+ is required project-wide. See .cursor/skills/be-db-migration-maintainer/SKILL.md and docker-compose.yml.`,
     );
   }
 }

@@ -1,5 +1,5 @@
 {
-  "_comment": "Deliberately-skipped seed-maintainer: this case MUST score below 100% and name the precise miss. Tier 3 gates on the scorecard matching this expectation.",
+  "_comment": "Deliberately-skipped be-seed-maintainer: this case MUST score below 100% and name the precise miss. Tier 3 gates on the scorecard matching this expectation.",
   "hitRate": 0.8333333333333334,
-  "misses": ["seed-maintainer"]
+  "misses": ["be-seed-maintainer"]
 }

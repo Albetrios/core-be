@@ -2,7 +2,7 @@
 # Claude Code UserPromptSubmit hook for core-be.
 #
 # When a prompt describes a build/change task, inject the relevant skill chain —
-# plus the "consult skill-index FIRST" rule and the requirement-intake checklist —
+# plus the "consult be-skill-index FIRST" rule and the requirement-intake checklist —
 # as additionalContext. This operationalizes CLAUDE.md's skill-first workflow at
 # PROMPT time; the PostToolUse skill-reminder ([`skill-reminder.sh`](skill-reminder.sh))
 # only fires reactively, AFTER an edit. The keyword→skill map mirrors
@@ -32,32 +32,32 @@ printf '%s' "$lower" \
 HINTS=()
 
 printf '%s' "$lower" | grep -Eq '\b(route|routes|endpoint|endpoints)\b' && \
-  HINTS+=("route/endpoint → api-contract-guard → route-schema-doc-guard → route-catalog → seed-maintainer")
+  HINTS+=("route/endpoint → be-api-contract-guard → be-route-schema-doc-guard → be-route-catalog → be-seed-maintainer")
 
 printf '%s' "$lower" | grep -Eq '\b(domain|sub-domain|subdomain)\b' && \
-  HINTS+=("domain/sub-domain → domain-generator (start at docs/getting-started/requirement-intake.md)")
+  HINTS+=("domain/sub-domain → be-domain-generator (start at docs/getting-started/requirement-intake.md)")
 
 printf '%s' "$lower" | grep -Eq '\b(schema|table|tables|column|columns|migration|migrations)\b' && \
-  HINTS+=("schema/table/migration → schema-generator → sql-design-guard → db-migration-maintainer → rls-tenant-isolation-guard")
+  HINTS+=("schema/table/migration → be-schema-generator → be-sql-design-guard → be-db-migration-maintainer → be-rls-tenant-isolation-guard")
 
 printf '%s' "$lower" | grep -Eq '\b(worker|workers|queue|queues|job|jobs|bullmq)\b|event handler' && \
-  HINTS+=("worker/queue/event → workers-events")
+  HINTS+=("worker/queue/event → be-workers-events")
 
 printf '%s' "$lower" | grep -Eq 'env var|environment variable|env-schema|\.env\b' && \
-  HINTS+=("env var → env-schema-add")
+  HINTS+=("env var → be-env-schema-add")
 
 printf '%s' "$lower" | grep -Eq '\b(i18n|translation|translations|locale|locales)\b' && \
-  HINTS+=("i18n/locale → i18n-message-guard")
+  HINTS+=("i18n/locale → be-i18n-message-guard")
 
 printf '%s' "$lower" | grep -Eq '\b(validator|serializer|serialiser)\b' && \
-  HINTS+=("validator/serializer → test-generator")
+  HINTS+=("validator/serializer → be-test-generator")
 
 printf '%s' "$lower" | grep -Eq '\b(seed|seeds|seeder|seeding)\b' && \
-  HINTS+=("seed → seed-maintainer")
+  HINTS+=("seed → be-seed-maintainer")
 
 [[ "${#HINTS[@]}" -eq 0 ]] && exit 0
 
-context="🧭 core-be skill routing — consult agent-os/skills/skill-index/SKILL.md FIRST, then run:"
+context="🧭 core-be skill routing — consult agent-os/skills/be-skill-index/SKILL.md FIRST, then run:"
 for h in "${HINTS[@]}"; do
   context="${context}"$'\n'"  • ${h}"
 done

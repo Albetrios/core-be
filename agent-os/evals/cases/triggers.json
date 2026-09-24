@@ -3,37 +3,37 @@
   "cases": [
     {
       "file": "src/domains/billing/sub-domains/plan/plan.routes.ts",
-      "expectSkills": ["api-contract-guard", "route-schema-doc-guard", "route-catalog", "seed-maintainer"],
+      "expectSkills": ["be-api-contract-guard", "be-route-schema-doc-guard", "be-route-catalog", "be-seed-maintainer"],
       "why": "Adding/changing a route must run the API-contract chain."
     },
     {
       "file": "src/domains/billing/sub-domains/plan/plan.schema.ts",
-      "expectSkills": ["sql-design-guard", "db-migration-maintainer", "schema-generator", "rls-tenant-isolation-guard"],
+      "expectSkills": ["be-sql-design-guard", "be-db-migration-maintainer", "be-schema-generator", "be-rls-tenant-isolation-guard"],
       "why": "Schema files route through the full schema chain including RLS review."
     },
     {
       "file": "src/shared/locales/en/errors.json",
-      "expectSkills": ["i18n-message-guard"],
+      "expectSkills": ["be-i18n-message-guard"],
       "why": "Editing locale copy must run the i18n guard."
     },
     {
       "file": "src/domains/notify/sub-domains/webhook/workers/webhook-delivery.worker.ts",
-      "expectSkills": ["workers-events"],
-      "why": "Worker changes must run the workers-events skill."
+      "expectSkills": ["be-workers-events"],
+      "why": "Worker changes must run the be-workers-events skill."
     },
     {
       "file": "migrations/20260614000000_add_plan_index.sql",
-      "expectSkills": ["db-migration-maintainer"],
+      "expectSkills": ["be-db-migration-maintainer"],
       "why": "A new migration must run the migration maintainer."
     },
     {
       "file": "src/infrastructure/database/contexts/database-context.ts",
-      "expectSkills": ["rls-tenant-isolation-guard"],
+      "expectSkills": ["be-rls-tenant-isolation-guard"],
       "why": "Changing a DB context wrapper must run the RLS / tenant-isolation guard."
     },
     {
       "file": "src/shared/middlewares/core/idempotency.middleware.ts",
-      "expectSkills": ["idempotency-guard"],
+      "expectSkills": ["be-idempotency-guard"],
       "why": "Changing the idempotency engine must run the idempotency guard."
     }
   ]

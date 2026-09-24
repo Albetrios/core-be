@@ -205,19 +205,19 @@ Move every existing `*.seed.ts` (`permission.seed.ts`, `plan.seed.ts`,
 `tenancy.seed.ts`, `user.seed.ts`, `audit.seed.ts`, `billing.seed.ts`,
 `notify.seed.ts`) into the `seed/` directory of its owning domain/sub-domain and
 adopt the contract (`seedReference`). Update imports in `minimal.ts` / `full.ts`.
-No behavior change to reference data. Governed by **structure-maintainer** and the
-**import-paths** rule.
+No behavior change to reference data. Governed by **be-structure-maintainer** and the
+**be-import-paths** rule.
 
 ## 5. Docs / skills / rules to update
 
 - **CLAUDE.md** — Domain Structure canonical layout (add `seed/`), Seeding
   section (orchestrator + contract + profiles), Commands (`db:seed:bulk`).
-- **`.cursor/rules/`** — new scoped rule `seed-conventions.mdc` (auto-attach under
+- **`.cursor/rules/`** — new scoped rule `be-seed-conventions.mdc` (auto-attach under
   `src/domains/**` and `src/scripts/seed/**`) describing the `seed/` directory +
   `DomainSeedModule` contract.
-- **Skills** — `seed-maintainer` (rewrite around the new structure),
-  `domain-generator` (scaffold `seed/` for new domains/sub-domains),
-  `structure-maintainer` (record the layout change), `skill-index` (trigger map).
+- **Skills** — `be-seed-maintainer` (rewrite around the new structure),
+  `be-domain-generator` (scaffold `seed/` for new domains/sub-domains),
+  `be-structure-maintainer` (record the layout change), `be-skill-index` (trigger map).
 - **In-source docs** — `OVERVIEW.md` in `src/scripts/seed/` and a short overview
   in each new `seed/` dir.
 - Run `pnpm routes:catalog` so seeds remain aligned with routes.

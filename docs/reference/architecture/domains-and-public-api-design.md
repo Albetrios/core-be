@@ -53,7 +53,7 @@ src/domains/<domain>/              # domain = DB schema
 | **notify**      | notification, webhook (webhook-event, webhook-delivery)                                                                                                                          |
 | **upload**      | (single domain, no sub-domains)                                                                                                                                                 |
 
-- **Code:** `src/domains/auth/sub-domains/auth-method/`, `src/domains/tenancy/sub-domains/organization/`, etc. Use `.cursor/skills/domain-generator/SKILL.md` and **CLAUDE.md** when adding or extending sub-domains.
+- **Code:** `src/domains/auth/sub-domains/auth-method/`, `src/domains/tenancy/sub-domains/organization/`, etc. Use `.cursor/skills/be-domain-generator/SKILL.md` and **CLAUDE.md** when adding or extending sub-domains.
 - **DB:** Schemas `auth`, `tenancy`, `billing`, `notify`, `audit`, `upload` in Postgres (same names as domain folders; the `user` domain has no dedicated schema — its `users` table lives in `auth`).
 
 ### 1.3 Sub-domain nesting (sub-domains may contain sub-domains)
@@ -95,7 +95,7 @@ Nested sub-domains use the same layer files and optional `events/`, `queues/`, `
 
 **Wiring:** Multi-sub-domain domains use `<domain>.container.ts` to export services. Routes pass the container (or individual services) to controllers. There is no orchestrator layer — controllers call sub-domain services directly.
 
-**Route schema (mandatory for OpenAPI):** Every Fastify route registration must include a `schema: { summary, description, tags }` block. This is the **single source of truth** for OpenAPI generation — there is no parallel `routeMetadataMap` side-table. Owned by **[route-schema-doc-guard](../../../.cursor/skills/route-schema-doc-guard/SKILL.md)**.
+**Route schema (mandatory for OpenAPI):** Every Fastify route registration must include a `schema: { summary, description, tags }` block. This is the **single source of truth** for OpenAPI generation — there is no parallel `routeMetadataMap` side-table. Owned by **[be-route-schema-doc-guard](../../../.cursor/skills/be-route-schema-doc-guard/SKILL.md)**.
 
 ```ts
 app.get(
@@ -127,7 +127,7 @@ app.get(
 | Sub-domain e2e (optional) | `sub-domains/<parent>/<child>/__tests__/<child>.test.ts`                            | `organization-api-key.test.ts`                                                   |
 | Event handlers / emit     | `sub-domains/<r>/__tests__/unit/events/`                                                 | `auth-method.event-handlers.unit.test.ts`, `member-invitation.event-handlers.unit.test.ts` |
 
-Do **not** add per-sub-domain `factories/` unless the helper is truly local; prefer `src/tests/factories/` or domain `__tests__/factories/`. Full pyramid and commands: **`.cursor/skills/test-generator/SKILL.md`** and **`.cursor/rules/testing-conventions.mdc`**.
+Do **not** add per-sub-domain `factories/` unless the helper is truly local; prefer `src/tests/factories/` or domain `__tests__/factories/`. Full pyramid and commands: **`.cursor/skills/be-test-generator/SKILL.md`** and **`.cursor/rules/be-testing-conventions.mdc`**.
 
 ---
 
@@ -389,7 +389,7 @@ All 19 phases from the Consolidated Master Plan (Domain API Upgrade + CI/CD + en
 
 ### Phase 5 — Test infrastructure foundations
 
-- **Convention:** Vitest under `src/tests/` (cross-cutting) and `src/domains/**/__tests__/**` (domain + sub-domain + nested sub-domain + `__tests__/unit/events/`). k6: `src/tests/load/k6/`. See §1.5 and **test-generator** skill.
+- **Convention:** Vitest under `src/tests/` (cross-cutting) and `src/domains/**/__tests__/**` (domain + sub-domain + nested sub-domain + `__tests__/unit/events/`). k6: `src/tests/load/k6/`. See §1.5 and **be-test-generator** skill.
 - [x] `createTestApp()` helper (`src/tests/helpers/test-app.ts`)
 - [x] `createTestOrganization()` helper
 - [x] Factory functions: user, organization, plan, permission, role, membership
@@ -466,12 +466,12 @@ All 19 phases from the Consolidated Master Plan (Domain API Upgrade + CI/CD + en
 
 ### Phase 17 — AI skills + rules (auto-mode)
 
-- [x] `.cursor/skills/test-generator/SKILL.md`
-- [x] `.cursor/skills/schema-generator/SKILL.md`
-- [x] `.cursor/skills/seed-maintainer/SKILL.md`
-- [x] `.cursor/skills/production-hardening-guard/SKILL.md`
+- [x] `.cursor/skills/be-test-generator/SKILL.md`
+- [x] `.cursor/skills/be-schema-generator/SKILL.md`
+- [x] `.cursor/skills/be-seed-maintainer/SKILL.md`
+- [x] `.cursor/skills/be-production-hardening-guard/SKILL.md`
 - [x] Skill index updated with trigger map for all new skills
-- [x] `.cursor/rules/` updated with production-hardening and no-placeholder-files rules
+- [x] `.cursor/rules/` updated with be-production-hardening and be-no-placeholder-files rules
 - [x] CLAUDE.md and README.md updated with full project structure, conventions, and commands
 
 ### Phase 18 — Env files (root only)

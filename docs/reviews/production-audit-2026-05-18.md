@@ -388,7 +388,7 @@ Idempotency middleware applies to all POST/PUT/PATCH/DELETE when `Idempotency-Ke
 Client confusion; duplicate subscription creates if client omits key.
 
 #### Recommended Fix
-Document required idempotency routes in OpenAPI + route catalog; forward key to Stripe in subscription create (optional improvement from path-to-production-gate).
+Document required idempotency routes in OpenAPI + route catalog; forward key to Stripe in subscription create (optional improvement from be-path-to-production-gate).
 
 #### Implementation Priority
 Technical debt backlog
@@ -803,7 +803,7 @@ Stay **modular monolith**: domains remain deployment units of ownership; extract
 # Final recommendations
 
 1. Run **`pnpm ci:local`** on every release candidate (includes coverage).  
-2. Treat [production-hardening-guard](../../.cursor/skills/production-hardening-guard/SKILL.md) as pre-deploy checklist.  
+2. Treat [be-production-hardening-guard](../../.cursor/skills/be-production-hardening-guard/SKILL.md) as pre-deploy checklist.  
 3. Re-run this audit after major domain additions or Prometheus re-enable.  
 4. Keep [production-readiness-2026-05-15.md](./production-readiness-2026-05-15.md) as historical snapshot; use **this file** as the current full audit.
 

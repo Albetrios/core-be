@@ -1,0 +1,48 @@
+---
+description: Always-in-context task → skill routing table. When a task matches a row, read that skill's SKILL.md and run its steps end-to-end. Companion to be-skill-index (full catalog) and agent-os/docs/skill-triggers.md (file-pattern map).
+alwaysApply: true
+---
+
+# Skill Router
+
+When a task matches a pattern below, **read the corresponding `SKILL.md` before starting** and complete the steps it defines (including the tests, route/OpenAPI registration, docs, and lint it lists) as part of the same change — see `agent-os/rules/be-change-completeness.mdc`. This table is the fast path; the authoritative catalog and decision tree live in `agent-os/skills/be-skill-index/SKILL.md` (consult it first for anything not listed here), and the file-pattern → skill map is `agent-os/docs/skill-triggers.md`.
+
+Behaviour: infer sensible defaults from the codebase rather than asking, and run the whole matched chain — see `agent-os/rules/be-agent-behavior.mdc` for the full-completion policy. The **one** confirmation checkpoint is the new-requirement plan gate in `agent-os/rules/be-new-requirement-intake.mdc` ("propose a Plan once, wait for **go**"); outside that, proceed without stopping to ask.
+
+## Task → skill
+
+| Task pattern | Skill(s) | Path |
+| --- | --- | --- |
+| **Any new requirement** (domain, route, schema, worker) — master orchestrator | be-auto-implement | `agent-os/skills/be-auto-implement/SKILL.md` |
+| New/changed **route or endpoint** (`*.routes.ts`) | be-api-contract-guard → be-route-schema-doc-guard → be-route-catalog → be-seed-maintainer | `agent-os/skills/be-api-contract-guard/SKILL.md` |
+| Route params, public ids, statuses, headers, list-query | be-api-contract-guard | `agent-os/skills/be-api-contract-guard/SKILL.md` |
+| New/changed **schema or table** (`*.schema.ts`) | be-schema-generator → be-sql-design-guard → be-db-migration-maintainer → be-rls-tenant-isolation-guard | `agent-os/skills/be-schema-generator/SKILL.md` |
+| SQL migration (`migrations/*.sql`) | be-db-migration-maintainer | `agent-os/skills/be-db-migration-maintainer/SKILL.md` |
+| New **domain or sub-domain** scaffold | be-domain-generator | `agent-os/skills/be-domain-generator/SKILL.md` |
+| **Events / queues / workers** | be-workers-events → be-test-generator | `agent-os/skills/be-workers-events/SKILL.md` |
+| Money/state **idempotent write**, Stripe mutation, idempotency middleware | be-idempotency-guard | `agent-os/skills/be-idempotency-guard/SKILL.md` |
+| RLS / tenant isolation, DB context wrappers, worker DB access | be-rls-tenant-isolation-guard | `agent-os/skills/be-rls-tenant-isolation-guard/SKILL.md` |
+| **Seed** data (`seed/**`) alignment | be-seed-maintainer | `agent-os/skills/be-seed-maintainer/SKILL.md` |
+| Validators, serializers, or any test layer | be-test-generator | `agent-os/skills/be-test-generator/SKILL.md` |
+| User-facing copy / translation keys (`locales/**`) | be-i18n-message-guard | `agent-os/skills/be-i18n-message-guard/SKILL.md` |
+| Env var add / rename / remove (`env-schema.ts`, `.env.example`) | be-env-schema-add | `agent-os/skills/be-env-schema-add/SKILL.md` |
+| Public export added / renamed | be-tsdoc-export-guard | `agent-os/skills/be-tsdoc-export-guard/SKILL.md` |
+| **Finishing any code change** — propagate to tests, docs, rules, skills | be-change-completeness-guard | `agent-os/skills/be-change-completeness-guard/SKILL.md` |
+| About to `git commit` / fix a failed commit | be-before-commit-guard | `agent-os/skills/be-before-commit-guard/SKILL.md` |
+| Dependency add/update or `pnpm audit` failure | be-dependency-security | `agent-os/skills/be-dependency-security/SKILL.md` |
+| Hand-written docs under `docs/**` | be-docs-maintainer | `agent-os/skills/be-docs-maintainer/SKILL.md` |
+| Directory/naming/structure changes, MCP template mirrors | be-structure-maintainer | `agent-os/skills/be-structure-maintainer/SKILL.md` |
+| "Which skill applies?" / full catalog | be-skill-index | `agent-os/skills/be-skill-index/SKILL.md` |
+| Broad read-heavy exploration across many files | be-delegate-search | `agent-os/skills/be-delegate-search/SKILL.md` |
+| PR CI failing — diagnose one check | be-ci-investigation | `agent-os/skills/be-ci-investigation/SKILL.md` |
+| Get a PR merge-ready (CI + review loop) | be-pr-babysit | `agent-os/skills/be-pr-babysit/SKILL.md` |
+| Split a branch/large change into reviewable PRs | be-split-to-prs | `agent-os/skills/be-split-to-prs/SKILL.md` |
+
+## Orchestration manifests
+
+Ordered multi-skill chains (which skills run in sequence for a change type) live in
+`agent-os/skills/chains.json`; the skill taxonomy is `agent-os/skills/groups.json`. The
+generated file-pattern table in `agent-os/docs/skill-triggers.md` is the single source
+for "I edited file X → run skill Y". When a row here and that table disagree, the
+generated table wins — update it (and re-run `pnpm agent-os:generate`) rather than
+hand-editing the generated block.

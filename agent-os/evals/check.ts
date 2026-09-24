@@ -115,7 +115,7 @@ for (const skill of skillNames) {
 // between GENERATED markers, so a stale count is impossible — gated by
 // `agent-os:generate:check`, not re-counted here. This check stays as the
 // path-existence guard: every table row points at a real SKILL.md.
-const indexFile = join(agentOsDirectory, "skills", "skill-index", "SKILL.md");
+const indexFile = join(agentOsDirectory, "skills", "be-skill-index", "SKILL.md");
 if (existsSync(indexFile)) {
   const indexText = readText(indexFile);
   const tableNames = new Set<string>();
@@ -127,20 +127,20 @@ if (existsSync(indexFile)) {
     if (!existsSync(join(repositoryRoot, referencedPath)))
       error(
         "skill-index-table",
-        `skill-index row "${row[1]}" points at missing path ${referencedPath}`,
+        `be-skill-index row "${row[1]}" points at missing path ${referencedPath}`,
       );
   }
   for (const skill of skillNames)
     if (!tableNames.has(skill))
       error(
         "skill-index-table",
-        `skill "${skill}" exists on disk but is absent from the skill-index table`,
+        `skill "${skill}" exists on disk but is absent from the be-skill-index table`,
       );
   for (const listed of tableNames)
     if (!skillNames.includes(listed))
       error(
         "skill-index-table",
-        `skill-index table lists "${listed}" which has no directory`,
+        `be-skill-index table lists "${listed}" which has no directory`,
       );
 }
 
@@ -239,12 +239,12 @@ if (existsSync(catalogFile)) {
 // model (e.g. haiku) — that is fine and does NOT warn. Only a *deep reasoner* pinned
 // off `inherit` warns, since under-powering a reasoning-heavy review is the real risk.
 const deepReasoners = new Set([
-  "verifier",
-  "sql-design-reviewer",
-  "production-hardening-reviewer",
-  "production-reviewer",
-  "ci-investigator",
-  "stack-monitor",
+  "be-verifier",
+  "be-sql-design-reviewer",
+  "be-production-hardening-reviewer",
+  "be-production-reviewer",
+  "be-ci-investigator",
+  "be-stack-monitor",
 ]);
 for (const file of agentFiles) {
   const text = readText(join(agentOsDirectory, "agents", file));
@@ -403,7 +403,7 @@ for (const rootDoc of ["CLAUDE.md", "AGENTS.md"])
     scanOneFile(join(repositoryRoot, rootDoc));
 
 // ── Check 10: root docs (CLAUDE.md, AGENTS.md) state counts that match disk ──
-// These root files sit outside the per-component scans above (skill-index,
+// These root files sit outside the per-component scans above (be-skill-index,
 // skill-triggers, agents-catalog), so a stale count there ("22 sync rules",
 // "All 8 agents", "36 project skills") drifts unseen. Same patterns, applied
 // at the repo root so the canonical entry-point docs cannot silently diverge.
@@ -573,9 +573,9 @@ if (existsSync(chainsFile) && existsSync(outcomesDirectory)) {
 // generated skill-triggers.md table — two surfaces for one fact. A sync rule
 // whose skill was renamed/deleted, or whose glob no longer appears in the
 // generated map, is silent drift between what Cursor attaches and what every
-// other platform is told. (project-identity-sync is the one command-driven
+// other platform is told. (be-project-identity-sync is the one command-driven
 // sync rule with no backing skill — exempt by design.)
-const syncRuleSkillExemptions = new Set(["project-identity"]);
+const syncRuleSkillExemptions = new Set(["be-project-identity"]);
 const triggersTableText = existsSync(triggersFile)
   ? readText(triggersFile)
   : "";
@@ -649,8 +649,9 @@ if (existsSync(commandsDirectory)) {
 }
 
 // ── Check 15: agent review-pipelines reference real agents ──
-// pipelines.json names sequences of read-only agents (consumed by /pre-merge-review
-// and /prod-readiness); every step must resolve to an agent file on disk.
+// pipelines.json names sequences of read-only agents (pre-merge-review runs via
+// /be-pre-merge-review, prod-readiness after be-path-to-production-gate); every step
+// must resolve to an agent file on disk.
 const pipelinesFile = join(agentOsDirectory, "agents", "pipelines.json");
 if (existsSync(pipelinesFile)) {
   const agentNames = new Set(agentFiles.map((file) => basename(file, ".md")));
@@ -715,8 +716,8 @@ if (existsSync(pluginManifestFile)) {
   }
 }
 
-// ── Check 17: the /build-requirement intake form exists with all canonical sections ──
-// docs/getting-started/requirement.template.md is the one format /build-requirement
+// ── Check 17: the /be-build-requirement intake form exists with all canonical sections ──
+// docs/getting-started/requirement.template.md is the one format /be-build-requirement
 // accepts; it must stay complete so a build always starts from the full 8-section spec.
 const requirementForm = join(
   repositoryRoot,
@@ -727,7 +728,7 @@ const requirementForm = join(
 if (!existsSync(requirementForm)) {
   error(
     "requirement-form",
-    "docs/getting-started/requirement.template.md is missing (the /build-requirement format)",
+    "docs/getting-started/requirement.template.md is missing (the /be-build-requirement format)",
   );
 } else {
   const formText = readText(requirementForm);
@@ -750,6 +751,41 @@ if (!existsSync(requirementForm)) {
         `requirement.template.md is missing the "${section}" section`,
       );
 }
+
+// ── Check 17: every agent-os item this repo owns starts with `be-` ──
+// core-be and core-fe (`fe-`) are often loaded in one session, where a shared name lets
+// one repo's skill, agent, command or rule hide the other's. Skills installed from
+// upstream keep their upstream names: the skills-lock.json entries whose sourceType is
+// not "local" (today ponytail and ponytail-audit).
+const repositoryPrefix = "be-";
+const upstreamSkills = new Set<string>();
+if (existsSync(lockFile)) {
+  try {
+    const lock = JSON.parse(readText(lockFile)) as {
+      skills?: Record<string, { sourceType?: string }>;
+    };
+    for (const [name, entry] of Object.entries(lock.skills ?? {}))
+      if (entry.sourceType !== "local") upstreamSkills.add(name);
+  } catch {
+    // Check 3b reports a malformed lock file.
+  }
+}
+const requirePrefix = (kind: string, name: string) => {
+  if (!name.startsWith(repositoryPrefix))
+    error(
+      "name-prefix",
+      `${kind} "${name}" must start with "${repositoryPrefix}" — rename it "${repositoryPrefix}${name}"` +
+        (kind === "skill" ? ", or record an upstream skill's source in skills-lock.json" : ""),
+    );
+};
+for (const skill of skillNames)
+  if (!upstreamSkills.has(skill)) requirePrefix("skill", skill);
+for (const file of agentFiles) requirePrefix("agent", basename(file, ".md"));
+if (existsSync(commandsDirectory))
+  for (const file of listFilesWithExtension(commandsDirectory, ".md"))
+    requirePrefix("command", basename(file, ".md"));
+for (const file of listFilesWithExtension(join(agentOsDirectory, "rules"), ".mdc"))
+  requirePrefix("rule", basename(file, ".mdc"));
 
 // ── Report ──
 const errors = findings.filter((finding) => finding.level === "error");
@@ -776,6 +812,7 @@ const checkLabels: Record<string, string> = {
   "command-uniqueness": "Command names unique",
   "agent-pipelines": "Agent pipelines ↔ disk",
   "plugin-refs": "Plugin manifest refs exist",
+  "name-prefix": "Repo name prefix (be-)",
   "requirement-form": "Requirement form sections",
 };
 
