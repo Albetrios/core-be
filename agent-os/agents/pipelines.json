@@ -1,5 +1,5 @@
 {
-  "description": "Read-only agent review pipelines — named sequences of diagnostic agents that fan out and aggregate into one report. Consumed by the /be-pre-merge-review and /prod-readiness commands. Every step references a real agent in agent-os/agents/ (eval-enforced). Diagnostic→procedural handoff: each finding names the procedural skill that fixes it (agent finds, skill fixes).",
+  "description": "Read-only agent review pipelines — named sequences of diagnostic agents that fan out and aggregate into one report. pre-merge-review is run by the /be-pre-merge-review command; prod-readiness runs after the be-path-to-production-gate skill. Every step references a real agent in agent-os/agents/ (eval-enforced). Diagnostic→procedural handoff: each finding names the procedural skill that fixes it (agent finds, skill fixes).",
   "pipelines": {
     "pre-merge-review": {
       "description": "Read-only review of the current diff before merge.",

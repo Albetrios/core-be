@@ -649,8 +649,9 @@ if (existsSync(commandsDirectory)) {
 }
 
 // ── Check 15: agent review-pipelines reference real agents ──
-// pipelines.json names sequences of read-only agents (consumed by /be-pre-merge-review
-// and /prod-readiness); every step must resolve to an agent file on disk.
+// pipelines.json names sequences of read-only agents (pre-merge-review runs via
+// /be-pre-merge-review, prod-readiness after be-path-to-production-gate); every step
+// must resolve to an agent file on disk.
 const pipelinesFile = join(agentOsDirectory, "agents", "pipelines.json");
 if (existsSync(pipelinesFile)) {
   const agentNames = new Set(agentFiles.map((file) => basename(file, ".md")));
