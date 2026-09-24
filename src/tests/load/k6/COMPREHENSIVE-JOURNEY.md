@@ -203,7 +203,13 @@ it churns other users' permission caches under load), `DIAG` (`true` logs each f
 
 ## 8. Teardown / revert
 
-The load-test overrides are local-only. To restore normal dev:
+The load-test overrides are local-only. To restore normal dev after `setup-loadtest.sh`, run
+`pnpm load:journey:down` (`setup-loadtest.sh --teardown`): it stops the cluster and restores
+`.env.local` from the owner-only backup setup took in `/tmp`, then **deletes that backup** — setup
+snapshots only when no backup exists, so one left behind would be restored by a later teardown and
+clobber everything added to `.env.local` in between. Postgres stays at `max_connections=500`.
+
+For a rig assembled by hand (no setup script), revert manually:
 
 ```bash
 cp /tmp/docker-compose.yml.bak docker-compose.yml   # if you scaled Postgres bigger

@@ -20,7 +20,10 @@ BAK=/tmp/.env.local.loadtest.bak
 if [ "${1:-}" = "--teardown" ]; then
   echo "Teardown: stop cluster + restore .env.local (tracked files are left as-is)"
   pkill -f cluster-run.mjs 2>/dev/null || true
-  [ -f "$BAK" ] && cp "$BAK" .env.local && echo "  .env.local restored from backup"
+  # Remove the backup once restored. Setup snapshots only when no backup exists (so a second
+  # setup never overwrites the pristine copy with load-test values), which means a backup left
+  # behind here would be restored by the NEXT teardown — clobbering everything added since.
+  [ -f "$BAK" ] && cp "$BAK" .env.local && rm -f "$BAK" && echo "  .env.local restored from backup (backup removed)"
   echo "Done. Postgres stays at max_connections=500 (harmless for dev); DB seed/pool are reusable."
   exit 0
 fi
@@ -42,7 +45,8 @@ setkv() {
 echo "==> Load-test setup: VUS=$VUS, WORKERS=$WORKERS, DB pool=$POOL"
 
 echo "[1/7] back up .env.local + apply load-test env overrides"
-[ -f "$BAK" ] || cp .env.local "$BAK"
+# The backup holds secrets and lives in /tmp: owner-only.
+[ -f "$BAK" ] || { cp .env.local "$BAK" && chmod 600 "$BAK"; }
 setkv NODE_ENV development                       # non-production runtime (CAPTCHA_FAIL_OPEN defaults true)
 setkv RATE_LIMIT_RELAXED_CAPS true                # per-route rate caps -> 5000 (previously implied by the old test runtime)
 setkv CAPTCHA_PROVIDER disabled
