@@ -2,7 +2,6 @@ import http from 'k6/http';
 import { sleep } from 'k6';
 import { API_PREFIX, SMOKE_THRESHOLDS } from '../helpers/config.js';
 import { checkStatus } from '../helpers/checks.js';
-import { switchToOrganization } from '../helpers/auth.js';
 
 /**
  * Hammer an idempotency-protected route with the same key (expect 409 or 422 on duplicates).
@@ -26,16 +25,16 @@ export const options = {
 };
 
 export function idempotencyStorm() {
-  let token = __ENV.TEST_TOKEN;
+  const token = __ENV.TEST_TOKEN;
   const organizationPublicId = __ENV.TEST_ORG_ID;
   if (!(token && organizationPublicId)) {
     sleep(1);
     return;
   }
 
-  // The active organization rides the token's `org` claim — scope the token to TEST_ORG_ID
-  // so the flat route resolves the right organization.
-  token = switchToOrganization(token, organizationPublicId) || token;
+  // TEST_TOKEN arrives already scoped to TEST_ORG_ID (tool:load-test-credentials). Never switch it
+  // here: a switch re-binds the shared session to the new token, which revokes TEST_TOKEN for every
+  // other VU and every later scenario.
 
   const idempotencyKey = `k6-storm-${organizationPublicId}`;
   const response = http.post(
