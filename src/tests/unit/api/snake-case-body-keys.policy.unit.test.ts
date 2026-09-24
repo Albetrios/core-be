@@ -3,7 +3,8 @@
  * snake_case. The public API contract exposes snake_case field names only — the single external
  * identifier is `id`. Internal TypeScript identifiers (local variables, private helpers) may stay
  * camelCase; this guard scans the wire-contract surfaces where a camelCase key would leak onto
- * the HTTP request/response. See `agent-os/rules/api-contract.mdc`.
+ * the HTTP request/response. A serializer also emits its own row's public id under exactly that
+ * key, `id` (`export_id` was the one exception). See `agent-os/rules/api-contract.mdc`.
  *
  * Documented exceptions (third-party / browser-native payloads passed through verbatim, plus
  * internal-only structures that are never serialized to a response):
@@ -37,6 +38,11 @@ const EXEMPT_KEYS_BY_FILE: Record<string, ReadonlySet<string>> = {
 const PROPERTY_KEY = /^\s*([a-zA-Z_$][\w$]*)\s*:/;
 /** A camelCase hump (lower/digit immediately followed by an uppercase letter). */
 const CAMEL_CASE_HUMP = /[a-z0-9][A-Z]/;
+/**
+ * A serializer line emitting its own row's public id: `<key>: row.public_id` (`item` is the other
+ * name serializers give their input). A comparison such as `row.public_id === …` does not match.
+ */
+const OWN_PUBLIC_ID_FIELD = /^\s*([a-z_]\w*)\s*:\s*(?:row|item)\.public_id,?\s*$/;
 
 function collectFiles(directory: string, suffix: string, collected: string[] = []): string[] {
   for (const entry of readdirSync(directory)) {
@@ -73,6 +79,16 @@ function findCamelCaseKeys(absolutePath: string): string[] {
   return offenders;
 }
 
+function findRenamedOwnIds(absolutePath: string): string[] {
+  const relativePath = relative(PROJECT_ROOT, absolutePath);
+  return readFileSync(absolutePath, 'utf8')
+    .split('\n')
+    .flatMap((line, index) => {
+      const key = OWN_PUBLIC_ID_FIELD.exec(line)?.[1];
+      return key !== undefined && key !== 'id' ? [`${relativePath}:${index + 1} → ${key}`] : [];
+    });
+}
+
 describe('snake_case body/response key policy', () => {
   it('every request DTO (*.dto.ts) declares only snake_case property keys', () => {
     const offenders = collectFiles(DOMAINS_ROOT, '.dto.ts').flatMap(findCamelCaseKeys);
@@ -81,6 +97,11 @@ describe('snake_case body/response key policy', () => {
 
   it('every response serializer (*.serializer.ts) declares only snake_case property keys', () => {
     const offenders = collectFiles(DOMAINS_ROOT, '.serializer.ts').flatMap(findCamelCaseKeys);
+    expect(offenders).toEqual([]);
+  });
+
+  it('every response serializer emits its own public id as `id`', () => {
+    const offenders = collectFiles(DOMAINS_ROOT, '.serializer.ts').flatMap(findRenamedOwnIds);
     expect(offenders).toEqual([]);
   });
 });

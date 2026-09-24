@@ -73,7 +73,7 @@ export interface UserDataExport {
 
 /** API response shape for export status queries; the `download_url` is presigned and only set when COMPLETED and not yet expired. */
 export type UserDataExportOutput = {
-  export_id: string;
+  id: string;
   status: UserDataExportStatus;
   download_url: string | null;
   expires_at: string | null;

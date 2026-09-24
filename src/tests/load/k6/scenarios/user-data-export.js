@@ -29,8 +29,7 @@ export function setup() {
     responseCallback: http.expectedStatuses(200, 409),
   });
   const body = response.status === 200 ? JSON.parse(response.body) : null;
-  // The serializer names the id `export_id`.
-  return { dataExportId: body?.data?.export_id ?? null };
+  return { dataExportId: body?.data?.id ?? null };
 }
 
 export function userDataExportOps(data) {

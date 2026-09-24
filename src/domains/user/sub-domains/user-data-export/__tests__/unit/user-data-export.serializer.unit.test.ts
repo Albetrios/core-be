@@ -26,7 +26,7 @@ describe('serializeUserDataExport', () => {
       download_url: 'https://s3.example.com/presigned',
     });
     expect(result).toEqual({
-      export_id: 'export_pub_id_001',
+      id: 'export_pub_id_001',
       status: 'completed',
       download_url: 'https://s3.example.com/presigned',
       expires_at: '2025-07-01T00:00:00.000Z',
@@ -104,9 +104,9 @@ describe('serializeUserDataExport', () => {
     expect(result.status).toBe('failed');
   });
 
-  it('uses public_id as export_id (not internal id)', () => {
+  it('uses public_id as id (not internal id)', () => {
     const result = serializeUserDataExport(makeExportRow({ id: 999, public_id: 'export_pub_xyz' }));
-    expect(result.export_id).toBe('export_pub_xyz');
+    expect(result.id).toBe('export_pub_xyz');
   });
 
   it('serializes created_at as ISO-8601 string', () => {

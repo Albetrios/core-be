@@ -403,7 +403,7 @@ export const healthAuthUserRouteResponses: Record<string, ResponseDefinition> = 
       {
         type: 'object',
         properties: {
-          export_id: { type: 'string' },
+          id: { type: 'string' },
           status: {
             type: 'string',
             enum: ['pending', 'processing', 'completed', 'failed'],
@@ -416,10 +416,10 @@ export const healthAuthUserRouteResponses: Record<string, ResponseDefinition> = 
           error_code: { type: 'string', nullable: true },
           created_at: { type: 'string', format: 'date-time' },
         },
-        required: ['export_id', 'status', 'created_at'],
+        required: ['id', 'status', 'created_at'],
       },
       {
-        export_id: 'exp_k7x9m2pqr4w8n1v3a1b2c',
+        id: 'exp_k7x9m2pqr4w8n1v3a1b2c',
         status: 'pending',
         download_url: null,
         expires_at: '2026-05-27T12:00:00.000Z',
@@ -437,7 +437,7 @@ export const healthAuthUserRouteResponses: Record<string, ResponseDefinition> = 
       {
         type: 'object',
         properties: {
-          export_id: { type: 'string' },
+          id: { type: 'string' },
           status: {
             type: 'string',
             enum: ['pending', 'processing', 'completed', 'failed'],
@@ -450,10 +450,10 @@ export const healthAuthUserRouteResponses: Record<string, ResponseDefinition> = 
           error_code: { type: 'string', nullable: true },
           created_at: { type: 'string', format: 'date-time' },
         },
-        required: ['export_id', 'status', 'created_at'],
+        required: ['id', 'status', 'created_at'],
       },
       {
-        export_id: 'exp_k7x9m2pqr4w8n1v3a1b2c',
+        id: 'exp_k7x9m2pqr4w8n1v3a1b2c',
         status: 'completed',
         download_url:
           'https://bucket.s3.amazonaws.com/user-data-export/usr/exp.json.gz?X-Amz-Signature=example',

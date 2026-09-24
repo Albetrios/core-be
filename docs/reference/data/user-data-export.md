@@ -4,8 +4,8 @@ Async export of personal data to S3 with time-limited presigned download URLs.
 
 ## Flow
 
-1. `POST /api/v1/users/me/data-export` — creates `auth.user_data_exports` row (`pending`), enqueues BullMQ job, returns **202** with `export_id`.
-2. Worker aggregates cross-domain data, writes `user-data-export/{userPublicId}/{export_id}.json.gz` to S3.
+1. `POST /api/v1/users/me/data-export` — creates `auth.user_data_exports` row (`pending`), enqueues BullMQ job, returns **200** with the export's `id` and `status` (the method-status policy answers every successful POST with 200).
+2. Worker aggregates cross-domain data, writes `user-data-export/{userPublicId}/{data_export_id}.json.gz` to S3.
 3. `GET /api/v1/users/me/data-export/{data_export_id}` — returns status; when `completed`, includes presigned GET URL (≤24h).
 
 ## Retention and privacy
