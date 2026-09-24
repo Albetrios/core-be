@@ -42,7 +42,7 @@ describe('createUserDataExportController', () => {
   it('requestExport returns 202 with export payload', async () => {
     const userPublicId = generatePublicId('user');
     const exportPayload = {
-      export_id: generatePublicId('userDataExport'),
+      id: generatePublicId('userDataExport'),
       status: USER_DATA_EXPORT_STATUSES.PENDING,
       download_url: null,
       expires_at: null,
@@ -80,7 +80,7 @@ describe('createUserDataExportController', () => {
     const exportId = generatePublicId('userDataExport');
     const service = {
       getExportStatus: vi.fn().mockResolvedValue({
-        export_id: exportId,
+        id: exportId,
         status: USER_DATA_EXPORT_STATUSES.COMPLETED,
       }),
     } as unknown as UserDataExportService;
@@ -104,7 +104,7 @@ describe('createUserDataExportController', () => {
       exportId,
     );
     expect(response).toMatchObject({
-      data: { export_id: exportId, status: USER_DATA_EXPORT_STATUSES.COMPLETED },
+      data: { id: exportId, status: USER_DATA_EXPORT_STATUSES.COMPLETED },
     });
   });
 
@@ -119,7 +119,7 @@ describe('createUserDataExportController', () => {
     recordScopedAuditEventSpy.mockClear();
     const service = {
       getExportStatus: vi.fn().mockResolvedValue({
-        export_id: exportId,
+        id: exportId,
         status: USER_DATA_EXPORT_STATUSES.COMPLETED,
         download_url: 'https://s3.example.com/presigned-url',
       }),
@@ -156,7 +156,7 @@ describe('createUserDataExportController', () => {
     recordScopedAuditEventSpy.mockClear();
     const service = {
       getExportStatus: vi.fn().mockResolvedValue({
-        export_id: exportId,
+        id: exportId,
         status: USER_DATA_EXPORT_STATUSES.PROCESSING,
         download_url: null,
       }),

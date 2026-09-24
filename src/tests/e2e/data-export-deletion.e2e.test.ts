@@ -37,9 +37,9 @@ describe('Cross-domain e2e: data export and deletion', () => {
       payload: {},
     });
     expect(exportResponse.statusCode).toBe(200);
-    const exportBody = exportResponse.json() as { data?: { export_id?: string; status?: string } };
+    const exportBody = exportResponse.json() as { data?: { id?: string; status?: string } };
     expect(exportBody.data?.status).toBe('pending');
-    expect(exportBody.data?.export_id).toBeTruthy();
+    expect(exportBody.data?.id).toBeTruthy();
 
     const deleteResponse = await injectAuthenticated(app, {
       method: 'DELETE',

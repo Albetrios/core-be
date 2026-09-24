@@ -161,7 +161,7 @@ describe('UserDataExportService', () => {
 
     const result = await service.requestExport(asUserScope('user_public'));
 
-    expect(result.export_id).toBe('exp_existing');
+    expect(result.id).toBe('exp_existing');
     expect(result.status).toBe(USER_DATA_EXPORT_STATUSES.PENDING);
   });
 

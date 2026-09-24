@@ -101,7 +101,7 @@ describe('User Data Export Sub-Domain — Integration', () => {
       expect(payload).toMatchObject({
         status: 'pending',
       });
-      expect(payload).toHaveProperty('export_id');
+      expect(payload).toHaveProperty('id');
     });
 
     /**
@@ -124,7 +124,7 @@ describe('User Data Export Sub-Domain — Integration', () => {
         payload: {},
       });
       expect(first.statusCode, first.body).toBe(200);
-      const firstId = (first.json() as { data: { export_id: string } }).data.export_id;
+      const firstId = (first.json() as { data: { id: string } }).data.id;
 
       const second = await injectAuthenticated(app, {
         method: 'POST',
@@ -133,7 +133,7 @@ describe('User Data Export Sub-Domain — Integration', () => {
         payload: {},
       });
       expect(second.statusCode, second.body).toBe(200);
-      expect((second.json() as { data: { export_id: string } }).data.export_id).toBe(firstId);
+      expect((second.json() as { data: { id: string } }).data.id).toBe(firstId);
     });
 
     it('survives concurrent export requests without a unique-violation 500', async () => {
@@ -158,7 +158,7 @@ describe('User Data Export Sub-Domain — Integration', () => {
         expect(response.statusCode, response.body).toBe(200);
       }
       const [a, b] = responses.map(
-        (response) => (response.json() as { data: { export_id: string } }).data.export_id,
+        (response) => (response.json() as { data: { id: string } }).data.id,
       );
       expect(a).toBe(b);
     });
@@ -201,7 +201,7 @@ describe('User Data Export Sub-Domain — Integration', () => {
         payload: {},
       });
       expect(created.statusCode, created.body).toBe(200);
-      const exportId = (created.json() as { data: { export_id: string } }).data.export_id;
+      const exportId = (created.json() as { data: { id: string } }).data.id;
 
       const stranger = await createTestUser({ email: `stranger-${owner.public_id}@test.com` });
       const strangerToken = await generateTestToken({ userId: stranger.public_id });

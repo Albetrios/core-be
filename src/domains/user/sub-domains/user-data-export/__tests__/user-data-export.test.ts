@@ -97,18 +97,18 @@ describe('User Data Export Sub-Domain — Integration', () => {
 
       const exportBody = exportResponse.json() as { data: Record<string, unknown> };
       const payload = exportBody.data;
-      expect(payload).toHaveProperty('export_id');
+      expect(payload).toHaveProperty('id');
       expect(payload).toHaveProperty('status', 'pending');
       expect(payload).toHaveProperty('created_at');
 
       const statusResponse = await injectAuthenticated(app, {
-        url: testApiPath(`/users/me/data-export/${String(payload.export_id)}`),
+        url: testApiPath(`/users/me/data-export/${String(payload.id)}`),
         token: bearerToken,
       });
       expect(statusResponse.statusCode).toBe(200);
       const statusBody = statusResponse.json() as { data: Record<string, unknown> };
       expect(statusBody.data).toMatchObject({
-        export_id: payload.export_id,
+        id: payload.id,
         status: 'pending',
       });
     });

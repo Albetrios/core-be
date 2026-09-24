@@ -13,7 +13,7 @@ export function serializeUserDataExport(
   options?: { download_url?: string | null },
 ): UserDataExportOutput {
   return {
-    export_id: row.public_id,
+    id: row.public_id,
     status: row.status as UserDataExportOutput['status'],
     download_url: options?.download_url ?? null,
     expires_at: row.expires_at?.toISOString() ?? null,
