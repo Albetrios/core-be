@@ -1,0 +1,4 @@
+{
+  "_comment": "Ratchet: routes (method + path) the nightly k6 workflow load-tests, as `pnpm load:coverage --nightly` counts them. k6-coverage.policy.unit.test.ts fails when the nightly covers fewer; raise this whenever a change adds coverage, so it can only grow.",
+  "nightlyCoveredRoutes": 45
+}

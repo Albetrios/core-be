@@ -29,6 +29,21 @@ export function membershipListOps() {
   });
   checkOk(response, 'list-memberships');
   checkResponseTime(response, 600, 'list-memberships');
+
+  const memberships = response.status === 200 ? (JSON.parse(response.body).data ?? []) : [];
+  const membershipId = memberships[0]?.id;
+  if (membershipId) {
+    const membershipResponse = http.get(
+      `${API_PREFIX}/tenancy/organization/memberships/${membershipId}`,
+      { ...authHeaders(token), tags: { name: 'get-membership' } },
+    );
+    checkOk(membershipResponse, 'get-membership');
+    const permissionsResponse = http.get(
+      `${API_PREFIX}/tenancy/organization/memberships/${membershipId}/permissions`,
+      { ...authHeaders(token), tags: { name: 'list-membership-permissions' } },
+    );
+    checkOk(permissionsResponse, 'list-membership-permissions');
+  }
   sleep(0.5);
 }
 

@@ -1904,6 +1904,7 @@ src/
     │   │   │   ├── notification-policy-crud.js
     │   │   │   ├── notification-write.js
     │   │   │   ├── org-membership-list.js
+    │   │   │   ├── organization-api-key-lifecycle.js
     │   │   │   ├── organization-settings-write.js
     │   │   │   ├── passwordless-signup.js
     │   │   │   ├── permission-cached.js
@@ -2254,6 +2255,7 @@ src/
     │   │   │   ├── route-response-map-statuses.unit.test.ts
     │   │   │   └── schema-enricher.unit.test.ts
     │   │   ├── agent-docker-daemon-script.unit.test.ts
+    │   │   ├── check-load-coverage.unit.test.ts
     │   │   ├── check-patch-coverage.unit.test.ts
     │   │   ├── db-viewer.unit.test.ts
     │   │   ├── project-identity.policy.unit.test.ts
