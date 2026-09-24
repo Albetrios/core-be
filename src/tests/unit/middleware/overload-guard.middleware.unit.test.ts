@@ -3,6 +3,20 @@ import { describe, expect, it } from 'vitest';
 import overloadGuardMiddleware, {
   shouldShedRequest,
 } from '@/shared/middlewares/core/overload-guard.middleware.js';
+import { resetSharedEventLoopHistogram } from '@/shared/utils/infrastructure/event-loop-monitor.js';
+
+/** The guard's sample interval (module-private in the middleware). */
+const SAMPLE_INTERVAL_MS = 500;
+/** A synchronous stall longer than the default 250 ms shed threshold. */
+const BOOT_STALL_MS = 350;
+
+/** Blocks the event loop the way synchronous boot work (imports, schema compilation) does. */
+function blockEventLoopFor(milliseconds: number): void {
+  const until = Date.now() + milliseconds;
+  while (Date.now() < until) {
+    // Deliberately synchronous.
+  }
+}
 
 /** Baseline options that do NOT shed — individual tests override one signal at a time. */
 const baseShedOptions = {
@@ -69,6 +83,32 @@ describe('overload-guard.middleware', () => {
       app.get('/x', async () => ({ ok: true }));
       const response = await app.inject({ method: 'GET', url: '/x' });
       expect(response.statusCode).toBe(200);
+      await app.close();
+    });
+
+    it('does not shed a fresh process on the stall of its own boot', async () => {
+      // Registering the guard starts its event-loop histogram, and everything the app does before
+      // it is ready — importing modules, compiling route schemas — is one synchronous stall on that
+      // loop. Counted, it became the first sample's p99 and shed the first requests a new process
+      // served: CI test workers got 503 on their opening calls whenever the runner was slow.
+      resetSharedEventLoopHistogram();
+      const app = Fastify();
+      await app.register(overloadGuardMiddleware);
+      app.get('/x', async () => ({ ok: true }));
+      // A real boot awaits I/O (Postgres, Redis) between its synchronous stretches, so the loop
+      // turns and the monitor is armed before the heavy work — which it then measures in full.
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      blockEventLoopFor(BOOT_STALL_MS);
+      await app.ready();
+
+      // Probe across two sample windows: the first sample after boot is where the stall would land.
+      const statuses = new Set<number>();
+      const probeUntil = Date.now() + SAMPLE_INTERVAL_MS * 2;
+      while (Date.now() < probeUntil) {
+        statuses.add((await app.inject({ method: 'GET', url: '/x' })).statusCode);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect([...statuses]).toEqual([200]);
       await app.close();
     });
   });
