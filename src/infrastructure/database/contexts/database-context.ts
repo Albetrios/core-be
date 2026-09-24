@@ -234,13 +234,9 @@ async function runPooledUnitOfWork<T>(options: {
     }
     started = true;
   };
-  let transaction: Promise<T>;
-  try {
-    transaction = options.openTransaction(claimConnection);
-  } catch (error) {
-    // A synchronous throw must still release the gauge below, as the per-site try/finally did.
-    transaction = Promise.reject(error);
-  }
+  // Called from an async function, a synchronous throw from openTransaction becomes a rejection,
+  // so the gauge below is still released, as the per-site try/finally did.
+  const transaction = (async () => options.openTransaction(claimConnection))();
   const unitOfWork = transaction.finally(() => {
     if (options.countsAsCheckout) {
       decrementOrganizationRlsCheckoutCount();
@@ -332,29 +328,43 @@ async function runPrincipalDatabaseContext<T>(
     countsAsCheckout: organizationPublicId !== undefined,
     openTransaction: (claimConnection) =>
       runWithWorkerDatabaseContext(workerContext, () =>
-        database.transaction(async (transaction) => {
-          claimConnection();
-          const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-          // Worker runtime only: lift the HTTP statement/lock caps to the worker
-          // budget for job-scope units of work (sec-re-16 semantics). HTTP paths
-          // keep the connection-level caps — see PR #1122's rationale.
-          if (isWorkerRuntime()) {
-            await applyWorkerStatementTimeout(databaseHandle);
-          }
-          await databaseHandle.execute(
-            buildIdentityGucStatement({ userPublicId, organizationPublicId }),
-          );
-          const runCallback = () => callback(brandWorkerContextDatabaseHandle(databaseHandle));
-          return organizationPublicId !== undefined
-            ? runWithPinnedOrganizationDatabaseSession(
-                organizationPublicId,
-                databaseHandle,
-                runCallback,
-              )
-            : runWithPinnedDatabaseHandle(databaseHandle, runCallback);
-        }),
+        database.transaction((transaction) =>
+          runPrincipalTransaction({
+            databaseHandle: transaction as unknown as RequestScopedPostgresDatabase,
+            claimConnection,
+            scope,
+            callback,
+          }),
+        ),
       ),
   });
+}
+
+/**
+ * The body of a principal unit of work once its transaction is open: claim the connection, lift
+ * the statement caps for workers, arm the identity GUCs in one round trip, and run the callback on
+ * the pinned handle.
+ */
+async function runPrincipalTransaction<T>(options: {
+  databaseHandle: RequestScopedPostgresDatabase;
+  claimConnection: () => void;
+  scope: PrincipalDatabaseScope;
+  callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>;
+}): Promise<T> {
+  const { databaseHandle, callback } = options;
+  const { userPublicId, organizationPublicId } = options.scope;
+  options.claimConnection();
+  // Worker runtime only: lift the HTTP statement/lock caps to the worker
+  // budget for job-scope units of work (sec-re-16 semantics). HTTP paths
+  // keep the connection-level caps — see PR #1122's rationale.
+  if (isWorkerRuntime()) {
+    await applyWorkerStatementTimeout(databaseHandle);
+  }
+  await databaseHandle.execute(buildIdentityGucStatement({ userPublicId, organizationPublicId }));
+  const runCallback = () => callback(brandWorkerContextDatabaseHandle(databaseHandle));
+  return organizationPublicId !== undefined
+    ? runWithPinnedOrganizationDatabaseSession(organizationPublicId, databaseHandle, runCallback)
+    : runWithPinnedDatabaseHandle(databaseHandle, runCallback);
 }
 
 /**
@@ -766,22 +776,43 @@ export async function withMaintenanceDatabaseContext<T>(
     countsAsCheckout: true,
     openTransaction: (claimConnection) =>
       runWithWorkerDatabaseContext({ kind: definition.workerContextKind }, () =>
-        resolveMaintenancePool().transaction(async (transaction) => {
-          claimConnection();
-          const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-          if (options?.useApplicationDatabaseRole === true) {
-            await databaseHandle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
-          }
-          if (definition.appliesWorkerStatementTimeout) {
-            await applyWorkerStatementTimeout(databaseHandle);
-          }
-          if (definition.guc !== null) {
-            await setLocalDatabaseConfig(databaseHandle, definition.guc, 'true');
-          }
-          return runWithPinnedDatabaseHandle(databaseHandle, () =>
-            callback(brandWorkerContextDatabaseHandle(databaseHandle)),
-          );
-        }),
+        resolveMaintenancePool().transaction((transaction) =>
+          runMaintenanceTransaction({
+            databaseHandle: transaction as unknown as RequestScopedPostgresDatabase,
+            claimConnection,
+            definition,
+            useApplicationDatabaseRole: options?.useApplicationDatabaseRole === true,
+            callback,
+          }),
+        ),
       ),
   });
+}
+
+/**
+ * The body of a transactional maintenance unit of work once its transaction is open: claim the
+ * connection, drop to the RLS-subject role when asked, lift the statement caps when the kind does,
+ * arm the kind's bypass GUC, and run the callback on the pinned handle.
+ */
+async function runMaintenanceTransaction<T>(options: {
+  databaseHandle: RequestScopedPostgresDatabase;
+  claimConnection: () => void;
+  definition: MaintenanceContextDefinition;
+  useApplicationDatabaseRole: boolean;
+  callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>;
+}): Promise<T> {
+  const { databaseHandle, definition, callback } = options;
+  options.claimConnection();
+  if (options.useApplicationDatabaseRole) {
+    await databaseHandle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
+  }
+  if (definition.appliesWorkerStatementTimeout) {
+    await applyWorkerStatementTimeout(databaseHandle);
+  }
+  if (definition.guc !== null) {
+    await setLocalDatabaseConfig(databaseHandle, definition.guc, 'true');
+  }
+  return runWithPinnedDatabaseHandle(databaseHandle, () =>
+    callback(brandWorkerContextDatabaseHandle(databaseHandle)),
+  );
 }
