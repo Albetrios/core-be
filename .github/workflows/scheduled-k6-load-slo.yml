@@ -72,6 +72,11 @@ jobs:
       # CI-only fixture, the one the Vitest harness uses. The webhook route answers 503 until a
       # secret is configured, and stripe-webhook-ingest asserts the 400 for a missing signature.
       STRIPE_WEBHOOK_SECRET: whsec_test_contract_fixture_secret_minimum_length_32_chars_xx
+      # CI-only fixtures, the Vitest harness's. /auth/email/send-code answers 503 until email is
+      # configured, which failed every passwordless-signup request. Mail only lands in the outbox —
+      # this job runs no worker — so nothing is sent. The results-email step keeps its own secret.
+      RESEND_API_KEY: re_test_contract_fixture_key
+      EMAIL_FROM_ADDRESS: noreply@example.com
 
     steps:
       - name: Checkout
@@ -106,36 +111,7 @@ jobs:
           ready-timeout-seconds: '80'
 
       - name: Export load-test credentials and admin token
-        run: |
-          set -euo pipefail
-          CREDS_OUT="$(pnpm tool:load-test-credentials 2>&1)"
-          echo "$CREDS_OUT"
-          TOKEN="$(echo "$CREDS_OUT" | sed -n 's/^export TEST_TOKEN="\([^"]*\)"/\1/p')"
-          ORGANIZATION_PUBLIC_ID="$(echo "$CREDS_OUT" | sed -n 's/^export TEST_ORG_ID="\([^"]*\)"/\1/p')"
-          if [ -z "$TOKEN" ] || [ -z "$ORGANIZATION_PUBLIC_ID" ]; then
-            echo "::error::Could not parse TEST_TOKEN or TEST_ORG_ID from tool:load-test-credentials"
-            exit 1
-          fi
-          {
-            echo "TEST_TOKEN<<EOF_TEST_TOKEN"
-            echo "$TOKEN"
-            echo "EOF_TEST_TOKEN"
-            echo "TEST_ORG_ID<<EOF_TEST_ORG_ID"
-            echo "$ORGANIZATION_PUBLIC_ID"
-            echo "EOF_TEST_ORG_ID"
-          } >> "$GITHUB_ENV"
-          ADMIN_OUT="$(pnpm tool:admin-token 2>&1)"
-          echo "$ADMIN_OUT"
-          ADMIN_TOKEN_VALUE="$(echo "$ADMIN_OUT" | sed -n 's/^export ADMIN_TOKEN="\([^"]*\)"/\1/p')"
-          if [ -z "$ADMIN_TOKEN_VALUE" ]; then
-            echo "::error::Could not parse ADMIN_TOKEN from tool:admin-token"
-            exit 1
-          fi
-          {
-            echo "ADMIN_TOKEN<<EOF_ADMIN_TOKEN"
-            echo "$ADMIN_TOKEN_VALUE"
-            echo "EOF_ADMIN_TOKEN"
-          } >> "$GITHUB_ENV"
+        run: bash src/tests/load/k6/export-load-test-credentials.sh
 
       - name: Gate — health stress + API stress (k6 SLO)
         id: gate
@@ -148,6 +124,12 @@ jobs:
           k6 run --summary-export=k6-permission-cached.json src/tests/load/k6/scenarios/permission-cached.js
           k6 run --summary-export=k6-stripe-webhook-ingest.json src/tests/load/k6/scenarios/stripe-webhook-ingest.js
           k6 run --summary-export=k6-idempotency-storm.json src/tests/load/k6/scenarios/idempotency-storm.js
+
+      - name: Refresh load-test credentials (before the informational scenarios)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        # Access tokens live 15 minutes; the block below would outlast one minted earlier.
+        run: bash src/tests/load/k6/export-load-test-credentials.sh
 
       - name: k6 auth-onboarding (informational)
         if: ${{ !cancelled() }}
@@ -185,16 +167,26 @@ jobs:
         continue-on-error: true
         run: k6 run --summary-export=k6-admin.json src/tests/load/k6/scenarios/admin.js
 
+      - name: Refresh load-test credentials (before the organization-scoped scenarios)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        # Access tokens live 15 minutes; the block below would outlast one minted earlier.
+        run: bash src/tests/load/k6/export-load-test-credentials.sh
+
       - name: k6 org-scoped routes (informational)
         if: ${{ !cancelled() }}
         continue-on-error: true
+        # Every scenario runs even when an earlier one fails (bash -e stopped the block at the first
+        # failure, so the rest never ran); the step still fails when any of them did.
         run: |
-          k6 run --summary-export=k6-audit-list.json src/tests/load/k6/scenarios/audit-list.js
-          k6 run --summary-export=k6-org-membership-list.json src/tests/load/k6/scenarios/org-membership-list.js
-          k6 run --summary-export=k6-notification-policy.json src/tests/load/k6/scenarios/notification-policy-crud.js
-          k6 run --summary-export=k6-billing-subscriptions-rls.json src/tests/load/k6/scenarios/billing-subscriptions-rls.js
-          k6 run --summary-export=k6-user-data-export.json src/tests/load/k6/scenarios/user-data-export.js
-          k6 run --summary-export=k6-rls-concurrency.json src/tests/load/k6/scenarios/rls-concurrency-beyond-pool.js
+          failed=0
+          k6 run --summary-export=k6-audit-list.json src/tests/load/k6/scenarios/audit-list.js || failed=1
+          k6 run --summary-export=k6-org-membership-list.json src/tests/load/k6/scenarios/org-membership-list.js || failed=1
+          k6 run --summary-export=k6-notification-policy.json src/tests/load/k6/scenarios/notification-policy-crud.js || failed=1
+          k6 run --summary-export=k6-billing-subscriptions-rls.json src/tests/load/k6/scenarios/billing-subscriptions-rls.js || failed=1
+          k6 run --summary-export=k6-user-data-export.json src/tests/load/k6/scenarios/user-data-export.js || failed=1
+          k6 run --summary-export=k6-rls-concurrency.json src/tests/load/k6/scenarios/rls-concurrency-beyond-pool.js || failed=1
+          exit "$failed"
         env:
           ADMIN_TOKEN: ${{ env.ADMIN_TOKEN }}
           TEST_TOKEN: ${{ env.TEST_TOKEN }}
