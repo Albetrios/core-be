@@ -1,6 +1,9 @@
 import { and, asc, desc, eq, inArray, isNull, ne, sql, type SQL } from 'drizzle-orm';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import {
+  getContextFreeDatabase,
+  getRequestDatabase,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { memberships } from '@/domains/tenancy/sub-domains/membership/membership.schema.js';
 import { member_invitations } from '@/domains/tenancy/sub-domains/membership/member-invitation/member-invitation.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
@@ -299,7 +302,7 @@ export class MembershipRepository extends BaseRepository {
       userInternalIds.map((userInternalId) => sql`${userInternalId}`),
       sql`, `,
     );
-    const result = await getRequestDatabase().execute(
+    const result = await getContextFreeDatabase().execute(
       sql`SELECT id, public_id, email, first_name, last_name, avatar_url FROM auth.resolve_user_summaries_by_ids(ARRAY[${userIdValues}]::bigint[])`,
     );
     const rows = (

@@ -18,14 +18,17 @@ vi.mock(
   '@/infrastructure/database/contexts/database-context-runtime.js',
   async (importOriginal) => {
     const actual = await importOriginal<Record<string, unknown>>();
+    const databaseHandle = () => ({
+      select: mockSelect,
+      insert: mockInsert,
+      update: mockUpdate,
+      execute: mockExecute,
+    });
+    // SECURITY DEFINER resolver calls go through the context-free accessor: same mock handle.
     return {
       ...actual,
-      getRequestDatabase: () => ({
-        select: mockSelect,
-        insert: mockInsert,
-        update: mockUpdate,
-        execute: mockExecute,
-      }),
+      getRequestDatabase: databaseHandle,
+      getContextFreeDatabase: databaseHandle,
     };
   },
 );

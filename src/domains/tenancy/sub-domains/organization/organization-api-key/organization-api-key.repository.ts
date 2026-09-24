@@ -1,6 +1,9 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import {
+  getContextFreeDatabase,
+  getRequestDatabase,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { api_keys } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.schema.js';
 import { BaseRepository } from '@/infrastructure/database/base-repository.js';
@@ -247,7 +250,7 @@ export class OrganizationApiKeyRepository extends BaseRepository {
   async findActiveByKeyPrefix(
     key_prefix: string,
   ): Promise<OrganizationApiKeyAuthenticationCandidate[]> {
-    const rows = await getRequestDatabase().execute(
+    const rows = await getContextFreeDatabase().execute(
       sql`SELECT * FROM tenancy.resolve_api_key_for_authentication(${key_prefix})`,
     );
     const resolverRows = (

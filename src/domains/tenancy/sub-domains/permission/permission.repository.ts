@@ -4,7 +4,10 @@ import { roles } from '@/domains/tenancy/sub-domains/member-roles/member-role.sc
 import { role_permissions } from '@/domains/tenancy/sub-domains/member-roles/member-role-permission/member-role-permission.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { DEFAULT_REPOSITORY_LIST_LIMIT } from '@/shared/constants/query-limits.constants.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import {
+  getContextFreeDatabase,
+  getRequestDatabase,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { eq, and, isNull, sql as drizzleSql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
@@ -31,7 +34,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
  */
 export class PermissionRepository {
   async findAll(limit = DEFAULT_REPOSITORY_LIST_LIMIT) {
-    const rows = await getRequestDatabase()
+    const rows = await getContextFreeDatabase()
       .select()
       .from(permissions)
       .orderBy(permissions.category, permissions.code)

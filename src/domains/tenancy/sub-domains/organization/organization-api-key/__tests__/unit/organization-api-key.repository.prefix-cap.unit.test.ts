@@ -10,6 +10,8 @@ vi.mock(
     return {
       ...actual,
       getRequestDatabase: () => ({ execute: dbMocks.execute }),
+      // The key-prefix resolver goes through the context-free accessor: same mock handle.
+      getContextFreeDatabase: () => ({ execute: dbMocks.execute }),
     };
   },
 );
