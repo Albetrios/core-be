@@ -57,13 +57,13 @@ When a job exhausts retries, the worker enqueues a snapshot to **`<queue-name>-d
 
 ### Get a super_admin JWT
 
-For local/dev, use the script:
+For local/dev, sign in as a super_admin with the script. It needs an account whose email is on `GLOBAL_ADMIN_EMAILS`; create one with `DEMO_EMAIL=<admin email> pnpm db:seed:demo-admin`. Then, with the server running:
 
 ```bash
 pnpm tool:admin-token
 ```
 
-Copy the printed token, then either:
+The token belongs to a real session and lives `GLOBAL_ADMIN_ACCESS_TOKEN_EXPIRY_SECONDS` (default 5 minutes). Copy it, then either:
 
 - **Browser**: Use an extension or devtools to add `Authorization: Bearer <your-token>` to requests to `http://localhost:3000/admin/queues`, or
 - **curl**:

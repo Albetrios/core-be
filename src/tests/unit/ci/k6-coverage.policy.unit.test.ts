@@ -54,7 +54,7 @@ describe('k6 coverage policy (#67)', () => {
     );
 
     expect(stripe).toContain('expectedStatuses(400)');
-    expect(idempotency).toContain('expectedStatuses(200, 200, 409, 422)');
+    expect(idempotency).toContain('expectedStatuses(200, 409, 422)');
   });
 
   it('never load-tests fewer routes nightly than the recorded budget (a ratchet)', () => {

@@ -53,8 +53,9 @@ export function adminOps() {
 
   sleep(0.5);
 
-  // Permissions (public)
+  // Permission catalog (any signed-in user; it was public once, and this request still sent no token)
   const permResponse = http.get(`${API_PREFIX}/tenancy/permissions`, {
+    headers,
     tags: { name: 'list-permissions' },
   });
   checkOk(permResponse, 'list-permissions');

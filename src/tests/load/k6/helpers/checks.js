@@ -3,9 +3,11 @@ import { check } from 'k6';
 /**
  * Standard response assertions for k6 tests.
  */
+/** Checks the status against one expected status or a list of them. */
 export function checkStatus(response, expectedStatus, name) {
+  const expected = [].concat(expectedStatus);
   return check(response, {
-    [`${name || 'response'} status is ${expectedStatus}`]: (r) => r.status === expectedStatus,
+    [`${name || 'response'} status is ${expected.join('|')}`]: (r) => expected.includes(r.status),
   });
 }
 

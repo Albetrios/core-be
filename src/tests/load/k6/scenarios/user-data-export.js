@@ -11,6 +11,8 @@ export const options = {
   thresholds: {
     ...THRESHOLDS,
     'http_req_duration{name:user-data-export-status}': ['p(95)<500', 'p(99)<1000'],
+    // Without a status read the latency thresholds pass on zero samples, so require that it ran.
+    'http_reqs{name:user-data-export-status}': ['count>0'],
   },
 };
 
@@ -27,12 +29,16 @@ export function setup() {
     responseCallback: http.expectedStatuses(200, 409),
   });
   const body = response.status === 200 ? JSON.parse(response.body) : null;
-  return { dataExportId: body?.data?.id ?? null };
+  // The serializer names the id `export_id`.
+  return { dataExportId: body?.data?.export_id ?? null };
 }
 
 export function userDataExportOps(data) {
   const token = __ENV.TEST_TOKEN;
-  if (!(token && data?.dataExportId)) return;
+  if (!(token && data?.dataExportId)) {
+    sleep(1);
+    return;
+  }
 
   const response = http.get(`${API_PREFIX}/users/me/data-export/${data.dataExportId}`, {
     ...authHeaders(token),

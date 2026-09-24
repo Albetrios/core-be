@@ -60,11 +60,11 @@ export function idempotencyStorm(data) {
         'X-Idempotency-Key': idempotencyKey,
       },
       tags: { name: 'idempotency-storm' },
-      responseCallback: http.expectedStatuses(200, 200, 409, 422),
+      responseCallback: http.expectedStatuses(200, 409, 422),
     },
   );
 
-  checkStatus(response, [200, 200, 409, 422], 'idempotency-storm');
+  checkStatus(response, [200, 409, 422], 'idempotency-storm');
   sleep(0.1);
 }
 

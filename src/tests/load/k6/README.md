@@ -54,7 +54,7 @@ Org-scoped routes are flat — they carry **no** `/organizations/{organization_i
 **Obtaining credentials:**
 
 - **TEST_TOKEN + TEST_ORG_ID**: `pnpm tool:load-test-credentials` (server up, full seed) — prints values for copy-paste.
-- **ADMIN_TOKEN**: `pnpm tool:admin-token` — prints a JWT with role `super_admin` for load-test use.
+- **ADMIN_TOKEN**: `pnpm tool:admin-token` (server up) — signs in as a `GLOBAL_ADMIN_EMAILS` account and prints its `super_admin` access token (5 minutes by default). Create the account first: `DEMO_EMAIL=<admin email> pnpm db:seed:demo-admin`.
 - **Credential pool** (user-journey, fe-login-to-org): `pnpm db:seed:loadtest` — no server needed; writes `src/tests/load/k6/data/credential-pool.json` automatically. Each VU logs in as a distinct user so tokens are minted once in `setup()` via `helpers/pool.js`.
 
 **Rate limit:** High-concurrency scenarios (`api-stress`, `rls-concurrency`) exceed the default global limit of `RATE_LIMIT_MAX` (100) requests per `RATE_LIMIT_WINDOW_MS` (60s) per IP, so the server returns `429` and k6 marks the requests as failed. Start the API with `RATE_LIMIT_MAX=10000 pnpm dev` (or `pnpm dev:loadtest`) before running them. The nightly CI workflow already boots the API at `RATE_LIMIT_MAX=10000`.
