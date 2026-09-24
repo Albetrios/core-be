@@ -57,15 +57,18 @@ export function shouldShedRequest(options: {
  *   shared `monitorEventLoopDelay` histogram is sampled every {@link OVERLOAD_SAMPLE_INTERVAL_MS}
  *   and reset each tick; the `onRequest` hook reads the cached p99 (no per-request syscall) and
  *   sheds above `env.OVERLOAD_MAX_EVENT_LOOP_DELAY_MS`. (2) DB-pool saturation: the hook reads the
- *   live in-process organization-RLS checkout gauge and sheds at `ceil(DATABASE_POOL_MAX × shedRatio)`. Both
+ *   live in-process checkout gauge — units of work running or still waiting for a connection — and
+ *   sheds at `ceil(DATABASE_POOL_MAX × shedRatio)`. The default ratio (3) lets a queue twice the
+ *   pool's size form first, so a burst the pool drains in milliseconds is served, not shed. Both
  *   throw {@link ServiceUnavailableError} with `Retry-After`.
  * - **Why:** without a valve, a backlog grows an unbounded queue and tail latency runs to multiple
  *   seconds. Shedding bounds the tail — requests the box cannot serve promptly get a fast, cheap
  *   503 instead of occupying a worker for seconds. The event-loop signal alone is blind to pool
  *   exhaustion: a request awaiting a pooled connection leaves the loop *idle*, so without the pool
- *   condition requests would queue behind postgres.js (which has no acquire deadline) up to the
- *   request timeout. The pool ratio (`env.OVERLOAD_DB_POOL_SHED_RATIO`, `0` disables) is decoupled
- *   from the alerter's `DATABASE_POOL_ACTIVE_CRITICAL_RATIO` so shedding tunes independently.
+ *   condition requests would queue behind postgres.js (which has no acquire timeout of its own)
+ *   until `DATABASE_POOL_ACQUIRE_TIMEOUT_MS`. The pool ratio (`env.OVERLOAD_DB_POOL_SHED_RATIO`,
+ *   `0` disables) is decoupled from the alerter's `DATABASE_POOL_ACTIVE_CRITICAL_RATIO` so shedding
+ *   tunes independently.
  * - **Failure modes:** none surfaced to healthy traffic — at sane thresholds the guard is dormant
  *   under normal load. Allowlisted health/metrics paths are never shed.
  * - **Side effects:** one shared `monitorEventLoopDelay` histogram + one unref'd interval timer

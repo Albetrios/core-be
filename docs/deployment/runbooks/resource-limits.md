@@ -144,10 +144,11 @@ Organization-scoped HTTP routes hold **one pool checkout per unit of work** via 
 > **Throughput SLA (RLS ceiling).** Because each organization-scoped request holds its connection for the
 > whole request, a single process sustains at most `DATABASE_POOL_MAX` concurrent organization-scoped
 > requests. Steady-state RPS ≈ `DATABASE_POOL_MAX / avg_request_seconds` per process (e.g. 20 / 0.05s
-> ≈ 400 RPS). Beyond that, the overload guard sheds new requests with 503 + `Retry-After` once 90% of
-> the pool is in flight (`OVERLOAD_DB_POOL_SHED_RATIO`); a unit of work that still cannot get a
-> connection within `DATABASE_POOL_ACQUIRE_TIMEOUT_MS` gets the same 503, and a running statement past
-> the 5s HTTP statement timeout surfaces as a 504. Scale by raising `DATABASE_POOL_MAX` (within the connection budget above) or
+> ≈ 400 RPS). Beyond that, units of work queue for a connection. The overload guard sheds new requests
+> with 503 + `Retry-After` once three times the pool is in flight, running plus waiting
+> (`OVERLOAD_DB_POOL_SHED_RATIO`, default 3); a unit of work that still cannot get a connection within
+> `DATABASE_POOL_ACQUIRE_TIMEOUT_MS` gets the same 503, and a running statement past the 5s HTTP
+> statement timeout surfaces as a 504. Scale by raising `DATABASE_POOL_MAX` (within the connection budget above) or
 > adding API replicas; watch the `database.pool.exhaustion.*` Sentry alerts (warn 80% / crit 95%).
 
 | Concern                | Guidance                                                                                               |
