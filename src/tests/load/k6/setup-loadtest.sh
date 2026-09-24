@@ -44,6 +44,22 @@ setkv() {
 
 echo "==> Load-test setup: VUS=$VUS, WORKERS=$WORKERS, DB pool=$POOL"
 
+# Box headroom. A load number measures the MACHINE as much as the API: orphaned dev servers left by
+# earlier sessions (`pnpm dev` whose parent is pid 1, each with a `tsx watch` child) and a box deep
+# in swap have inflated p99 ~5x before — and one such watcher hijacked :3001 on 2026-09-24. Warn,
+# don't fail: the run is still valid for "this box right now", just not for "this API".
+echo "[0/7] preflight: box headroom"
+ORPHANED_DEV_SERVERS=$(ps -A -o ppid=,pid=,command= | awk '$1 == 1 && /pnpm dev|tsx\/dist\/cli\.mjs watch/ {printf "%s ", $2}')
+if [ -n "$ORPHANED_DEV_SERVERS" ]; then
+  echo "      ⚠ orphaned dev servers (parent pid 1): ${ORPHANED_DEV_SERVERS}— stop them for clean numbers:"
+  echo "        pkill -f '[t]sx/dist/cli.mjs watch'; kill ${ORPHANED_DEV_SERVERS}"
+fi
+SWAP_USED_MB=$(sysctl -n vm.swapusage 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "used") {value = $(i + 2); sub(/M$/, "", value); print int(value)}}')
+if [ "${SWAP_USED_MB:-0}" -gt 4096 ]; then
+  echo "      ⚠ ${SWAP_USED_MB} MB of swap in use — latency will partly measure paging, not the API"
+fi
+[ -z "$ORPHANED_DEV_SERVERS" ] && [ "${SWAP_USED_MB:-0}" -le 4096 ] && echo "      no orphaned dev servers; swap ${SWAP_USED_MB:-0} MB"
+
 echo "[1/7] back up .env.local + apply load-test env overrides"
 # The backup holds secrets and lives in /tmp: owner-only.
 [ -f "$BAK" ] || { cp .env.local "$BAK" && chmod 600 "$BAK"; }

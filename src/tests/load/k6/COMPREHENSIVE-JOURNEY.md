@@ -11,7 +11,9 @@ capacity. This file documents **everything needed to reproduce a clean run**, th
 > Tear down with `pnpm load:journey:down`.
 >
 > **Setup only** — applies every prerequisite below and verifies it:
-> `bash src/tests/load/k6/setup-loadtest.sh [VUS] [WORKERS]` (defaults `100 10`). It backs up
+> `bash src/tests/load/k6/setup-loadtest.sh [VUS] [WORKERS]` (defaults `100 10`). It first **warns
+> about box headroom** — orphaned dev servers (parent pid 1) and more than 4 GB of swap, either of
+> which skews the numbers toward the machine rather than the API — then backs up
 > `.env.local`, applies the load-test env, **sizes the DB pool to the connection budget**, rebuilds and
 > **copies runtime assets to `dist/`**, **heals a half-open Redis port-forward**, ensures Postgres
 > `max_connections=500`, seeds the credential pool, cleans leaked data, starts the cluster, and ends by
