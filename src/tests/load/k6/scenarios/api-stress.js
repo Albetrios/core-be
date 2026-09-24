@@ -31,7 +31,7 @@ export const options = {
     http_reqs: ['rate>5'],
     http_req_duration: ['p(95)<500', 'p(99)<1000'],
     'http_req_duration{name:users-me}': ['p(95)<500'],
-    'http_req_duration{name:tenancy-organizations}': ['p(95)<500'],
+    'http_req_duration{name:my-organizations}': ['p(95)<500'],
     'http_req_duration{name:notify-notifications}': ['p(95)<500'],
     'http_req_duration{name:notify-unread-count}': ['p(95)<500'],
     'http_req_duration{name:tenancy-memberships}': ['p(95)<500'],

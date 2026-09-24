@@ -82,9 +82,13 @@ jobs:
 
       - name: Export shared CI test env (JWT keys + retention + secrets-encryption)
         uses: ./.github/actions/test-env
+        # The global limiter keeps running, so its cost is measured, but never rejects the one k6
+        # source IP: the schema caps RATE_LIMIT_MAX at 100000, and a 1 s window makes that 100k req/s
+        # (the local load rig's setting). At 10000 per minute, api-stress had 97% of its requests
+        # answered 429 and starved the scenarios after it.
         with:
-          rate-limit-max: '10000'
-          rate-limit-window-ms: '60000'
+          rate-limit-max: '100000'
+          rate-limit-window-ms: '1000'
 
       - name: Setup k6
         uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
@@ -98,7 +102,7 @@ jobs:
       - name: Start API server
         uses: ./.github/actions/start-api-server
         with:
-          rate-limit-max: '10000'
+          rate-limit-max: '100000'
           ready-timeout-seconds: '80'
 
       - name: Export load-test credentials and admin token
