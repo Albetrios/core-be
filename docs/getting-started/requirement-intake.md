@@ -296,7 +296,7 @@ It runs the pipeline (each step is an existing skill), self-healing failed gates
 
 **Skills to run (in order):**
 
-1. **be-ci-investigator** (if diagnosing one check) — `.cursor/skills/be-ci-investigation/SKILL.md`
+1. **be-ci-investigation** (if diagnosing one check) — `.cursor/skills/be-ci-investigation/SKILL.md`
 2. **be-pr-babysit** — `.cursor/skills/be-pr-babysit/SKILL.md`
 3. **be-before-commit-guard** (if pre-commit fails locally)
 4. Skills from **be-skill-index** matching the code you change (routes, migrations, contract/chaos tests, etc.)

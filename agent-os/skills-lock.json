@@ -29,7 +29,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/be-chaos-test-maintainer/SKILL.md",
-      "computedHash": "310c4edcfa4d6daa25786e181eac46486cc1e5a4b536ea63aae24c77e6bba1c0"
+      "computedHash": "618ed6aeef1da913257fa2b027ef5d6835b1ff079095dddf90a1a8cfd0c5d3a0"
     },
     "be-ci-investigation": {
       "source": "local",
@@ -53,13 +53,13 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/be-contract-test-maintainer/SKILL.md",
-      "computedHash": "36708f979f4db9104562cec7812b2a7aacc509189f08faf24b7016ac5e33afaa"
+      "computedHash": "77af453e0bfcdb86b5e43e04896792c9c28348fca951d0619ea34131686550cb"
     },
     "be-cursor-global-skills": {
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/be-cursor-global-skills/SKILL.md",
-      "computedHash": "49bceb169b2e83cefd8113d82593eabf9b316f2e01732e3f090f981aeeb6cb82"
+      "computedHash": "65578f0f93aa7b4d841282a26400da6c4aaf954ef4bffaaf096aa16499dc1fa1"
     },
     "be-db-migration-maintainer": {
       "source": "local",
@@ -161,7 +161,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/be-pr-babysit/SKILL.md",
-      "computedHash": "d544945647ae0e23abbb458953eb9cdebbce97bf06c1051134bd635931b54587"
+      "computedHash": "52176d9a8fd523f6db8f0955b8031cc7d5e9e8f18f39b01a054f215931adb8eb"
     },
     "be-production-hardening-guard": {
       "source": "local",
@@ -209,7 +209,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/be-skill-index/SKILL.md",
-      "computedHash": "e9653cf2648d8ba1cea335e3ab5e93e79cd2e92fa0fc79fe2fe802dfe9cdcd7b"
+      "computedHash": "9f5534559fb8fbd43c53153b6f80b6667bd9328289673b42c3b653c0a3d058a8"
     },
     "be-split-to-prs": {
       "source": "local",

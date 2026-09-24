@@ -77,7 +77,7 @@ Most chaos "failures" on a fresh machine are environment, not code. Check these 
 
 - **be-workers-events** — queue/worker behavior under faults
 - **be-production-hardening-guard** — circuit breakers, readiness
-- **be-ci-investigator** — chaos job failures
+- **be-ci-investigation** — chaos job failures
 
 ---
 

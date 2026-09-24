@@ -79,6 +79,6 @@ pnpm ci:local
 
 ## Related skills
 
-- **be-ci-investigator** — single failing check root-cause summary
+- **be-ci-investigation** — single failing check root-cause summary
 - **be-before-commit-guard** — pre-commit hook failures before push
 - **be-split-to-prs** — if scope is too large to merge safely

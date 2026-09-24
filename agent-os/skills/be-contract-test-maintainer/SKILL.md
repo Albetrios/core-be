@@ -45,7 +45,7 @@ Runs in **Quality** CI (`pnpm test:contract`). Default `pnpm test` **excludes** 
 ## Related skills
 
 - **be-production-hardening-guard** — circuit breakers on external clients
-- **be-ci-investigator** — when Quality job contract step fails
+- **be-ci-investigation** — when Quality job contract step fails
 
 ---
 

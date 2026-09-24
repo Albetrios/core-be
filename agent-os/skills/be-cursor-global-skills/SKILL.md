@@ -14,7 +14,7 @@ These skills ship with **Cursor** under `~/.cursor/skills-cursor/`. They are **n
 | -------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | New domain, routes, tests, migrations, seeds       | **core-be** skills (`be-skill-index` first)                                           |
 | PR CI failures, merge conflicts, review comments   | **be-pr-babysit** (project) — or global **babysit** if project skill unavailable      |
-| Diagnose one failing CI check on a PR              | **be-ci-investigator** (project)                                                      |
+| Diagnose one failing CI check on a PR              | **be-ci-investigation** (project)                                                     |
 | Split branch into multiple PRs                     | **be-split-to-prs** (project) — domain-aware slices                                   |
 | Create/edit project `.cursor/skills` or rules      | **create-skill**, **create-rule** (global)                                         |
 | Edit `agent-os/agents/` subagent definitions        | **create-subagent** (global)                                                       |
@@ -61,4 +61,4 @@ command file and rule file (`pnpm agent-os:check`, Check 17). Upstream skills ke
 
 For the full list and triggers, read **`agent-os/skills/be-skill-index/SKILL.md`**.
 
-Project copies of common global workflows: **be-pr-babysit**, **be-split-to-prs**, **be-ci-investigator**, **be-contract-test-maintainer**, **be-chaos-test-maintainer**.
+Project copies of common global workflows: **be-pr-babysit**, **be-split-to-prs**, **be-ci-investigation**, **be-contract-test-maintainer**, **be-chaos-test-maintainer**.

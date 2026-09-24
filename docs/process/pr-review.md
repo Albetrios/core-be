@@ -187,7 +187,7 @@ Post a short review comment body:
 ### Related skills
 
 - **be-pr-babysit** — loop until merge-ready; apply this rubric when addressing comments.
-- **be-ci-investigator** — one failing check diagnosis.
+- **be-ci-investigation** — one failing check diagnosis.
 - **be-code-smells-and-best-practices** — fix Biome issues in touched `src/` files.
 
 ---
