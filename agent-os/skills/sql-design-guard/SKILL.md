@@ -137,7 +137,8 @@ Every FK column **must** have an index its ON DELETE / ON UPDATE action can use.
 
 - The FK column(s) must **lead** the index — a composite `(organization_id, created_at, id)` covers `organization_id`.
 - A **partial** index counts only when its predicate is `<column> IS NOT NULL` (the right shape for nullable FKs such as `*_by_user_id`). Any other predicate — e.g. `WHERE revoked_at IS NULL` — cannot serve the action, which must reach every row.
-- Gated against the migrated catalog by `src/tests/integration/database/index-hygiene.integration.test.ts`.
+- **Declare it in the `*.schema.ts` too**, with the same name, uniqueness, key columns and `.where(...)` predicate — even when the migration builds it `CONCURRENTLY`. An index that exists only in a migration is invisible to anyone reading the schema, and a drizzle-kit diff drafted from that schema would propose dropping it.
+- Gated against the migrated catalog by `src/tests/integration/database/index-hygiene.integration.test.ts` (FK coverage, no redundant prefixes, and schema ↔ catalog parity).
 
 ```sql
 CREATE INDEX idx_webhook_delivery_attempts_webhook_id ON notify.webhook_delivery_attempts(webhook_id);

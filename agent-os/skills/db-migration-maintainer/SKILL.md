@@ -104,6 +104,7 @@ These are enforced by `pnpm db:migrate:lint` and cannot be overridden by the `--
 ## Anti-patterns
 
 - Changing only `*.schema.ts` without a migration (production drift)
+- Creating an index only in a migration without declaring it in `*.schema.ts` (schema drift — the index-hygiene gate's parity check fails on it)
 - Putting Drizzle schemas under `src/infrastructure/database/schemas/` (use domain co-location)
 - Confusing this skill with **supabase-porting** (Edge Functions → Fastify)
 - `SET row_security = off` / `RESET row_security` inside any migration (use `SECURITY DEFINER` + `GRANT EXECUTE` instead)

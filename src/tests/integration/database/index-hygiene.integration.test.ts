@@ -1,12 +1,16 @@
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { SQL, is } from 'drizzle-orm';
+import { type IndexedColumn, PgTable, getTableConfig } from 'drizzle-orm/pg-core';
 import { describe, it, expect } from 'vitest';
 import { sql } from '@/infrastructure/database/connection.js';
 
 /**
  * Structural index invariants, asserted against the migrated catalog.
  *
- * The catalog — not the Drizzle schema files — is the source here, because some indexes (the
- * attribution FK indexes of `20260623000000_attribution_fk_indexes.sql`) exist only in
- * migrations; only `pg_index` sees every one.
+ * Migrations create indexes; the Drizzle schema files describe them. The catalog is what the
+ * database actually has, so every invariant is checked against `pg_index` — including the third,
+ * which holds the schema files to it.
  *
  * 1. Every foreign key has an index its ON DELETE / ON UPDATE action can use. The action runs as
  *    `... WHERE <fk columns> = $1` on the child table once per deleted parent row, so a missing
@@ -14,6 +18,10 @@ import { sql } from '@/infrastructure/database/connection.js';
  * 2. No B-tree index is a leading prefix (or a duplicate) of another on the same table. The
  *    longer index serves every lookup, range and ordering the shorter one can, so the shorter one
  *    only adds work to every insert and non-HOT update.
+ * 3. The Drizzle schema declares exactly the indexes the database has — same name, uniqueness and
+ *    key columns. An index that exists only in a migration is invisible to anyone reading the
+ *    schema, and a drizzle-kit diff drafted from that schema would propose dropping it (the
+ *    attribution FK indexes of `20260623000000` were in exactly that state).
  */
 
 const APPLICATION_SCHEMAS = ['auth', 'tenancy', 'billing', 'notify', 'audit', 'upload', 'public'];
@@ -126,4 +134,89 @@ describe('Integration: index hygiene', () => {
       'Indexes the index on the right already serves — drop them with DROP INDEX CONCURRENTLY (model: 20260923130000_drop_redundant_prefix_indexes.sql)',
     ).toEqual([]);
   });
+
+  it('declares in the Drizzle schema exactly the indexes the database has', async () => {
+    // Constraint-backed indexes (primary keys, `.unique()` constraints) are declared through the
+    // constraint, not as an index, so only standalone indexes are compared.
+    const catalogRows = await sql<{ key: string; is_unique: boolean; key_columns: string }[]>`
+      SELECT n.nspname || '.' || t.relname || '.' || i.relname AS key,
+             x.indisunique AS is_unique,
+             (SELECT string_agg(coalesce(a.attname, '<expression>'), ',' ORDER BY k.position)
+                FROM unnest((x.indkey::int2[])[0:x.indnkeyatts - 1]) WITH ORDINALITY AS k(attnum, position)
+                LEFT JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum) AS key_columns
+        FROM pg_index x
+        JOIN pg_class i ON i.oid = x.indexrelid
+        JOIN pg_class t ON t.oid = x.indrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+       WHERE n.nspname = ANY (${APPLICATION_SCHEMAS})
+         AND NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conindid = x.indexrelid)
+    `;
+    const catalog = new Map(catalogRows.map((row) => [row.key, describeIndex(row)]));
+    const declared = await declaredDrizzleIndexes();
+    // Guard against a vacuous pass: no schema files found, or an unmigrated database.
+    expect(declared.size).toBeGreaterThan(100);
+    expect(catalog.size).toBeGreaterThan(100);
+
+    const drift = [
+      ...[...catalog.keys()]
+        .filter((key) => !declared.has(key))
+        .map((key) => `${key} exists in the database but no schema declares it`),
+      ...[...declared.keys()]
+        .filter((key) => !catalog.has(key))
+        .map((key) => `${key} is declared but no migration creates it`),
+      ...[...declared.entries()]
+        .filter(([key, shape]) => catalog.has(key) && catalog.get(key) !== shape)
+        .map(
+          ([key, shape]) =>
+            `${key} is declared as ${shape} but the database has ${catalog.get(key)}`,
+        ),
+    ].sort();
+    expect(
+      drift,
+      'Declare every index in its *.schema.ts, matching the migration that creates it (model: the attribution FK indexes of 20260623000000)',
+    ).toEqual([]);
+  });
 });
+
+/** An index's comparable shape: uniqueness plus its key columns in order. */
+function describeIndex(index: { is_unique: boolean; key_columns: string }): string {
+  return `${index.is_unique ? 'unique' : 'non-unique'}(${index.key_columns})`;
+}
+
+/** Every index declared on a Drizzle table in any `*.schema.ts` under `src/`, keyed like the catalog. */
+async function declaredDrizzleIndexes(): Promise<Map<string, string>> {
+  const indexes = new Map<string, string>();
+  for (const file of schemaFiles('src')) {
+    const schemaModule = (await import(
+      `@/${file.slice('src/'.length).replace(/\.ts$/, '.js')}`
+    )) as Record<string, unknown>;
+    for (const exported of Object.values(schemaModule)) {
+      if (!is(exported, PgTable)) continue;
+      const table = getTableConfig(exported);
+      for (const index of table.indexes) {
+        const columns = index.config.columns
+          // `index().on(...)` stores IndexedColumn wrappers (carrying the column `name`); an
+          // expression index stores the SQL itself.
+          .map((column) =>
+            is(column, SQL)
+              ? '<expression>'
+              : ((column as Partial<IndexedColumn>).name ?? '<expression>'),
+          )
+          .join(',');
+        indexes.set(
+          `${table.schema ?? 'public'}.${table.name}.${index.config.name}`,
+          describeIndex({ is_unique: index.config.unique, key_columns: columns }),
+        );
+      }
+    }
+  }
+  return indexes;
+}
+
+function schemaFiles(directory: string): string[] {
+  return readdirSync(directory).flatMap((entry) => {
+    const path = join(directory, entry);
+    if (statSync(path).isDirectory()) return entry === '__tests__' ? [] : schemaFiles(path);
+    return path.endsWith('.schema.ts') ? [path] : [];
+  });
+}

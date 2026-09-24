@@ -49,6 +49,14 @@ export const api_keys = tenancySchema
       ),
     },
     (table) => [
+      // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+      // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+      index('idx_api_keys_created_by_user_id')
+        .on(table.created_by_user_id)
+        .where(sql`${table.created_by_user_id} IS NOT NULL`),
+      index('idx_api_keys_updated_by_user_id')
+        .on(table.updated_by_user_id)
+        .where(sql`${table.updated_by_user_id} IS NOT NULL`),
       uniqueIndex('idx_api_keys_public_id').on(table.public_id),
       index('idx_api_keys_organization_status').on(table.organization_id, table.status),
       index('idx_api_keys_org_created_id_active')
