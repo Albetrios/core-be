@@ -123,9 +123,24 @@ docker exec core-be-redis sh -c "redis-cli --scan --pattern '*rate*limit*' | xar
 
 echo "[6/7] start cluster ($WORKERS workers on :3001)"
 pkill -f cluster-run.mjs 2>/dev/null || true; sleep 1
+# Anything else on :3001 answers /livez too — a stale `pnpm dev` whose watcher picked up PORT=3001
+# from the env file written above did exactly that — and every later check, and the k6 run, would
+# then measure the wrong server while reporting green.
+if lsof -nP -iTCP:3001 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "      ✗ :3001 is already in use (pid $(lsof -nP -t -iTCP:3001 -sTCP:LISTEN | head -1)) — stop it and re-run" >&2
+  exit 1
+fi
 CLUSTER_WORKERS="$WORKERS" nohup node cluster-run.mjs > /tmp/loadtest-server.log 2>&1 &
-for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:3001/livez 2>/dev/null && break; sleep 0.5; done
-echo "      livez -> $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/livez) ($(grep -ciE 'Server listening at http://127' /tmp/loadtest-server.log) workers)"
+for i in $(seq 1 60); do
+  [ "$(grep -ciE 'Server listening at http://127' /tmp/loadtest-server.log)" -ge "$WORKERS" ] && break
+  sleep 0.5
+done
+LISTENING=$(grep -ciE 'Server listening at http://127' /tmp/loadtest-server.log)
+echo "      livez -> $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/livez) ($LISTENING/$WORKERS workers)"
+if [ "$LISTENING" -lt "$WORKERS" ]; then
+  echo "      ✗ only $LISTENING of $WORKERS workers are listening — see /tmp/loadtest-server.log" >&2
+  exit 1
+fi
 
 echo "[7/7] verify prerequisites"
 VUS="$VUS" node src/tests/load/k6/check-prereqs.mjs
