@@ -190,6 +190,7 @@ Grouped index: **[deployment/README.md](deployment/README.md)** (`setup/`, `ci-c
 | Doc                                                                                                        | Description                                                    |
 | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | [reviews/codebase-audit-loop.md](reviews/codebase-audit-loop.md)                                           | Repeatable `/loop`-driven audit procedure (rotating perspectives; append-only living log). |
+| [reviews/production-readiness-2026-09-24.md](reviews/production-readiness-2026-09-24.md)                   | Pending items from the 2026-09-24 readiness pass (security findings tracked privately). |
 | [reviews/production-readiness-audit-2026-05-29.md](reviews/production-readiness-audit-2026-05-29.md)       | Principal-staff production-readiness audit for scale risks.    |
 | [reviews/production-readiness-remediation-2026-05-30.md](reviews/production-readiness-remediation-2026-05-30.md) | Remediation status tracker (findings 1–16 + extended bugs 31–64). |
 | [reviews/production-readiness-2026-05-15.md](reviews/production-readiness-2026-05-15.md)                   | Pre-production checklist (Prometheus/OTel deferred).           |
