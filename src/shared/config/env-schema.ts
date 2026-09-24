@@ -191,11 +191,13 @@ const SERVER_VARS = {
     },
   ),
   // DB-pool exhaustion shows as awaiting-promise time (the loop stays idle), so the event-loop valve
-  // never trips on it; shedding at pool saturation bounds that tail. Set 0 to disable (loop valve stays on).
-  OVERLOAD_DB_POOL_SHED_RATIO: envVar(z.coerce.number().min(0).max(1).default(0.9), {
-    allowed: 'number 0–1',
+  // never trips on it; shedding at pool saturation bounds that tail. The gauge counts units of work
+  // still waiting for a connection too, so a ratio above 1 lets a bounded queue form first: 3 sheds at
+  // three times the pool (the pool busy plus a queue twice its size). Set 0 to disable (loop valve stays on).
+  OVERLOAD_DB_POOL_SHED_RATIO: envVar(z.coerce.number().min(0).max(10).default(3), {
+    allowed: 'number 0–10',
     description:
-      'Fraction of DATABASE_POOL_MAX in-flight RLS checkouts at which the overload guard sheds requests.',
+      'Multiple of DATABASE_POOL_MAX in-flight units of work (running plus waiting for a connection) at which the overload guard sheds requests; above 1 lets a bounded queue form.',
   }),
   DATABASE_POOL_ACQUIRE_TIMEOUT_MS: envVar(
     z.coerce.number().int().min(0).max(60_000).default(10_000),

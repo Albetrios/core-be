@@ -14,8 +14,8 @@ vi.mock('@/infrastructure/observability/sentry/sentry.js', () => ({
   captureException: vi.fn(),
 }));
 
-// Pin the pool inputs the guard reads at registration to the schema defaults, so the shed threshold
-// is ceil(20 × 0.9) = 18 whatever a developer's env file sets (the load rig raises the pool size).
+// Pin the pool inputs the guard reads at registration, so the shed threshold is ceil(20 × 0.9) = 18
+// whatever the schema default or a developer's env file says (the load rig raises the pool size).
 vi.mock('@/shared/config/env.config.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/shared/config/env.config.js')>();
   return {
