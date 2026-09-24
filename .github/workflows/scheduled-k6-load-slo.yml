@@ -1,5 +1,5 @@
 # Nightly k6 load tests against an ephemeral API (Postgres + Redis).
-# Gate: health-stress, api-stress, login-smoke, permission-cached, stripe-webhook-ingest, idempotency-storm (SLO thresholds). Informational: auth, daily-ops, billing, webhooks, admin, org-scoped routes (incl. rls-concurrency-beyond-pool).
+# Gate: health-stress, api-stress, login-smoke, permission-cached, stripe-webhook-ingest, idempotency-storm (SLO thresholds). Informational: auth, daily-ops, billing, webhooks, admin, org-scoped routes (incl. rls-concurrency-beyond-pool), organization writes (roles, permissions, settings, notifications).
 # Secrets (optional email): RESEND_API_KEY, TEST_RESULT_EMAIL_TO
 name: Scheduled k6 API load & SLO
 
@@ -19,7 +19,9 @@ jobs:
   k6:
     name: k6 SLO gate and scenarios
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # ~45 min of k6 (gate ≈ 7, informational ≈ 9, organization-scoped ≈ 12, organization writes ≈ 10)
+    # plus setup; the headroom keeps one slow night from being cut off mid-scenario.
+    timeout-minutes: 60
     # RESEND_API_KEY / TEST_RESULT_EMAIL_TO are environment secrets; without this
     # the job resolves the repository-level copies. `development` has no
     # protection rules, so a scheduled run needs no approval.
@@ -72,6 +74,10 @@ jobs:
       # CI-only fixture, the one the Vitest harness uses. The webhook route answers 503 until a
       # secret is configured, and stripe-webhook-ingest asserts the 400 for a missing signature.
       STRIPE_WEBHOOK_SECRET: whsec_test_contract_fixture_secret_minimum_length_32_chars_xx
+      # The webhooks scenario creates webhooks pointing at example.com; the SSRF guard only accepts
+      # allowlisted hosts (the local load rig allowlists the same one). Nothing is delivered: this job
+      # runs no worker.
+      WEBHOOK_URL_ALLOWLIST: example.com
       # CI-only fixtures, the Vitest harness's. /auth/email/send-code answers 503 until email is
       # configured, which failed every passwordless-signup request. Mail only lands in the outbox —
       # this job runs no worker — so nothing is sent. The results-email step keeps its own secret.
@@ -191,6 +197,26 @@ jobs:
           ADMIN_TOKEN: ${{ env.ADMIN_TOKEN }}
           TEST_TOKEN: ${{ env.TEST_TOKEN }}
           TEST_ORG_ID: ${{ env.TEST_ORG_ID }}
+
+      - name: Refresh load-test credentials (before the organization-write scenarios)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        # Access tokens live 15 minutes; the block below would outlast one minted earlier.
+        run: bash src/tests/load/k6/export-load-test-credentials.sh
+
+      - name: k6 organization writes (informational)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        # Every scenario runs even when an earlier one fails; the step still fails when any did.
+        run: |
+          failed=0
+          k6 run --summary-export=k6-member-role-permission-list.json src/tests/load/k6/scenarios/member-role-permission-list.js || failed=1
+          k6 run --summary-export=k6-permission-write.json src/tests/load/k6/scenarios/permission-write.js || failed=1
+          k6 run --summary-export=k6-tenancy-role-write.json src/tests/load/k6/scenarios/tenancy-role-write.js || failed=1
+          k6 run --summary-export=k6-organization-settings-write.json src/tests/load/k6/scenarios/organization-settings-write.js || failed=1
+          k6 run --summary-export=k6-notification-write.json src/tests/load/k6/scenarios/notification-write.js || failed=1
+          k6 run --summary-export=k6-organization-api-key-lifecycle.json src/tests/load/k6/scenarios/organization-api-key-lifecycle.js || failed=1
+          exit "$failed"
 
       - name: Upload k6 summaries and server log
         if: always()

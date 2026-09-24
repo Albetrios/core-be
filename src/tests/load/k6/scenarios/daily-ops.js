@@ -53,6 +53,25 @@ export function dailyOps() {
   checkOk(unreadResponse, 'unread-count');
   checkResponseTime(unreadResponse, 200, 'unread-count');
 
+  // Mark the newest notification read — idempotent, so repeating it leaves the data as it was.
+  const notifications =
+    notifResponse.status === 200 ? (JSON.parse(notifResponse.body).data ?? []) : [];
+  if (notifications[0]?.id) {
+    const readResponse = http.patch(
+      `${API_PREFIX}/notify/notifications/${notifications[0].id}/read`,
+      JSON.stringify({}),
+      { headers, tags: { name: 'mark-notification-read' } },
+    );
+    checkOk(readResponse, 'mark-notification-read');
+  }
+
+  // The organization's audit log, as a member with audit-log:read opens it.
+  const auditResponse = http.get(`${API_PREFIX}/tenancy/organization/audit-logs`, {
+    headers,
+    tags: { name: 'list-organization-audit-logs' },
+  });
+  checkOk(auditResponse, 'list-organization-audit-logs');
+
   sleep(0.3);
 
   // Organization memberships

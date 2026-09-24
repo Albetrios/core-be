@@ -2,7 +2,7 @@ import http from 'k6/http';
 import { sleep } from 'k6';
 import { API_PREFIX, THRESHOLDS, SCENARIOS } from '../helpers/config.js';
 import { checkOk, checkResponseTime } from '../helpers/checks.js';
-import { authHeaders, switchToOrganization } from '../helpers/auth.js';
+import { authHeaders } from '../helpers/auth.js';
 
 export const options = {
   scenarios: {
@@ -14,15 +14,38 @@ export const options = {
   },
 };
 
-export function memberRolePermissionListOps() {
-  let token = __ENV.TEST_TOKEN;
+/**
+ * The permissions list needs a role: TEST_ROLE_ID when given, otherwise the organization's first role,
+ * read once for every VU.
+ */
+export function setup() {
+  const token = __ENV.TEST_TOKEN;
+  if (__ENV.TEST_ROLE_ID || !token) {
+    return { rolePublicId: __ENV.TEST_ROLE_ID || null };
+  }
+  const response = http.get(`${API_PREFIX}/tenancy/organization/roles`, {
+    ...authHeaders(token),
+    tags: { name: 'list-roles' },
+  });
+  const roles = response.status === 200 ? (JSON.parse(response.body).data ?? []) : [];
+  return { rolePublicId: roles[0]?.id ?? null };
+}
+
+export function memberRolePermissionListOps(data) {
+  const token = __ENV.TEST_TOKEN;
   const organizationPublicId = __ENV.TEST_ORG_ID;
-  const rolePublicId = __ENV.TEST_ROLE_ID;
+  const rolePublicId = data?.rolePublicId;
   if (!(token && organizationPublicId && rolePublicId)) return;
 
-  // The active organization rides the token's `org` claim — scope the token to TEST_ORG_ID
-  // so the flat route resolves the right organization.
-  token = switchToOrganization(token, organizationPublicId) || token;
+  // TEST_TOKEN arrives already scoped to TEST_ORG_ID (tool:load-test-credentials). Never switch it
+  // here: a switch re-binds the shared session to the new token, which revokes TEST_TOKEN for every
+  // other VU and every later scenario.
+
+  const roleResponse = http.get(`${API_PREFIX}/tenancy/organization/roles/${rolePublicId}`, {
+    ...authHeaders(token),
+    tags: { name: 'get-role' },
+  });
+  checkOk(roleResponse, 'get-role');
 
   const response = http.get(
     `${API_PREFIX}/tenancy/organization/roles/${rolePublicId}/permissions`,

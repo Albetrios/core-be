@@ -2,19 +2,19 @@ import http from 'k6/http';
 import { sleep } from 'k6';
 import { API_PREFIX, THRESHOLDS, SCENARIOS } from '../helpers/config.js';
 import { checkOk, checkResponseTime } from '../helpers/checks.js';
-import { authHeaders, switchToOrganization } from '../helpers/auth.js';
+import { authHeaders } from '../helpers/auth.js';
+import { idempotencyKey } from '../helpers/idempotency.js';
 
 /**
- * k6 Scenario: Permission write paths
+ * k6 Scenario: Permission write paths on a role of the scenario's own.
  *
- * Exercises role permission resolution writes:
- * - GET roles for organization
- * - GET current role permissions
- * - PUT same permission set back (idempotent)
+ * The owner's role cannot be edited — 403 by design, transfer ownership first — and the first role
+ * an organization lists IS the owner's, so this used to fail every write. setup() now creates a
+ * role, every VU reads and replaces its permission set, and teardown() deletes it.
  */
 export const options = {
   scenarios: {
-    load: { ...SCENARIOS.load, exec: 'permissionWriteOps' },
+    load: { ...SCENARIOS.pacedWrites, exec: 'permissionWriteOps' },
   },
   thresholds: {
     ...THRESHOLDS,
@@ -24,19 +24,37 @@ export const options = {
   },
 };
 
-export function permissionWriteOps() {
-  let token = __ENV.TEST_TOKEN;
-  const organizationPublicId = __ENV.TEST_ORG_ID;
-  if (!(token && organizationPublicId)) {
+export function setup() {
+  const token = __ENV.TEST_TOKEN;
+  if (!token) {
+    return { roleId: null };
+  }
+  const response = http.post(
+    `${API_PREFIX}/tenancy/organization/roles`,
+    JSON.stringify({ name: `k6 permission-write ${Date.now()}`, description: 'k6 target role' }),
+    {
+      headers: {
+        ...authHeaders(token).headers,
+        'X-Idempotency-Key': idempotencyKey('permission-role'),
+      },
+      tags: { name: 'create-target-role' },
+    },
+  );
+  return { roleId: response.status === 200 ? (JSON.parse(response.body).data?.id ?? null) : null };
+}
+
+export function permissionWriteOps(data) {
+  const token = __ENV.TEST_TOKEN;
+  const roleId = data?.roleId;
+  if (!(token && roleId)) {
+    sleep(1);
     return;
   }
 
-  // The active organization rides the token's `org` claim — scope the token to TEST_ORG_ID
-  // so the flat route resolves the right organization.
-  token = switchToOrganization(token, organizationPublicId) || token;
-
+  // TEST_TOKEN arrives already scoped to TEST_ORG_ID (tool:load-test-credentials). Never switch it
+  // here: a switch re-binds the shared session to the new token, which revokes TEST_TOKEN for every
+  // other VU and every later scenario.
   const headers = authHeaders(token).headers;
-  const jsonHeaders = { ...headers, 'Content-Type': 'application/json' };
 
   const rolesResponse = http.get(`${API_PREFIX}/tenancy/organization/roles`, {
     headers,
@@ -45,55 +63,35 @@ export function permissionWriteOps() {
   checkOk(rolesResponse, 'list-roles');
   checkResponseTime(rolesResponse, 500, 'list-roles');
 
-  if (rolesResponse.status !== 200) {
-    sleep(1);
-    return;
-  }
-
-  const rolesBody = JSON.parse(rolesResponse.body);
-  const roles = rolesBody.data ?? [];
-  const firstRole = roles[0];
-  if (!firstRole?.id) {
-    sleep(1);
-    return;
-  }
-
-  sleep(0.3);
-
   const permissionsResponse = http.get(
-    `${API_PREFIX}/tenancy/organization/roles/${firstRole.id}/permissions`,
-    {
-      headers,
-      tags: { name: 'get-role-permissions' },
-    },
+    `${API_PREFIX}/tenancy/organization/roles/${roleId}/permissions`,
+    { headers, tags: { name: 'get-role-permissions' } },
   );
   checkOk(permissionsResponse, 'get-role-permissions');
   checkResponseTime(permissionsResponse, 500, 'get-role-permissions');
 
-  if (permissionsResponse.status !== 200) {
-    sleep(1);
-    return;
-  }
-
-  const permissionsBody = JSON.parse(permissionsResponse.body);
-  const permissionCodes = (permissionsBody.data ?? [])
-    .map((permission) => permission.permission_code)
-    .filter(Boolean);
-
   sleep(0.3);
 
   const putResponse = http.put(
-    `${API_PREFIX}/tenancy/organization/roles/${firstRole.id}/permissions`,
-    JSON.stringify({ permission_codes: permissionCodes }),
-    {
-      headers: jsonHeaders,
-      tags: { name: 'put-role-permissions' },
-    },
+    `${API_PREFIX}/tenancy/organization/roles/${roleId}/permissions`,
+    JSON.stringify({ permission_codes: ['organization:read', 'membership:read'] }),
+    { headers, tags: { name: 'put-role-permissions' } },
   );
   checkOk(putResponse, 'put-role-permissions');
   checkResponseTime(putResponse, 700, 'put-role-permissions');
 
   sleep(1);
+}
+
+export function teardown(data) {
+  const token = __ENV.TEST_TOKEN;
+  if (!(token && data?.roleId)) {
+    return;
+  }
+  http.del(`${API_PREFIX}/tenancy/organization/roles/${data.roleId}`, null, {
+    ...authHeaders(token),
+    tags: { name: 'delete-target-role' },
+  });
 }
 
 export default permissionWriteOps;

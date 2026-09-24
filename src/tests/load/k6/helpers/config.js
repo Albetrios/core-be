@@ -38,6 +38,20 @@ export const BREAKPOINT_THRESHOLDS = {
  * Standard scenario presets for reuse.
  */
 export const SCENARIOS = {
+  /**
+   * Organization writes, paced: one iteration per second across all VUs. Every organization write
+   * route carries a 100-per-minute cap per (organization, actor) that RATE_LIMIT_RELAXED_CAPS does not
+   * lift, and a k6 run is ONE actor (the demo user) — faster, and the scenario measures the rate
+   * limiter (429) instead of the route.
+   */
+  pacedWrites: {
+    executor: 'constant-arrival-rate',
+    rate: 1,
+    timeUnit: '1s',
+    duration: '2m',
+    preAllocatedVUs: 4,
+    maxVUs: 10,
+  },
   smoke: {
     executor: 'constant-vus',
     vus: 1,

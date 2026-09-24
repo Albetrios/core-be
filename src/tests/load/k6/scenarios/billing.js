@@ -35,6 +35,15 @@ export function billingOps() {
   checkOk(plansResponse, 'list-plans');
   checkResponseTime(plansResponse, 300, 'list-plans');
 
+  const plans = plansResponse.status === 200 ? (JSON.parse(plansResponse.body).data ?? []) : [];
+  if (plans[0]?.id) {
+    const planResponse = http.get(`${API_PREFIX}/billing/plans/${plans[0].id}`, {
+      headers,
+      tags: { name: 'get-plan' },
+    });
+    checkOk(planResponse, 'get-plan');
+  }
+
   sleep(0.3);
 
   // TEST_TOKEN must be minted scoped to TEST_ORG_ID — the active organization rides the
