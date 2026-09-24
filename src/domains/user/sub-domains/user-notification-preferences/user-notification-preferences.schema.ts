@@ -58,6 +58,14 @@ export const user_notification_preferences = authSchema
       ),
     },
     (table) => [
+      // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+      // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+      index('idx_user_notification_preferences_created_by_user_id')
+        .on(table.created_by_user_id)
+        .where(sql`${table.created_by_user_id} IS NOT NULL`),
+      index('idx_user_notification_preferences_updated_by_user_id')
+        .on(table.updated_by_user_id)
+        .where(sql`${table.updated_by_user_id} IS NOT NULL`),
       // audit-#11: UNIQUE natural key so duplicate (user_id, type, channel) rows
       // cannot be persisted (a .limit(1) preference read must be deterministic).
       uniqueIndex('idx_user_notif_prefs_user_type_channel_unique').on(

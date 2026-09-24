@@ -65,7 +65,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/db-migration-maintainer/SKILL.md",
-      "computedHash": "e3d70b593c0cfa0b4998dd9ca6955480673970335097f9f3ff35807500ed9843"
+      "computedHash": "39080d165259db16fa2f28c3503f1ec044a9eacbc81d0ac2809791f509f38c19"
     },
     "delegate-search": {
       "source": "local",
@@ -233,7 +233,7 @@
       "source": "local",
       "sourceType": "local",
       "skillPath": "agent-os/skills/sql-design-guard/SKILL.md",
-      "computedHash": "23502d5c22f5d489471060150b426e14b84e33a432b5b1433b8fd2fc9631cc7b"
+      "computedHash": "e383ee5d1bb54771376d887bc4f5a424ae9d8e9bea466f156ea5e7aea7474864"
     },
     "structure-maintainer": {
       "source": "local",

@@ -46,6 +46,14 @@ export const plans = billingSchema.table(
     updated_by_user_id: bigint('updated_by_user_id', { mode: 'number' }).references(() => users.id),
   },
   (table) => [
+    // Attribution FK indexes (partial on IS NOT NULL) from migration 20260623000000 — declared so
+    // the schema lists every index the database has (pinned by index-hygiene.integration.test.ts).
+    index('idx_plans_created_by_user_id')
+      .on(table.created_by_user_id)
+      .where(sql`${table.created_by_user_id} IS NOT NULL`),
+    index('idx_plans_updated_by_user_id')
+      .on(table.updated_by_user_id)
+      .where(sql`${table.updated_by_user_id} IS NOT NULL`),
     uniqueIndex('idx_plans_public_id').on(table.public_id),
     uniqueIndex('idx_plans_name').on(table.name),
     index('idx_plans_active_price').on(table.is_active, table.price_monthly),
