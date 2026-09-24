@@ -1150,7 +1150,8 @@ src/
     │   │   └── migration-version.ts
     │   ├── pool/
     │   │   ├── organization-rls-checkout-counter.ts
-    │   │   └── pool.constants.ts
+    │   │   ├── pool.constants.ts
+    │   │   └── unscoped-query-counter.ts
     │   ├── safety/
     │   │   ├── assert-connection-budget.ts
     │   │   ├── assert-database-rls-safety.ts
@@ -1797,6 +1798,7 @@ src/
     │   ├── database-context-mock.helper.ts
     │   ├── fast-check-property.util.ts
     │   ├── object-storage-mock.helper.ts
+    │   ├── operator-database.ts
     │   ├── principal-scope.helper.ts
     │   ├── redis-mock.helper.ts
     │   ├── registered-route.util.ts
@@ -1854,6 +1856,8 @@ src/
     │   │   ├── permission-cache-version.integration.test.ts
     │   │   ├── redis-primitives.integration.test.ts
     │   │   └── shutdown-drain.integration.test.ts
+    │   ├── upload/
+    │   │   └── upload-offboarding-erasure.integration.test.ts
     │   ├── worker-race/
     │   │   ├── mail-claim-race.integration.test.ts
     │   │   ├── mail-race.integration.test.ts
@@ -1957,6 +1961,8 @@ src/
     │   │   ├── object-ownership.security.test.ts
     │   │   ├── tenancy-grant-escalation.security.test.ts
     │   │   └── tier-and-grant.security.test.ts
+    │   ├── concurrency/
+    │   │   └── resource-quota-race.security.test.ts
     │   ├── headers/
     │   │   ├── cors.security.test.ts
     │   │   ├── csp.security.test.ts
@@ -2128,6 +2134,7 @@ src/
     │   │   │   ├── scope-shape-contract.policy.unit.test.ts
     │   │   │   ├── session-context-confinement.policy.unit.test.ts
     │   │   │   ├── transaction.util.db.unit.test.ts
+    │   │   │   ├── unscoped-query-counter.unit.test.ts
     │   │   │   ├── verified-scope-usage.policy.unit.test.ts
     │   │   │   └── worker-database-guard.unit.test.ts
     │   │   ├── mail/

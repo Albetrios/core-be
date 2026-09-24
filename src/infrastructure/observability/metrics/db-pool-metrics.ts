@@ -1,6 +1,7 @@
 import { sql } from '@/infrastructure/database/connection.js';
 import { resolvePostgresAllowedApplicationConnections } from '@/infrastructure/database/safety/assert-connection-budget.js';
 import { registerOrganizationRlsCheckoutHoldObserver } from '@/infrastructure/database/pool/organization-rls-checkout-counter.js';
+import { registerUnscopedDatabaseAccessObserver } from '@/infrastructure/database/pool/unscoped-query-counter.js';
 import { getEnv } from '@/shared/config/env.config.js';
 import { isMetricsEnabled } from '@/infrastructure/observability/metrics/metrics-registry.js';
 import {
@@ -9,6 +10,7 @@ import {
 } from '@/infrastructure/observability/dlq-depth/db-pool-alert.service.js';
 import {
   recordOrganizationRlsCheckoutHold,
+  recordUnscopedDatabaseQuery,
   setOrganizationRlsActiveCheckouts,
   setPostgresPoolConfigMetrics,
   setPostgresPoolConnectionCounts,
@@ -132,6 +134,15 @@ export async function refreshPostgresPoolMetrics(): Promise<void> {
 export function registerPostgresPoolMetrics(): void {
   registerOrganizationRlsCheckoutHoldObserver((sample) => {
     recordOrganizationRlsCheckoutHold(sample);
+  });
+
+  // Every unscoped access is counted; only the FIRST sighting of a given call site is logged,
+  // so a hot offender cannot flood the log while still being named once.
+  registerUnscopedDatabaseAccessObserver((sample) => {
+    recordUnscopedDatabaseQuery();
+    if (sample.isNewCallSite) {
+      logger.warn({ callSite: sample.callSite }, 'database.query.unscoped');
+    }
   });
 
   if (poolMonitoringInterval) {

@@ -1,4 +1,4 @@
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { plans } from '@/domains/billing/sub-domains/plan/plan.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -19,7 +19,7 @@ export interface CreatePlanOptions {
 export async function createTestPlan(options: CreatePlanOptions = {}) {
   const publicId = generatePublicId('plan');
 
-  const [plan] = await database
+  const [plan] = await getOperatorDatabase()
     .insert(plans)
     .values({
       public_id: publicId,

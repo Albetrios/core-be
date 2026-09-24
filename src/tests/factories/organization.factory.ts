@@ -1,5 +1,10 @@
 import { faker } from '@faker-js/faker';
 import { database } from '@/infrastructure/database/connection.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
+import { getOperatorSql } from '@/tests/helpers/operator-database.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
 import { generatePublicId } from '@/shared/utils/identity/public-id.util.js';
 
@@ -49,17 +54,34 @@ export async function createTestOrganization(options: CreateOrganizationOptions)
   const name = options.name ?? faker.company.name();
   const slug = options.slug ?? buildCollisionResistantSlug(name, publicId);
 
-  const [organization] = await database
-    .insert(organizations)
-    .values({
-      public_id: publicId,
-      name,
-      slug,
-      owner_user_id: options.ownerUserId,
-      created_by_user_id: options.ownerUserId,
-      ...(options.type !== undefined ? { type: options.type } : {}),
-    })
-    .returning();
+  // `tenancy.organizations` is FORCE RLS; its WITH CHECK is satisfied by the owner's context,
+  // which is exactly how `OrganizationService.create` inserts — pinned to
+  // `PRINCIPAL_SCOPE.VERIFIED({ userPublicId: owner_user_public_id })`. Resolving the owner's
+  // public id is a fixture concern (the lookup is itself RLS-gated and the caller only has an
+  // internal id), so that one read uses the operator connection; the INSERT itself stays
+  // on the production path rather than out-privileging the policy it is meant to respect.
+  const [owner] = await getOperatorSql()<{ public_id: string }[]>`
+    SELECT public_id FROM auth.users WHERE id = ${options.ownerUserId}
+  `;
+  if (!owner) {
+    throw new Error(`createTestOrganization: no user with id ${options.ownerUserId}`);
+  }
+
+  const [organization] = await withAppDatabaseContext(
+    PRINCIPAL_SCOPE.VERIFIED({ userPublicId: owner.public_id }),
+    (databaseHandle) =>
+      (databaseHandle ?? database)
+        .insert(organizations)
+        .values({
+          public_id: publicId,
+          name,
+          slug,
+          owner_user_id: options.ownerUserId,
+          created_by_user_id: options.ownerUserId,
+          ...(options.type !== undefined ? { type: options.type } : {}),
+        })
+        .returning(),
+  );
 
   return organization!;
 }

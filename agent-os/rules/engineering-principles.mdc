@@ -15,7 +15,9 @@ Write production-grade, maintainable, scalable code. Preserve simplicity; avoid 
 
 1. Read **[CLAUDE.md](../../CLAUDE.md)** for architecture, domains, and dependency rules.
 2. For new requirements, use **[requirement-intake](../../docs/getting-started/requirement-intake.md)** and consult **[skill-index](../skills/skill-index/SKILL.md)** first.
-3. Reuse existing utilities, services, and patterns before creating new ones.
+3. **Reuse before you create.** Before adding a helper, wrapper, env var, constant or pattern, search for the one that already does the job and use it. Create something new only when nothing existing fits.
+   - **Close but not quite right?** Improve the existing one instead of forking a parallel version — or, if new is genuinely the better design, say why in the PR description. Either way, do it **in the same PR**: never leave old and new side by side behind a "consolidate later".
+   - **Recognize the miss:** a new `TEST_*_URL` beside the existing `DATABASE_OPERATOR_URL`, or a hand-rolled second pool that re-implements `getMaintenanceDatabase()`, is the parallel-version smell. PR #1193 did both, then folded them back into the existing pieces.
 4. Do not introduce duplicate abstractions.
 5. **Product slug, image names, branch/env mapping:** follow **[project-identity.mdc](project-identity.mdc)** — manifest `tooling/setup/setup.config.json` and imports from `project-identity.constants.ts`; do not hardcode `core-be` (or manifest-derived names) in `src/`, workflows, or tooling.
 

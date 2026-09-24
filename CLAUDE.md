@@ -4,6 +4,10 @@
 
 For **any new requirement** (new domain, routes, worker, schema, etc.), use the format and checklist in **`docs/getting-started/requirement-intake.md`**. That doc defines what details to provide and which skills/rules to invoke so the AI can perform best and keep docs, routes, tests, and lint in sync. Consult **`agent-os/skills/skill-index/SKILL.md`** first, then run the skills listed for the requirement type.
 
+## Reuse before you create
+
+Before adding a helper, wrapper, env var, constant or pattern, find the one that already does the job and use it; create something new only when nothing fits. If an existing one is close but not right, improve it — or say in the PR why new is better — **in the same PR**, never leaving old and new side by side. Detail and examples: principle #3 in [`agent-os/docs/principles.md`](agent-os/docs/principles.md).
+
 ## AI agent references (`agent-os/`)
 
 `agent-os/` at the repo root is the single source of truth for all AI tooling.
@@ -448,6 +452,7 @@ Local SonarQube quality gate (pre-commit): `pnpm sonar:up` / `sonar:scan` / `son
 - `pnpm test:coverage` — all tests with V8 coverage (CI)
 - `pnpm test:performance` — performance tests
 - `pnpm test:security` — security test suite
+- `pnpm test:rls-role` — runs the **e2e** lane with the pool under test opened as the RLS-subject `core_be_app` role. Every other lane connects as a role that BYPASSES row-level security (Compose's `POSTGRES_USER: core` is a superuser; the local operator role carries `rolbypassrls`), so a path reaching a FORCE RLS table without a database context reads rows there and **none** in production. Harness fixtures use the operator connection (`src/tests/helpers/operator-database.ts`). CI job: `RLS application role (whole connection)`
 - `pnpm test:chaos` — Toxiproxy chaos / fault-injection suite (`tooling/vitest/chaos.config.ts`; see `docs/reference/reliability/chaos-testing.md`)
 - `pnpm test:contract` — outbound HTTP contracts for Stripe, Resend, S3 (`tooling/vitest/contract.config.ts`; see `docs/reference/testing/contract-tests.md`)
 - `pnpm chaos:up` / `pnpm chaos:down` — start/stop the Toxiproxy sidecar (`docker compose --profile chaos`)

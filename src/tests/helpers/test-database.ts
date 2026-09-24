@@ -1,5 +1,6 @@
 import { database } from '@/infrastructure/database/connection.js';
 import { sql } from '@/infrastructure/database/connection.js';
+import { getOperatorSql } from '@/tests/helpers/operator-database.js';
 import { env } from '@/shared/config/env.config.js';
 import { resetPlanCatalogMemoForTests } from '@/domains/billing/sub-domains/plan/plan-catalog-memo.js';
 import { resetPermissionCatalogMemoForTests } from '@/domains/tenancy/sub-domains/permission/permission-catalog-memo.js';
@@ -34,7 +35,9 @@ export async function cleanupDatabase(): Promise<void> {
 
   for (let attempt = 1; attempt <= MAX_CLEANUP_RETRIES; attempt++) {
     try {
-      await sql`
+      // Elevated on purpose: TRUNCATE across every table is not something the application
+      // role may do, and under `pnpm test:rls-role` the pool under test IS that role.
+      await getOperatorSql()`
         DO $$ DECLARE
           tables text;
         BEGIN

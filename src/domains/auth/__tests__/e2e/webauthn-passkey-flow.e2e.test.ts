@@ -10,7 +10,7 @@ import { cleanupDatabase } from '@/tests/helpers/test-database.js';
 import { createTestUser } from '@/tests/factories/user.factory.js';
 import { generateTestTokenWithActiveSession } from '@/tests/helpers/test-auth.js';
 import { seedRecentStepUpForTestUser } from '@/tests/helpers/test-step-up.helper.js';
-import { database } from '@/infrastructure/database/connection.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { webauthn_credentials } from '@/domains/auth/sub-domains/auth-webauthn/webauthn-credential.schema.js';
 import type { FastifyInstance } from 'fastify';
 import type * as SimpleWebAuthnServerModule from '@simplewebauthn/server';
@@ -151,7 +151,7 @@ describe('Auth e2e: WebAuthn passkey enrolment and sign-in', () => {
     expect(sessionCookie).toBeDefined();
     expect(sessionCookie).toContain('HttpOnly');
 
-    const storedCredentials = await database.select().from(webauthn_credentials);
+    const storedCredentials = await getOperatorDatabase().select().from(webauthn_credentials);
     expect(storedCredentials).toHaveLength(1);
     expect(storedCredentials[0]?.credential_id).toBe(credentialId);
     expect(storedCredentials[0]?.counter).toBe(1);
@@ -220,7 +220,7 @@ describe('Auth e2e: WebAuthn passkey enrolment and sign-in', () => {
     expect(second.statusCode).toBe(409);
 
     // The collision must not have written a duplicate row.
-    const storedCredentials = await database.select().from(webauthn_credentials);
+    const storedCredentials = await getOperatorDatabase().select().from(webauthn_credentials);
     expect(storedCredentials).toHaveLength(1);
     expect(storedCredentials[0]?.credential_id).toBe(credentialId);
   });

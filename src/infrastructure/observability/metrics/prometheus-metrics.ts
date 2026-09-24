@@ -37,6 +37,7 @@ let processUnhandledRejectionsTotal: Counter<'process'> | null = null;
 let eventBusHandlerFailuresTotal: Counter<'event_type'> | null = null;
 let commitDispatchDurabilityFallbacksTotal: Counter | null = null;
 let readCacheRequestsTotal: Counter<'cache' | 'result'> | null = null;
+let databaseUnscopedQueriesTotal: Counter | null = null;
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: single registration site for all Prometheus instruments — boilerplate, intentionally long
 function registerOn(registry: Registry): void {
@@ -170,6 +171,12 @@ function registerOn(registry: Registry): void {
     help: 'Wall-clock seconds an organization-scoped RLS transaction held a pooled connection, by path (scoped_context | request_transaction)',
     labelNames: ['path'],
     buckets: DEFAULT_LATENCY_BUCKETS_SECONDS,
+    registers: [registry],
+  });
+
+  databaseUnscopedQueriesTotal = new Counter({
+    name: 'database_unscoped_query_total',
+    help: 'Queries issued on the bare pool with no database context active (possible RLS bypass)',
     registers: [registry],
   });
 
@@ -492,4 +499,16 @@ export function recordReadCacheRequest(cache: string, result: 'hit' | 'miss'): v
   ensurePrometheusMetricsRegistered(getMetricsRegistry());
   if (!readCacheRequestsTotal) return;
   readCacheRequestsTotal.inc({ cache, result });
+}
+
+/**
+ * Increments `database_unscoped_query_total`.
+ *
+ * @remarks
+ * A non-zero rate means some path reached Postgres without a database context. Against a
+ * FORCE RLS table that silently returns zero rows — how offboarding came to erase nothing —
+ * so this is the counter to alert on, not merely graph.
+ */
+export function recordUnscopedDatabaseQuery(): void {
+  databaseUnscopedQueriesTotal?.inc();
 }

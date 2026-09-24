@@ -33,13 +33,44 @@ describe('PR CI runs the non-superuser RLS security suite against Postgres', () 
 
   it('provisions Postgres and migrates before the suite (the RLS tests need a real database)', () => {
     expect(prCi).toContain('postgres:17');
-    // `pnpm db:migrate` (not `:lint`) is unique to this job within pr-ci.yml.
+    // `pnpm db:migrate` (not `:lint`) appears only in the DB-backed RLS jobs within pr-ci.yml.
     expect(prCi).toContain('pnpm db:migrate\n');
   });
 
   it('skips docs-only PRs but runs on source/ci changes', () => {
     expect(prCi).toContain("needs.changes.outputs.docs-only-md != 'true'");
     expect(prCi).toContain("needs.changes.outputs.src-code == 'true'");
+  });
+});
+
+/**
+ * The policy lane above opts INTO `core_be_app` per statement; this lane opens the whole pool as
+ * `core_be_app`, so application code paths are RLS-subject too. A query that runs without a
+ * database context reads zero rows there and in production, but every row on the RLS-exempt
+ * superuser the other lanes use — which is how offboarding came to erase nothing with every check
+ * green. It must stay a PR gate, run as the role, and migrate before the role is applied.
+ */
+describe('PR CI runs the application-role lane against Postgres', () => {
+  const prCi = readFileSync(prCiPath, 'utf8');
+  const start = prCi.indexOf('\n  rls-application-role:');
+  const job = prCi.slice(start, prCi.indexOf('\n  build-verify:', start));
+
+  it('declares the rls-application-role job', () => {
+    expect(start, 'pr-ci.yml must declare the rls-application-role job').toBeGreaterThan(-1);
+    expect(job).toContain('name: RLS application role (whole connection)');
+  });
+
+  it('migrates as the superuser, then runs the suites as the application role', () => {
+    expect(job).toContain('postgres:17');
+    const migrateAt = job.indexOf('pnpm db:migrate\n');
+    const roleRunAt = job.indexOf('pnpm test:rls-role');
+    expect(migrateAt).toBeGreaterThan(-1);
+    expect(roleRunAt).toBeGreaterThan(migrateAt);
+  });
+
+  it('skips docs-only PRs but runs on source/ci changes', () => {
+    expect(job).toContain("needs.changes.outputs.docs-only-md != 'true'");
+    expect(job).toContain("needs.changes.outputs.src-code == 'true'");
   });
 });
 
@@ -54,7 +85,7 @@ describe('PR CI runs the non-superuser RLS security suite against Postgres', () 
  * pr-quality-gate.policy.unit.test.ts; this keeps a dedicated tripwire on the RLS lane specifically.
  */
 const REQUIRED_AGGREGATE_CONTEXT = 'Quality gate';
-const RLS_LANE = 'rls-security';
+const RLS_LANES = ['rls-security', 'rls-application-role'] as const;
 
 interface BranchRuleset {
   rules: {
@@ -79,13 +110,13 @@ describe.each([DEFAULT_BRANCH])(
       expect(requiredContexts).toContain(REQUIRED_AGGREGATE_CONTEXT);
     });
 
-    it('makes the quality-gate aggregate depend on the rls-security lane', () => {
+    it.each(RLS_LANES)('makes the quality-gate aggregate depend on the %s lane', (lane) => {
       // quality-gate is the final job in pr-ci.yml — slice from its header to EOF so
-      // the `- rls-security` match is scoped to the aggregate's `needs:` list.
+      // the `- <lane>` match is scoped to the aggregate's `needs:` list.
       const prCiText = readFileSync(prCiPath, 'utf8');
       const start = prCiText.indexOf('\n  quality-gate:');
       expect(start, 'pr-ci.yml must declare the quality-gate aggregate job').toBeGreaterThan(-1);
-      expect(prCiText.slice(start)).toContain(`- ${RLS_LANE}`);
+      expect(prCiText.slice(start)).toContain(`- ${lane}`);
     });
   },
 );

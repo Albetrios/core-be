@@ -4,7 +4,11 @@ import { env } from '@/shared/config/env.config.js';
 import { MILLISECONDS_PER_DAY } from '@/shared/constants/index.js';
 import { signAccessToken } from '@/shared/utils/security/jwt.util.js';
 import { AuthSessionRepository } from '@/domains/auth/sub-domains/auth-session/auth-session.repository.js';
-import { database } from '@/infrastructure/database/connection.js';
+import {
+  PRINCIPAL_SCOPE,
+  withAppDatabaseContext,
+} from '@/infrastructure/database/contexts/database-context.js';
+import { getOperatorDatabase } from '@/tests/helpers/operator-database.js';
 import { users } from '@/domains/user/user.schema.js';
 import { and, eq, ne } from 'drizzle-orm';
 import { testApiPath } from '@/tests/helpers/test-api-prefix.helper.js';
@@ -14,7 +18,10 @@ async function persistActiveSessionForToken(
   userPublicId: string,
   token: string,
 ): Promise<string | null> {
-  const [user] = await database
+  // Fixture lookup on the operator connection: `auth.users` is FORCE RLS and this runs before any
+  // request context exists, so under `pnpm test:rls-role` the ordinary pool sees nothing here —
+  // which silently yielded no session and turned every authenticated assertion into a 401.
+  const [user] = await getOperatorDatabase()
     .select({ id: users.id })
     .from(users)
     .where(eq(users.public_id, userPublicId))
@@ -25,14 +32,21 @@ async function persistActiveSessionForToken(
   const tokenHash = createHash('sha256').update(token).digest('hex');
   const expiresAt = new Date(Date.now() + env.AUTH_SESSION_MAX_AGE_DAYS * MILLISECONDS_PER_DAY);
   const sessionRepository = new AuthSessionRepository();
-  const session = await sessionRepository.create({
-    user_id: user.id,
-    token_hash: tokenHash,
-    refresh_token_hash: createHash('sha256').update(`${tokenHash}:refresh`).digest('hex'),
-    ip_address: '127.0.0.1',
-    user_agent: 'vitest',
-    expires_at: expiresAt,
-  });
+  // The session row itself is written through the repository inside the owner's context —
+  // the same shape `AuthSessionService` uses in production, so the fixture exercises the real
+  // write path rather than out-privileging the policy that guards it.
+  const session = await withAppDatabaseContext(
+    PRINCIPAL_SCOPE.VERIFIED({ userPublicId: userPublicId }),
+    () =>
+      sessionRepository.create({
+        user_id: user.id,
+        token_hash: tokenHash,
+        refresh_token_hash: createHash('sha256').update(`${tokenHash}:refresh`).digest('hex'),
+        ip_address: '127.0.0.1',
+        user_agent: 'vitest',
+        expires_at: expiresAt,
+      }),
+  );
   return session.public_id;
 }
 
@@ -68,10 +82,10 @@ async function alignUserWithSuperAdminAllowlist(userPublicId: string): Promise<v
   // leave a committed user already holding the allowlist email — the reassignment below
   // would then violate idx_users_email_unique in suites that never truncate (mcp-auth).
   // Hard-delete any OTHER row holding the email first; this is a test-only helper.
-  await database
+  await getOperatorDatabase()
     .delete(users)
     .where(and(eq(users.email, superAdminEmail), ne(users.public_id, userPublicId)));
-  await database
+  await getOperatorDatabase()
     .update(users)
     .set({
       email: superAdminEmail,
