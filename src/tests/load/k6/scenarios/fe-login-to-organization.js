@@ -5,26 +5,29 @@ import { API_PREFIX } from '../helpers/config.js';
 import { credentialPool } from '../helpers/pool.js';
 
 /**
- * k6 Scenario: core-fe FULL signup journey — N users, ONE pass each, 16 routes.
+ * k6 Scenario: core-fe login-to-organization journey — N users, ONE pass each, 16 routes
+ * (15 with `AUTH=password`).
  *
- * **VUS = users, and every user walks all sixteen routes exactly once**, so the call
- * count is always `VUS x 16`. 50 users means 50 signups and 800 calls. Nothing loops.
+ * **VUS = users, and every user walks every route exactly once**, so the call count is
+ * `VUS x 16` (`VUS x 15` with `AUTH=password`). 50 users means 800 calls. Nothing loops.
  *
- * This is the heavy scenario: a brand-new person arriving with no account and leaving
- * with a provisioned organization and a loaded dashboard. Every iteration creates a
- * real user AND a real organization, so the database grows with every run.
+ * With `AUTH=otp` this is the heavy scenario: a brand-new person arriving with no account
+ * and leaving with a provisioned organization and a loaded dashboard. Every iteration
+ * creates a real organization (and, with `AUTH=otp`, a real user), so the database grows
+ * with every run.
  *
  * ## Companion scenario
  *
- * `fe-session.js` covers the same product surface for an EXISTING user — password
- * login from the seeded credential pool, 8 routes, no signup. Reach for that one when
- * you want capacity numbers for the app; reach for this one when you want the cost of
- * onboarding itself.
+ * `fe-full-surface.js` covers the product surface for EXISTING users: pool users sign in
+ * with an email code and walk the API calls core-fe makes, in the app's order. Reach for
+ * that one when you want capacity numbers for the app. Reach for this one with `AUTH=otp`
+ * when you want the cost of onboarding itself; its other modes (`AUTH=code`, the default,
+ * and `AUTH=password`) sign in pre-seeded pool users instead of signing up.
  *
  * The difference is large and worth knowing before you read a result: signup pays
  * `ANTI_ENUMERATION_MINIMUM_DURATION_MS` (300 ms) TWICE — once in `send-code` and once
  * in `email/login` — a deliberate constant-time floor that stops response timing
- * revealing whether an account exists. ~600 ms of every journey here is that sleep.
+ * revealing whether an account exists. ~600 ms of every `AUTH=otp` journey is that sleep.
  *
  * ## The sixteen routes
  *
@@ -36,6 +39,7 @@ import { credentialPool } from '../helpers/pool.js';
  *               6  POST /tenancy/organizations               create the workspace
  *               7  POST /users/me/onboarding/complete        stamp the flag
  *               8  POST /auth/switch-to-organization         activate it
+ *               9  GET  /auth/me/context                     re-read after the switch
  *   Workspace  10  GET  /users/me/organizations              switcher list
  *              11  GET  /tenancy/organizations/by-slug/:slug resolve the URL slug
  *   Dashboard  12  GET  /notify/notifications/unread-count   bell badge
@@ -43,6 +47,10 @@ import { credentialPool } from '../helpers/pool.js';
  *              14  GET  /tenancy/organization                shell header
  *   Upkeep     15  POST /auth/refresh                        proactive refresh
  *              16  POST /auth/logout                         end the session
+ *
+ * The table shows `AUTH=otp`. `AUTH=code` (the default) makes the same calls for a
+ * pre-seeded pool user, so step 3 signs in and creates no account. `AUTH=password`
+ * replaces steps 2-3 with one `POST /auth/login`, so it walks 15.
  *
  * Two calls need headers that are easy to miss, and both 4xx without them:
  *   - `POST /tenancy/organizations` requires `X-Idempotency-Key` (422 otherwise)
@@ -53,13 +61,18 @@ import { credentialPool } from '../helpers/pool.js';
  * measure a thundering herd. Set STAGGER=0 to measure that burst deliberately.
  *
  * A journey that fails early stops firing its later routes, so a failing run sends
- * FEWER calls than `VUS x 16`, never more.
+ * FEWER calls than the full count, never more.
  *
- * REQUIRES the API with TEST_MODE=true (the OTP echo lets a VU complete its own signup).
+ * REQUIRES, by mode:
+ *   AUTH=code (default)  the API with AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED (local or
+ *                        development targets only) and the credential pool
+ *                        (`pnpm db:seed:loadtest`)
+ *   AUTH=password        the credential pool
+ *   AUTH=otp             the API with TEST_MODE=true (the OTP echo lets a VU sign itself up)
  *
  * Usage:
  *   VUS=1  k6 run fe-login-to-organization.js       # 1 user,  16 calls
- *   VUS=50 k6 run fe-login-to-organization.js       # 50 users, 800 calls, 50 signups + 50 organizations
+ *   VUS=50 k6 run fe-login-to-organization.js       # 50 users, 800 calls, 50 organizations (+ 50 signups with AUTH=otp)
  */
 
 const VUS = Number(__ENV.VUS || 1);
@@ -78,7 +91,7 @@ const POOL = __ENV.POOL || 'unknown';
  *                    brand-new account per VU. Reads `debug_verification_code`, which the
  *                    API only echoes under TEST_MODE.
  *
- * Why password is the default for load work, measured on an idle server:
+ * Why the pool modes suit load work better than `otp`, measured on an idle server:
  *
  *   otp       send-code    604 ms   + email/login  724 ms   = 1328 ms over 2 calls
  *   password  login        184 ms                           =  184 ms over 1 call

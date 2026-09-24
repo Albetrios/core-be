@@ -5,7 +5,7 @@ did. Point k6 at it instead of the API and every call is captured and grouped pe
 
 ```bash
 pnpm load:monitor                     # proxy + dashboard on http://localhost:4985
-BASE_URL=http://localhost:4985 VUS=50 k6 run src/tests/load/k6/scenarios/fe-login-to-org.js
+BASE_URL=http://localhost:4985 VUS=50 k6 run src/tests/load/k6/scenarios/fe-login-to-organization.js
 ```
 
 ## What it is for

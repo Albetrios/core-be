@@ -125,7 +125,7 @@ instead of :3000 and each call appears as it happens, grouped per route.
 
 ```bash
 pnpm load:monitor                 # proxy + dashboard on http://localhost:4985
-BASE_URL=http://localhost:4985 VUS=50 k6 run src/tests/load/k6/scenarios/fe-login-to-org.js
+BASE_URL=http://localhost:4985 VUS=50 k6 run src/tests/load/k6/scenarios/fe-login-to-organization.js
 ```
 
 **Port 4985 is fixed and not configurable.** It sits beside the DB viewer's 4984 so the loopback
@@ -314,7 +314,7 @@ The same signals are observable live via `GET /readyz` (verbose), `GET /metrics`
 Walks the complete front-end user journey once per virtual user, so **VUs are users** — 50 VUs means
 50 people each performing the journey a single time, not 50 people looping.
 
-- **File**: `src/tests/load/k6/scenarios/fe-login-to-org.js`
+- **File**: `src/tests/load/k6/scenarios/fe-login-to-organization.js`
 - **Auth**: `AUTH=code` (default) logs in with `AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED`; `AUTH=password` uses
   `POST /auth/login`; `AUTH=otp` does the real `send-code` → read `debug_verification_code` → login
   round trip (needs `TEST_MODE=true`).
@@ -354,7 +354,7 @@ Requires the API started with `TEST_MODE=true` and `AUTH_STATIC_VERIFICATION_COD
 ```bash
 TEST_MODE=true AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED=true DATABASE_POOL_MAX=50 pnpm dev
 # then
-BASE_URL=http://localhost:3000 VUS=50 POOL=50 k6 run src/tests/load/k6/scenarios/fe-login-to-org.js
+BASE_URL=http://localhost:3000 VUS=50 POOL=50 k6 run src/tests/load/k6/scenarios/fe-login-to-organization.js
 ```
 
 ### Org-scoped / RLS-heavy (informational, CI nightly)
