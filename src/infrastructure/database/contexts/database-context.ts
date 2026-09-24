@@ -49,13 +49,17 @@ import {
 import {
   decrementOrganizationRlsCheckoutCount,
   incrementOrganizationRlsCheckoutCount,
+  type OrganizationRlsCheckoutPath,
   observeOrganizationRlsCheckoutHold,
 } from '@/infrastructure/database/pool/organization-rls-checkout-counter.js';
+import { DATABASE_ACQUIRE_RETRY_AFTER_SECONDS } from '@/infrastructure/database/pool/pool.constants.js';
 import {
   brandWorkerContextDatabaseHandle,
   type WorkerContextDatabaseHandle,
 } from '@/infrastructure/database/utils/database-handle.types.js';
-import { ConfigurationError } from '@/shared/errors/index.js';
+import { getEnv } from '@/shared/config/env.config.js';
+import { ConfigurationError, ServiceUnavailableError } from '@/shared/errors/index.js';
+import { logger } from '@/shared/utils/infrastructure/logger.util.js';
 import { trace } from '@opentelemetry/api';
 
 declare const PRINCIPAL_SCOPE_BRAND: unique symbol;
@@ -197,6 +201,82 @@ export const PRINCIPAL_SCOPE: {
 // The principal branch of withAppDatabaseContext: same-organization reuse, user-GUC
 // layering, and a fresh transaction with both identity GUCs in one round trip
 // otherwise. Only reachable through the exported app wrapper.
+/**
+ * Runs one pooled transaction with what every unit of work shares: the in-flight checkout gauge the
+ * overload guard reads, the hold-time sample, and a deadline on getting the connection.
+ *
+ * @remarks
+ * postgres.js has no acquire timeout. With no connection open, a query waits while the pool keeps
+ * reconnecting for as long as the database stays unreachable — `connect_timeout` bounds each attempt,
+ * not the wait — so a unit of work could outlive the HTTP request that started it and commit after
+ * the client had been told the request failed. `openTransaction` calls `claimConnection` first thing
+ * inside the transaction. When `DATABASE_POOL_ACQUIRE_TIMEOUT_MS` passes before it does, the unit of
+ * work is abandoned: the caller gets a 503 with `Retry-After`, and a connection that arrives later
+ * throws out of `claimConnection`, so the transaction rolls back before running anything. Once the
+ * transaction has started, the deadline no longer applies; `statement_timeout` bounds the work. The
+ * gauge and the hold sample follow the transaction itself, so an abandoned waiter keeps counting as
+ * in flight — and the overload guard keeps shedding — until the pool lets it go.
+ */
+async function runPooledUnitOfWork<T>(options: {
+  path: OrganizationRlsCheckoutPath;
+  countsAsCheckout: boolean;
+  openTransaction: (claimConnection: () => void) => Promise<T>;
+}): Promise<T> {
+  if (options.countsAsCheckout) {
+    incrementOrganizationRlsCheckoutCount();
+  }
+  const checkoutStartedAtNanoseconds = process.hrtime.bigint();
+  let started = false;
+  let abandoned = false;
+  const claimConnection = () => {
+    if (abandoned) {
+      throw new Error('Unit of work abandoned: its connection arrived after the acquire deadline');
+    }
+    started = true;
+  };
+  let transaction: Promise<T>;
+  try {
+    transaction = options.openTransaction(claimConnection);
+  } catch (error) {
+    // A synchronous throw must still release the gauge below, as the per-site try/finally did.
+    transaction = Promise.reject(error);
+  }
+  const unitOfWork = transaction.finally(() => {
+    if (options.countsAsCheckout) {
+      decrementOrganizationRlsCheckoutCount();
+      observeOrganizationRlsCheckoutHold({
+        path: options.path,
+        durationSeconds:
+          Number(process.hrtime.bigint() - checkoutStartedAtNanoseconds) / 1_000_000_000,
+      });
+    }
+  });
+
+  const deadlineMs = getEnv().DATABASE_POOL_ACQUIRE_TIMEOUT_MS;
+  if (deadlineMs === 0) {
+    return unitOfWork;
+  }
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    deadlineTimer = setTimeout(() => {
+      if (started) {
+        return;
+      }
+      abandoned = true;
+      logger.warn({ path: options.path, deadlineMs }, 'database.acquire_deadline_exceeded');
+      reject(new ServiceUnavailableError().withRetryAfter(DATABASE_ACQUIRE_RETRY_AFTER_SECONDS));
+    }, deadlineMs);
+  });
+  try {
+    return await Promise.race([unitOfWork, deadline]);
+  } finally {
+    clearTimeout(deadlineTimer);
+    // An abandoned unit of work settles later — rolled back, or failed by the pool — with nothing
+    // awaiting it any more.
+    unitOfWork.catch(() => undefined);
+  }
+}
+
 async function runPrincipalDatabaseContext<T>(
   scope: PrincipalDatabaseScope,
   callback: (databaseHandle: WorkerContextDatabaseHandle) => Promise<T>,
@@ -247,44 +327,34 @@ async function runPrincipalDatabaseContext<T>(
     });
   }
 
-  const countsAsOrganizationCheckout = organizationPublicId !== undefined;
-  if (countsAsOrganizationCheckout) {
-    incrementOrganizationRlsCheckoutCount();
-  }
-  const checkoutStartedAtNanoseconds = process.hrtime.bigint();
-  try {
-    return await runWithWorkerDatabaseContext(workerContext, () =>
-      database.transaction(async (transaction) => {
-        const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-        // Worker runtime only: lift the HTTP statement/lock caps to the worker
-        // budget for job-scope units of work (sec-re-16 semantics). HTTP paths
-        // keep the connection-level caps — see PR #1122's rationale.
-        if (isWorkerRuntime()) {
-          await applyWorkerStatementTimeout(databaseHandle);
-        }
-        await databaseHandle.execute(
-          buildIdentityGucStatement({ userPublicId, organizationPublicId }),
-        );
-        const runCallback = () => callback(brandWorkerContextDatabaseHandle(databaseHandle));
-        return organizationPublicId !== undefined
-          ? runWithPinnedOrganizationDatabaseSession(
-              organizationPublicId,
-              databaseHandle,
-              runCallback,
-            )
-          : runWithPinnedDatabaseHandle(databaseHandle, runCallback);
-      }),
-    );
-  } finally {
-    if (countsAsOrganizationCheckout) {
-      decrementOrganizationRlsCheckoutCount();
-      observeOrganizationRlsCheckoutHold({
-        path: 'scoped_context',
-        durationSeconds:
-          Number(process.hrtime.bigint() - checkoutStartedAtNanoseconds) / 1_000_000_000,
-      });
-    }
-  }
+  return runPooledUnitOfWork({
+    path: 'scoped_context',
+    countsAsCheckout: organizationPublicId !== undefined,
+    openTransaction: (claimConnection) =>
+      runWithWorkerDatabaseContext(workerContext, () =>
+        database.transaction(async (transaction) => {
+          claimConnection();
+          const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+          // Worker runtime only: lift the HTTP statement/lock caps to the worker
+          // budget for job-scope units of work (sec-re-16 semantics). HTTP paths
+          // keep the connection-level caps — see PR #1122's rationale.
+          if (isWorkerRuntime()) {
+            await applyWorkerStatementTimeout(databaseHandle);
+          }
+          await databaseHandle.execute(
+            buildIdentityGucStatement({ userPublicId, organizationPublicId }),
+          );
+          const runCallback = () => callback(brandWorkerContextDatabaseHandle(databaseHandle));
+          return organizationPublicId !== undefined
+            ? runWithPinnedOrganizationDatabaseSession(
+                organizationPublicId,
+                databaseHandle,
+                runCallback,
+              )
+            : runWithPinnedDatabaseHandle(databaseHandle, runCallback);
+        }),
+      ),
+  });
 }
 
 /**
@@ -389,24 +459,19 @@ async function runSessionDatabaseContext<T>(
     scope.sessionPublicId !== undefined
       ? { guc: SESSION_CONTEXTS.sessionPublicId.guc, value: scope.sessionPublicId }
       : { guc: SESSION_CONTEXTS.sessionTokenHash.guc, value: scope.sessionTokenHash as string };
-  incrementOrganizationRlsCheckoutCount();
-  const checkoutStartedAtNanoseconds = process.hrtime.bigint();
-  try {
-    return await database.transaction(async (transaction) => {
-      const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-      await setLocalDatabaseConfig(databaseHandle, armed.guc, armed.value);
-      return runWithPinnedDatabaseHandle(databaseHandle, () =>
-        callback(brandWorkerContextDatabaseHandle(databaseHandle)),
-      );
-    });
-  } finally {
-    decrementOrganizationRlsCheckoutCount();
-    observeOrganizationRlsCheckoutHold({
-      path: 'session_context',
-      durationSeconds:
-        Number(process.hrtime.bigint() - checkoutStartedAtNanoseconds) / 1_000_000_000,
-    });
-  }
+  return runPooledUnitOfWork({
+    path: 'session_context',
+    countsAsCheckout: true,
+    openTransaction: (claimConnection) =>
+      database.transaction(async (transaction) => {
+        claimConnection();
+        const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+        await setLocalDatabaseConfig(databaseHandle, armed.guc, armed.value);
+        return runWithPinnedDatabaseHandle(databaseHandle, () =>
+          callback(brandWorkerContextDatabaseHandle(databaseHandle)),
+        );
+      }),
+  });
 }
 
 /**
@@ -696,32 +761,27 @@ export async function withMaintenanceDatabaseContext<T>(
       ),
     );
   }
-  incrementOrganizationRlsCheckoutCount();
-  const checkoutStartedAtNanoseconds = process.hrtime.bigint();
-  try {
-    return await runWithWorkerDatabaseContext({ kind: definition.workerContextKind }, () =>
-      resolveMaintenancePool().transaction(async (transaction) => {
-        const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
-        if (options?.useApplicationDatabaseRole === true) {
-          await databaseHandle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
-        }
-        if (definition.appliesWorkerStatementTimeout) {
-          await applyWorkerStatementTimeout(databaseHandle);
-        }
-        if (definition.guc !== null) {
-          await setLocalDatabaseConfig(databaseHandle, definition.guc, 'true');
-        }
-        return runWithPinnedDatabaseHandle(databaseHandle, () =>
-          callback(brandWorkerContextDatabaseHandle(databaseHandle)),
-        );
-      }),
-    );
-  } finally {
-    decrementOrganizationRlsCheckoutCount();
-    observeOrganizationRlsCheckoutHold({
-      path: 'maintenance_context',
-      durationSeconds:
-        Number(process.hrtime.bigint() - checkoutStartedAtNanoseconds) / 1_000_000_000,
-    });
-  }
+  return runPooledUnitOfWork({
+    path: 'maintenance_context',
+    countsAsCheckout: true,
+    openTransaction: (claimConnection) =>
+      runWithWorkerDatabaseContext({ kind: definition.workerContextKind }, () =>
+        resolveMaintenancePool().transaction(async (transaction) => {
+          claimConnection();
+          const databaseHandle = transaction as unknown as RequestScopedPostgresDatabase;
+          if (options?.useApplicationDatabaseRole === true) {
+            await databaseHandle.execute(drizzleSql`SET LOCAL ROLE core_be_app`);
+          }
+          if (definition.appliesWorkerStatementTimeout) {
+            await applyWorkerStatementTimeout(databaseHandle);
+          }
+          if (definition.guc !== null) {
+            await setLocalDatabaseConfig(databaseHandle, definition.guc, 'true');
+          }
+          return runWithPinnedDatabaseHandle(databaseHandle, () =>
+            callback(brandWorkerContextDatabaseHandle(databaseHandle)),
+          );
+        }),
+      ),
+  });
 }

@@ -380,6 +380,9 @@ const errorHandlerMiddlewarePlugin: FastifyPluginAsync = async (app) => {
 
     if (error instanceof AppError) {
       reply.status(error.statusCode);
+      if (error.retryAfterSeconds !== undefined) {
+        reply.header('Retry-After', String(error.retryAfterSeconds));
+      }
       return handleAppErrorResponse(error, request, currentRequestId);
     }
 

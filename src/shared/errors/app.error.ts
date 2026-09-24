@@ -49,6 +49,11 @@ export class AppError extends Error {
    * `error.reason` on non-5xx responses only.
    */
   reason?: string;
+  /**
+   * Seconds the client should wait before retrying — the error handler sends it as `Retry-After`.
+   * Set via {@link AppError.withRetryAfter}; meaningful on 429 and 503.
+   */
+  retryAfterSeconds?: number;
 
   constructor(
     code: AppErrorCode,
@@ -73,6 +78,15 @@ export class AppError extends Error {
    */
   withReason(reason: string): this {
     this.reason = reason;
+    return this;
+  }
+
+  /**
+   * Attaches {@link AppError.retryAfterSeconds} and returns `this` (fluent), e.g.
+   * `throw new ServiceUnavailableError().withRetryAfter(1)`; the error handler sends `Retry-After`.
+   */
+  withRetryAfter(seconds: number): this {
+    this.retryAfterSeconds = seconds;
     return this;
   }
 }
