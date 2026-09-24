@@ -90,3 +90,13 @@ process.env.DATABASE_URL = chaosHostedOnGithubActionsContinuousIntegration
   : 'postgresql://core:core@127.0.0.1:25432/core';
 
 process.env.REDIS_URL = 'redis://127.0.0.1:26379';
+
+/**
+ * The harness's elevated connection (`DATABASE_OPERATOR_URL`, which `cleanupDatabase()` uses) must
+ * go through the proxy too. Left on a developer's direct URL, cleanup bypasses Toxiproxy and the
+ * app pool starts every test cold — and a cold pool does not fail fast under a connect-time fault
+ * (it keeps reconnecting while the query waits), so an assertion that expects the query to reject
+ * waits out the test timeout instead. Pointing it at `DATABASE_URL` makes the operator connection
+ * the app pool, as before the harness gained a separate one.
+ */
+process.env.DATABASE_OPERATOR_URL = process.env.DATABASE_URL;
