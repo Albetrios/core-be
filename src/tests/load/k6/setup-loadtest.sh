@@ -57,7 +57,10 @@ setkv DATABASE_RLS_SAFETY_ENFORCED false
 setkv REDIS_TLS_ENFORCED false
 setkv TRUST_PROXY_REQUIRED false
 setkv PORT 3001
-setkv RATE_LIMIT_MAX 100000000            # global limiter never rejects (one source IP)
+# Global limiter never rejects the one k6 source IP — while still running, so its cost is measured.
+# The schema caps RATE_LIMIT_MAX at 100000; a 1 s window makes that 100k req/s, far above this box.
+setkv RATE_LIMIT_MAX 100000
+setkv RATE_LIMIT_WINDOW_MS 1000
 setkv WEBHOOK_URL_ALLOWLIST example.com   # create-webhook host passes SSRF/allowlist
 setkv SENTRY_DSN ""                        # optional; ~0ms impact
 setkv MEMBER_ROLE_MAX_PER_ORG 500          # role create/delete under concurrency
