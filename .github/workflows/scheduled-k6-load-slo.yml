@@ -1,5 +1,5 @@
 # Nightly k6 load tests against an ephemeral API (Postgres + Redis).
-# Gate: health-stress, api-stress, login-smoke, permission-cached, stripe-webhook-ingest, idempotency-storm (SLO thresholds). Informational: auth, daily-ops, billing, webhooks, admin, org-scoped routes (incl. rls-concurrency-beyond-pool), organization writes (roles, permissions, settings, notifications).
+# Gate: health-stress, api-stress, login-smoke, permission-cached, stripe-webhook-ingest, idempotency-storm (SLO thresholds). Informational: auth, daily-ops, billing, webhooks, admin, org-scoped routes (incl. rls-concurrency-beyond-pool), organization writes (roles, permissions, settings, notifications), fe-full-surface (every call core-fe makes).
 # Secrets (optional email): RESEND_API_KEY, TEST_RESULT_EMAIL_TO
 name: Scheduled k6 API load & SLO
 
@@ -19,7 +19,8 @@ jobs:
   k6:
     name: k6 SLO gate and scenarios
     runs-on: ubuntu-latest
-    # ~45 min of k6 (gate ≈ 7, informational ≈ 9, organization-scoped ≈ 12, organization writes ≈ 10)
+    # ~48 min of k6 (gate ≈ 7, informational ≈ 9, organization-scoped ≈ 12, organization writes ≈ 10,
+    # fe-full-surface ≈ 3)
     # plus setup; the headroom keeps one slow night from being cut off mid-scenario.
     timeout-minutes: 60
     # RESEND_API_KEY / TEST_RESULT_EMAIL_TO are environment secrets; without this
@@ -83,6 +84,19 @@ jobs:
       # this job runs no worker — so nothing is sent. The results-email step keeps its own secret.
       RESEND_API_KEY: re_test_contract_fixture_key
       EMAIL_FROM_ADDRESS: noreply@example.com
+      # The admin and audit-list scenarios need a super_admin token. tool:admin-token signs in as the
+      # first GLOBAL_ADMIN_EMAILS entry (ops@example.com, exported by the shared test-env action) with
+      # DEMO_PASSWORD. Such a token lives 5 minutes by default, and the admin scenario runs about 10
+      # minutes after the refresh step that mints it. CI-only: the same 15 minutes as a user token.
+      GLOBAL_ADMIN_ACCESS_TOKEN_EXPIRY_SECONDS: '900'
+      # fe-full-surface signs its pool users in with a fixed email code (STATIC_VERIFICATION_CODE)
+      # instead of a mailed one. A refine allows this on the local and development targets only.
+      AUTH_STATIC_VERIFICATION_CODE_ACCEPT_ENABLED: 'true'
+      # CI-only fixtures, the Vitest harness's. fe-full-surface starts a Google sign-in, which answers
+      # 302 to the authorize URL (string work, no outbound call) only once a provider is configured.
+      OAUTH_GOOGLE_CLIENT_ID: test-google-client-id
+      OAUTH_GOOGLE_CLIENT_SECRET: test-google-client-secret
+      OAUTH_GOOGLE_REDIRECT_URI: http://localhost:5173/callback/google
 
     steps:
       - name: Checkout
@@ -109,6 +123,13 @@ jobs:
 
       - name: Seed full demo data
         run: pnpm db:seed:full
+
+      - name: Seed the super_admin the admin scenarios sign in as
+        # Creates DEMO_EMAIL with DEMO_PASSWORD (the job's demo password) as an active member of the
+        # demo organization. GLOBAL_ADMIN_EMAILS (the test-env export) makes its token super_admin.
+        run: pnpm db:seed:demo-admin
+        env:
+          DEMO_EMAIL: ops@example.com
 
       - name: Start API server
         uses: ./.github/actions/start-api-server
@@ -217,6 +238,21 @@ jobs:
           k6 run --summary-export=k6-notification-write.json src/tests/load/k6/scenarios/notification-write.js || failed=1
           k6 run --summary-export=k6-organization-api-key-lifecycle.json src/tests/load/k6/scenarios/organization-api-key-lifecycle.js || failed=1
           exit "$failed"
+
+      - name: Seed the fe-full-surface user pool
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        # A bulk seed of 12 organizations × 10 users, then the credential pool fe-full-surface signs in
+        # from (src/tests/load/k6/data/credential-pool.json). Last, so the extra rows cannot shift the
+        # scenarios before it.
+        run: pnpm db:seed:loadtest
+
+      - name: k6 fe-full-surface (informational)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        # Every call core-fe makes, walked once by each of 20 pool users; the scenario header lists the
+        # calls it cannot reach. Signs in with the static code (job env), so it needs no mail.
+        run: k6 run --summary-export=k6-fe-full-surface.json src/tests/load/k6/scenarios/fe-full-surface.js
 
       - name: Upload k6 summaries and server log
         if: always()
