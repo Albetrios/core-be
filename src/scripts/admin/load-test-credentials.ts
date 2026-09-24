@@ -7,6 +7,7 @@
  * Run: pnpm run tool:load-test-credentials
  */
 import '@/shared/config/load-env-files.js';
+import { signInOverApi } from '@/scripts/admin/api-sign-in.util.js';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 const API_PREFIX = `${BASE_URL}/api/v1`;
@@ -14,26 +15,7 @@ const EMAIL = process.env.DEMO_EMAIL ?? 'demo@example.com';
 const PASSWORD = process.env.DEMO_PASSWORD ?? 'DemoPassword123!';
 
 async function main() {
-  const loginResponse = await fetch(`${API_PREFIX}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
-  });
-
-  if (!loginResponse.ok) {
-    const text = await loginResponse.text();
-    console.error('Login failed:', loginResponse.status, text);
-    process.exit(1);
-  }
-
-  const loginBody = (await loginResponse.json()) as {
-    data?: { access_token?: string };
-  };
-  const token = loginBody.data?.access_token;
-  if (!token) {
-    console.error('Login response missing access_token');
-    process.exit(1);
-  }
+  const token = await signInOverApi({ apiPrefix: API_PREFIX, email: EMAIL, password: PASSWORD });
 
   const organizationsResponse = await fetch(`${API_PREFIX}/users/me/organizations`, {
     headers: { Authorization: `Bearer ${token}` },
