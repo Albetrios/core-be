@@ -57,7 +57,6 @@ jobs:
       PORT: 3000
       DATABASE_URL: postgresql://core:core@localhost:5432/core
       REDIS_URL: redis://localhost:6379
-      DATABASE_SSL_ENABLED: 'false'
       RATE_LIMIT_MAX: 1000
       RATE_LIMIT_WINDOW_MS: 60000
       RUN_DB_TESTS: 1

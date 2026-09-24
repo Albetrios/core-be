@@ -7,7 +7,7 @@ Manual and scripted checks against a running API (`pnpm dev` + `pnpm dev:worker`
 ```bash
 docker compose up -d
 pnpm db:migrate
-TEST_PASSWORD=DemoPassword123! pnpm db:seed:full   # fixed demo password
+DEMO_PASSWORD=DemoPassword123! pnpm db:seed:full   # fixed demo password
 pnpm db:seed:sync-demo   # sync admin permissions (after permission changes)
 pnpm dev              # terminal 1 — http://localhost:3000
 pnpm dev:worker       # terminal 2
@@ -16,7 +16,7 @@ pnpm dev:worker       # terminal 2
 Set in `.env` for a repeatable password on every seed:
 
 ```bash
-TEST_PASSWORD=DemoPassword123!
+DEMO_PASSWORD=DemoPassword123!
 ```
 
 ## Seeded credentials
@@ -24,7 +24,7 @@ TEST_PASSWORD=DemoPassword123!
 | Field                  | Value                                               |
 | ---------------------- | --------------------------------------------------- |
 | Email                  | `demo@example.com`                                  |
-| Password               | `DemoPassword123!` (or `TEST_PASSWORD` from `.env`) |
+| Password               | `DemoPassword123!` (or `DEMO_PASSWORD` from `.env`) |
 | Demo organization slug | `demo-org`                                          |
 | Demo organization name | Demo Organization                                   |
 

@@ -50,3 +50,72 @@ jobs:
     with:
       merge_commit_sha: ${{ needs.resolve-target.outputs.merge_commit_sha }}
       target_branch: ${{ needs.resolve-target.outputs.target_branch }}
+
+  resolve-success:
+    name: Close ci-failure issue
+    needs: [run-chaos]
+    if: always() && needs.run-chaos.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Close the open ci-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Weekly chaos suite failing"
+          existing="$(gh issue list --repo "$GH_REPOSITORY" --state open --label ci-failure \
+            --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')"
+          if [ -z "$existing" ]; then
+            echo "No open ci-failure issue to close."
+            exit 0
+          fi
+          gh issue close "$existing" --repo "$GH_REPOSITORY" \
+            --comment "The chaos suite is green again on main — closing automatically. Run: ${WORKFLOW_URL}"
+          echo "Closed ci-failure issue #${existing}."
+
+  notify-failure:
+    name: Notify failure
+    needs: [resolve-target, run-chaos]
+    # Every run tests main (resolve-target pins it), whichever ref dispatched it.
+    if: always() && (needs.resolve-target.result == 'failure' || needs.run-chaos.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update ci-failure issue
+        # This suite was red on every weekly run from its first one — every test died in setup —
+        # and nothing said so. An issue produces a real notification; repeats collect as comments.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh label create ci-failure --repo "$GH_REPOSITORY" \
+            --color D93F0B --description "Automated post-merge/guard failure notification" \
+            2>/dev/null || true
+          title="Weekly chaos suite failing"
+          body="$(printf '%s\n' \
+            "Run: ${WORKFLOW_URL}" \
+            "" \
+            "The Toxiproxy chaos suite is red on main. Every test failing within milliseconds means" \
+            "setup (connection, proxy, env), not a resilience regression." \
+            "" \
+            "Reproduce locally: pnpm chaos:up && pnpm chaos:provision && pnpm test:chaos" \
+            "(docs/reference/reliability/chaos-testing.md). The next green run closes this issue.")"
+          existing="$(gh issue list --repo "$GH_REPOSITORY" --state open --label ci-failure \
+            --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GH_REPOSITORY" --body "$body"
+            echo "Commented on existing ci-failure issue #${existing}."
+          else
+            gh issue create --repo "$GH_REPOSITORY" --title "$title" --label ci-failure --body "$body"
+          fi

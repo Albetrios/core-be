@@ -19,6 +19,15 @@ runs:
   using: composite
   steps:
     - name: Start API server (background)
+      # The boot-time safety checks default hardened (src/shared/config/env-schema.ts). This
+      # ephemeral CI boot runs against plaintext, superuser, proxy-less service containers, so it
+      # relaxes them exactly as the Docker smoke boot in reusable-docker-build-trivy.yml does.
+      env:
+        DATABASE_TLS_ENFORCED: 'false'
+        DATABASE_RLS_SAFETY_ENFORCED: 'false'
+        DATABASE_CONNECTION_BUDGET_ENFORCED: 'false'
+        REDIS_TLS_ENFORCED: 'false'
+        TRUST_PROXY_REQUIRED: 'false'
       run: |
         RATE_LIMIT_MAX=${{ inputs.rate-limit-max }} pnpm exec tsx src/server.ts > "${{ inputs.log-file }}" 2>&1 &
         echo $! > server.pid

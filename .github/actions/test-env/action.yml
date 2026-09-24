@@ -2,8 +2,8 @@ name: Export shared CI test env
 description: |
   Exports the canonical fake JWT keypair and the shared CI test environment
   variables (ALLOWED_ORIGINS, AUDIT_RETENTION_DAYS, AUTH_SESSION_RETENTION_DAYS,
-  METRICS_SCRAPE_TOKEN, SECRETS_ENCRYPTION_KEY, etc.) into $GITHUB_ENV so each
-  CI workflow does not have to inline the same 80-line YAML blob.
+  DATABASE_SSL_ENABLED, METRICS_SCRAPE_TOKEN, SECRETS_ENCRYPTION_KEY, etc.) into
+  $GITHUB_ENV so each CI workflow does not have to inline the same 80-line YAML blob.
 
   These values are CI-only test fixtures. Production secrets are injected by the
   `reusable-railway-deploy.yml` workflow from the matching GitHub Environment.
@@ -42,6 +42,13 @@ runs:
           echo "ALLOWED_ORIGINS=${ALLOWED_ORIGINS_INPUT}"
           echo "AUDIT_RETENTION_DAYS=90"
           echo "AUTH_SESSION_RETENTION_DAYS=30"
+          # The CI Postgres service containers, and the Toxiproxy in front of them, speak plaintext,
+          # while the schema default is TLS on (production-safe). Without this, a connection made
+          # outside the Vitest setup file dies in the TLS handshake ("Client network socket
+          # disconnected before secure TLS connection was established") — which kept the scheduled
+          # k6 and chaos suites red from their first run. A URL carrying `sslmode=` still wins, so a
+          # job pointed at a real TLS server (the Neon restore drills) keeps TLS.
+          echo "DATABASE_SSL_ENABLED=false"
           # Matches the .env.development default so the super-admin allowlist
           # path is exercised consistently in CI. Without this, tests that call
           # `generateSuperAdminToken` would silently fall through the helper's
