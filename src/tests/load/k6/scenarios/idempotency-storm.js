@@ -1,6 +1,6 @@
 import http from 'k6/http';
 import { sleep } from 'k6';
-import { API_PREFIX, SCENARIOS, SMOKE_THRESHOLDS } from '../helpers/config.js';
+import { API_PREFIX, SMOKE_THRESHOLDS } from '../helpers/config.js';
 import { checkStatus } from '../helpers/checks.js';
 import { switchToOrganization } from '../helpers/auth.js';
 
@@ -10,10 +10,13 @@ import { switchToOrganization } from '../helpers/auth.js';
 export const options = {
   scenarios: {
     idempotencyStorm: {
-      ...SCENARIOS.smoke,
+      // 20 requests shared by 5 VUs. `constant-vus` (the smoke profile) takes no `iterations`,
+      // and k6 2 refuses to load a scenario with an unknown field.
+      executor: 'shared-iterations',
       exec: 'idempotencyStorm',
       vus: 5,
       iterations: 20,
+      maxDuration: '30s',
     },
   },
   thresholds: {

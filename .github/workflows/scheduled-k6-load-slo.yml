@@ -65,6 +65,13 @@ jobs:
       # Test-run gate: lets /auth/email/send-code echo debug_verification_code so the
       # passwordless-signup scenario can complete. A refine forbids TEST_MODE=true in production.
       TEST_MODE: 'true'
+      # Every k6 request comes from one source IP, so the tight per-route caps (login, webhook)
+      # would answer 429 instead of measuring the route; the Vitest harness relaxes them the same
+      # way. A refine forbids RATE_LIMIT_RELAXED_CAPS=true in production.
+      RATE_LIMIT_RELAXED_CAPS: 'true'
+      # CI-only fixture, the one the Vitest harness uses. The webhook route answers 503 until a
+      # secret is configured, and stripe-webhook-ingest asserts the 400 for a missing signature.
+      STRIPE_WEBHOOK_SECRET: whsec_test_contract_fixture_secret_minimum_length_32_chars_xx
 
     steps:
       - name: Checkout
