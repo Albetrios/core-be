@@ -38,13 +38,21 @@ services:
     environment:
       SONAR_HOST_URL: http://sonarqube:9000
       SONAR_TOKEN: ${SONAR_TOKEN:-}
+    # SCM analysis is off: the gate fails on ANY open issue, so blame/new-code data never changes its
+    # verdict — and the scanner's JGit crashes ("Bare Repository has neither a working tree, nor an
+    # index") on a checkout whose shared .git/config sets core.bare=true with per-worktree overrides
+    # (extensions.worktreeConfig), which git itself handles.
+    # The token comes ONLY from the SONAR_TOKEN environment variable above, which the scanner reads
+    # natively. Passing it again as -Dsonar.token made the scanner log "Property 'sonar.token' with
+    # value '<token>' is overridden with value '<token>'" — the token in plain text in every
+    # pre-commit run's output. (No comments inside the folded block below: it is one command line.)
     command: >
       sonar-scanner
+        -Dsonar.scm.disabled=true
         -Dsonar.projectKey=core-be
         -Dsonar.projectName="core-be"
         -Dsonar.projectVersion=3.5.1-dev.0
         -Dsonar.host.url=http://sonarqube:9000
-        -Dsonar.token=${SONAR_TOKEN:-admin:admin@}
 
 volumes:
   sonarqube_data:
