@@ -2,7 +2,10 @@ import { createHash } from 'node:crypto';
 import { databaseNowTimestamp } from '@/shared/utils/infrastructure/database-timestamp.util.js';
 import { and, asc, eq, ilike, isNotNull, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { countWithCap } from '@/infrastructure/database/utils/capped-count.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import {
+  getContextFreeDatabase,
+  getRequestDatabase,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { users } from '@/domains/user/user.schema.js';
 import { escapeLikePattern } from '@/shared/utils/validation/validation.util.js';
 import {
@@ -77,7 +80,7 @@ export class UserRepository {
    * user (the resolver filters `deleted_at IS NULL`).
    */
   async resolveInternalIdByPublicId(public_id: string): Promise<number | null> {
-    const result = await getRequestDatabase().execute<{ id: string | number | null }>(
+    const result = await getContextFreeDatabase().execute<{ id: string | number | null }>(
       sql`SELECT auth.resolve_user_id_by_public_id(${public_id}) AS id`,
     );
     const rows = (
@@ -94,7 +97,7 @@ export class UserRepository {
    * plain SELECT would resolve the owner policy to NULL and return zero rows, rejecting every login.
    */
   async findByEmail(email: string): Promise<UserRow | null> {
-    const result = await getRequestDatabase().execute(
+    const result = await getContextFreeDatabase().execute(
       sql`SELECT * FROM auth.resolve_user_for_authentication_by_email(${email})`,
     );
     const rows = extractResolverRows(result);
@@ -107,7 +110,7 @@ export class UserRepository {
    * {@link UserRepository.findByEmail}. Mirrors the historical no-`deleted_at`-filter behaviour.
    */
   async findById(identifier: number): Promise<UserRow | null> {
-    const result = await getRequestDatabase().execute(
+    const result = await getContextFreeDatabase().execute(
       sql`SELECT * FROM auth.resolve_user_by_internal_id(${identifier})`,
     );
     const rows = extractResolverRows(result);

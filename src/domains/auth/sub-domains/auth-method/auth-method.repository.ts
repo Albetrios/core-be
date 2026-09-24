@@ -1,5 +1,8 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import {
+  getContextFreeDatabase,
+  getRequestDatabase,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { DEFAULT_REPOSITORY_LIST_LIMIT } from '@/shared/constants/query-limits.constants.js';
 import { capListWithWarning } from '@/shared/utils/infrastructure/list-cap.util.js';
 import { auth_methods } from '@/domains/auth/sub-domains/auth-method/auth-method.schema.js';
@@ -136,7 +139,7 @@ export class AuthMethodRepository {
     provider: string,
     providerUserId: string,
   ): Promise<AuthMethodProviderLookup | null> {
-    const result = await getRequestDatabase().execute(
+    const result = await getContextFreeDatabase().execute(
       sql`SELECT * FROM auth.resolve_auth_method_by_provider(${provider}, ${providerUserId})`,
     );
     const rows = (

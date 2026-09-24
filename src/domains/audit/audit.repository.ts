@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
 import { and, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import { countWithCap } from '@/infrastructure/database/utils/capped-count.util.js';
-import { getRequestDatabase } from '@/infrastructure/database/contexts/database-context-runtime.js';
+import {
+  getContextFreeDatabase,
+  getRequestDatabase,
+} from '@/infrastructure/database/contexts/database-context-runtime.js';
 import { logs } from '@/domains/audit/audit.schema.js';
 import { api_keys } from '@/domains/tenancy/sub-domains/organization/organization-api-key/organization-api-key.schema.js';
 import { organizations } from '@/domains/tenancy/sub-domains/organization/organization.schema.js';
@@ -182,7 +185,7 @@ export class AuditRepository {
       userInternalIds.map((userInternalId) => sql`${userInternalId}`),
       sql`, `,
     );
-    const result = await getRequestDatabase().execute(
+    const result = await getContextFreeDatabase().execute(
       sql`SELECT id, public_id FROM auth.resolve_user_public_ids_by_ids(ARRAY[${userIdValues}]::bigint[])`,
     );
     const rows = (
