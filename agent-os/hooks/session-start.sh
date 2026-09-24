@@ -182,7 +182,7 @@ map_file="$ROOT/agent-os/docs/skill-triggers.md"
 map_section=""
 [ -f "$map_file" ] && map_section="$(cat "$map_file")"
 
-context="$(printf 'core-be session ready — environment provisioned: %s.\n- Node %s (need >=%s) · deps %s · gh %s · codegraph %s · mcp %s · gitleaks %s · agent-os %s · docker %s%s%s\n- Startup is light: Node + deps + agent-os:check + (web) Docker daemon — run compose:up / db:migrate / db:seed / tests on demand per prompt.\n- Gates: pnpm validate · pnpm ci:local   (pre-commit: pnpm guard:pre-commit)\n- Custom commands: /validate · /ci-local · /new-domain · /routes-sync\n\nagent-os skill routing — consult skill-index FIRST, then run the listed skill(s) for the files you change:\n\n%s' \
+context="$(printf 'core-be session ready — environment provisioned: %s.\n- Node %s (need >=%s) · deps %s · gh %s · codegraph %s · mcp %s · gitleaks %s · agent-os %s · docker %s%s%s\n- Startup is light: Node + deps + agent-os:check + (web) Docker daemon — run compose:up / db:migrate / db:seed / tests on demand per prompt.\n- Gates: pnpm validate · pnpm ci:local   (pre-commit: pnpm guard:pre-commit)\n- Custom commands: /be-validate · /be-ci-local · /be-new-domain · /be-routes-sync\n\nagent-os skill routing — consult be-skill-index FIRST, then run the listed skill(s) for the files you change:\n\n%s' \
   "$provisioned" "$node_version" "$required_major" "$deps" "$gh_cli" "$codegraph" "$mcp_status" "$gitleaks_status" "$agent_os_status" "$docker_status" "$node_note" "$hook_health" "$map_section")"
 
 # Prefer the structured additionalContext envelope; fall back to plain stdout

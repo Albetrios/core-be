@@ -60,6 +60,6 @@ BULK_PROFILE=edge BULK_ORGS=200 pnpm db:seed:bulk
 
 ## Related
 
-- Convention rule: `.cursor/rules/seed-conventions.mdc`.
-- Skill: `.cursor/skills/seed-maintainer/SKILL.md`.
+- Convention rule: `.cursor/rules/be-seed-conventions.mdc`.
+- Skill: `.cursor/skills/be-seed-maintainer/SKILL.md`.
 - Canonical per-domain examples: `src/domains/user/seed/`, `src/domains/tenancy/seed/`.

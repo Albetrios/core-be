@@ -1,9 +1,9 @@
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/skill-index/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-skill-index/SKILL.md"}}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"src/domains/billing/sub-domains/plan/plan.routes.ts","old_string":"a","new_string":"b"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/api-contract-guard/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/route-schema-doc-guard/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"route-catalog"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/seed-maintainer/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/tsdoc-export-guard/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/change-completeness-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-api-contract-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-route-schema-doc-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"be-route-catalog"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-seed-maintainer/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-tsdoc-export-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-change-completeness-guard/SKILL.md"}}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"pnpm routes:catalog:check"}}]}}

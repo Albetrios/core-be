@@ -12,7 +12,7 @@ action. Fixes land as ordinary PRs and are then noted back here under **Resolved
 ## How to run
 
 Drive it with the built-in `/loop` skill, pointing each cycle at a read-only review
-(for a diff-scoped pass, [`/pre-merge-review`](../../agent-os/commands/pre-merge-review.md);
+(for a diff-scoped pass, [`/be-pre-merge-review`](../../agent-os/commands/be-pre-merge-review.md);
 for a whole-repo pass, an explicit perspective prompt):
 
 ```text

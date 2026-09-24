@@ -39,7 +39,7 @@ function main(): void {
     }
     console.error(
       '\nAdd a `params:` Zod schema (snake_case + semantic id) to each route — see ' +
-        'agent-os/skills/api-contract-guard/SKILL.md.',
+        'agent-os/skills/be-api-contract-guard/SKILL.md.',
     );
     process.exit(1);
   }

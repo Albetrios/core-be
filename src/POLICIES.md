@@ -4,7 +4,7 @@
 
 Every value here is a deliberate business, UX, or security trade-off. Each entry records what the value is, why it was picked, what changes if you move it, and when it was last reviewed. **Changing one requires updating this file in the same commit and re-running PR review.**
 
-The canonical exports live under [src/shared/constants/](src/shared/constants/) (`ttl.constants.ts`, `limits.constants.ts`, `security.constants.ts`, `pagination.constants.ts`, `billing.constants.ts`, `roles.constants.ts`, `query-limits.constants.ts`, `notification.constants.ts`, `project-identity.constants.ts`). When a new policy constant is added there, the `tsdoc-export-guard` skill cross-pings `system-narrative-maintainer` to add a row here.
+The canonical exports live under [src/shared/constants/](src/shared/constants/) (`ttl.constants.ts`, `limits.constants.ts`, `security.constants.ts`, `pagination.constants.ts`, `billing.constants.ts`, `roles.constants.ts`, `query-limits.constants.ts`, `notification.constants.ts`, `project-identity.constants.ts`). When a new policy constant is added there, the `be-tsdoc-export-guard` skill cross-pings `be-system-narrative-maintainer` to add a row here.
 
 ## VERIFICATION_CODE_TTL_MINUTES
 

@@ -3,7 +3,7 @@
  * agent-os doc generator — regenerates the three hand-maintained derivative docs
  * from their single sources so drift is impossible, not merely detected:
  *
- *   - the `Project skills (N)` table in agent-os/skills/skill-index/SKILL.md
+ *   - the `Project skills (N)` table in agent-os/skills/be-skill-index/SKILL.md
  *       ← skill directories on disk + groups.json order + per-skill `indexNote`
  *   - agent-os/docs/agents-catalog.md
  *       ← agents/*.md frontmatter (name/description/model/wrapsSkill/useWhen)
@@ -118,9 +118,9 @@ function rewriteRegion(displayPath: string, text: string, body: string): string 
   return `${before}\n${body}\n${after}`;
 }
 
-// ── 1) skill-index Project-skills table ─────────────────────────────────────
+// ── 1) be-skill-index Project-skills table ─────────────────────────────────────
 function buildSkillIndexRegion(): DocResult {
-  const path = join(agentOsDirectory, 'skills', 'skill-index', 'SKILL.md');
+  const path = join(agentOsDirectory, 'skills', 'be-skill-index', 'SKILL.md');
   const skills = listDirectoryNames(join(agentOsDirectory, 'skills'));
   const groups = readJson<{ groups: Record<string, string[]> }>(
     join(agentOsDirectory, 'skills', 'groups.json'),
@@ -154,7 +154,7 @@ function buildSkillIndexRegion(): DocResult {
   const next = rewriteRegion('skill-index/SKILL.md', text, body);
   return {
     path,
-    displayPath: 'agent-os/skills/skill-index/SKILL.md',
+    displayPath: 'agent-os/skills/be-skill-index/SKILL.md',
     next,
     changed: next !== text,
   };

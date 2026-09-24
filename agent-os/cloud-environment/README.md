@@ -54,7 +54,7 @@ For Docker image pulls without the GCR mirror script, also add
 | `headroom` | `headroom mcp serve` | `install-headroom.sh` + `pnpm mcp:setup:default` |
 
 On-demand MCPs (`dashboards`, `core-be:api`, hosted integrations): `pnpm mcp:setup <name>`.
-Project skills (43): start at [`skill-index`](../../agent-os/skills/skill-index/SKILL.md).
+Project skills (43): start at [`be-skill-index`](../../agent-os/skills/be-skill-index/SKILL.md).
 
 ## Related
 

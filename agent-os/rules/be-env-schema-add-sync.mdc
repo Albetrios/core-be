@@ -1,0 +1,15 @@
+---
+description: When changing the env schema or .env.example, run the be-env-schema-add skill to keep schema, template, operator .env.<env> files, and GitHub Environments in sync, and to decide Secret vs Variable correctly.
+globs: src/shared/config/env-schema.ts, .env.example
+alwaysApply: false
+---
+
+# Env schema sync
+
+Changing `src/shared/config/env-schema.ts` or `.env.example`? Run **[be-env-schema-add](../skills/be-env-schema-add/SKILL.md)** — decide Secret vs Variable, place under the right `.env.example` half, run `pnpm tool:sync-env-example`, keep GitHub Environments in sync. `NODE_ENV` is `local | development | production` (default `local`; runtime never branches on it).
+
+Non-negotiable env-flag principles (see the skill):
+
+1. **Conditions live in the env layer** (`.refine()` in `env-schema.ts`); runtime code reads one specific `env.FLAG` and never re-derives the condition or combines flags.
+2. **One thing → exactly one env variable** — never gate a single behaviour on two flags (`env.A && env.B`); collapse to one. (E.g. wipe helpers gate on `env.TEST_MODE` alone.)
+3. **Casing** — env vars are `UPPER_SNAKE_CASE`; a `snake_case` name like `debug_verification_code` is an API body field, not an env var.

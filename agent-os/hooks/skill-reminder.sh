@@ -15,32 +15,32 @@ FILE=$(echo "$INPUT" | python3 -c \
 REMINDERS=()
 
 [[ "$FILE" == *".routes.ts" ]] && \
-  REMINDERS+=("routes → route-schema-doc-guard + route-catalog + seed-maintainer")
+  REMINDERS+=("routes → be-route-schema-doc-guard + be-route-catalog + be-seed-maintainer")
 
 [[ "$FILE" == *".schema.ts" ]] && \
-  REMINDERS+=("schema → schema-generator + sql-design-guard + db-migration-maintainer + rls-tenant-isolation-guard")
+  REMINDERS+=("schema → be-schema-generator + be-sql-design-guard + be-db-migration-maintainer + be-rls-tenant-isolation-guard")
 
 [[ "$FILE" == *"env-schema.ts"* || "$FILE" == *".env.example"* ]] && \
-  REMINDERS+=("env → env-schema-add")
+  REMINDERS+=("env → be-env-schema-add")
 
 [[ "$FILE" == *"/locales/"*".json" ]] && \
-  REMINDERS+=("i18n → i18n-message-guard")
+  REMINDERS+=("i18n → be-i18n-message-guard")
 
 [[ "$FILE" == *".validator.ts" || "$FILE" == *".serializer.ts" ]] && \
-  REMINDERS+=("validator/serializer → test-generator")
+  REMINDERS+=("validator/serializer → be-test-generator")
 
 [[ "$FILE" == *"/events/"*".ts" || "$FILE" == *"/workers/"*".ts" || \
    "$FILE" == *"/queues/"*".ts" ]] && \
-  REMINDERS+=("events/workers/queues → workers-events skill")
+  REMINDERS+=("events/workers/queues → be-workers-events skill")
 
 [[ "$FILE" == *"/database/contexts/"*".ts" || "$FILE" == *".worker.ts" || "$FILE" == *".processor.ts" ]] && \
-  REMINDERS+=("tenant data path → rls-tenant-isolation-guard (RLS + GUC + context wrappers)")
+  REMINDERS+=("tenant data path → be-rls-tenant-isolation-guard (RLS + GUC + context wrappers)")
 
 [[ "$FILE" == *"idempotency"* || "$FILE" == *"stripe.client.ts" ]] && \
-  REMINDERS+=("idempotency / stripe writes → idempotency-guard")
+  REMINDERS+=("idempotency / stripe writes → be-idempotency-guard")
 
 [[ "$FILE" == *".container.ts" ]] && \
-  REMINDERS+=("container → domain-generator (check DI wiring)")
+  REMINDERS+=("container → be-domain-generator (check DI wiring)")
 
 if [[ "${#REMINDERS[@]}" -gt 0 ]]; then
   telemetry_fired

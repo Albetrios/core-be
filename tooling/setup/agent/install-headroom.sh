@@ -3,7 +3,7 @@
 # (cloud agent) sessions. Headroom (headroom-ai) is a local context-compression
 # layer: its MCP server exposes headroom_compress / headroom_retrieve /
 # headroom_stats so agents shrink large tool output, logs, files, and RAG chunks
-# before they reach the model. See agent-os/rules/headroom-context-compression.mdc
+# before they reach the model. See agent-os/rules/be-headroom-context-compression.mdc
 # and docs/integrations/agentic-third-party-tooling.md.
 #
 # Usage: paste into the environment's *Setup script* field (runs as root, cached),

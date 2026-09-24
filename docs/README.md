@@ -26,7 +26,7 @@ Hand-written guides live in **topic subfolders**; generated API artifacts stay a
 - TSDoc on every public export, plus `@remarks` on services/workers/processors/policy files (canonical; gated by `pnpm tsdoc:check`).
 - Route documentation lives in inline Fastify `schema.summary` / `schema.description` and drives [openapi/openapi.json](openapi/openapi.json).
 
-There is no auto-generated `DOCS.md` aggregator. These layers are owned by the **system-narrative-maintainer**, **overview-doc-maintainer**, **tsdoc-export-guard**, and **route-schema-doc-guard** skills. Hand-written docs under `docs/` are owned by **docs-maintainer**.
+There is no auto-generated `DOCS.md` aggregator. These layers are owned by the **be-system-narrative-maintainer**, **be-overview-doc-maintainer**, **be-tsdoc-export-guard**, and **be-route-schema-doc-guard** skills. Hand-written docs under `docs/` are owned by **be-docs-maintainer**.
 
 ```mermaid
 flowchart TB

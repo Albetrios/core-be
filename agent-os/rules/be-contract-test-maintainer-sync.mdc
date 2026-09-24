@@ -1,0 +1,13 @@
+---
+description: When changing outbound contract tests or integration client wrappers used by contracts, run be-contract-test-maintainer.
+globs: src/tests/contract/**/*.ts, src/infrastructure/payment/**/*.ts, src/infrastructure/mail/**/*.ts, src/infrastructure/storage/**/*.ts, tooling/vitest/contract.config.ts
+alwaysApply: false
+---
+
+## Contract test maintainer sync
+
+When you create or modify matching files:
+
+1. **Read** `agent-os/skills/be-contract-test-maintainer/SKILL.md`.
+2. Update nock fixtures and matchers when external request/response shapes change.
+3. Run `pnpm test:contract` before finishing (also runs in CI Quality job).

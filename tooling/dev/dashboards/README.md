@@ -17,11 +17,11 @@ Then open **<http://localhost:3010/>**.
 
 The HTML hub (`hub.html` on `:3010`) is **for humans**. An **AI agent asked to monitor the stack should never read or screenshot the UI** — it reads the *same data the hub renders*, as structured tool output, through the **`dashboards` MCP server** (`mcp.mjs`): `local_stack_status`, `local_metrics`, `local_queue_stats`, `local_worker_health`.
 
-The **`stack-monitor` sub-agent** ([`agent-os/agents/stack-monitor.md`](../../../agent-os/agents/stack-monitor.md)) wraps those tools: spawn it for a one-line health verdict plus any anomalies (down services, failed jobs, DLQ depth, event-loop spikes, disconnected dependencies). For continuous monitoring, drive it on an interval and pass back the previous verdict so it reports *deltas*, not a steady state:
+The **`be-stack-monitor` sub-agent** ([`agent-os/agents/be-stack-monitor.md`](../../../agent-os/agents/be-stack-monitor.md)) wraps those tools: spawn it for a one-line health verdict plus any anomalies (down services, failed jobs, DLQ depth, event-loop spikes, disconnected dependencies). For continuous monitoring, drive it on an interval and pass back the previous verdict so it reports *deltas*, not a steady state:
 
 ```sh
-#   one check        → spawn the stack-monitor agent once
-#   continuous       → /loop 60s use the stack-monitor agent to check the stack; pass it the previous verdict
+#   one check        → spawn the be-stack-monitor agent once
+#   continuous       → /loop 60s use the be-stack-monitor agent to check the stack; pass it the previous verdict
 ```
 
 The MCP server reads the proxy on `:3010`, so `pnpm dashboards:up` (or `pnpm dashboards:proxy`) must be running first.

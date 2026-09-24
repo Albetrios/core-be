@@ -1,0 +1,11 @@
+---
+description: Auto-triggers be-dependency-security skill when dependencies or lockfile change.
+globs: package.json, pnpm-lock.yaml
+alwaysApply: false
+---
+
+When any matching file is created or modified, read and follow the be-dependency-security skill:
+- Skill file: `agent-os/skills/be-dependency-security/SKILL.md`
+- Ensure zero vulnerabilities: run `pnpm audit` (CI fails on any finding)
+- Prefer safe updates (patch/minor); use `pnpm.overrides` for transitive vulns before major upgrades
+- After dependency changes: run `pnpm validate` and `pnpm test` before committing

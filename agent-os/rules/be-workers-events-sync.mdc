@@ -1,0 +1,12 @@
+---
+description: Auto-triggers be-workers-events skill when event types, queues, or workers are created or modified.
+globs: src/domains/**/events/**/*.ts, src/domains/**/queues/**/*.ts, src/domains/**/workers/**/*.ts, src/infrastructure/queue/**/*.ts, src/core/events/**/*.ts
+alwaysApply: false
+---
+
+When any matching file is created or modified, read and follow the be-workers-events skill:
+- Skill file: `agent-os/skills/be-workers-events/SKILL.md`
+- Verify event types are properly defined and registered
+- Ensure queues follow the BullMQ conventions (connection, job types, enqueue helpers)
+- Validate workers have proper error handling, retries, and graceful shutdown
+- For BullMQ workers: confirm the new worker is registered in `src/infrastructure/queue/worker-runtime/worker-registration.registry.ts` with the correct `family`, `usesPostgres`, and `resolvePostgresConcurrency` — never wire workers directly in `bootstrap.ts`

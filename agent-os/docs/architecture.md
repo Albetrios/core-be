@@ -33,11 +33,11 @@ agent-os/cloud-environment/  install.sh, environment.json, agents-cloud.md  ─�
 
 ## Commands
 
-[`agent-os/commands/`](../commands/) holds **workflow** commands (multi-step, orchestrating existing skills/agents/gates); granular procedures stay as skills. Build chains, the PR lifecycle (`/open-pr`→`/watch-pr`→`/merge-pr`, `/ship`), `/pre-merge-review`, `/agent-os-sync`, and `/build-requirement`. Command names are eval-checked for collisions.
+[`agent-os/commands/`](../commands/) holds **workflow** commands (multi-step, orchestrating existing skills/agents/gates); granular procedures stay as skills. Build chains, the PR lifecycle (`/be-open-pr`→`/be-watch-pr`→`/be-merge-pr`, `/be-ship`), `/be-pre-merge-review`, `/be-agent-os-sync`, and `/be-build-requirement`. Command names are eval-checked for collisions.
 
 ## Requirement → production-ready build
 
-Fill the full-slice template in [`docs/getting-started/requirement-intake.md`](../../docs/getting-started/requirement-intake.md) and run `/build-requirement`: it validates the spec, drives `schema-complete → domain-generator → route-complete → workers → seed → tests → docs → /pre-merge-review` through a self-healing verify loop, and emits a reports bundle under `docs/builds/<feature>/`.
+Fill the full-slice template in [`docs/getting-started/requirement-intake.md`](../../docs/getting-started/requirement-intake.md) and run `/be-build-requirement`: it validates the spec, drives `schema-complete → be-domain-generator → route-complete → workers → seed → tests → docs → /be-pre-merge-review` through a self-healing verify loop, and emits a reports bundle under `docs/builds/<feature>/`.
 
 ## Continuous context
 

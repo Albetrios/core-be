@@ -12,7 +12,7 @@ How core-be treats **removal** of persisted rows: tombstones (`deleted_at`), **r
 4. Every **read** path for tombstoned entities must filter **`deleted_at IS NULL`** (Drizzle: `isNull(table.deleted_at)`) unless the handler is **admin**, **restore**, or **compliance export**.
 5. **`INSERT`** on tenant-managed entities with a stable natural key uses **`onConflictDoUpdate`**: set **`deleted_at` to `NULL`** and refresh columns so **recreate becomes reactivation** (webhook URL per organization, notification-policy triple — see **Upserts** below).
 6. Tombstones older than **`TOMBSTONE_RETENTION_DAYS`** (default **90**) are **hard-deleted** by dedicated BullMQ retention workers (distinct from audit/session jobs).
-7. Introducing `deleted_at` on tables with **multiple natural keys** may require **composite unique indexes** for upsert + deduplication — see [sql-design-guard](../../../.cursor/skills/sql-design-guard/SKILL.md).
+7. Introducing `deleted_at` on tables with **multiple natural keys** may require **composite unique indexes** for upsert + deduplication — see [be-sql-design-guard](../../../.cursor/skills/be-sql-design-guard/SKILL.md).
 
 ---
 
@@ -153,11 +153,11 @@ Batch deletes use `deleteInBatchesByCondition` with per-row FK fallback (`blocke
 - **Tombstone read guard**: `src/domains/user/__tests__/unit/tombstone-repository-reads.unit.test.ts`
 - **Batch delete FK fallback**: `src/infrastructure/database/utils/batch-delete.util.ts`, `src/tests/unit/infrastructure/database/batch-delete.util.unit.test.ts`
 - **Scheduler tombstone order**: `src/tests/unit/infrastructure/queue/scheduler.unit.test.ts`
-- **SQL design guard**: `.cursor/skills/sql-design-guard/SKILL.md`
+- **SQL design guard**: `.cursor/skills/be-sql-design-guard/SKILL.md`
 
 After pulling schema changes (for example **`notify.webhooks.deleted_at`**), apply **`pnpm db:migrate`** so the database matches Drizzle definitions.
 
-When you change any `*.schema.ts` or `migrations/*.sql`, follow **db-migration-maintainer** and **sql-design-guard**.
+When you change any `*.schema.ts` or `migrations/*.sql`, follow **be-db-migration-maintainer** and **be-sql-design-guard**.
 
 ## Related
 

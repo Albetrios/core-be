@@ -90,8 +90,8 @@ AGENTS.md              Codex + Claude Code secondary entry point
 | Modify | All 8 `agent-os/agents/*.md` | Replace inline platform table with `agent-os/docs/platform-access.md` ref |
 | Modify | `agent-os/skills/` internal refs | Rewrite `.cursor/` paths → `agent-os/` paths |
 | Modify | `agent-os/rules/` internal refs | Rewrite `.cursor/` paths → `agent-os/` paths |
-| Modify | `agent-os/rules/engineering-principles.mdc` | Add "Source: agent-os/docs/principles.md" note |
-| Modify | `agent-os/rules/project-identity.mdc` | Add "Source: agent-os/docs/principles.md" note |
+| Modify | `agent-os/rules/be-engineering-principles.mdc` | Add "Source: agent-os/docs/principles.md" note |
+| Modify | `agent-os/rules/be-project-identity.mdc` | Add "Source: agent-os/docs/principles.md" note |
 | Modify | `CLAUDE.md` | Add `## AI tooling (agent-os/)` section |
 | Modify | `AGENTS.md` | Replace agents table; add `agent-os/` references |
 | Modify | `docs/integrations/cursor-agent-system.md` | Update all paths to `agent-os/` |
@@ -187,26 +187,26 @@ FILE=$(echo "$INPUT" | python3 -c \
 REMINDERS=()
 
 [[ "$FILE" == *".routes.ts" ]] && \
-  REMINDERS+=("routes → route-schema-doc-guard + route-catalog + seed-maintainer")
+  REMINDERS+=("routes → be-route-schema-doc-guard + be-route-catalog + be-seed-maintainer")
 
 [[ "$FILE" == *".schema.ts" ]] && \
-  REMINDERS+=("schema → sql-design-guard + db-migration-maintainer")
+  REMINDERS+=("schema → be-sql-design-guard + be-db-migration-maintainer")
 
 [[ "$FILE" == *"env-schema.ts"* || "$FILE" == *".env.example"* ]] && \
-  REMINDERS+=("env → env-schema-add")
+  REMINDERS+=("env → be-env-schema-add")
 
 [[ "$FILE" == *"/locales/"*".json" ]] && \
-  REMINDERS+=("i18n → i18n-message-guard")
+  REMINDERS+=("i18n → be-i18n-message-guard")
 
 [[ "$FILE" == *".validator.ts" || "$FILE" == *".serializer.ts" ]] && \
-  REMINDERS+=("validator/serializer → test-generator")
+  REMINDERS+=("validator/serializer → be-test-generator")
 
 [[ "$FILE" == *"/events/"*".ts" || "$FILE" == *"/workers/"*".ts" || \
    "$FILE" == *"/queues/"*".ts" ]] && \
-  REMINDERS+=("events/workers/queues → workers-events skill")
+  REMINDERS+=("events/workers/queues → be-workers-events skill")
 
 [[ "$FILE" == *".container.ts" ]] && \
-  REMINDERS+=("container → domain-generator (check DI wiring)")
+  REMINDERS+=("container → be-domain-generator (check DI wiring)")
 
 if [[ "${#REMINDERS[@]}" -gt 0 ]]; then
   echo ""
@@ -237,7 +237,7 @@ Expected:
 
 ```text
 ⚡ Skill reminders for organization.routes.ts:
-  • routes → route-schema-doc-guard + route-catalog + seed-maintainer
+  • routes → be-route-schema-doc-guard + be-route-catalog + be-seed-maintainer
   Full map: agent-os/docs/skill-triggers.md
 ```
 
@@ -283,7 +283,7 @@ invoke the wrapping skill inline in the main conversation.
 | **Claude Code** | `"Read agent-os/agents/<agent-name>.md and follow the procedure"` |
 | **Codex** | Listed in `AGENTS.md` custom subagents table — invoke by name in your prompt |
 
-Replace `<agent-name>` with the agent's `name:` frontmatter value (e.g. `dependency-auditor`).
+Replace `<agent-name>` with the agent's `name:` frontmatter value (e.g. `be-dependency-auditor`).
 
 ## All agents
 
@@ -301,35 +301,35 @@ See [platform-access.md](platform-access.md) for how to invoke on each platform.
 
 | Agent | File | Wraps skill | Use when |
 | ----- | ---- | ----------- | -------- |
-| **production-reviewer** | [`agent-os/agents/production-reviewer.md`](agents/production-reviewer.md) | path-to-production-gate + production-hardening-guard | Pre-release / deploy sign-off — full readiness plan |
-| **verifier** | [`agent-os/agents/verifier.md`](agents/verifier.md) | *(inline)* | After claiming work complete — scoped validate/tests + wiring check |
-| **ci-investigator** | [`agent-os/agents/ci-investigator.md`](agents/ci-investigator.md) | ci-investigator | One failing CI job — root-cause summary without log noise |
-| **production-hardening-reviewer** | [`agent-os/agents/production-hardening-reviewer.md`](agents/production-hardening-reviewer.md) | production-hardening-guard | Targeted hardening sweep — security headers, DB/Redis/worker gaps |
-| **docs-auditor** | [`agent-os/agents/docs-auditor.md`](agents/docs-auditor.md) | docs-audit | Full docs/ audit — stale links, index gaps, Mermaid issues |
-| **sql-design-reviewer** | [`agent-os/agents/sql-design-reviewer.md`](agents/sql-design-reviewer.md) | sql-design-guard | Schema design review — indexes, constraints, column conventions |
-| **dependency-auditor** | [`agent-os/agents/dependency-auditor.md`](agents/dependency-auditor.md) | dependency-security | `pnpm audit` — vulnerabilities + prioritized fix plan |
-| **tsdoc-coverage-reviewer** | [`agent-os/agents/tsdoc-coverage-reviewer.md`](agents/tsdoc-coverage-reviewer.md) | tsdoc-export-guard *(check phase)* | TSDoc gap scan — missing summaries and @remarks |
+| **be-production-reviewer** | [`agent-os/agents/be-production-reviewer.md`](agents/be-production-reviewer.md) | be-path-to-production-gate + be-production-hardening-guard | Pre-release / deploy sign-off — full readiness plan |
+| **be-verifier** | [`agent-os/agents/be-verifier.md`](agents/be-verifier.md) | *(inline)* | After claiming work complete — scoped validate/tests + wiring check |
+| **be-ci-investigator** | [`agent-os/agents/be-ci-investigator.md`](agents/be-ci-investigator.md) | be-ci-investigator | One failing CI job — root-cause summary without log noise |
+| **be-production-hardening-reviewer** | [`agent-os/agents/be-production-hardening-reviewer.md`](agents/be-production-hardening-reviewer.md) | be-production-hardening-guard | Targeted hardening sweep — security headers, DB/Redis/worker gaps |
+| **be-docs-auditor** | [`agent-os/agents/be-docs-auditor.md`](agents/be-docs-auditor.md) | be-docs-audit | Full docs/ audit — stale links, index gaps, Mermaid issues |
+| **be-sql-design-reviewer** | [`agent-os/agents/be-sql-design-reviewer.md`](agents/be-sql-design-reviewer.md) | be-sql-design-guard | Schema design review — indexes, constraints, column conventions |
+| **be-dependency-auditor** | [`agent-os/agents/be-dependency-auditor.md`](agents/be-dependency-auditor.md) | be-dependency-security | `pnpm audit` — vulnerabilities + prioritized fix plan |
+| **be-tsdoc-coverage-reviewer** | [`agent-os/agents/be-tsdoc-coverage-reviewer.md`](agents/be-tsdoc-coverage-reviewer.md) | be-tsdoc-export-guard *(check phase)* | TSDoc gap scan — missing summaries and @remarks |
 ```
 
 - [ ] **Step 3: Create agent-os/docs/principles.md**
 
-Merge the body of `agent-os/rules/engineering-principles.mdc` and
-`agent-os/rules/project-identity.mdc` (strip frontmatter from both) and
+Merge the body of `agent-os/rules/be-engineering-principles.mdc` and
+`agent-os/rules/be-project-identity.mdc` (strip frontmatter from both) and
 prepend this header:
 
 ```markdown
 # Engineering principles and project identity (core-be)
 
 > **Canonical source** for Claude Code and Codex. Cursor auto-injects
-> `agent-os/rules/engineering-principles.mdc` and `agent-os/rules/project-identity.mdc`
+> `agent-os/rules/be-engineering-principles.mdc` and `agent-os/rules/be-project-identity.mdc`
 > via `alwaysApply: true`. When you update this file, mirror the changes
 > to those two rule files so Cursor stays in sync.
 
 ---
 ```
 
-Then paste the full body of `engineering-principles.mdc`, a `---` separator, then
-the full body of `project-identity.mdc`.
+Then paste the full body of `be-engineering-principles.mdc`, a `---` separator, then
+the full body of `be-project-identity.mdc`.
 
 - [ ] **Step 4: Create agent-os/docs/skill-triggers.md**
 
@@ -342,28 +342,28 @@ Skills live in [`agent-os/skills/`](skills/).
 
 | File pattern | Invoke skill(s) | Notes |
 | ------------ | --------------- | ----- |
-| `src/domains/**/*.routes.ts` | route-schema-doc-guard → route-catalog → seed-maintainer | Also openapi-multilingual if tags changed |
-| `src/domains/**/*.schema.ts` | sql-design-guard → db-migration-maintainer | |
-| `src/domains/**/*.container.ts`, `src/routes.ts` | domain-generator (check wiring) | |
-| `migrations/*.sql` | db-migration-maintainer | |
-| `src/shared/config/env-schema.ts`, `.env.example` | env-schema-add | |
-| `src/shared/locales/**/*.json` | i18n-message-guard | |
-| `src/domains/**/*.validator.ts`, `*.serializer.ts` | test-generator | |
-| `src/domains/**/events/**`, `**/workers/**`, `**/queues/**` | workers-events | |
-| `src/domains/**/seed/**`, `src/scripts/seed/**` | seed-maintainer | |
-| `src/**/*.ts` (public export added/renamed) | tsdoc-export-guard | |
-| `docs/**/*.md` | docs-maintainer | |
-| `src/**/OVERVIEW.md` | overview-doc-maintainer | |
-| `src/OVERVIEW.md`, `src/PATTERNS.md`, `src/FLOWS.md`, `src/POLICIES.md` | system-narrative-maintainer | |
-| `biome.json`, `.husky/pre-commit` | code-quality-guard | |
-| `package.json`, `pnpm-lock.yaml` | dependency-security | |
-| `src/tests/chaos/**` | chaos-test-maintainer | |
-| `src/tests/contract/**` | contract-test-maintainer | |
-| `.vscode/extensions.json`, `.vscode/settings.json` | ide-productivity-guard | |
+| `src/domains/**/*.routes.ts` | be-route-schema-doc-guard → be-route-catalog → be-seed-maintainer | Also be-openapi-multilingual if tags changed |
+| `src/domains/**/*.schema.ts` | be-sql-design-guard → be-db-migration-maintainer | |
+| `src/domains/**/*.container.ts`, `src/routes.ts` | be-domain-generator (check wiring) | |
+| `migrations/*.sql` | be-db-migration-maintainer | |
+| `src/shared/config/env-schema.ts`, `.env.example` | be-env-schema-add | |
+| `src/shared/locales/**/*.json` | be-i18n-message-guard | |
+| `src/domains/**/*.validator.ts`, `*.serializer.ts` | be-test-generator | |
+| `src/domains/**/events/**`, `**/workers/**`, `**/queues/**` | be-workers-events | |
+| `src/domains/**/seed/**`, `src/scripts/seed/**` | be-seed-maintainer | |
+| `src/**/*.ts` (public export added/renamed) | be-tsdoc-export-guard | |
+| `docs/**/*.md` | be-docs-maintainer | |
+| `src/**/OVERVIEW.md` | be-overview-doc-maintainer | |
+| `src/OVERVIEW.md`, `src/PATTERNS.md`, `src/FLOWS.md`, `src/POLICIES.md` | be-system-narrative-maintainer | |
+| `biome.json`, `.husky/pre-commit` | be-code-quality-guard | |
+| `package.json`, `pnpm-lock.yaml` | be-dependency-security | |
+| `src/tests/chaos/**` | be-chaos-test-maintainer | |
+| `src/tests/contract/**` | be-contract-test-maintainer | |
+| `.vscode/extensions.json`, `.vscode/settings.json` | be-ide-productivity-guard | |
 | `tooling/setup/**`, `setup.config.json` | setup-infra-maintainer | |
-| `src/shared/locales/*/openapi.json` | openapi-multilingual | |
-| `CLAUDE.md`, `AGENTS.md`, `agent-os/rules/**`, `agent-os/skills/**`, `agent-os/agents/**` | structure-maintainer | |
-| `tooling/setup/setup.config.json`, `src/shared/constants/project-identity.constants.ts` | project-identity-sync | |
+| `src/shared/locales/*/openapi.json` | be-openapi-multilingual | |
+| `CLAUDE.md`, `AGENTS.md`, `agent-os/rules/**`, `agent-os/skills/**`, `agent-os/agents/**` | be-structure-maintainer | |
+| `tooling/setup/setup.config.json`, `src/shared/constants/project-identity.constants.ts` | be-project-identity-sync | |
 
 > The 22 `agent-os/rules/*-sync.mdc` files remain for Cursor's glob auto-attach.
 > This table is the human-readable cross-platform equivalent.
@@ -411,7 +411,7 @@ frontmatter above.
 
 - [ ] **Step 2: Add Platform access section to the 3 original agents that lack it**
 
-For `ci-investigator.md`, `verifier.md`, `production-reviewer.md` — append at the end:
+For `be-ci-investigator.md`, `verifier.md`, `production-reviewer.md` — append at the end:
 
 ```markdown
 ## Platform access
@@ -472,7 +472,7 @@ Expected: no output.
 - [ ] **Step 3: Check one skill file to confirm paths look correct**
 
 ```bash
-head -20 agent-os/skills/skill-index/SKILL.md
+head -20 agent-os/skills/be-skill-index/SKILL.md
 ```
 
 Expected: skill table paths show `agent-os/skills/X/SKILL.md`, not `.cursor/skills/X/SKILL.md`.
@@ -502,13 +502,13 @@ grep -rl "\.cursor/rules/"  agent-os/rules/ | xargs sed -i '' 's|\.cursor/rules/
 
 - [ ] **Step 2: Add source pointer to the two alwaysApply rules**
 
-In `agent-os/rules/engineering-principles.mdc`, after the frontmatter, add:
+In `agent-os/rules/be-engineering-principles.mdc`, after the frontmatter, add:
 
 ```markdown
 > **Source:** [`agent-os/docs/principles.md`](../../agent-os/docs/principles.md) — edit there for Claude Code / Codex; mirror changes here for Cursor auto-inject.
 ```
 
-In `agent-os/rules/project-identity.mdc`, after the frontmatter, add:
+In `agent-os/rules/be-project-identity.mdc`, after the frontmatter, add:
 
 ```markdown
 > **Source:** [`agent-os/docs/principles.md`](../../agent-os/docs/principles.md) — edit there for Claude Code / Codex; mirror changes here for Cursor auto-inject.
@@ -629,25 +629,25 @@ Claude Code and Codex reference `agent-os/` directly.
 | [`agent-os/hooks/`](agent-os/hooks/) | Claude Code hook scripts |
 ```markdown
 
-- [ ] **Step 2: Update the existing skill-index reference**
+- [ ] **Step 2: Update the existing be-skill-index reference**
 
 Find:
 
 ```markdown
-Consult **`.cursor/skills/skill-index/SKILL.md`**
+Consult **`.cursor/skills/be-skill-index/SKILL.md`**
 ```
 
 Replace with:
 
 ```markdown
-Consult **`agent-os/skills/skill-index/SKILL.md`**
+Consult **`agent-os/skills/be-skill-index/SKILL.md`**
 ```
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add CLAUDE.md
-git commit -m "docs(claude): add agent-os/ reference table and update skill-index path"
+git commit -m "docs(claude): add agent-os/ reference table and update be-skill-index path"
 ```
 
 ---
@@ -658,18 +658,18 @@ git commit -m "docs(claude): add agent-os/ reference table and update skill-inde
 
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: Update the skill-index reference**
+- [ ] **Step 1: Update the be-skill-index reference**
 
 Find:
 
 ```markdown
-consult **[skill-index](.cursor/skills/skill-index/SKILL.md)**
+consult **[be-skill-index](.cursor/skills/be-skill-index/SKILL.md)**
 ```
 
 Replace with:
 
 ```markdown
-consult **[skill-index](agent-os/skills/skill-index/SKILL.md)**
+consult **[be-skill-index](agent-os/skills/be-skill-index/SKILL.md)**
 ```
 
 - [ ] **Step 2: Replace the custom subagents table**
@@ -701,7 +701,7 @@ Project-defined subagents in [`agent-os/agents/`](agent-os/agents/) run in isola
 **Skill trigger map:** [agent-os/docs/skill-triggers.md](agent-os/docs/skill-triggers.md) — file pattern → which skill to invoke.
 
 To add a subagent, use global **create-subagent**
-(see [cursor-global-skills](agent-os/skills/cursor-global-skills/SKILL.md)).
+(see [be-cursor-global-skills](agent-os/skills/be-cursor-global-skills/SKILL.md)).
 ```
 
 - [ ] **Step 3: Commit**
@@ -750,7 +750,7 @@ Cursor reads them via `.cursor/agents` → `agent-os/agents/` symlink.
 | **Claude Code** | `"Read agent-os/agents/<name>.md and follow the procedure"` |
 | **Codex** | Reads `AGENTS.md` custom subagents table; invoke by name |
 
-Add new agents with global **create-subagent**. See [cursor-global-skills](../../agent-os/skills/cursor-global-skills/SKILL.md).
+Add new agents with global **create-subagent**. See [be-cursor-global-skills](../../agent-os/skills/be-cursor-global-skills/SKILL.md).
 ```
 
 - [ ] **Step 3: Commit**
@@ -880,7 +880,7 @@ Expected: all 8 entries listed (symlinks are tracked as files).
 ```bash
 ls .cursor/agents/   # 8 .md files
 ls .claude/agents/   # same 8 .md files (same symlink target)
-ls .claude/skills/skill-index/  # SKILL.md
+ls .claude/skills/be-skill-index/  # SKILL.md
 ```
 
 - [ ] **Step 4: Verify hook fires correctly**
@@ -894,7 +894,7 @@ Expected:
 
 ```text
 ⚡ Skill reminders for auth-method.schema.ts:
-  • schema → sql-design-guard + db-migration-maintainer
+  • schema → be-sql-design-guard + be-db-migration-maintainer
   Full map: agent-os/docs/skill-triggers.md
 ```
 
@@ -925,7 +925,7 @@ Expected:
 - The 36 skills, 42 rules, 8 agents — content unchanged, only location
 - Cursor's glob auto-attach behavior — symlinks are transparent to Cursor
 - Pre-commit gates — they check `src/` structure, not `.cursor/` or `agent-os/`
-- `skill-index` — stays canonical on the Cursor side; `agent-os/docs/skill-triggers.md` is the cross-platform equivalent
+- `be-skill-index` — stays canonical on the Cursor side; `agent-os/docs/skill-triggers.md` is the cross-platform equivalent
 
 ### Windows caveat
 

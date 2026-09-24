@@ -276,7 +276,7 @@ Use **workflow_dispatch** when you need to run part of the pipeline without a fu
 
 ## 6. Adding a new env var
 
-Use the **env-schema-add** skill (`.cursor/skills/env-schema-add/SKILL.md`) — it
+Use the **be-env-schema-add** skill (`.cursor/skills/be-env-schema-add/SKILL.md`) — it
 walks through the Secret-vs-Variable decision and the section placement in
 `.env.example`. Summary:
 

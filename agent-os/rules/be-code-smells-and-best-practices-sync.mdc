@@ -1,0 +1,13 @@
+---
+description: Single quality gate for src/ edits — fix Biome issues in touched files; full validate runs on commit/CI (do not duplicate).
+globs: src/**/*.ts
+alwaysApply: false
+---
+
+## Code quality (single owner for `src/**/*.ts`)
+
+When you add or modify code under `src/`:
+
+1. **Fix issues in files you touched** — resolve Biome errors and any new warnings inline (see `agent-os/skills/be-code-smells-and-best-practices/SKILL.md`; warning details in `agent-os/skills/be-lint-warnings-handler/SKILL.md`).
+2. **Do not re-run full-repo checks by default** — Husky pre-commit (`lint-staged`, `typecheck`, `validate:domain`) and CI (`pnpm validate`) already enforce lint, format, and types. Run `pnpm lint` / `pnpm typecheck` only when the hook or CI failed, or before a large PR-sized change.
+3. **Do not ask the user** how to fix warnings — apply the skills and move on.

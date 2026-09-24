@@ -27,7 +27,7 @@ function main(): void {
     for (const line of problems) console.error(`  - ${line}`);
     console.error(
       "\nAdd summary, description, and tags to each route's `schema` block " +
-        '(see agent-os/skills/route-schema-doc-guard/SKILL.md).',
+        '(see agent-os/skills/be-route-schema-doc-guard/SKILL.md).',
     );
     process.exit(1);
   }

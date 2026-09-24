@@ -1,24 +1,24 @@
 {
-  "description": "Read-only agent review pipelines — named sequences of diagnostic agents that fan out and aggregate into one report. Consumed by the /pre-merge-review and /prod-readiness commands. Every step references a real agent in agent-os/agents/ (eval-enforced). Diagnostic→procedural handoff: each finding names the procedural skill that fixes it (agent finds, skill fixes).",
+  "description": "Read-only agent review pipelines — named sequences of diagnostic agents that fan out and aggregate into one report. Consumed by the /be-pre-merge-review and /prod-readiness commands. Every step references a real agent in agent-os/agents/ (eval-enforced). Diagnostic→procedural handoff: each finding names the procedural skill that fixes it (agent finds, skill fixes).",
   "pipelines": {
     "pre-merge-review": {
       "description": "Read-only review of the current diff before merge.",
-      "steps": ["sql-design-reviewer", "production-hardening-reviewer", "verifier"],
+      "steps": ["be-sql-design-reviewer", "be-production-hardening-reviewer", "be-verifier"],
       "aggregate": "one prioritized report — blocking gaps first, then optional improvements",
       "handoff": {
-        "sql-design-reviewer": "sql-design-guard",
-        "production-hardening-reviewer": "production-hardening-guard",
-        "verifier": "test-generator"
+        "be-sql-design-reviewer": "be-sql-design-guard",
+        "be-production-hardening-reviewer": "be-production-hardening-guard",
+        "be-verifier": "be-test-generator"
       }
     },
     "prod-readiness": {
       "description": "Full production-readiness sweep before a release/deploy.",
-      "steps": ["production-reviewer", "production-hardening-reviewer", "dependency-auditor"],
+      "steps": ["be-production-reviewer", "be-production-hardening-reviewer", "be-dependency-auditor"],
       "aggregate": "satisfied items, blocking gaps, optional improvements",
       "handoff": {
-        "production-reviewer": "path-to-production-gate",
-        "production-hardening-reviewer": "production-hardening-guard",
-        "dependency-auditor": "dependency-security"
+        "be-production-reviewer": "be-path-to-production-gate",
+        "be-production-hardening-reviewer": "be-production-hardening-guard",
+        "be-dependency-auditor": "be-dependency-security"
       }
     }
   }

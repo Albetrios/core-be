@@ -1,0 +1,59 @@
+---
+description: Complete all dependent work in the same change without asking — tests, route/OpenAPI registration, docs, lint, i18n. The ONE confirmation checkpoint is the be-new-requirement-intake plan gate; destructive/outward actions still follow be-ai-guardrails.
+alwaysApply: true
+---
+
+# Agent Behavior — Full Completion, One Checkpoint
+
+When implementing a task, complete **all dependent work** as part of the same change.
+Do not offer optional follow-ups or ask whether to do work that the project
+conventions already require — do it.
+
+## The single confirmation checkpoint
+
+There is exactly **one** place to stop and confirm: the **plan gate** in
+`agent-os/rules/be-new-requirement-intake.mdc` — for a new requirement, post the Plan
+once (requirement type, provided vs assumed fields, skills in order, files to touch,
+verification commands) and wait for **go** / **tweak** / **stop**. After **go**, do
+not ask further questions.
+
+Outside that gate, do not ask "Do you want me to…?". The exceptions that still
+require a stop are the **destructive / outward** cases, not routine dev work:
+data loss, a breaking API change without acknowledgment, ambiguous cross-domain
+ownership (per the intake doc), and everything in `agent-os/rules/be-ai-guardrails.mdc`
+(protected paths, secrets, destructive shell, migrations on billing ledgers). Those
+guardrails are unchanged — this rule narrows *routine* confirmation, not safety.
+
+## Do these as part of every change (never ask)
+
+1. **Tests** — add/update the right layer per `agent-os/rules/be-testing-conventions.mdc`
+   and the `agent-os/skills/be-test-generator/SKILL.md` skill (pure-layer unit + domain
+   e2e via `fastify.inject`). Do not ask "Should I add tests?".
+2. **Routes** — register handlers in the domain `*.routes.ts`, wire the container into
+   `src/routes.ts`, and add `schema.summary`/`description`/`tags` + refresh the route
+   catalog and OpenAPI. Do not ask.
+3. **i18n** — user-facing strings go through translation keys (never raw strings in
+   errors/success). Do not ask.
+4. **Docs** — keep TSDoc on new exports and any affected `docs/**` in sync via
+   `agent-os/skills/be-docs-maintainer/SKILL.md`. Do not ask "Should I update the docs?".
+5. **Lint & types** — fix all Biome + TypeScript issues in touched files
+   (`agent-os/skills/be-code-smells-and-best-practices/SKILL.md`) so `pnpm lint` and
+   `pnpm typecheck` are clean before responding. Do this silently.
+6. **Infer sensible defaults** — for slight ambiguity (e.g. "add a settings field"),
+   apply the intake doc's default assumptions and proceed; only stop when a field is
+   genuinely unresolvable or a destructive case applies.
+
+## Orchestration
+
+For a whole requirement, drive it through `agent-os/skills/be-auto-implement/SKILL.md`
+(the master pipeline). To route a specific change to its skill, use
+`agent-os/rules/be-skill-router.mdc`. This rule takes precedence over
+`agent-os/rules/be-engineering-principles.mdc` for implementation *output behaviour*;
+for code-review / PR-review requests, follow the review guidance in
+be-engineering-principles instead.
+
+## Definition of done
+
+Every change propagates to its tests, docs, rules, and skills in the **same** change —
+see `agent-os/rules/be-change-completeness.mdc`. The user provides the requirement;
+everything downstream of the plan gate is the agent's to complete.

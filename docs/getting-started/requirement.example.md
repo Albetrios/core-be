@@ -2,9 +2,9 @@
 
 A complete, filled-in copy of [`requirement.template.md`](requirement.template.md) — what
 a ready-to-build requirement looks like with every `<...>` replaced. Study it, or copy the
-block and run it with `/build-requirement` (bring Postgres + Redis up for the live smoke).
+block and run it with `/be-build-requirement` (bring Postgres + Redis up for the live smoke).
 
-This is the *approved* shape. When `/build-requirement` drafts a requirement from a short
+This is the *approved* shape. When `/be-build-requirement` drafts a requirement from a short
 prompt, every value it inferred is tagged `[assumed]` and gathered in an "Assumptions I
 added" list up top, so you can change them before the document is finalized like this.
 

@@ -1,0 +1,9 @@
+---
+description: Domain layout + route catalog when domain structure or routes change (single rule for containers, routes, src/routes.ts).
+globs: src/domains/**/*.container.ts, src/domains/**/*.routes.ts, src/routes.ts
+alwaysApply: false
+---
+
+# Domain + routes sync
+
+New domain/sub-domain, `*.container.ts`, `*.routes.ts`, or `src/routes.ts` wiring? Run **[be-domain-generator](../skills/be-domain-generator/SKILL.md)**; for routes also **[be-route-schema-doc-guard](../skills/be-route-schema-doc-guard/SKILL.md)** + **[be-route-catalog](../skills/be-route-catalog/SKILL.md)**. Full chains: `new-domain` / `route-change` in `agent-os/skills/chains.json`.

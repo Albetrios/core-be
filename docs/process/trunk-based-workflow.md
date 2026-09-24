@@ -30,14 +30,14 @@ flowchart TB
 | `<type>/<slug>` | Working branch for one change (`feat`/`fix`/`chore`/`refactor`/`docs`/`test`/`ci`/`build`/`perf`/`hotfix`). | short-lived, deleted on merge |
 | `claude/*`      | Fallback for AI web sessions — the platform-assigned name. Rename to `<type>/<slug>` before the first push. | short-lived                   |
 
-Enforced by [`.husky/pre-push`](../../.husky/pre-push) and the [`git-branch-naming`](../../agent-os/rules/git-branch-naming.mdc) rule.
+Enforced by [`.husky/pre-push`](../../.husky/pre-push) and the [`be-git-branch-naming`](../../agent-os/rules/be-git-branch-naming.mdc) rule.
 
 Name the branch after the change: `<type>` is its conventional-commit type, `<slug>` is 2–5 kebab-case words (≤ 40 chars) matching the commit subject and PR title — `docs/american-spelling-organization`, `feat/billing-invoice-route`, `fix/webhook-event-rls-scope`. AI web sessions boot on a platform-generated `claude/<slug>` that carries no meaning; rename it with `git branch -m <type>/<slug>` **before** the first push, because the cloud git proxy allows branch creates but refuses deletes.
 
 ## The loop
 
 1. Branch off `main`: `git switch -c feat/my-change`.
-2. Commit; open a PR to **`main`** (`/open-pr` or `/ship`).
+2. Commit; open a PR to **`main`** (`/be-open-pr` or `/be-ship`).
 3. **PR CI is the authoritative gate**: lint, typecheck, unit, the full DB-backed matrix
    (e2e/integration/rls/performance), security, and contract lanes all roll up into the single
    **`Quality gate`** required check (with **`Checks`** from pr-governance). It must be green — and the

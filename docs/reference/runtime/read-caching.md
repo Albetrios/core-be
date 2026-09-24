@@ -147,7 +147,7 @@ Those use a **module-level TTL memo** instead, following
 | Key | `<domain>:<thing>:<scope public id>` | none — one value |
 | Invalidation | tombstone after every write, in API and workers | none; the TTL is the whole story |
 | Shared across processes | yes | no — each process holds its own |
-| Name it | `<thing>.cache.ts` | `<thing>-memo.ts` — **not** `.cache.ts`, or `read-cache-guard` will hold it to a contract it does not need |
+| Name it | `<thing>.cache.ts` | `<thing>-memo.ts` — **not** `.cache.ts`, or `be-read-cache-guard` will hold it to a contract it does not need |
 
 Three things a memo still owes:
 

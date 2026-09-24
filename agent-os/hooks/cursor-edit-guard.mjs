@@ -75,7 +75,7 @@ if (
   /(^|\/)src\/.*\.tsx?$/.test(filePath) &&
   /(from|require|import)\s*\(?\s*['"]\.\.\//.test(content)
 ) {
-  violations.push("relative parent import ('../') is banned under src/ — use the '@/' alias (import-paths.mdc).");
+  violations.push("relative parent import ('../') is banned under src/ — use the '@/' alias (be-import-paths.mdc).");
 }
 
 // R4 — NODE_ENV set/compared to a REMOVED value (test|staging; docs are exempt). `local` is a valid
@@ -85,7 +85,7 @@ if (
   /NODE_ENV\s*[:=]+\s*['"`]?(test|staging)\b/i.test(content)
 ) {
   violations.push(
-    "NODE_ENV must never be 'test' or 'staging' (the enum is 'local' | 'development' | 'production') — use an explicit env flag with a static default instead (env-schema-add skill).",
+    "NODE_ENV must never be 'test' or 'staging' (the enum is 'local' | 'development' | 'production') — use an explicit env flag with a static default instead (be-env-schema-add skill).",
   );
 }
 

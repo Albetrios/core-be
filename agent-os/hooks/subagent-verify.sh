@@ -18,6 +18,6 @@ cat <<'EOF'
 Subagent finished — its output is a report, not proof. Before relying on it:
 - verify load-bearing claims (run the gate it names, read the file it cites);
 - if it edited files, those files route through agent-os/docs/skill-triggers.md like your own edits (run the listed skills/gates);
-- prefer the verifier agent before declaring a task complete.
+- prefer the be-verifier agent before declaring a task complete.
 EOF
 exit 0

@@ -41,7 +41,7 @@ Order matters: framework (Tasks 1–5) → migration (Task 6) → domain bulk se
 
 **Files:** Create `src/scripts/seed/seed-contract.ts`.
 
-Exports (full TSDoc required per tsdoc-export-guard):
+Exports (full TSDoc required per be-tsdoc-export-guard):
 
 - `interface ResolvedCounts` — `{ organizations, usersPerOrg:{min,max}, customRolesPerOrg, subscriptionsPerOrg, apiKeysPerOrg, webhooksPerOrg, notificationsPerUser, uploadsPerOrg, auditMonths, auditPerOrgPerMonth, edgeCases }`.
 - `interface SeededOrg { id; public_id; ownerUserId }`, `interface SeededUser { id; public_id }`.
@@ -137,9 +137,9 @@ Each task: implement → `BULK_PROFILE=demo pnpm db:seed:bulk` runs clean agains
 
 ## Task 13: Rule
 
-- [ ] Create `.cursor/rules/seed-conventions.mdc` (auto-attach globs `src/domains/**`, `src/scripts/seed/**`): the `seed/` dir layout, `SeedContribution` vs `DomainSeedModule`, compose-up rule, idempotency + production-guard requirements.
+- [ ] Create `.cursor/rules/be-seed-conventions.mdc` (auto-attach globs `src/domains/**`, `src/scripts/seed/**`): the `seed/` dir layout, `SeedContribution` vs `DomainSeedModule`, compose-up rule, idempotency + production-guard requirements.
 - [ ] Mirror to `agents/`/`.claude/` only if that sync exists on `dev` (it does not yet — skip).
-- [ ] Commit: `docs(rules): add seed-conventions rule`.
+- [ ] Commit: `docs(rules): add be-seed-conventions rule`.
 
 ## Task 14: Skills
 

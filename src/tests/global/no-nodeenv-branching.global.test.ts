@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
  *
  * When adding an environment-varying behaviour: add a flag with a static production-safe default and a
  * production `.refine()` in `env-schema.ts`, read that flag, and set the dev value in `.env.example` /
- * the test harness. See `agent-os/skills/env-schema-add/SKILL.md`.
+ * the test harness. See `agent-os/skills/be-env-schema-add/SKILL.md`.
  */
 describe('Global: no NODE_ENV branching, no removed env values (env-driven-config guard)', () => {
   const SKIP_EXTENSIONS = new Set<string>([
@@ -118,7 +118,7 @@ describe('Global: no NODE_ENV branching, no removed env values (env-driven-confi
       throw new Error(
         'NODE_ENV is compared outside env-schema.ts. Runtime code must NEVER branch on NODE_ENV — ' +
           'add an explicit env flag (static production-safe default + a production `.refine()`) in ' +
-          'env-schema.ts and read that flag instead (see agent-os/skills/env-schema-add/SKILL.md):\n' +
+          'env-schema.ts and read that flag instead (see agent-os/skills/be-env-schema-add/SKILL.md):\n' +
           violations.join('\n'),
       );
     }

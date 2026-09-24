@@ -332,4 +332,4 @@ describe("example.validator", () => {
 - [api-testing.md](../../getting-started/api-testing.md) — manual smoke checklist
 - [documentation-system.md](../architecture/documentation-system.md) — layered docs ownership map
 - `src/tests/<suite>/<suite>.overview.md` — per-suite scope (unit, integration, e2e, global, chaos, contract, performance, security, smoke, load, bench)
-- `.cursor/skills/test-generator/SKILL.md` — orchestration checklist
+- `.cursor/skills/be-test-generator/SKILL.md` — orchestration checklist

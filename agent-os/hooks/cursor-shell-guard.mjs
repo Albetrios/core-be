@@ -5,7 +5,7 @@
 // Companions: cursor-read-guard.mjs (beforeReadFile secrets block),
 // cursor-mcp-guard.mjs (beforeMCPExecution), cursor-edit-guard.mjs (afterFileEdit,
 // advisory — Cursor cannot veto writes pre-flight; hard policy stays in
-// .cursor/rules/ai-guardrails.mdc).
+// .cursor/rules/be-ai-guardrails.mdc).
 //
 // Reads the hook payload on stdin; prints { "permission": "allow" | "deny", ... }.
 import { readFileSync } from "node:fs";

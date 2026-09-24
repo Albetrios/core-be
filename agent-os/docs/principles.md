@@ -1,7 +1,7 @@
 # Engineering principles and project identity (core-be)
 
 > **Canonical source** for Claude Code and Codex. Cursor auto-injects
-> `agent-os/rules/engineering-principles.mdc` and `agent-os/rules/project-identity.mdc`
+> `agent-os/rules/be-engineering-principles.mdc` and `agent-os/rules/be-project-identity.mdc`
 > via `alwaysApply: true`. When you update this file, mirror the changes
 > to those two rule files so Cursor stays in sync.
 
@@ -16,34 +16,34 @@ Write production-grade, maintainable, scalable code. Preserve simplicity; avoid 
 ### Before writing code
 
 1. Read **[CLAUDE.md](../../CLAUDE.md)** for architecture, domains, and dependency rules.
-2. For new requirements, use **[requirement-intake](../../docs/getting-started/requirement-intake.md)** and consult **[skill-index](../skills/skill-index/SKILL.md)** first.
+2. For new requirements, use **[requirement-intake](../../docs/getting-started/requirement-intake.md)** and consult **[be-skill-index](../skills/be-skill-index/SKILL.md)** first.
 3. **Reuse before you create.** Before adding a helper, wrapper, env var, constant or pattern, search for the one that already does the job and use it. Create something new only when nothing existing fits.
    - **Close but not quite right?** Improve the existing one instead of forking a parallel version — or, if new is genuinely the better design, say why in the PR description. Either way, do it **in the same PR**: never leave old and new side by side behind a "consolidate later".
    - **Recognize the miss:** a new `TEST_*_URL` beside the existing `DATABASE_OPERATOR_URL`, or a hand-rolled second pool that re-implements `getMaintenanceDatabase()`, is the parallel-version smell. PR #1193 did both, then folded them back into the existing pieces.
 4. Do not introduce duplicate abstractions.
-5. **Product slug, image names, branch/env mapping:** follow **[project-identity.mdc](../rules/project-identity.mdc)** — manifest `tooling/setup/setup.config.json` and imports from `project-identity.constants.ts`; do not hardcode `core-be` (or manifest-derived names) in `src/`, workflows, or tooling.
+5. **Product slug, image names, branch/env mapping:** follow **[be-project-identity.mdc](../rules/be-project-identity.mdc)** — manifest `tooling/setup/setup.config.json` and imports from `project-identity.constants.ts`; do not hardcode `core-be` (or manifest-derived names) in `src/`, workflows, or tooling.
 
 ### Code quality
 
 - Prefer simple solutions over clever ones.
 - Keep functions small and single-purpose; use descriptive naming.
-- Avoid magic numbers and hardcoded values; extract constants when reused. Place each constant at the **lowest scope that covers its use sites** — one file → a local `const`; one sub-domain/domain → a co-located `*.constants.ts`; cross-cutting primitives only → `src/shared/constants/`. See **[core-be-src-architecture.mdc](../rules/core-be-src-architecture.mdc)**.
+- Avoid magic numbers and hardcoded values; extract constants when reused. Place each constant at the **lowest scope that covers its use sites** — one file → a local `const`; one sub-domain/domain → a co-located `*.constants.ts`; cross-cutting primitives only → `src/shared/constants/`. See **[be-src-architecture.mdc](../rules/be-src-architecture.mdc)**.
 - Add comments only when logic is non-obvious.
 - Remove dead code, unused imports, `console.log`, and commented-out code.
 - Use `logger` from `@/shared/utils/infrastructure/logger.util.js` in application code.
 - Avoid unnecessary dependencies.
-- **Object parameters only** for any function/method with 2+ inputs, except in `*.repository.ts` / `*.repository.unit.test.ts` and framework-mandated callbacks (Fastify handlers, BullMQ processors, DI constructors, test/Zod callbacks). See **[object-params.mdc](../rules/object-params.mdc)**.
+- **Object parameters only** for any function/method with 2+ inputs, except in `*.repository.ts` / `*.repository.unit.test.ts` and framework-mandated callbacks (Fastify handlers, BullMQ processors, DI constructors, test/Zod callbacks). See **[be-object-params.mdc](../rules/be-object-params.mdc)**.
 
 ### Architecture (brief)
 
-- **Import paths**: `@/` in `src/`, `@tooling/` in tooling; same-folder `./` only — no parent-relative `../`. See **[import-paths.mdc](../rules/import-paths.mdc)**.
+- **Import paths**: `@/` in `src/`, `@tooling/` in tooling; same-folder `./` only — no parent-relative `../`. See **[be-import-paths.mdc](../rules/be-import-paths.mdc)**.
 - **Controllers** coordinate only — thin handlers, no DB queries.
 - **Services** express intent — business logic, validators, events; they may declare a transaction boundary via `withTransaction` for atomicity, but issue no raw SQL and manage no DB connection (repositories own the SQL; enforced by `no-direct-db-in-services.global.test.ts`).
 - **Repositories** own DB access (Drizzle).
 - **Services** express intent; they use **same-domain repositories** and other domains' **services** for cross-domain reads/writes — never another domain's repository or schema.
 - **Postgres** is the only source of truth; workers are pull-based (BullMQ).
 
-For layout, layers, routes, events, and Drizzle conventions, follow **[core-be-src-architecture.mdc](../rules/core-be-src-architecture.mdc)** when editing `src/**/*.ts`. For naming, follow **[full-names-only.mdc](../rules/full-names-only.mdc)**.
+For layout, layers, routes, events, and Drizzle conventions, follow **[be-src-architecture.mdc](../rules/be-src-architecture.mdc)** when editing `src/**/*.ts`. For naming, follow **[be-full-names-only.mdc](../rules/be-full-names-only.mdc)**.
 
 ### Type safety
 
@@ -54,7 +54,7 @@ For layout, layers, routes, events, and Drizzle conventions, follow **[core-be-s
 ### Backend and API
 
 - Validate all inputs; never trust client-side data.
-- Use typed errors from `@/shared/errors`; user-facing messages via i18n translation keys (see **[i18n-message-guard](../skills/i18n-message-guard/SKILL.md)**).
+- Use typed errors from `@/shared/errors`; user-facing messages via i18n translation keys (see **[be-i18n-message-guard](../skills/be-i18n-message-guard/SKILL.md)**).
 - Use `withTransaction` where multiple writes must succeed or fail together.
 - Avoid N+1 queries; keep repository access efficient.
 - Workers and scripts must pass organization identifiers explicitly in queries — do not rely on RLS session context.
@@ -74,7 +74,7 @@ For layout, layers, routes, events, and Drizzle conventions, follow **[core-be-s
 
 ### Context efficiency (Headroom)
 
-Route large, low-signal text — long command/CI/test output, logs, whole-file reads, RAG/search chunks — through the **Headroom MCP** (`headroom_compress`) before loading it into context; pull originals with `headroom_retrieve` when exact bytes are needed. Skip compression for small outputs or content applied verbatim (diffs, code to edit, migration SQL, secrets). Shared by all AI agents — see **[headroom-context-compression.mdc](../rules/headroom-context-compression.mdc)**.
+Route large, low-signal text — long command/CI/test output, logs, whole-file reads, RAG/search chunks — through the **Headroom MCP** (`headroom_compress`) before loading it into context; pull originals with `headroom_retrieve` when exact bytes are needed. Skip compression for small outputs or content applied verbatim (diffs, code to edit, migration SQL, secrets). Shared by all AI agents — see **[be-headroom-context-compression.mdc](../rules/be-headroom-context-compression.mdc)**.
 
 ### Git and refactoring
 
@@ -87,7 +87,7 @@ Route large, low-signal text — long command/CI/test output, logs, whole-file r
 
 - Update docs, types, OpenAPI locale keys, and examples when behavior changes.
 - Do not add unsolicited markdown files or README sections.
-- **After each task**, consult **[skill-index](../skills/skill-index/SKILL.md)** once and run only the skills listed for the files you changed (routes → route-catalog, env → env-schema-add, hand-written docs → docs-maintainer, etc.). Do not invoke overlapping skills separately.
+- **After each task**, consult **[be-skill-index](../skills/be-skill-index/SKILL.md)** once and run only the skills listed for the files you changed (routes → be-route-catalog, env → be-env-schema-add, hand-written docs → be-docs-maintainer, etc.). Do not invoke overlapping skills separately.
 
 ### Output behavior
 
@@ -111,14 +111,14 @@ Avoid: massive files, deeply nested conditionals, duplicated logic, tight coupli
 
 ### Dependency policy
 
-Before adding a dependency: check whether existing code or platform APIs solve the problem; prefer lightweight libraries; justify large or new packages. Follow **[dependency-security](../skills/dependency-security/SKILL.md)** when changing `package.json`.
+Before adding a dependency: check whether existing code or platform APIs solve the problem; prefer lightweight libraries; justify large or new packages. Follow **[be-dependency-security](../skills/be-dependency-security/SKILL.md)** when changing `package.json`.
 
 ### Testing
 
 Write testable, deterministic, loosely coupled code.
 
-- Domain tests: `src/domains/<domain>/__tests__/` — see **[testing-conventions.mdc](../rules/testing-conventions.mdc)**.
-- Fix Biome lint issues in touched files per **[code-smells-and-best-practices](../skills/code-smells-and-best-practices/SKILL.md)**; full `pnpm validate` is enforced by pre-commit and CI (do not duplicate on every small edit).
+- Domain tests: `src/domains/<domain>/__tests__/` — see **[be-testing-conventions.mdc](../rules/be-testing-conventions.mdc)**.
+- Fix Biome lint issues in touched files per **[be-code-smells-and-best-practices](../skills/be-code-smells-and-best-practices/SKILL.md)**; full `pnpm validate` is enforced by pre-commit and CI (do not duplicate on every small edit).
 - Run `pnpm test` (or targeted tests) before considering work complete.
 
 ### Final rule
@@ -183,5 +183,5 @@ Import from `@/shared/constants/project-identity.constants.js`:
 ### Related
 
 - Deployment: `docs/deployment/runbooks/add-new-environment.md`, `docs/deployment/ci-cd/cicd-and-deployment.md`
-- Skill: `agent-os/skills/env-schema-add/SKILL.md` (hosted envs + manifest)
-- Scoped sync rule: **project-identity-sync.mdc** when editing manifest, workflows, or codegen
+- Skill: `agent-os/skills/be-env-schema-add/SKILL.md` (hosted envs + manifest)
+- Scoped sync rule: **be-project-identity-sync.mdc** when editing manifest, workflows, or codegen

@@ -1,0 +1,9 @@
+---
+description: Drizzle schema design + conventions when *.schema.ts changes (single rule).
+globs: src/domains/**/*.schema.ts
+alwaysApply: false
+---
+
+# SQL design sync
+
+Created/changed a `*.schema.ts`? Run **[be-sql-design-guard](../skills/be-sql-design-guard/SKILL.md)** (indexes, partitioning, constraint names, column types, soft-delete) alongside **[be-schema-generator](../skills/be-schema-generator/SKILL.md)**, then **[be-db-migration-maintainer](../skills/be-db-migration-maintainer/SKILL.md)**.

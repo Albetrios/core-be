@@ -69,6 +69,6 @@ Fields: `type` is `request_error` or `validation_error` (always present); `code`
 
 ## Related
 
-- Header matrix and id conventions: `agent-os/skills/api-contract-guard/SKILL.md`
+- Header matrix and id conventions: `agent-os/skills/be-api-contract-guard/SKILL.md`
 - Versioning: [api-versioning.md](api-versioning.md)
 - Spec/Postman generation: [api-documentation.md](api-documentation.md)

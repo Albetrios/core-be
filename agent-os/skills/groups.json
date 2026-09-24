@@ -2,69 +2,69 @@
   "description": "Skill taxonomy — every project skill belongs to exactly one group. Single source for grouped rendering of the skill index and for group-level operations ('run all docs maintainers'). agent-os/evals/check.ts asserts this stays in sync with the skills on disk (every skill grouped exactly once; no unknown names).",
   "groups": {
     "api-routes": [
-      "api-contract-guard",
-      "route-schema-doc-guard",
-      "route-catalog",
-      "openapi-multilingual",
-      "openapi-route-sync",
-      "idempotency-guard",
-      "i18n-message-guard"
+      "be-api-contract-guard",
+      "be-route-schema-doc-guard",
+      "be-route-catalog",
+      "be-openapi-multilingual",
+      "be-openapi-route-sync",
+      "be-idempotency-guard",
+      "be-i18n-message-guard"
     ],
     "database": [
-      "schema-generator",
-      "sql-design-guard",
-      "db-migration-maintainer"
+      "be-schema-generator",
+      "be-sql-design-guard",
+      "be-db-migration-maintainer"
     ],
     "domain": [
-      "domain-generator",
-      "workers-events",
-      "supabase-porting"
+      "be-domain-generator",
+      "be-workers-events",
+      "be-supabase-porting"
     ],
     "testing": [
-      "test-generator",
-      "chaos-test-maintainer",
-      "contract-test-maintainer"
+      "be-test-generator",
+      "be-chaos-test-maintainer",
+      "be-contract-test-maintainer"
     ],
     "docs": [
-      "tsdoc-export-guard",
-      "docs-maintainer",
-      "docs-audit",
-      "overview-doc-maintainer",
-      "system-narrative-maintainer"
+      "be-tsdoc-export-guard",
+      "be-docs-maintainer",
+      "be-docs-audit",
+      "be-overview-doc-maintainer",
+      "be-system-narrative-maintainer"
     ],
     "quality": [
-      "code-quality-guard",
-      "code-smells-and-best-practices",
-      "lint-warnings-handler",
-      "before-commit-guard",
-      "change-completeness-guard",
+      "be-code-quality-guard",
+      "be-code-smells-and-best-practices",
+      "be-lint-warnings-handler",
+      "be-before-commit-guard",
+      "be-change-completeness-guard",
       "ponytail",
       "ponytail-audit"
     ],
     "security-hardening": [
-      "rls-tenant-isolation-guard",
-      "read-cache-guard",
-      "dependency-security",
-      "production-hardening-guard",
-      "path-to-production-gate"
+      "be-rls-tenant-isolation-guard",
+      "be-read-cache-guard",
+      "be-dependency-security",
+      "be-production-hardening-guard",
+      "be-path-to-production-gate"
     ],
     "infra-config": [
-      "env-schema-add",
-      "ide-productivity-guard"
+      "be-env-schema-add",
+      "be-ide-productivity-guard"
     ],
     "seed": [
-      "seed-maintainer"
+      "be-seed-maintainer"
     ],
     "workflow": [
-      "auto-implement",
-      "delegate-search",
-      "ci-investigator",
-      "pr-babysit",
-      "split-to-prs",
-      "skill-index",
-      "find-skills",
-      "cursor-global-skills",
-      "structure-maintainer"
+      "be-auto-implement",
+      "be-delegate-search",
+      "be-ci-investigation",
+      "be-pr-babysit",
+      "be-split-to-prs",
+      "be-skill-index",
+      "be-find-skills",
+      "be-cursor-global-skills",
+      "be-structure-maintainer"
     ]
   }
 }

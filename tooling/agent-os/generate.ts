@@ -278,7 +278,7 @@ if (codexTarget?.capabilities.mcpFormat === 'toml') {
   }
 }
 
-// ── Derived docs (skill-index table, agents-catalog, skill-triggers) ──
+// ── Derived docs (be-skill-index table, agents-catalog, skill-triggers) ──
 // Regenerated from manifests + skill/agent frontmatter between GENERATED markers;
 // hand-written prose outside the markers survives verbatim.
 for (const message of generateDocs(writeMode)) report(message);

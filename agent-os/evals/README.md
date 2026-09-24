@@ -2,7 +2,7 @@
 
 Treats the `agent-os/` bundle (skills, rules, agents, docs, hooks) as **tested code**, not just documentation. The bundle is a large, cross-referenced surface that drifts silently — stale counts, dead path references, index/disk divergence, non-portable hook commands. These evals turn that drift into a failing gate instead of a months-later human audit.
 
-> **Why this exists:** a June 2026 audit found 7 of 37 skills had silently drifted (wrong counts, a dead `.github/sync.config.json` reference, a hook hardcoded to one developer's home path, `schema-generator` missing from the trigger map) with zero detection. This harness is the closed loop: **author → enforce → measure** instead of author → hope.
+> **Why this exists:** a June 2026 audit found 7 of 37 skills had silently drifted (wrong counts, a dead `.github/sync.config.json` reference, a hook hardcoded to one developer's home path, `be-schema-generator` missing from the trigger map) with zero detection. This harness is the closed loop: **author → enforce → measure** instead of author → hope.
 
 ## Four tiers
 
@@ -66,7 +66,7 @@ Each case maps a changed file to the skills the routing map must surface:
 
 ```json
 { "file": "src/domains/x/y/y.schema.ts",
-  "expectSkills": ["sql-design-guard", "db-migration-maintainer", "schema-generator"] }
+  "expectSkills": ["be-sql-design-guard", "be-db-migration-maintainer", "be-schema-generator"] }
 ```
 
 `trigger-eval.ts` converts the globs in `skill-triggers.md` to matchers, resolves each file, and reports expected skills the map fails to surface. Add a case whenever you wire a new file-pattern → skill route.
@@ -76,7 +76,7 @@ Each case maps a changed file to the skills the routing map must surface:
 Tier 2 proves the *map* is right; Tier 3 proves the routing **actually worked in practice**. It reads a session transcript (Claude Code JSONL, or any JSONL with `tool_use` blocks), extracts the **files edited** (Edit/Write/MultiEdit) and the **skills consulted/invoked** (a `Skill` tool call, or a `Read` of `agent-os/skills/<name>/SKILL.md`), computes the skills that *should* have run from `chains.json` steps + per-skill `trigger` frontmatter (the same sources the routing map is generated from), and emits a **scorecard**: expected vs actual, per file, with a hit rate.
 
 - **Target hit rate for real sessions: ≥ 90%.** `agent-os:outcomes:live <transcript>` prints the scorecard and warns below target — run it on a real session to spot-check routing.
-- **Fixtures gate CI deterministically.** Each `cases/outcomes/<name>.jsonl` is a recorded (sanitized) session; its `<name>.expected.json` declares the `hitRate` and precise `misses`. `agent-os:outcomes` asserts every fixture's computed scorecard matches its declaration — so a regression in routing behaviour (or in the scorer) fails CI. One fixture (`route-change-skipped-seed`) deliberately omits `seed-maintainer`: it scores 83% and names `seed-maintainer` as the miss, proving the scorer catches a skipped skill precisely.
+- **Fixtures gate CI deterministically.** Each `cases/outcomes/<name>.jsonl` is a recorded (sanitized) session; its `<name>.expected.json` declares the `hitRate` and precise `misses`. `agent-os:outcomes` asserts every fixture's computed scorecard matches its declaration — so a regression in routing behaviour (or in the scorer) fails CI. One fixture (`route-change-skipped-seed`) deliberately omits `be-seed-maintainer`: it scores 83% and names `be-seed-maintainer` as the miss, proving the scorer catches a skipped skill precisely.
 - **Add a fixture** whenever you want to lock in a routing outcome: drop the transcript JSONL + an `.expected.json` next to it.
 - **Coverage policy (gated by Tier 1):** every chain in `chains.json` must have at least one outcome fixture named `<chain>-*.jsonl`. Adding a chain without a fixture fails `agent-os:check`.
 

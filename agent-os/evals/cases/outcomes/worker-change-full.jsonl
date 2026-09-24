@@ -1,8 +1,8 @@
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/skill-index/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-skill-index/SKILL.md"}}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"src/domains/notify/sub-domains/webhook/workers/webhook-delivery.worker.ts","content":"..."}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"workers-events"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/rls-tenant-isolation-guard/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/test-generator/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/tsdoc-export-guard/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/change-completeness-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"be-workers-events"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-rls-tenant-isolation-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-test-generator/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-tsdoc-export-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-change-completeness-guard/SKILL.md"}}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"pnpm test:unit"}}]}}

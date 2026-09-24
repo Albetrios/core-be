@@ -12,7 +12,7 @@ invoke the wrapping skill inline in the main conversation.
 | **Claude Code** | `"Read agent-os/agents/<agent-name>.md and follow the procedure"` |
 | **Codex** | Listed in `AGENTS.md` custom subagents table — invoke by name in your prompt |
 
-Replace `<agent-name>` with the agent's `name:` frontmatter value (e.g. `dependency-auditor`).
+Replace `<agent-name>` with the agent's `name:` frontmatter value (e.g. `be-dependency-auditor`).
 
 ## All agents
 

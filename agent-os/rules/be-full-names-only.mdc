@@ -1,0 +1,24 @@
+---
+description: Use full names only for all identifiers — no abbreviations in functions, methods, variables, classes, interfaces, enums, types, parameters, or file names.
+globs: src/**/*.ts
+alwaysApply: false
+---
+
+# Full names only — no abbreviations
+
+**Always use full, unabbreviated names** for every identifier you introduce or rename. This applies to:
+
+- **Functions** and **methods**: e.g. `getOrganizationById` not `getOrgById`, `findByPublicId` not `findByPid`
+- **Prose too** (comments, test titles, docs, log messages): write `organization` (and `organizations`, `organizationB`, …), never the short form. The ONLY sanctioned short-form survivors are intentional compact WIRE/DATA literals: the `org_` public-id prefix (3-letter id prefix by design), the JWT claim keys `org` / `sv` (compact claims are the JWT convention — `iss`/`sub`/`aud`; body-size on every request), third-party payloads passed through verbatim, and the agent-os item prefixes `be-` / `fe-` (repo namespaces that keep core-be's and core-fe's skills, agents, commands and rules unique when both are loaded in one session). Prose may NAME those literals in backticks (`` `org` claim ``); it may not use the short form as an ordinary word.
+- **Variables** and **parameters**: e.g. `organization` not `org`, `repository` not `repo`, `identifier` not `id` when it stands for “identifier”, `request` not `req` (see exception below)
+- **Classes**, **interfaces**, **enums**, **types**: e.g. `OrganizationRepository` not `OrgRepo`, `UserSettings` not `UserSettings` (already full)
+- **File and folder names**: e.g. `organization.repository.ts` not `org.repo.ts`; directory `organization-settings` not `org-settings`
+- **Constants** and **properties**: e.g. `organizationId` not `organizationId` in new code when the concept is “organization”
+
+**Exception (framework convention):** In Fastify route handlers, `request` and `reply` are commonly shortened to `req` and `reply` in the function signature; that convention may be kept. Do not extend abbreviations elsewhere (e.g. use `request` in JSDoc or in your own helper parameters unless the helper is clearly Fastify-specific).
+
+**Why:** Full names improve readability, reduce ambiguity, and match the project standard in `CLAUDE.md` (Naming Conventions → Full Names Only). When in doubt, spell it out.
+
+**Examples to avoid:** `org`, `repo`, `db`, `id` (as a standalone name for “identifier”), `config` (prefer `configuration` or keep if it’s the established export name), `auth` (prefer `authentication` or `authorization` as appropriate), `sub` (use `subscription`), `ctx` (use `context`), `fn` (use `callback` or `handler`), `err` (use `error`), `e` (use `error`), `i`/`j` only in short numeric loops.
+
+**Reference:** `CLAUDE.md` → Naming Conventions → Full Names Only — No Short Names.

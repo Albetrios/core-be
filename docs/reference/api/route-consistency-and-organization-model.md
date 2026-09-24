@@ -131,5 +131,5 @@ The old `/auth/mfa*` (non-login) paths now return **404** — there are no depre
 
 - Method→status policy and the `409 vs 422` rule: [response-codes.md](response-codes.md)
 - Domain layout, the organization-type model, and the active-organization model: [domains-and-public-api-design.md](../architecture/domains-and-public-api-design.md)
-- Route catalog generator: `agent-os/skills/route-catalog/SKILL.md`
-- Header matrix and id conventions: `agent-os/skills/api-contract-guard/SKILL.md`
+- Route catalog generator: `agent-os/skills/be-route-catalog/SKILL.md`
+- Header matrix and id conventions: `agent-os/skills/be-api-contract-guard/SKILL.md`

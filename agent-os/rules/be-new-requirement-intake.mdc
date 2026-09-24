@@ -1,0 +1,19 @@
+---
+description: When starting a new requirement, use the intake format and invoke the right skills. Reference this rule and docs/getting-started/requirement-intake.md so the AI performs best.
+globs: docs/getting-started/requirement-intake.md
+alwaysApply: false
+---
+
+# New Requirement Intake
+
+When the user describes a **new requirement** or you are directed to **docs/getting-started/requirement-intake.md**:
+
+1. **Read** `docs/getting-started/requirement-intake.md` and identify the requirement type (new domain, new routes, new worker, schema, seed, migration, CI, infra, rename, or other).
+2. **Consult** `agent-os/skills/be-skill-index/SKILL.md` first.
+3. **Apply default assumptions** from the intake doc for any field the user did not specify; list assumed defaults in the Plan.
+4. **Build a Plan and confirm once** — post requirement type, provided vs assumed fields, skills in order, files to touch, and verification commands. Wait for **go**, **tweak …**, or **stop**. After **go**, do not ask further questions unless a destructive case in the intake doc applies (data loss, breaking API without acknowledgment, ambiguous cross-domain ownership). This plan gate is the **single** confirmation checkpoint under `agent-os/rules/be-agent-behavior.mdc` — everything downstream of **go** is completed without asking.
+5. **Run the skills** listed for that requirement type **in the order given** in the intake doc.
+6. **Apply the rules** whose globs match the files you change (see intake doc "Rules that will apply" and skill index "Auto-trigger rules").
+7. **Finish** with zero new lint issues in touched files (**be-code-smells-and-best-practices**); rely on pre-commit/CI for full `pnpm validate` unless the hook failed.
+
+This ensures every new requirement is handled consistently and all relevant skills and rules are invoked.

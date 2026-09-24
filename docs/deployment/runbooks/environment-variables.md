@@ -23,7 +23,7 @@ invariant. This runbook covers the **per-key lifecycle**.
 | Verify schema ↔ template parity      | `pnpm tool:sync-env-example`                  |
 | Verify branch/env/NODE_ENV invariant | `pnpm github:sync --check`                    |
 | Verify required keys exist in GitHub | deploy workflow step `pnpm validate:github-env-runtime` (after the environment export) |
-| Add a new env var (skill)            | read `.cursor/skills/env-schema-add/SKILL.md` |
+| Add a new env var (skill)            | read `.cursor/skills/be-env-schema-add/SKILL.md` |
 | **Which dev/load-test values are unsafe in prod** | [§11 Production safety](#11-production-safety-unsafe-dev-and-load-test-values) |
 
 ## 1. The mental model
@@ -145,7 +145,7 @@ existing files manually so real values are not discarded.
 
 ## 4. Adding a new env var
 
-Use the **env-schema-add** skill — it walks through the decision tree and
+Use the **be-env-schema-add** skill — it walks through the decision tree and
 checklist. Summary:
 
 ```mermaid
@@ -398,7 +398,7 @@ This section is specifically the **dev / load-test → production delta**.
 - **`.env.example` add helper:** `tooling/setup/envs/env-add.ts` (`pnpm env:add`)
 - **Validator: schema ↔ template:** `src/scripts/validators/env/sync-env-example.ts` (`pnpm tool:sync-env-example`)
 - **Consistency (in github:sync):** `tooling/setup/github/sync-config.ts` (`validateGithubSyncConsistency`; run via `pnpm github:sync --check`)
-- **Skill (use this when editing the schema):** `.cursor/skills/env-schema-add/SKILL.md`
+- **Skill (use this when editing the schema):** `.cursor/skills/be-env-schema-add/SKILL.md`
 - **Where to obtain credentials:** [credentials-and-env.md](../../integrations/credentials-and-env.md)
 - **Hosted-environment plumbing:** [add-new-environment.md](./add-new-environment.md)
 - **GitHub Environments index:** [.github/environments/README.md](../../../.github/environments/README.md)

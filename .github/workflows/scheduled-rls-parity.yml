@@ -192,7 +192,7 @@ jobs:
             "maintenance-database-role runbook): run the DB suites normally — the local" \
             "harness uses the same operator/maintenance roles." \
             "Check first: NEW-row SELECT visibility, RETURNING visibility, missing" \
-            "WITH CHECK bypass arms, MATERIALIZED locking CTEs (the rls-tenant-isolation-guard" \
+            "WITH CHECK bypass arms, MATERIALIZED locking CTEs (the be-rls-tenant-isolation-guard" \
             "skill checklist).")"
           existing="$(gh issue list --repo "$GH_REPOSITORY" --state open --label ci-failure \
             --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')"

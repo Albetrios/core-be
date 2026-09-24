@@ -40,7 +40,7 @@ Scaffold into `.mcp.json` with `pnpm mcp:setup <name>` (see
 
 | Server | When to add | Prerequisite |
 | ------ | ----------- | ------------ |
-| **dashboards** | Stack monitoring (`stack-monitor` subagent), load-test observability | `pnpm mcp:setup dashboards` then `pnpm dashboards:up` or `pnpm dashboards:proxy` |
+| **dashboards** | Stack monitoring (`be-stack-monitor` subagent), load-test observability | `pnpm mcp:setup dashboards` then `pnpm dashboards:up` or `pnpm dashboards:proxy` |
 | **core-be:api** | Call live API tools from the agent | API running with `ENABLE_MCP_SERVER=true` — `pnpm mcp:setup core-be:api` |
 | **context7** | Up-to-date Fastify/Drizzle/BullMQ docs (if not platform-provided) | `CONTEXT7_API_KEY` — `pnpm mcp:setup context7` |
 | **serena** | Semantic code navigation on a large repo — go-to-def / find-refs / symbol bodies; returns **symbols, not files** (token-efficient) | `uvx` — `pnpm mcp:setup serena` |
@@ -51,7 +51,7 @@ Full template: [`.mcp.example.json`](../../.mcp.example.json). List status: `pnp
 
 **Serena onboarding (first use).** `serena` is LSP-backed semantic code retrieval — prefer it (and
 `codegraph`) over whole-file reads to keep context small (see
-[`agent-os/rules/token-efficient-navigation.mdc`](../../agent-os/rules/token-efficient-navigation.mdc)).
+[`agent-os/rules/be-token-efficient-navigation.mdc`](../../agent-os/rules/be-token-efficient-navigation.mdc)).
 After `pnpm mcp:setup serena`, on first use call the server's **`activate_project`** on this repo so it
 indexes the codebase; then use `find_symbol` / `find_referencing_symbols` / `get_symbols_overview`
 instead of reading files to answer "where / who / what". It complements `codegraph` (graph queries) and
@@ -64,21 +64,21 @@ instead of reading files to answer "where / who / what". It complements `codegra
 ## Project skills (43)
 
 All project skills live under [`agent-os/skills/`](../../agent-os/skills/). **Consult
-[`skill-index`](../../agent-os/skills/skill-index/SKILL.md) first** — it maps file patterns
+[`be-skill-index`](../../agent-os/skills/be-skill-index/SKILL.md) first** — it maps file patterns
 to which skill(s) to run (no duplicate invocations).
 
 | Category | Skills | When in cloud |
 | -------- | ------ | ------------- |
-| **Meta / routing** | `skill-index`, `change-completeness-guard`, `auto-implement`, `delegate-search` | Every code change; `auto-implement` drives a whole requirement, `delegate-search` keeps context small |
-| **Routes & API** | `api-contract-guard`, `route-schema-doc-guard`, `route-catalog`, `openapi-multilingual` | `*.routes.ts`, controllers, serializers |
-| **Domains & schema** | `domain-generator`, `schema-generator`, `sql-design-guard`, `db-migration-maintainer` | New domains, `migrations/*.sql`, Drizzle schema |
-| **Workers & events** | `workers-events` | Queues, workers, event handlers |
-| **Seeds & tests** | `seed-maintainer`, `test-generator`, `contract-test-maintainer`, `chaos-test-maintainer` | `seed/`, `__tests__/` |
-| **Docs & narrative** | `docs-maintainer`, `overview-doc-maintainer`, `system-narrative-maintainer`, `tsdoc-export-guard` | `docs/**/*.md`, `src/**/*.overview.md`, public exports |
-| **Quality & CI** | `code-quality-guard`, `before-commit-guard`, `dependency-security`, `ci-investigator`, `pr-babysit` | Pre-commit, `package.json`, CI failures |
-| **Infra & setup** | `env-schema-add`, `production-hardening-guard`, `path-to-production-gate` | `tooling/setup/**`, env schema, deploy readiness |
-| **Security & tenancy** | `rls-tenant-isolation-guard`, `idempotency-guard` | RLS, tenant middleware, idempotency |
-| **Cursor built-ins (reference)** | `cursor-global-skills` | Editing `agent-os/skills`, rules, agents, hooks |
+| **Meta / routing** | `be-skill-index`, `be-change-completeness-guard`, `be-auto-implement`, `be-delegate-search` | Every code change; `be-auto-implement` drives a whole requirement, `be-delegate-search` keeps context small |
+| **Routes & API** | `be-api-contract-guard`, `be-route-schema-doc-guard`, `be-route-catalog`, `be-openapi-multilingual` | `*.routes.ts`, controllers, serializers |
+| **Domains & schema** | `be-domain-generator`, `be-schema-generator`, `be-sql-design-guard`, `be-db-migration-maintainer` | New domains, `migrations/*.sql`, Drizzle schema |
+| **Workers & events** | `be-workers-events` | Queues, workers, event handlers |
+| **Seeds & tests** | `be-seed-maintainer`, `be-test-generator`, `be-contract-test-maintainer`, `be-chaos-test-maintainer` | `seed/`, `__tests__/` |
+| **Docs & narrative** | `be-docs-maintainer`, `be-overview-doc-maintainer`, `be-system-narrative-maintainer`, `be-tsdoc-export-guard` | `docs/**/*.md`, `src/**/*.overview.md`, public exports |
+| **Quality & CI** | `be-code-quality-guard`, `be-before-commit-guard`, `be-dependency-security`, `be-ci-investigation`, `be-pr-babysit` | Pre-commit, `package.json`, CI failures |
+| **Infra & setup** | `be-env-schema-add`, `be-production-hardening-guard`, `be-path-to-production-gate` | `tooling/setup/**`, env schema, deploy readiness |
+| **Security & tenancy** | `be-rls-tenant-isolation-guard`, `be-idempotency-guard` | RLS, tenant middleware, idempotency |
+| **Cursor built-ins (reference)** | `be-cursor-global-skills` | Editing `agent-os/skills`, rules, agents, hooks |
 
 Trigger map (file pattern → skill): [`agent-os/docs/skill-triggers.md`](../../agent-os/docs/skill-triggers.md).
 
@@ -95,15 +95,15 @@ Read-only agents in [`agent-os/agents/`](../../agent-os/agents/). Catalog:
 
 | Subagent | Typical cloud use |
 | -------- | ----------------- |
-| **stack-monitor** | Health verdict after `pnpm dashboards:up` — needs **dashboards** MCP or proxy on `:3010` |
-| **verifier** | Confirm implementation passes `pnpm validate` / tests |
-| **ci-investigator** | Diagnose failing GitHub Actions on a PR |
-| **dependency-auditor** | `pnpm audit` report and fix plan |
-| **production-reviewer** / **production-hardening-reviewer** | Pre-deploy readiness |
-| **sql-design-reviewer** | Drizzle schema / migration design |
-| **tsdoc-coverage-reviewer** | `pnpm tsdoc:check` gaps |
-| **docs-auditor** | `docs/` index and cross-links |
-| **changelog-reviewer** | `CHANGELOG-dev.md` vs branch changes |
+| **be-stack-monitor** | Health verdict after `pnpm dashboards:up` — needs **dashboards** MCP or proxy on `:3010` |
+| **be-verifier** | Confirm implementation passes `pnpm validate` / tests |
+| **be-ci-investigator** | Diagnose failing GitHub Actions on a PR |
+| **be-dependency-auditor** | `pnpm audit` report and fix plan |
+| **be-production-reviewer** / **be-production-hardening-reviewer** | Pre-deploy readiness |
+| **be-sql-design-reviewer** | Drizzle schema / migration design |
+| **be-tsdoc-coverage-reviewer** | `pnpm tsdoc:check` gaps |
+| **be-docs-auditor** | `docs/` index and cross-links |
+| **be-changelog-reviewer** | `CHANGELOG-dev.md` vs branch changes |
 | **security-review** / **bugbot** | Review local diffs on request |
 
 Invocation: [`agent-os/docs/platform-access.md`](../../agent-os/docs/platform-access.md).
@@ -114,9 +114,9 @@ Invocation: [`agent-os/docs/platform-access.md`](../../agent-os/docs/platform-ac
 
 | Layer | Location | Cloud behavior |
 | ----- | -------- | -------------- |
-| **Always-applied rules** | `agent-os/rules/engineering-principles.mdc`, `project-identity.mdc`, `change-completeness.mdc` | Cursor auto-attach |
-| **Architecture / API** | `CLAUDE.md`, `agent-os/skills/api-contract-guard/SKILL.md` | Read before `src/` changes |
-| **Import paths** | `agent-os/rules/import-paths.mdc` | `@/` in `src/`, `@tooling/` in tooling |
+| **Always-applied rules** | `agent-os/rules/be-engineering-principles.mdc`, `be-project-identity.mdc`, `be-change-completeness.mdc` | Cursor auto-attach |
+| **Architecture / API** | `CLAUDE.md`, `agent-os/skills/be-api-contract-guard/SKILL.md` | Read before `src/` changes |
+| **Import paths** | `agent-os/rules/be-import-paths.mdc` | `@/` in `src/`, `@tooling/` in tooling |
 | **Shell guardrails** | `.cursor/hooks.json` | Blocks destructive shell in Cursor cloud |
 | **Pre-commit parity** | `pnpm guard:pre-commit` / `pnpm ci:local` | Same gates as local before PR |
 
@@ -131,7 +131,7 @@ bash agent-os/cloud-environment/install.sh
 # On-demand stack (Postgres, Redis, migrate, seed, healthcheck)
 bash tooling/setup/agent/bootstrap.sh
 
-# Optional MCP: stack dashboards (stack-monitor)
+# Optional MCP: stack dashboards (be-stack-monitor)
 pnpm mcp:setup dashboards && pnpm dashboards:up
 
 # List all MCP template servers + .mcp.json status

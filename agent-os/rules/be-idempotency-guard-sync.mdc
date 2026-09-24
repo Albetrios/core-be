@@ -1,0 +1,16 @@
+---
+description: When changing a mutating money/state route, the idempotency middleware or utils, the Stripe client, or the subscription controller/service, keep request idempotency and Stripe key-forwarding correct.
+globs: src/shared/middlewares/core/idempotency.middleware.ts, src/shared/middlewares/core/request-lifecycle.middleware.ts, src/shared/utils/idempotency/**, src/infrastructure/payment/stripe.client.ts, src/domains/billing/sub-domains/subscription/**, src/domains/tenancy/sub-domains/organization/organization.routes.ts, src/domains/tenancy/sub-domains/membership/membership.routes.ts
+alwaysApply: false
+---
+
+## Idempotency guard
+
+When you change any matched file, read `agent-os/skills/be-idempotency-guard/SKILL.md` and verify:
+
+- A **new externally-mutating write** (creates/charges/transfers state) sets `config: { idempotencyRequired: true }` — **merged into the existing `config` object**, not clobbered by spreading a rate-limit preset at the top level. Update the "13 routes" count in `docs/reference/api/frontend-auth-guide.md`.
+- Stripe mutation helpers in `stripe.client.ts` accept and forward `options.idempotencyKey` as Stripe's native `RequestOptions.idempotencyKey`; the controller reads the request `X-Idempotency-Key` header (`readIdempotencyKey`) and threads it controller → service → client. Add a contract test asserting `matchHeader('idempotency-key', …)`.
+- The completed Redis entry is written **post-commit** (dispatched from `request-lifecycle.middleware.ts`), never in `onSend`; rollback `DEL`s the placeholder.
+- Secret-bearing bodies stay excluded (`responseBodyContainsSecretFields`); new token-issuance routes go in `IDEMPOTENCY_EXCLUDED_ROUTE_PATTERNS`; new single-use secret fields in the secret-field name lists.
+
+Verify: `pnpm test:contract` (Stripe key forwarding) + `pnpm test:unit` (idempotency utils) + `pnpm routes:catalog && pnpm docs:check`.

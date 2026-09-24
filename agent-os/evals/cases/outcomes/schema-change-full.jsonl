@@ -1,9 +1,9 @@
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/skill-index/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-skill-index/SKILL.md"}}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"src/domains/billing/sub-domains/plan/plan.schema.ts","content":"..."}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"schema-generator"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/sql-design-guard/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/db-migration-maintainer/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/rls-tenant-isolation-guard/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/tsdoc-export-guard/SKILL.md"}}]}}
-{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/change-completeness-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"be-schema-generator"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-sql-design-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-db-migration-maintainer/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-rls-tenant-isolation-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-tsdoc-export-guard/SKILL.md"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"agent-os/skills/be-change-completeness-guard/SKILL.md"}}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"pnpm db:migrate:lint"}}]}}

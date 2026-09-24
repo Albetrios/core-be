@@ -1,7 +1,7 @@
 # Code-review instructions for core-be
 
 Highest-priority instructions for any agent reviewing a diff or PR in this repo
-(`/code-review`, `/pre-merge-review`, `/review`, and review subagents). These
+(`/code-review`, `/be-pre-merge-review`, `/review`, and review subagents). These
 tune *review judgment*; the mechanical rules themselves live in `CLAUDE.md` and
 are enforced by gates — do not re-litigate what a gate already proves.
 

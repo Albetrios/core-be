@@ -1,47 +1,47 @@
 {
-  "description": "Declarative skill chains — ordered, named pipelines that capture the skill-index 'multi-skill scenarios' as runnable sequences. Single source for: workflow commands (e.g. /route-complete), the routing reminder hooks, and the eventual `agent-os:plan-skills` planner. agent-os/evals/check.ts asserts every step references a real skill and that the entry step matches a skill-triggers.md trigger. Steps run in order; each step is an existing skill invoked by name.",
+  "description": "Declarative skill chains — ordered, named pipelines that capture the be-skill-index 'multi-skill scenarios' as runnable sequences. Single source for: workflow commands (e.g. /be-route-complete), the routing reminder hooks, and the eventual `agent-os:plan-skills` planner. agent-os/evals/check.ts asserts every step references a real skill and that the entry step matches a skill-triggers.md trigger. Steps run in order; each step is an existing skill invoked by name.",
   "chains": {
     "route-change": {
       "description": "Adding or changing an API route end-to-end.",
       "trigger": "src/domains/**/*.routes.ts",
       "steps": [
-        "api-contract-guard",
-        "route-schema-doc-guard",
-        "route-catalog",
-        "seed-maintainer"
+        "be-api-contract-guard",
+        "be-route-schema-doc-guard",
+        "be-route-catalog",
+        "be-seed-maintainer"
       ],
-      "optional": ["openapi-multilingual"]
+      "optional": ["be-openapi-multilingual"]
     },
     "schema-change": {
       "description": "Adding or changing a Drizzle schema / table end-to-end.",
       "trigger": "src/domains/**/*.schema.ts",
       "steps": [
-        "schema-generator",
-        "sql-design-guard",
-        "db-migration-maintainer",
-        "rls-tenant-isolation-guard"
+        "be-schema-generator",
+        "be-sql-design-guard",
+        "be-db-migration-maintainer",
+        "be-rls-tenant-isolation-guard"
       ]
     },
     "worker-change": {
       "description": "Adding or changing events, queues, or workers.",
       "trigger": "src/domains/**/{events,queues,workers}/**",
-      "steps": ["workers-events", "test-generator", "tsdoc-export-guard"]
+      "steps": ["be-workers-events", "be-test-generator", "be-tsdoc-export-guard"]
     },
     "new-domain": {
       "description": "Scaffolding a whole new domain or sub-domain (the full DAG).",
       "trigger": "src/domains/**/*.container.ts",
       "steps": [
-        "domain-generator",
-        "schema-generator",
-        "db-migration-maintainer",
-        "workers-events",
-        "route-schema-doc-guard",
-        "route-catalog",
-        "seed-maintainer",
-        "test-generator",
-        "tsdoc-export-guard",
-        "overview-doc-maintainer",
-        "system-narrative-maintainer"
+        "be-domain-generator",
+        "be-schema-generator",
+        "be-db-migration-maintainer",
+        "be-workers-events",
+        "be-route-schema-doc-guard",
+        "be-route-catalog",
+        "be-seed-maintainer",
+        "be-test-generator",
+        "be-tsdoc-export-guard",
+        "be-overview-doc-maintainer",
+        "be-system-narrative-maintainer"
       ]
     }
   }

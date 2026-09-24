@@ -117,7 +117,7 @@ top-level half it sits in inside `.env.<environment>`:
 - Anything under `# ### GitHub Variables ### #` → `gh api .../variables`.
 
 The file structure is the source of truth — no separate classifier file, no override lists.
-The `env-schema-add` skill walks through which half + sub-section to pick when adding a new
+The `be-env-schema-add` skill walks through which half + sub-section to pick when adding a new
 env var.
 
 ### 5. Wire CI (usually automatic)
